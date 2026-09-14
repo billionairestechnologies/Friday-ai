@@ -1,5 +1,14 @@
 import { Router } from "express";
+import * as controller from "../controllers/chatController.js";
+import { requireAuth } from "../middleware/auth.js";
+import { asyncHandler } from "../middleware/errorHandler.js";
 
 export const chatRouter = Router();
 
-// Implemented in feature/chat
+chatRouter.use(requireAuth);
+
+chatRouter.post("/conversations", asyncHandler(controller.createConversation));
+chatRouter.get("/conversations", asyncHandler(controller.listConversations));
+chatRouter.delete("/conversations/:id", asyncHandler(controller.deleteConversation));
+chatRouter.get("/conversations/:id/messages", asyncHandler(controller.listMessages));
+chatRouter.post("/conversations/:id/messages", asyncHandler(controller.sendMessage));
