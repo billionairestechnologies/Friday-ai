@@ -22,6 +22,13 @@ This repo is built branch-by-branch, one feature per branch, merged into `main` 
 - `feature/voice` — speech-to-text endpoint for the mic button
 - `feature/frontend-scaffold` — React app: Auth page, Chat page, Admin Panel
 
+All branches above are merged into `main`; each still exists in git history/branches for reference and future work continues the same way — one branch per feature, merged once it works.
+
 ## Getting started
 
-See `backend/README.md` and `frontend/README.md` for setup once those branches land.
+1. Create a Supabase project, then run `supabase/migrations/0001_init.sql` in its SQL editor (see `supabase/README.md`, including how to promote your account to admin).
+2. `cd backend && npm install && cp .env.example .env` — fill in `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, then `npm run dev` (http://localhost:4000).
+3. `cd frontend && npm install && npm run dev` (http://localhost:5173, proxies `/api` to the backend).
+4. Sign up on `/auth`, promote yourself to admin in Supabase, open `/admin`, and add API keys for whichever of OpenAI / Anthropic / Gemini / OpenRouter / Sarvam AI / ElevenLabs / Ollama you want live — models are auto-discovered and health-checked as soon as a key is added. Toggle which models are enabled, and they immediately appear in the model selector on `/auth` and `/chat`.
+
+See `backend/README.md` and `frontend/README.md` for more detail on each side.
