@@ -18,12 +18,15 @@ export interface ModelOption {
   providers: { slug: string; display_name: string };
 }
 
+export type ConversationMode = "single" | "auto" | "teamup";
+
 export interface Conversation {
   id: string;
   title: string;
-  model_id: string;
-  provider_id: string;
-  providers: { slug: string; display_name: string };
+  model_id: string | null;
+  provider_id: string | null;
+  mode: ConversationMode;
+  providers: { slug: string; display_name: string } | null;
   updated_at: string;
 }
 
@@ -32,6 +35,7 @@ export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   input_mode: "text" | "voice";
+  model_label?: string | null;
   created_at: string;
 }
 

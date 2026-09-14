@@ -4,6 +4,7 @@ import { ModelSelector } from "../components/ModelSelector";
 import { PromptInputBox } from "../components/ui/ai-prompt-box";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
+import { isSpecialMode } from "../lib/modelSelection";
 import type { Conversation, Message, ModelOption } from "../lib/types";
 
 const PREFERRED_MODEL_KEY = "friday-ai-preferred-model";
@@ -36,13 +37,16 @@ export function ChatPage() {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function startNewChat(model: ModelOption | null) {
-    if (!model) return;
-    const res = await api.post<{ conversation: Conversation }>("/chat/conversations", {
-      providerSlug: model.providers.slug,
-      modelId: model.model_id,
-      title: `${model.display_name} chat`,
-    });
+  async function startNewChat(value: string, model: ModelOption | null) {
+    const specialMode = isSpecialMode(value);
+    const body = specialMode
+      ? { mode: specialMode, title: specialMode === "auto" ? "Auto chat" : "Team Up chat" }
+      : model
+        ? { mode: "single" as const, providerSlug: model.providers.slug, modelId: model.model_id, title: `${model.display_name} chat` }
+        : null;
+    if (!body) return;
+
+    const res = await api.post<{ conversation: Conversation }>("/chat/conversations", body);
     setConversations((prev) => [res.conversation, ...prev]);
     setActiveId(res.conversation.id);
   }
@@ -57,11 +61,11 @@ export function ChatPage() {
       { id: `pending-${Date.now()}`, role: "user", content, input_mode: inputMode, created_at: new Date().toISOString() },
     ]);
     try {
-      const res = await api.post<{ message: Message }>(`/chat/conversations/${activeId}/messages`, {
+      const res = await api.post<{ messages: Message[] }>(`/chat/conversations/${activeId}/messages`, {
         content,
         inputMode,
       });
-      setMessages((prev) => [...prev, res.message]);
+      setMessages((prev) => [...prev, ...res.messages]);
       refreshConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -92,7 +96,7 @@ export function ChatPage() {
             onChange={(v, model) => {
               setSelectedModel(v);
               localStorage.setItem(PREFERRED_MODEL_KEY, v);
-              startNewChat(model);
+              startNewChat(v, model);
             }}
           />
         </div>
@@ -102,7 +106,9 @@ export function ChatPage() {
             <div key={c.id} className={`conversation-item ${c.id === activeId ? "active" : ""}`}>
               <button className="conversation-select" onClick={() => setActiveId(c.id)}>
                 <span className="conversation-title">{c.title}</span>
-                <span className="conversation-meta">{c.providers.display_name}</span>
+                <span className="conversation-meta">
+                  {c.mode === "auto" ? "🔀 Auto" : c.mode === "teamup" ? "👥 Team Up" : c.providers?.display_name}
+                </span>
               </button>
               <button className="conversation-delete" title="Delete" onClick={() => deleteConversation(c.id)}>
                 ✕
@@ -121,7 +127,10 @@ export function ChatPage() {
             <div className="message-list">
               {messages.map((m) => (
                 <div key={m.id} className={`message message--${m.role}`}>
-                  <div className="message-bubble">{m.content}</div>
+                  <div className="message-bubble">
+                    {m.model_label && <div className="message-model-label">{m.model_label}</div>}
+                    {m.content}
+                  </div>
                 </div>
               ))}
               <div ref={listEndRef} />

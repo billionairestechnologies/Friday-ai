@@ -167,6 +167,41 @@ export async function listModelsForUsers() {
   return data;
 }
 
+export interface ChatCandidate {
+  slug: string;
+  providerDisplayName: string;
+  modelId: string;
+  displayName: string;
+}
+
+/**
+ * Enabled, chat-capable models whose provider currently has a working key —
+ * the pool that Auto and Team Up modes pick from.
+ */
+export async function listChatCandidates(): Promise<ChatCandidate[]> {
+  const { data: models, error } = await supabaseAdmin
+    .from("provider_models")
+    .select("model_id, display_name, capabilities, provider_id, providers(slug, display_name)")
+    .eq("is_enabled_for_users", true);
+  if (error) throw new HttpError(500, error.message);
+
+  const { data: keys } = await supabaseAdmin
+    .from("provider_api_keys")
+    .select("provider_id, is_active, is_working");
+
+  const workingProviderIds = new Set(
+    (keys ?? []).filter((k) => k.is_active && k.is_working).map((k) => k.provider_id),
+  );
+
+  return (models ?? [])
+    .filter((m) => workingProviderIds.has(m.provider_id))
+    .filter((m) => (m.capabilities as Record<string, boolean> | null)?.chat === true)
+    .map((m) => {
+      const provider = (m as unknown as { providers: { slug: string; display_name: string } }).providers;
+      return { slug: provider.slug, providerDisplayName: provider.display_name, modelId: m.model_id, displayName: m.display_name };
+    });
+}
+
 /** Returns a decrypted, working API key for the given provider — used by the chat/voice services. */
 export async function getWorkingKeyForProvider(slug: string): Promise<string> {
   const provider = await getProviderBySlug(slug);

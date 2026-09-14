@@ -23,11 +23,17 @@ export const sarvamAdapter: ProviderAdapter = {
     const res = await fetch(`${BASE_URL}/v1/chat/completions`, {
       method: "POST",
       headers: { "api-subscription-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages }),
+      // sarvam-105b is a reasoning model that spends its token budget on a hidden
+      // "reasoning_content" trace before writing the final answer, so it needs a
+      // generous max_tokens or it can run out mid-thought and leave content null.
+      body: JSON.stringify({ model, messages, max_tokens: 8192 }),
     });
     if (!res.ok) throw new Error(`Sarvam chat failed: ${res.status} ${await res.text()}`);
-    const body = (await res.json()) as { choices: { message: { content: string } }[] };
-    return body.choices[0]?.message?.content ?? "";
+    const body = (await res.json()) as {
+      choices: { message: { content: string | null; reasoning_content?: string | null } }[];
+    };
+    const message = body.choices[0]?.message;
+    return message?.content ?? message?.reasoning_content ?? "";
   },
 
   async healthCheck(apiKey: string): Promise<HealthCheckResult> {

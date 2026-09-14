@@ -123,6 +123,9 @@ create table if not exists public.conversations (
   title text not null default 'New chat',
   provider_id uuid references public.providers (id),
   model_id text,
+  -- 'single' talks to one chosen provider+model; 'auto' picks a working model per message
+  -- with fallback; 'teamup' fans a message out to several models and shows every reply.
+  mode text not null default 'single' check (mode in ('single', 'auto', 'teamup')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -138,6 +141,9 @@ create table if not exists public.messages (
   role text not null check (role in ('user', 'assistant', 'system')),
   content text not null,
   input_mode text not null default 'text' check (input_mode in ('text', 'voice')),
+  -- which model actually produced this reply, e.g. "Anthropic — Claude Sonnet" (auto/teamup modes
+  -- can answer with a different or several models, so replies are attributed individually).
+  model_label text,
   created_at timestamptz not null default now()
 );
 

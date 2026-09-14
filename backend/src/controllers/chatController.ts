@@ -2,15 +2,20 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import * as chatService from "../services/chatService.js";
 
-const createConversationSchema = z.object({
-  providerSlug: z.string().min(1),
-  modelId: z.string().min(1),
-  title: z.string().trim().max(200).optional(),
-});
+const createConversationSchema = z
+  .object({
+    mode: z.enum(["single", "auto", "teamup"]).optional().default("single"),
+    providerSlug: z.string().min(1).optional(),
+    modelId: z.string().min(1).optional(),
+    title: z.string().trim().max(200).optional(),
+  })
+  .refine((data) => data.mode !== "single" || (data.providerSlug && data.modelId), {
+    message: "providerSlug and modelId are required for single mode",
+  });
 
 export async function createConversation(req: Request, res: Response) {
-  const { providerSlug, modelId, title } = createConversationSchema.parse(req.body);
-  const conversation = await chatService.createConversation(req.user!.id, providerSlug, modelId, title);
+  const { mode, providerSlug, modelId, title } = createConversationSchema.parse(req.body);
+  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title);
   res.status(201).json({ conversation });
 }
 
@@ -34,6 +39,6 @@ const sendMessageSchema = z.object({
 
 export async function sendMessage(req: Request, res: Response) {
   const { content, inputMode } = sendMessageSchema.parse(req.body);
-  const reply = await chatService.sendMessage(req.user!.id, req.params.id, content, inputMode);
-  res.status(201).json({ message: reply });
+  const replies = await chatService.sendMessage(req.user!.id, req.params.id, content, inputMode);
+  res.status(201).json({ messages: replies });
 }
