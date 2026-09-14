@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MicButton } from "../components/MicButton";
 import { ModelSelector } from "../components/ModelSelector";
+import { PromptInputBox } from "../components/ui/ai-prompt-box";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import type { Conversation, Message, ModelOption } from "../lib/types";
@@ -12,7 +13,6 @@ export function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState("");
   const [selectedModel, setSelectedModel] = useState(localStorage.getItem(PREFERRED_MODEL_KEY) ?? "");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,18 +47,20 @@ export function ChatPage() {
     setActiveId(res.conversation.id);
   }
 
-  async function handleSend() {
-    if (!draft.trim() || !activeId || sending) return;
-    const content = draft.trim();
-    setDraft("");
+  async function handleSend(rawContent: string, inputMode: "text" | "voice" = "text") {
+    const content = rawContent.trim();
+    if (!content || !activeId || sending) return;
     setSending(true);
     setError(null);
     setMessages((prev) => [
       ...prev,
-      { id: `pending-${Date.now()}`, role: "user", content, input_mode: "text", created_at: new Date().toISOString() },
+      { id: `pending-${Date.now()}`, role: "user", content, input_mode: inputMode, created_at: new Date().toISOString() },
     ]);
     try {
-      const res = await api.post<{ message: Message }>(`/chat/conversations/${activeId}/messages`, { content });
+      const res = await api.post<{ message: Message }>(`/chat/conversations/${activeId}/messages`, {
+        content,
+        inputMode,
+      });
       setMessages((prev) => [...prev, res.message]);
       refreshConversations();
     } catch (err) {
@@ -127,23 +129,15 @@ export function ChatPage() {
 
             {error && <div className="form-error">{error}</div>}
 
-            <div className="chat-input-row">
-              <textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Type a message, or use the mic…"
-                rows={2}
+            <div className="chat-input-row chat-input-row--composer">
+              <PromptInputBox
+                onSend={(message) => handleSend(message, "text")}
+                isLoading={sending}
+                placeholder="Type a message…"
               />
-              <MicButton onTranscribed={(text) => setDraft((prev) => (prev ? `${prev} ${text}` : text))} />
-              <button className="btn-primary" onClick={handleSend} disabled={sending || !draft.trim()}>
-                {sending ? "Sending…" : "Send"}
-              </button>
+              {/* Real speech-to-text (backend-transcribed), separate from the composer's
+                  built-in mic icon which is a visual-only placeholder in this component. */}
+              <MicButton onTranscribed={(text) => handleSend(text, "voice")} disabled={sending} />
             </div>
           </>
         )}
