@@ -109,12 +109,6 @@ export function ChatPage() {
           ))}
           {conversations.length === 0 && <p className="empty-hint">Pick a model above to start your first chat.</p>}
         </div>
-
-        {user?.role === "admin" && (
-          <a className="admin-link" href="/admin">
-            Admin panel →
-          </a>
-        )}
       </aside>
 
       <main className="chat-main">

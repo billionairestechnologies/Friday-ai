@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./components/RequireAuth";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { AdminPage } from "./pages/admin/AdminPage";
+import { AdminGate } from "./pages/admin/AdminGate";
 import { AuthPage } from "./pages/AuthPage";
 import { ChatPage } from "./pages/ChatPage";
 
@@ -25,14 +25,8 @@ export function App() {
             </RequireAuth>
           }
         />
-        <Route
-          path="/admin"
-          element={
-            <RequireAuth>
-              <AdminPage />
-            </RequireAuth>
-          }
-        />
+        {/* Hidden, standalone admin gate — deliberately not wrapped in RequireAuth or linked anywhere. */}
+        <Route path="/admin" element={<AdminGate />} />
       </Routes>
     </AuthProvider>
   );

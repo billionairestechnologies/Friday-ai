@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import type { ProviderModelRow, ProviderWithStatus } from "../../lib/types";
 
-export function AdminPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+export function AdminPage({ onLogout }: { onLogout: () => void }) {
   const [providers, setProviders] = useState<ProviderWithStatus[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [models, setModels] = useState<Record<string, ProviderModelRow[]>>({});
@@ -14,10 +10,6 @@ export function AdminPage() {
   const [keyValue, setKeyValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user && user.role !== "admin") navigate("/chat");
-  }, [user, navigate]);
 
   function refreshProviders() {
     api.get<{ providers: ProviderWithStatus[] }>("/admin/providers").then((res) => setProviders(res.providers));
@@ -113,8 +105,11 @@ export function AdminPage() {
             Check all keys
           </button>
           <a className="link-btn" href="/chat">
-            Back to chat
+            Chat
           </a>
+          <button className="link-btn" onClick={onLogout}>
+            Log out
+          </button>
         </div>
       </header>
 
