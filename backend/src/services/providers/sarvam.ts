@@ -43,3 +43,19 @@ export const sarvamAdapter: ProviderAdapter = {
     }
   },
 };
+
+/** Speech-to-text via Sarvam Saarika, used as a fallback for the mic button. */
+export async function sarvamTranscribe(apiKey: string, audio: Buffer, filename: string): Promise<string> {
+  const form = new FormData();
+  form.append("model", "saarika:v2");
+  form.append("file", new Blob([new Uint8Array(audio)]), filename);
+
+  const res = await fetch(`${BASE_URL}/speech-to-text`, {
+    method: "POST",
+    headers: { "api-subscription-key": apiKey },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Sarvam transcription failed: ${res.status} ${await res.text()}`);
+  const body = (await res.json()) as { transcript: string };
+  return body.transcript;
+}

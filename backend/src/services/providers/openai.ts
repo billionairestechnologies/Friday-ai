@@ -46,3 +46,19 @@ export const openaiAdapter: ProviderAdapter = {
     }
   },
 };
+
+/** Speech-to-text via OpenAI Whisper, used as a fallback for the mic button. */
+export async function openaiTranscribe(apiKey: string, audio: Buffer, filename: string): Promise<string> {
+  const form = new FormData();
+  form.append("model", "whisper-1");
+  form.append("file", new Blob([new Uint8Array(audio)]), filename);
+
+  const res = await fetch(`${BASE_URL}/audio/transcriptions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`OpenAI transcription failed: ${res.status} ${await res.text()}`);
+  const body = (await res.json()) as { text: string };
+  return body.text;
+}
