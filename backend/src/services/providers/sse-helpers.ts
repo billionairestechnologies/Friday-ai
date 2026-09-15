@@ -66,6 +66,7 @@ export async function streamOpenAiCompatibleChat(
   }
 
   let full = "";
+  let reasoningFull = "";
   await readSseStream(res.body, (data) => {
     const chunk = data as OpenAiCompatibleChunk;
     const delta = chunk.choices?.[0]?.delta;
@@ -73,8 +74,16 @@ export async function streamOpenAiCompatibleChat(
       full += delta.content;
       onDelta(delta.content);
     } else if (delta?.reasoning_content) {
+      reasoningFull += delta.reasoning_content;
       onThink?.(delta.reasoning_content);
     }
   });
+  // Same gap the non-streaming chat() path guards against: a reasoning model (e.g. Sarvam's
+  // sarvam-105b) can burn its whole token budget on reasoning_content and never emit a real
+  // content delta. Fall back to the reasoning trace as the visible reply instead of an empty one.
+  if (!full && reasoningFull) {
+    full = reasoningFull;
+    onDelta(reasoningFull);
+  }
   return full;
 }
