@@ -34,14 +34,14 @@ function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const login = useAuthStore((s) => s.login);
+  const adminLogin = useAuthStore((s) => s.adminLogin);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await login(resolveLoginEmail(username), password);
+      await adminLogin(resolveLoginEmail(username), password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

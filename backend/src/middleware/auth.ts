@@ -6,6 +6,7 @@ export interface AuthedUser {
   id: string;
   email: string | null;
   name: string | null;
+  phone: string | null;
   role: "user" | "admin";
 }
 
@@ -29,7 +30,7 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("full_name, role")
+    .select("full_name, phone, role")
     .eq("id", data.user.id)
     .single();
 
@@ -37,6 +38,7 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
     id: data.user.id,
     email: data.user.email ?? null,
     name: profile?.full_name ?? (data.user.user_metadata?.full_name as string | undefined) ?? null,
+    phone: profile?.phone ?? null,
     role: (profile?.role as "user" | "admin") ?? "user",
   };
   next();

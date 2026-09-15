@@ -38,32 +38,102 @@ function Shell({
   );
 }
 
+function GoogleLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden>
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  );
+}
+
 export function LoginPopout() {
   const dialog = useChat((s) => s.dialog);
   const setDialog = useChat((s) => s.setDialog);
   const { user } = useCurrentUserState();
   const login = useAuthStore((s) => s.login);
+  const verifyOtp = useAuthStore((s) => s.verifyOtp);
+  const resendOtp = useAuthStore((s) => s.resendOtp);
   const signup = useAuthStore((s) => s.signup);
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const signedIn = Boolean(user && !user.isDevFallback);
 
-  async function submit(e: FormEvent) {
+  function resetForm() {
+    setStep("credentials");
+    setCode("");
+    setError(null);
+    setNotice(null);
+  }
+
+  async function submitCredentials(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      if (mode === "login") await login(email, password);
-      else await signup(name, email, password);
-      setDialog(null);
-      setPassword("");
+      if (mode === "login") {
+        await login(email, password);
+        setStep("otp");
+      } else {
+        await signup(name, email, phone, password);
+        setDialog(null);
+        setPassword("");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitOtp(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await verifyOtp(email, code);
+      setDialog(null);
+      setPassword("");
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResend() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      await resendOtp(email);
+      setNotice("Sent a new code.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't resend the code");
     } finally {
       setBusy(false);
     }
@@ -73,7 +143,15 @@ export function LoginPopout() {
     <Shell
       open={dialog === "login"}
       onClose={() => setDialog(null)}
-      title={signedIn ? "Account" : mode === "login" ? "Sign in to Friday" : "Create your account"}
+      title={
+        signedIn
+          ? "Account"
+          : step === "otp"
+            ? "Check your email"
+            : mode === "login"
+              ? "Sign in to Friday"
+              : "Create your account"
+      }
     >
       {signedIn ? (
         <div className="flex flex-col gap-4">
@@ -106,57 +184,119 @@ export function LoginPopout() {
             </button>
           )}
         </div>
-      ) : (
-        <form onSubmit={submit} className="flex flex-col gap-3">
+      ) : step === "otp" ? (
+        <form onSubmit={submitOtp} className="flex flex-col gap-3">
           <p className="text-sm leading-relaxed text-muted">
-            Save chats across devices. You can keep using Friday as a guest.
+            We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>. It expires in
+            10 minutes.
           </p>
-          {mode === "signup" && (
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Name"
-              required
-              className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
-            />
-          )}
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="000000"
+            inputMode="numeric"
+            autoComplete="one-time-code"
             required
             autoFocus
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            minLength={6}
-            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
+            maxLength={6}
+            className="h-12 rounded-xl border border-border bg-background px-3 text-center font-mono text-xl tracking-[0.4em] text-foreground outline-none placeholder:text-subtle"
           />
           {error && <p className="text-sm text-danger">{error}</p>}
+          {notice && <p className="text-sm text-muted">{notice}</p>}
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || code.length !== 6}
             className="h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-transform duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
           >
-            {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+            {busy ? "Verifying…" : "Verify"}
           </button>
+          <div className="flex items-center justify-between text-xs">
+            <button type="button" onClick={resetForm} className="text-muted hover:text-foreground">
+              Back
+            </button>
+            <button type="button" onClick={() => void handleResend()} disabled={busy} className="text-muted hover:text-foreground disabled:opacity-60">
+              Resend code
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <form onSubmit={submitCredentials} className="flex flex-col gap-3">
+            <p className="text-sm leading-relaxed text-muted">
+              Save chats across devices. You can keep using Friday as a guest.
+            </p>
+            {mode === "signup" && (
+              <>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Name"
+                  required
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
+                />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Mobile number"
+                  required
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
+                />
+              </>
+            )}
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              required
+              autoFocus
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              required
+              minLength={6}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
+            />
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <button
+              type="submit"
+              disabled={busy}
+              className="h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-transform duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+            >
+              {busy ? "Please wait…" : mode === "login" ? "Continue" : "Create account"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setMode(mode === "login" ? "signup" : "login");
+              }}
+              className="text-center text-xs text-muted hover:text-foreground"
+            >
+              {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+            </button>
+          </form>
+          <div className="flex items-center gap-2 py-1">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-subtle">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
           <button
             type="button"
-            onClick={() => {
-              setError(null);
-              setMode(mode === "login" ? "signup" : "login");
-            }}
-            className="text-center text-xs text-muted hover:text-foreground"
+            disabled
+            title="Coming soon"
+            className="flex h-11 items-center justify-center gap-2.5 rounded-full border border-border text-sm font-medium text-muted opacity-60"
           >
-            {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+            <GoogleLogo className="size-4" />
+            Continue with Google
+            <span className="ml-1 rounded-full bg-chip px-2 py-0.5 text-[10px] font-medium text-subtle">Coming soon</span>
           </button>
-        </form>
+        </div>
       )}
     </Shell>
   );

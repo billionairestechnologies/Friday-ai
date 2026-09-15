@@ -16,6 +16,8 @@ export const env = {
   keyEncryptionSecret: process.env.KEY_ENCRYPTION_SECRET ?? "dev-only-insecure-secret",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Friday <onboarding@resend.dev>",
 };
 
 export function assertSupabaseConfigured() {

@@ -20,12 +20,27 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// The access token is a short-lived JWT (~1hr) — a tab left open longer than that would
+// otherwise start throwing "missing/invalid token" on every request. auth/client.ts registers
+// a handler here (rather than this module importing the auth store directly, which would be
+// circular) that tries to refresh the session; on success the request below is retried once.
+let unauthorizedHandler: (() => Promise<boolean>) | null = null;
+
+export function setUnauthorizedHandler(fn: (() => Promise<boolean>) | null) {
+  unauthorizedHandler = fn;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   if (!(options.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401 && !isRetry && unauthorizedHandler) {
+    const refreshed = await unauthorizedHandler();
+    if (refreshed) return request<T>(path, options, true);
+  }
 
   if (res.status === 204) return undefined as T;
 
