@@ -5,6 +5,7 @@ import { ollamaAdapter } from "./ollama.js";
 import { openaiAdapter } from "./openai.js";
 import { openrouterAdapter } from "./openrouter.js";
 import { sarvamAdapter } from "./sarvam.js";
+import { scalemaxAdapter } from "./scalemax.js";
 import type { ProviderAdapter } from "./types.js";
 
 export const PROVIDER_REGISTRY: Record<string, ProviderAdapter> = {
@@ -15,6 +16,7 @@ export const PROVIDER_REGISTRY: Record<string, ProviderAdapter> = {
   sarvam: sarvamAdapter,
   elevenlabs: elevenlabsAdapter,
   ollama: ollamaAdapter,
+  scalemax: scalemaxAdapter,
 };
 
 export function getProviderAdapter(slug: string): ProviderAdapter {

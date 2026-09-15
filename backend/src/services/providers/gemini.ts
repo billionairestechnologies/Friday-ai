@@ -1,3 +1,4 @@
+import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage } from "./types.js";
 
@@ -54,5 +55,39 @@ export const geminiAdapter: ProviderAdapter = {
     } catch (err) {
       return { ok: false, error: safeErrorMessage(err) };
     }
+  },
+
+  async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
+    const system = messages.find((m) => m.role === "system")?.content;
+    const contents = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+
+    const res = await fetch(
+      `${BASE_URL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        }),
+        signal,
+      },
+    );
+    if (!res.ok || !res.body) {
+      throw new Error(`Gemini chat failed: ${res.status} ${res.body ? await res.text() : ""}`);
+    }
+
+    let full = "";
+    await readSseStream(res.body, (data) => {
+      const body = data as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      if (text) {
+        full += text;
+        onDelta(text);
+      }
+    });
+    return full;
   },
 };

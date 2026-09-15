@@ -44,6 +44,46 @@ export const ollamaAdapter: ProviderAdapter = {
     return body.message?.content ?? "";
   },
 
+  async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
+    const { baseUrl, headers } = resolveTarget(apiKey);
+    const res = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages, stream: true }),
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      throw new Error(`Ollama chat failed: ${res.status} ${res.body ? await res.text() : ""}`);
+    }
+
+    // Ollama streams newline-delimited JSON objects, not SSE.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let full = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const chunk = JSON.parse(line) as { message?: { content?: string }; done?: boolean };
+          const text = chunk.message?.content;
+          if (text) {
+            full += text;
+            onDelta(text);
+          }
+        } catch {
+          /* skip malformed */
+        }
+      }
+    }
+    return full;
+  },
+
   async healthCheck(apiKey: string): Promise<HealthCheckResult> {
     try {
       const { baseUrl, headers } = resolveTarget(apiKey);
