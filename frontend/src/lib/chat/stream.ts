@@ -1,6 +1,37 @@
 import { API_BASE_URL, api, getAccessToken } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth/client";
 import type { ServerMessage } from "./store";
 import type { StreamEvent } from "./types";
+
+async function fetchStream(
+  conversationId: string,
+  content: string,
+  inputMode: "text" | "voice",
+  think: boolean,
+  behavior: string,
+  webSearch: boolean,
+  signal: AbortSignal,
+  isRetry = false,
+): Promise<Response> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ content, inputMode, think, behavior, webSearch }),
+    signal,
+  });
+  // Same short-lived-token gap as fetchSpeech in voices.ts: a raw 401 here surfaces the
+  // backend's literal "Missing bearer token"/"Invalid or expired session" text to the user
+  // instead of quietly refreshing and retrying like the shared `api` client does.
+  if (res.status === 401 && !isRetry) {
+    const refreshed = await useAuthStore.getState().refresh();
+    if (refreshed) return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, signal, true);
+  }
+  return res;
+}
 
 /** Single/Auto mode: real token streaming from the backend's SSE endpoint. */
 export async function streamMessage(
@@ -13,16 +44,7 @@ export async function streamMessage(
   onEvent: (ev: StreamEvent) => void,
   signal: AbortSignal,
 ) {
-  const token = getAccessToken();
-  const res = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ content, inputMode, think, behavior, webSearch }),
-    signal,
-  });
+  const res = await fetchStream(conversationId, content, inputMode, think, behavior, webSearch, signal);
 
   if (!res.ok || !res.body) {
     let message = `Request failed (${res.status})`;

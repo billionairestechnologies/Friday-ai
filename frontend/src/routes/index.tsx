@@ -36,7 +36,7 @@ function modeForModel(model: string): ConversationMode {
 
 export function Home() {
   const greeting = useGreeting();
-  const { user } = useCurrentUserState();
+  const { user, isPending } = useCurrentUserState();
   const firstName = user?.displayName?.trim().split(/\s+/)[0];
   const heroLine = useHeroLine(greeting, firstName);
   const models = useModels((s) => s.models);
@@ -63,11 +63,14 @@ export function Home() {
 
   useEffect(() => {
     void loadModels();
+    // Wait for auth bootstrap to finish restoring the access token — firing this before it
+    // resolves races the token and hits the backend with no/stale Authorization header.
+    if (isPending || !user) return;
     api
       .get<{ conversations: ServerConversation[] }>("/chat/conversations")
       .then((res) => useChat.getState().hydrateFromServer(res.conversations))
       .catch(() => {});
-  }, [loadModels]);
+  }, [loadModels, isPending, user]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -78,6 +81,7 @@ export function Home() {
   }, []);
 
   useEffect(() => {
+    if (isPending || !user) return;
     if (!activeId) return;
     const chat = useChat.getState().chats.find((c) => c.id === activeId);
     if (!chat?.conversationId) return;
@@ -88,7 +92,7 @@ export function Home() {
       .get<{ messages: ServerMessage[] }>(`/chat/conversations/${chat.conversationId}/messages`)
       .then((res) => useChat.getState().loadMessagesInto(activeId, res.messages))
       .catch(() => {});
-  }, [activeId]);
+  }, [activeId, isPending, user]);
 
   async function ensureConversation(model: string): Promise<{ chatId: string; conversationId: string }> {
     const s = useChat.getState();
