@@ -1,0 +1,71 @@
+export type Role = "user" | "assistant";
+
+export type Attachment = {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  kind: "image" | "file";
+  dataUrl: string;
+};
+
+export type Citation = {
+  url: string;
+  title?: string;
+};
+
+export type AssistantStatus = "working" | "searching" | "thinking" | "synthesizing" | "writing" | null;
+
+export type AgentStatus = {
+  slug: string;
+  model: string;
+  state: "start" | "done" | "error";
+  error?: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: Role;
+  content: string;
+  thinking?: string;
+  citations?: Citation[];
+  attachments?: Attachment[];
+  createdAt: number;
+  streaming?: boolean;
+  error?: string;
+  status?: AssistantStatus;
+  usedThink?: boolean;
+  usedSearch?: boolean;
+  usedCanvas?: boolean;
+  /** Which provider/model produced this reply — shown above Team Up replies. */
+  modelLabel?: string;
+  /** Live per-model progress during a Team Up run — which models are answering and how it went. */
+  agents?: AgentStatus[];
+};
+
+export type Chat = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ChatMessage[];
+  /** Backend conversation id (created lazily on first send). Absent for a brand-new local chat. */
+  conversationId?: string;
+  /** Encoded model id (or Auto/Team Up sentinel) the conversation is currently wired to on the backend. */
+  conversationModel?: string;
+};
+
+export type ChatRequestMessage = {
+  role: Role;
+  content: string;
+  attachments?: Pick<Attachment, "kind" | "mime" | "name" | "dataUrl">[];
+};
+
+export type StreamEvent =
+  | { t: "status"; s: "thinking" | "searching" | "synthesizing" | "writing" }
+  | { t: "agent"; slug: string; model: string; state: "start" | "done" | "error"; error?: string }
+  | { t: "think"; c: string }
+  | { t: "text"; c: string }
+  | { t: "cite"; u: string; title?: string }
+  | { t: "err"; c: string }
+  | { t: "done" };

@@ -1,3 +1,4 @@
+import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage } from "./types.js";
 
@@ -37,5 +38,16 @@ export const openrouterAdapter: ProviderAdapter = {
     } catch (err) {
       return { ok: false, error: safeErrorMessage(err) };
     }
+  },
+
+  async chatStream(apiKey, model, messages, onDelta, signal, onThink) {
+    return streamOpenAiCompatibleChat(
+      `${BASE_URL}/chat/completions`,
+      { Authorization: `Bearer ${apiKey}` },
+      { model, messages },
+      onDelta,
+      signal,
+      onThink,
+    );
   },
 };

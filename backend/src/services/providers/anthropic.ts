@@ -1,3 +1,4 @@
+import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage } from "./types.js";
 
@@ -54,5 +55,41 @@ export const anthropicAdapter: ProviderAdapter = {
     } catch (err) {
       return { ok: false, error: safeErrorMessage(err) };
     }
+  },
+
+  async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
+    const system = messages.find((m) => m.role === "system")?.content;
+    const conversation = messages.filter((m) => m.role !== "system");
+
+    const res = await fetch(`${BASE_URL}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        system,
+        stream: true,
+        messages: conversation.map((m) => ({ role: m.role, content: m.content })),
+      }),
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      throw new Error(`Anthropic chat failed: ${res.status} ${res.body ? await res.text() : ""}`);
+    }
+
+    let full = "";
+    await readSseStream(res.body, (data) => {
+      if (data.type !== "content_block_delta") return;
+      const delta = data.delta as { type?: string; text?: string } | undefined;
+      if (delta?.type === "text_delta" && delta.text) {
+        full += delta.text;
+        onDelta(delta.text);
+      }
+    });
+    return full;
   },
 };

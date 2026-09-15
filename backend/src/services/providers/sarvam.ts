@@ -1,3 +1,4 @@
+import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage } from "./types.js";
 
@@ -48,6 +49,18 @@ export const sarvamAdapter: ProviderAdapter = {
     } catch (err) {
       return { ok: false, error: safeErrorMessage(err) };
     }
+  },
+
+  async chatStream(apiKey, model, messages, onDelta, signal, onThink) {
+    // Same generous budget as chat() — sarvam-105b burns tokens on a hidden reasoning trace first.
+    return streamOpenAiCompatibleChat(
+      `${BASE_URL}/v1/chat/completions`,
+      { "api-subscription-key": apiKey },
+      { model, messages, max_tokens: 8192 },
+      onDelta,
+      signal,
+      onThink,
+    );
   },
 };
 

@@ -1,0 +1,370 @@
+import { useState, type ReactNode } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  Bell,
+  Check,
+  CreditCard,
+  Palette,
+  Shield,
+  SlidersHorizontal,
+  Sparkles,
+  UserRound,
+  X,
+  Zap,
+} from "lucide-react";
+import { authEnabled, signOut } from "@/lib/auth/client";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useModels } from "@/lib/chat/models";
+import { saveFile } from "@/lib/chat/download";
+import { useChat } from "@/lib/chat/store";
+import { cn } from "@/lib/utils";
+
+const NAV = [
+  {
+    group: "General",
+    items: [
+      { id: "account", label: "Account", icon: UserRound },
+      { id: "appearance", label: "Appearance", icon: Palette },
+      { id: "behavior", label: "Behavior", icon: SlidersHorizontal },
+      { id: "notifications", label: "Notifications", icon: Bell },
+    ],
+  },
+  {
+    group: "Friday",
+    items: [{ id: "customize", label: "Customize", icon: Sparkles }],
+  },
+  {
+    group: "Payments",
+    items: [
+      { id: "billing", label: "Billing", icon: CreditCard },
+      { id: "usage", label: "Usage", icon: Zap },
+    ],
+  },
+  {
+    group: "Data & Information",
+    items: [{ id: "data", label: "Data Controls", icon: Shield }],
+  },
+];
+
+export function SettingsModal() {
+  const dialog = useChat((s) => s.dialog);
+  const setDialog = useChat((s) => s.setDialog);
+  const tab = useChat((s) => s.settingsTab);
+  const setTab = useChat((s) => s.setSettingsTab);
+
+  return (
+    <Dialog.Root open={dialog === "settings"} onOpenChange={(v) => !v && setDialog(null)}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed top-[50%] left-[50%] z-50 flex h-[min(84vh,560px)] w-[min(94vw,720px)] translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-2xl border border-border bg-elevated shadow-[var(--shadow-composer)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <Dialog.Title className="sr-only">Settings</Dialog.Title>
+          <nav className="hidden w-52 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border p-3 sm:flex">
+            {NAV.map((g) => (
+              <div key={g.group}>
+                <p className="px-2 pb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">
+                  {g.group}
+                </p>
+                {g.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTab(item.id)}
+                      className={cn(
+                        "flex h-9 w-full items-center gap-2 rounded-lg px-2 text-sm",
+                        tab === item.id
+                          ? "bg-chip text-foreground"
+                          : "text-muted hover:bg-chip/60 hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex items-center justify-between px-5 py-3 sm:hidden">
+              <select
+                value={tab}
+                onChange={(e) => setTab(e.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
+              >
+                {NAV.flatMap((g) => g.items).map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.label}
+                  </option>
+                ))}
+              </select>
+              <Dialog.Close className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip">
+                <X className="size-4" />
+              </Dialog.Close>
+            </div>
+            <div className="hidden items-center justify-end px-4 py-3 sm:flex">
+              <Dialog.Close className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground">
+                <X className="size-4" />
+              </Dialog.Close>
+            </div>
+            <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+              {tab === "account" && <AccountPane />}
+              {tab === "appearance" && <AppearancePane />}
+              {tab === "behavior" && <BehaviorPane />}
+              {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
+              {tab === "customize" && <SimpleNote title="Customize" body="Search, Think, and Canvas live in the composer. Personality stays direct and truthful." />}
+              {tab === "billing" && <BillingPane />}
+              {tab === "usage" && <SimpleNote title="Usage" body="Chat, search, and canvas run against the xAI key in this environment. There’s no separate meter here." />}
+              {tab === "data" && <DataPane />}
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function Row({ label, value, action }: { label: ReactNode; value?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border py-3 last:border-0">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        {value && <p className="text-xs text-muted">{value}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function AccountPane() {
+  const { user } = useCurrentUserState();
+  const setDialog = useChat((s) => s.setDialog);
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [signingOut, setSigningOut] = useState(false);
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-semibold">Account</h2>
+      <div className="flex items-center justify-between gap-3 border-b border-border py-3">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 place-items-center rounded-full bg-chip text-sm font-semibold">
+            {(user?.displayName ?? "G").charAt(0).toUpperCase()}
+          </span>
+          <div>
+            <p className="text-sm font-medium">{signedIn ? user?.displayName : "Guest"}</p>
+            <p className="text-xs text-muted">{signedIn ? user?.primaryEmail : "Not signed in"}</p>
+          </div>
+        </div>
+        {signedIn && authEnabled ? (
+          <button
+            type="button"
+            disabled={signingOut}
+            onClick={() => {
+              setSigningOut(true);
+              void signOut().catch(() => setSigningOut(false));
+            }}
+            className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip disabled:opacity-60"
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setDialog("login")}
+            className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
+          >
+            Sign in
+          </button>
+        )}
+      </div>
+      <Row label="Plan" value="Friday" action={<span className="text-xs text-muted">Active</span>} />
+    </div>
+  );
+}
+
+function AppearancePane() {
+  const appearance = useChat((s) => s.appearance);
+  const setAppearance = useChat((s) => s.setAppearance);
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-semibold">Appearance</h2>
+      <div className="flex gap-2">
+        {(["dark", "light"] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setAppearance(mode)}
+            className={cn(
+              "flex h-20 flex-1 flex-col items-center justify-center rounded-xl border text-sm capitalize",
+              appearance === mode ? "border-foreground bg-chip" : "border-border hover:bg-chip/50",
+            )}
+          >
+            {appearance === mode && <Check className="mb-1 size-3.5" />}
+            {mode}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const PERSONALITY_PRESETS = [
+  { label: "Default", prompt: "" },
+  { label: "Friendly", prompt: "Be warm, encouraging, and conversational. Use a friendly, approachable tone." },
+  {
+    label: "Professional",
+    prompt: "Be formal and precise. Use professional, businesslike language and avoid slang or casual phrasing.",
+  },
+  {
+    label: "Funny",
+    prompt: "Be witty and playful. Use humor, light jokes, and a fun tone while still being genuinely helpful.",
+  },
+  { label: "Concise", prompt: "Be extremely concise. Answer in as few words as possible, no filler, no preamble." },
+  {
+    label: "Direct",
+    prompt: "Be blunt and direct. Skip pleasantries, don't hedge, give the straight answer first.",
+  },
+] as const;
+
+function BehaviorPane() {
+  const model = useChat((s) => s.model);
+  const setModel = useChat((s) => s.setModel);
+  const models = useModels((s) => s.models);
+  const behavior = useChat((s) => s.behavior);
+  const setBehavior = useChat((s) => s.setBehavior);
+
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-semibold">Behavior</h2>
+
+      <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">Personality</p>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {PERSONALITY_PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => setBehavior(p.prompt)}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-sm",
+              behavior === p.prompt ? "border-foreground bg-chip" : "border-border hover:bg-chip/60",
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={behavior}
+        onChange={(e) => setBehavior(e.target.value)}
+        placeholder="Or write custom instructions for how Friday should respond — e.g. “explain things like I'm a beginner” or “always answer in bullet points”."
+        rows={3}
+        className="mb-6 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle"
+      />
+
+      <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">Default model</p>
+      <div className="flex flex-col gap-1">
+        {models.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setModel(m.id)}
+            className={cn(
+              "flex items-center justify-between rounded-xl px-3 py-2.5 text-left",
+              m.id === model ? "bg-chip" : "hover:bg-chip/60",
+            )}
+          >
+            <span>
+              <span className="block text-sm font-medium">{m.label}</span>
+              <span className="block text-xs text-muted">{m.hint}</span>
+            </span>
+            {m.id === model && <Check className="size-4" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BillingPane() {
+  const setDialog = useChat((s) => s.setDialog);
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-semibold">Billing</h2>
+      <Row
+        label="Friday"
+        value="Included in this workspace"
+        action={
+          <button
+            type="button"
+            onClick={() => setDialog("upgrade")}
+            className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
+          >
+            Manage
+          </button>
+        }
+      />
+    </div>
+  );
+}
+
+function DataPane() {
+  const chats = useChat((s) => s.chats);
+  const clearAllChats = useChat((s) => s.clearAllChats);
+  const [cleared, setCleared] = useState(false);
+  const [saved, setSaved] = useState(false);
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-semibold">Data Controls</h2>
+      <p className="mb-4 text-sm text-muted">Chats stay in this browser. Clearing them can’t be undone.</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={chats.length === 0}
+          onClick={async () => {
+            const payload = JSON.stringify(
+              chats.map((c) => ({
+                title: c.title,
+                createdAt: c.createdAt,
+                messages: c.messages.map((m) => ({
+                  role: m.role,
+                  content: m.content,
+                })),
+              })),
+              null,
+              2,
+            );
+            const ok = await saveFile("friday-chats.json", payload, "application/json;charset=utf-8");
+            if (ok) {
+              setSaved(true);
+              window.setTimeout(() => setSaved(false), 1400);
+            }
+          }}
+          className="h-10 rounded-full border border-border px-4 text-sm font-medium hover:bg-chip disabled:opacity-40"
+        >
+          {saved ? "Downloaded" : "Download chats"}
+        </button>
+        <button
+          type="button"
+          disabled={chats.length === 0}
+          onClick={() => {
+            clearAllChats();
+            setCleared(true);
+            window.setTimeout(() => setCleared(false), 1400);
+          }}
+          className="h-10 rounded-full border border-border px-4 text-sm font-medium hover:bg-chip disabled:opacity-40"
+        >
+          {cleared ? "Cleared" : "Clear all chats"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SimpleNote({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
+      <p className="text-sm leading-relaxed text-muted">{body}</p>
+    </div>
+  );
+}
