@@ -20,3 +20,34 @@ export function useGreeting(): string {
 
   return greeting;
 }
+
+// Friendly, generic openers mixed in alongside the time-of-day greeting so the dashboard doesn't
+// say the exact same thing on every visit.
+const FRIENDLY_LINES = [
+  "What can I do for you today?",
+  "What's on your mind?",
+  "Ready when you are.",
+  "What should we work on?",
+  "How can I help today?",
+  "What are we building today?",
+];
+
+export type HeroLine = { kind: "greeting"; greeting: string; name?: string } | { kind: "line"; text: string };
+
+/**
+ * Picks the dashboard's headline once per visit — the time-of-day greeting (with the user's
+ * name) most of the time, occasionally a friendly generic line instead, for variety. Stable
+ * for the lifetime of the mount so it doesn't shuffle mid-visit.
+ */
+export function useHeroLine(greeting: string, name?: string): HeroLine {
+  const [line] = useState<HeroLine>(() => {
+    // Weighted so the personal greeting still shows more often than not.
+    const pool: HeroLine[] = [
+      { kind: "greeting", greeting, name },
+      { kind: "greeting", greeting, name },
+      ...FRIENDLY_LINES.map((text): HeroLine => ({ kind: "line", text })),
+    ];
+    return pool[Math.floor(Math.random() * pool.length)]!;
+  });
+  return line;
+}

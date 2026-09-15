@@ -54,6 +54,11 @@ type ChatState = {
   draft: string;
   attachments: Attachment[];
   dialog: DialogId;
+  /** Selected ElevenLabs voice for Voice Mode / spoken replies. Null until the user picks one. */
+  voiceId: string | null;
+  voiceName: string | null;
+  /** Whether the first-time voice picker has been shown, so Voice Mode only shows it once. */
+  voiceIntroSeen: boolean;
   setHydrated: () => void;
   setSidebarOpen: (open: boolean) => void;
   setQuery: (q: string) => void;
@@ -65,6 +70,8 @@ type ChatState = {
   setCanvasOpen: (v: boolean) => void;
   setSettingsTab: (id: string) => void;
   setAppearance: (v: "dark" | "light") => void;
+  setVoice: (id: string, name: string) => void;
+  setVoiceIntroSeen: (v: boolean) => void;
   setDraft: (v: string) => void;
   setDialog: (id: DialogId) => void;
   addAttachments: (files: Attachment[]) => void;
@@ -95,6 +102,9 @@ type Persisted = Pick<
   | "appearance"
   | "behavior"
   | "sidebarOpen"
+  | "voiceId"
+  | "voiceName"
+  | "voiceIntroSeen"
 >;
 
 function createThrottledStorage(ms = 700): PersistStorage<Persisted> {
@@ -161,6 +171,9 @@ export const useChat = create<ChatState>()(
       draft: "",
       attachments: [],
       dialog: null,
+      voiceId: null,
+      voiceName: null,
+      voiceIntroSeen: false,
       setHydrated: () => set({ hydrated: true }),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setQuery: (query) => set({ query }),
@@ -172,6 +185,8 @@ export const useChat = create<ChatState>()(
       setCanvasOpen: (canvasOpen) => set({ canvasOpen }),
       setSettingsTab: (settingsTab) => set({ settingsTab }),
       setAppearance: (appearance) => set({ appearance }),
+      setVoice: (voiceId, voiceName) => set({ voiceId, voiceName }),
+      setVoiceIntroSeen: (voiceIntroSeen) => set({ voiceIntroSeen }),
       setDraft: (draft) => set({ draft }),
       setDialog: (dialog) => set({ dialog }),
       addAttachments: (files) =>
@@ -387,6 +402,9 @@ export const useChat = create<ChatState>()(
         appearance: s.appearance,
         behavior: s.behavior,
         sidebarOpen: s.sidebarOpen,
+        voiceId: s.voiceId,
+        voiceName: s.voiceName,
+        voiceIntroSeen: s.voiceIntroSeen,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();

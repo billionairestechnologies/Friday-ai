@@ -31,7 +31,7 @@ export function MessageThread() {
       <div
         ref={scroller}
         onScroll={onScroll}
-        className="thread-scroll scroll-thin mx-auto h-full w-full max-w-3xl px-4 py-6 md:px-6"
+        className="thread-scroll scroll-thin mx-auto h-full w-full max-w-3xl px-4 py-6 md:px-6 lg:max-w-4xl 2xl:max-w-5xl"
       >
         <div ref={content} className="flex flex-col gap-6">
           {messages.map((m) =>

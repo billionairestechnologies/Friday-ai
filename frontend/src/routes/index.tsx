@@ -4,10 +4,12 @@ import { Composer } from "@/components/composer";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { MessageThread } from "@/components/message-thread";
 import { HeaderActions, Popouts } from "@/components/popouts";
+import { CompleteProfileModal } from "@/components/complete-profile-modal";
 import { Sidebar, SidebarToggle } from "@/components/sidebar";
-import { useGreeting } from "@/hooks/use-greeting";
+import { useGreeting, useHeroLine } from "@/hooks/use-greeting";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { applyLive, clearLive, peekLive, startLive } from "@/lib/chat/live-stream";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/chat/models";
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
@@ -34,6 +36,9 @@ function modeForModel(model: string): ConversationMode {
 
 export function Home() {
   const greeting = useGreeting();
+  const { user } = useCurrentUserState();
+  const firstName = user?.displayName?.trim().split(/\s+/)[0];
+  const heroLine = useHeroLine(greeting, firstName);
   const models = useModels((s) => s.models);
   const loadModels = useModels((s) => s.load);
   const available = models.length > 2; // beyond the Auto/Team Up sentinels
@@ -258,14 +263,50 @@ export function Home() {
               className="flex flex-1 flex-col items-center justify-center px-4 pb-8"
             >
               <div className="mb-8 flex flex-col items-center text-center">
-                <p className="mb-2 text-sm font-medium text-muted">Friday AI</p>
-                <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-                  {available ? greeting : "No models enabled yet"}
-                </h1>
-                {!available && (
-                  <p className="mt-2 max-w-md text-pretty text-sm text-muted">
-                    Ask an admin to add a provider key in the admin panel.
-                  </p>
+                {available ? (
+                  <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+                    {heroLine.kind === "greeting" ? (
+                      <>
+                        <motion.span
+                          initial={{ opacity: 0, y: 14 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                          className="block text-muted"
+                        >
+                          {heroLine.greeting}
+                          {heroLine.name ? "," : ""}
+                        </motion.span>
+                        {heroLine.name && (
+                          <motion.span
+                            initial={{ opacity: 0, y: 18, scale: 0.94 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ duration: 0.55, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                            className="block bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent"
+                          >
+                            {heroLine.name}
+                          </motion.span>
+                        )}
+                      </>
+                    ) : (
+                      <motion.span
+                        initial={{ opacity: 0, y: 16, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                        className="block bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent"
+                      >
+                        {heroLine.text}
+                      </motion.span>
+                    )}
+                  </h1>
+                ) : (
+                  <>
+                    <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                      No models enabled yet
+                    </h1>
+                    <p className="mt-2 max-w-md text-pretty text-sm text-muted">
+                      Ask an admin to add a provider key in the admin panel.
+                    </p>
+                  </>
                 )}
               </div>
               <div className="w-full max-w-2xl">
@@ -306,7 +347,7 @@ export function Home() {
               <MessageThread />
               <div className="relative shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
                 <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-b from-transparent to-background" />
-                <div className="mx-auto w-full max-w-3xl">
+                <div className="mx-auto w-full max-w-3xl lg:max-w-4xl 2xl:max-w-5xl">
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
@@ -324,6 +365,7 @@ export function Home() {
       </div>
       <CanvasPanel />
       <Popouts />
+      <CompleteProfileModal />
       {sendError && (
         <div className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-elevated px-4 py-2 text-sm text-danger shadow-[var(--shadow-composer)]">
           {sendError}

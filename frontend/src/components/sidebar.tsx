@@ -1,6 +1,6 @@
 import { PanelLeft, Puzzle, Search, SquarePen, Trash2, X } from "lucide-react";
 import { ProfileDock } from "@/components/profile-dock";
-import { SparkMark } from "@/components/spark-mark";
+import { BrandWordmark } from "@/components/brand-mark";
 import { api } from "@/lib/api";
 import { filteredChats, useChat } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
@@ -41,8 +41,7 @@ export function Sidebar() {
       >
         <div className="flex h-14 items-center justify-between px-3">
           <div className="flex items-center gap-2 px-1 text-foreground">
-            <SparkMark className="size-5" />
-            <span className="text-sm font-semibold tracking-tight">Friday</span>
+            <BrandWordmark className="text-base" />
           </div>
           <button
             type="button"
