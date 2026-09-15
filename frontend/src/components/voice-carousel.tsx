@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type WheelEvent } from "react";
 import { motion, type PanInfo } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { fetchVoices, hueForVoice, randomDemoLine, speak, type VoiceOption } from "@/lib/chat/voices";
@@ -8,10 +8,11 @@ import { cn } from "@/lib/utils";
 
 type GenderFilter = "all" | "male" | "female";
 
-const CARD_WIDTH = 176;
-const CARD_GAP = 20;
+const CARD_WIDTH = 232;
+const CARD_GAP = 28;
 const STEP = CARD_WIDTH + CARD_GAP;
 const AUTO_SPEAK_DELAY = 400;
+const WHEEL_COOLDOWN_MS = 350;
 
 /**
  * Horizontal, swipeable voice picker — the centered card is the selected voice, and it speaks a
@@ -34,6 +35,8 @@ export function VoiceCarousel({
   const [analyser, setAnalyser] = useState<LiveAnalyser | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const autoSpeakTimer = useRef<number | null>(null);
+  const wheelCooldownRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +99,39 @@ export function VoiceCarousel({
     else if (power > threshold && index > 0) setIndex((i) => i - 1);
   }
 
+  function step(delta: number) {
+    setIndex((i) => Math.min(Math.max(i + delta, 0), filtered.length - 1));
+  }
+
+  // Right/left arrow keys move through the carousel while it's on screen.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        step(1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        step(-1);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered.length]);
+
+  // Trackpad horizontal swipe and mouse wheel both land here — one "tick" moves one card, with a
+  // short cooldown so a single scroll gesture (which fires many small wheel events) doesn't blow
+  // through several cards at once.
+  function onWheel(e: WheelEvent<HTMLDivElement>) {
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) < 12 || wheelCooldownRef.current) return;
+    wheelCooldownRef.current = true;
+    step(delta > 0 ? 1 : -1);
+    window.setTimeout(() => {
+      wheelCooldownRef.current = false;
+    }, WHEEL_COOLDOWN_MS);
+  }
+
   const trackOffset = -index * STEP;
 
   return (
@@ -130,7 +166,12 @@ export function VoiceCarousel({
 
       {voices && filtered.length > 0 && (
         <>
-          <div className="relative w-full overflow-hidden py-2" style={{ height: CARD_WIDTH + 8 }}>
+          <div
+            ref={containerRef}
+            onWheel={onWheel}
+            className="relative w-full overflow-hidden py-2"
+            style={{ height: CARD_WIDTH + 8 }}
+          >
             <motion.div
               className="absolute top-2 left-1/2 flex cursor-grab active:cursor-grabbing"
               style={{ gap: CARD_GAP, marginLeft: -CARD_WIDTH / 2 }}
@@ -155,21 +196,21 @@ export function VoiceCarousel({
                     style={{ width: CARD_WIDTH }}
                     className="flex shrink-0 flex-col items-center gap-2"
                   >
-                    <div className="relative size-24 shrink-0">
+                    <div className="relative size-36 shrink-0">
                       <ParticleSphere
                         analyser={centered ? analyser : null}
                         active={centered && speaking}
                         hue={hueForVoice(v.voiceId)}
-                        pointCount={centered ? 500 : 200}
+                        pointCount={centered ? 650 : 250}
                       />
                       {centered && loading && (
-                        <Loader2 className="absolute inset-0 m-auto size-5 animate-spin text-muted" />
+                        <Loader2 className="absolute inset-0 m-auto size-6 animate-spin text-muted" />
                       )}
                     </div>
-                    <span className={cn("truncate text-sm font-medium", centered ? "text-foreground" : "text-muted")}>
+                    <span className={cn("truncate text-base font-medium", centered ? "text-foreground" : "text-muted")}>
                       {v.name}
                     </span>
-                    <span className="truncate text-xs text-subtle capitalize">
+                    <span className="truncate text-sm text-subtle capitalize">
                       {v.gender}
                       {v.accent ? ` · ${v.accent}` : ""}
                     </span>
@@ -190,7 +231,9 @@ export function VoiceCarousel({
               />
             ))}
           </div>
-          <p className="text-xs text-subtle">Swipe or drag to browse — Friday says hello as each one centers.</p>
+          <p className="text-xs text-subtle">
+            Swipe, drag, scroll, or use the arrow keys — Friday says hello as each one centers.
+          </p>
         </>
       )}
     </div>
