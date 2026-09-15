@@ -1,6 +1,6 @@
 # Friday AI
 
-Multi-model AI chat platform. Users chat with any AI model (OpenAI, Anthropic, Gemini, OpenRouter, Sarvam AI, ElevenLabs, Ollama) selected from a model picker on the auth and chat pages, with mic-based speech-to-text. Admins manage provider API keys, auto-discover available models per provider, choose which models are shown to users, and monitor live health (working/not working) of every key from the Admin Panel — no redeploy needed to add/remove a provider key or model.
+Multi-model AI chat platform. Users chat with any AI model (OpenAI, Anthropic, Gemini, OpenRouter, Sarvam AI, ElevenLabs, Ollama) selected from a model picker in the chat app, with streaming replies (single model or Auto), a Team Up mode that asks several providers at once, and mic-based speech-to-text. Admins manage provider API keys, auto-discover available models per provider, choose which models are shown to users, and monitor live health (working/not working) of every key from the hidden Admin Panel — no redeploy needed to add/remove a provider key or model.
 
 ## Repo layout
 
@@ -24,11 +24,13 @@ This repo is built branch-by-branch, one feature per branch, merged into `main` 
 
 All branches above are merged into `main`; each still exists in git history/branches for reference and future work continues the same way — one branch per feature, merged once it works.
 
+The frontend from `feature/frontend-scaffold` was later replaced wholesale with a new design (chat UI, Settings, Canvas, Team Up mode) built on `@tanstack/react-router`, still talking to the same Express/Supabase backend — the backend also gained an SSE streaming endpoint (`POST /api/chat/conversations/:id/messages/stream`) alongside the original single-shot one. See `frontend/README.md` for the current pages/routes.
+
 ## Getting started
 
 1. Create a Supabase project, then run `supabase/migrations/0001_init.sql` in its SQL editor (see `supabase/README.md`, including how to promote your account to admin).
 2. `cd backend && npm install && cp .env.example .env` — fill in `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, then `npm run dev` (http://localhost:4000).
 3. `cd frontend && npm install && npm run dev` (http://localhost:5173, proxies `/api` to the backend).
-4. Sign up on `/auth`, promote yourself to admin in Supabase, open `/admin`, and add API keys for whichever of OpenAI / Anthropic / Gemini / OpenRouter / Sarvam AI / ElevenLabs / Ollama you want live — models are auto-discovered and health-checked as soon as a key is added. Toggle which models are enabled, and they immediately appear in the model selector on `/auth` and `/chat`.
+4. Sign up from the account menu in the chat app, promote yourself to admin in Supabase, open `/admin`, and add API keys for whichever of OpenAI / Anthropic / Gemini / OpenRouter / Sarvam AI / ElevenLabs / Ollama you want live — models are auto-discovered and health-checked as soon as a key is added. Toggle which models are enabled, and they immediately appear in the model picker in the composer.
 
 See `backend/README.md` and `frontend/README.md` for more detail on each side.
