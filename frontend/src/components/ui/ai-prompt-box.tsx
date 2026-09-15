@@ -19,11 +19,14 @@ import {
   ChevronDown,
   Zap,
   Users,
+  AudioLines,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, getModel, useModels } from "@/lib/chat/models";
 import { ProviderLogo } from "@/components/provider-logos";
+import { createLiveAnalyser, type LiveAnalyser } from "@/lib/audio/analyser";
+import { VoiceMode } from "@/components/voice-mode";
 import { api } from "@/lib/api";
 
 function ModelIcon({ id, providerSlug, className }: { id: string; providerSlug?: string; className?: string }) {
@@ -159,12 +162,19 @@ Button.displayName = "Button";
 
 function VoiceRecorder({
   isRecording,
+  analyser,
+  onCancel,
+  onConfirm,
   visualizerBars = 32,
 }: {
   isRecording: boolean;
+  analyser: LiveAnalyser | null;
+  onCancel: () => void;
+  onConfirm: () => void;
   visualizerBars?: number;
 }) {
   const [time, setTime] = React.useState(0);
+  const barRefs = React.useRef<(HTMLDivElement | null)[]>([]);
 
   React.useEffect(() => {
     if (!isRecording) {
@@ -175,6 +185,25 @@ function VoiceRecorder({
     return () => window.clearInterval(id);
   }, [isRecording]);
 
+  // Imperative rAF loop so live audio levels don't force a React re-render every frame.
+  React.useEffect(() => {
+    if (!isRecording || !analyser) return;
+    let raf = 0;
+    const tick = () => {
+      const data = analyser.getFrequencyData();
+      const step = Math.max(1, Math.floor(data.length / visualizerBars));
+      for (let i = 0; i < visualizerBars; i++) {
+        const v = data[i * step] ?? 0;
+        const pct = 12 + (v / 255) * 88;
+        const bar = barRefs.current[i];
+        if (bar) bar.style.height = `${pct}%`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isRecording, analyser, visualizerBars]);
+
   const mins = Math.floor(time / 60)
     .toString()
     .padStart(2, "0");
@@ -183,29 +212,44 @@ function VoiceRecorder({
   return (
     <div
       className={cn(
-        "flex w-full flex-col items-center justify-center py-3 transition-all duration-300",
+        "flex w-full items-center gap-3 py-2 transition-all duration-300",
         isRecording ? "opacity-100" : "h-0 opacity-0",
       )}
     >
-      <div className="mb-3 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        aria-label="Cancel recording"
+        className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground"
+      >
+        <X className="size-4" />
+      </button>
+      <div className="flex h-2 w-2 shrink-0 items-center justify-center">
         <div className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-        <span className="font-mono text-sm text-foreground/80">
-          {mins}:{secs}
-        </span>
       </div>
-      <div className="flex h-10 w-full items-center justify-center gap-0.5 px-4">
+      <span className="shrink-0 font-mono text-xs text-foreground/80">
+        {mins}:{secs}
+      </span>
+      <div className="flex h-9 min-w-0 flex-1 items-center justify-center gap-0.5">
         {Array.from({ length: visualizerBars }).map((_, i) => (
           <div
             key={i}
-            className="w-0.5 animate-pulse rounded-full bg-foreground/50"
-            style={{
-              height: `${15 + ((i * 37) % 85)}%`,
-              animationDelay: `${i * 0.05}s`,
-              animationDuration: `${0.5 + (i % 5) * 0.1}s`,
+            ref={(el) => {
+              barRefs.current[i] = el;
             }}
+            className="w-0.5 shrink-0 rounded-full bg-foreground/60 transition-[height] duration-75"
+            style={{ height: "12%" }}
           />
         ))}
       </div>
+      <button
+        type="button"
+        onClick={onConfirm}
+        aria-label="Confirm recording"
+        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+      >
+        <Check className="size-4" />
+      </button>
     </div>
   );
 }
@@ -463,6 +507,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const [attachError, setAttachError] = React.useState<string | null>(null);
     const [isRecording, setIsRecording] = React.useState(false);
     const [isTranscribing, setIsTranscribing] = React.useState(false);
+    const [recordError, setRecordError] = React.useState<string | null>(null);
+    const [liveAnalyser, setLiveAnalyser] = React.useState<LiveAnalyser | null>(null);
+    const [voiceModeOpen, setVoiceModeOpen] = React.useState(false);
     const [internalSearch, setInternalSearch] = React.useState(false);
     const [internalThink, setInternalThink] = React.useState(false);
     const [internalCanvas, setInternalCanvas] = React.useState(false);
@@ -472,28 +519,44 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const promptBoxRef = React.useRef<HTMLDivElement>(null);
     const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
     const chunksRef = React.useRef<Blob[]>([]);
+    const cancelledRef = React.useRef(false);
+    const analyserRef = React.useRef<LiveAnalyser | null>(null);
     const models = useModels((s) => s.models);
+
+    React.useEffect(() => {
+      if (!recordError) return;
+      const id = window.setTimeout(() => setRecordError(null), 4000);
+      return () => window.clearTimeout(id);
+    }, [recordError]);
 
     async function startRecording() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const recorder = new MediaRecorder(stream);
         chunksRef.current = [];
+        cancelledRef.current = false;
+        const analyser = createLiveAnalyser(stream);
+        analyserRef.current = analyser;
+        setLiveAnalyser(analyser);
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) chunksRef.current.push(e.data);
         };
         recorder.onstop = async () => {
           stream.getTracks().forEach((t) => t.stop());
-          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+          analyserRef.current?.close();
+          analyserRef.current = null;
+          setLiveAnalyser(null);
           setIsRecording(false);
+          if (cancelledRef.current) return;
+          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
           setIsTranscribing(true);
           try {
             const form = new FormData();
             form.append("audio", blob, "recording.webm");
             const res = await api.post<{ text: string }>("/voice/transcribe", form);
             setInput((prev) => (prev ? `${prev} ${res.text}` : res.text));
-          } catch {
-            /* transcription failed — leave input untouched */
+          } catch (err) {
+            setRecordError(err instanceof Error ? err.message : "Couldn't transcribe that recording");
           } finally {
             setIsTranscribing(false);
           }
@@ -503,12 +566,46 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
         setIsRecording(true);
       } catch {
         setIsRecording(false);
+        setRecordError("Couldn't access the microphone");
       }
     }
 
     function stopRecording() {
+      cancelledRef.current = false;
       mediaRecorderRef.current?.stop();
     }
+
+    function cancelRecording() {
+      cancelledRef.current = true;
+      mediaRecorderRef.current?.stop();
+    }
+
+    // Push-to-talk: hold Space anywhere on the page (when not typing, and not on a focused
+    // button, where Space already means "click") to dictate, release to transcribe it in.
+    React.useEffect(() => {
+      function isTypingOrActivatable(el: Element | null) {
+        if (!(el instanceof HTMLElement)) return false;
+        return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "BUTTON" || el.isContentEditable;
+      }
+      function onKeyDown(e: KeyboardEvent) {
+        if (e.code !== "Space" || e.repeat) return;
+        if (isTypingOrActivatable(document.activeElement)) return;
+        if (disabled || isRecording || isTranscribing || voiceModeOpen) return;
+        e.preventDefault();
+        void startRecording();
+      }
+      function onKeyUp(e: KeyboardEvent) {
+        if (e.code !== "Space" || !isRecording) return;
+        e.preventDefault();
+        stopRecording();
+      }
+      window.addEventListener("keydown", onKeyDown);
+      window.addEventListener("keyup", onKeyUp);
+      return () => {
+        window.removeEventListener("keydown", onKeyDown);
+        window.removeEventListener("keyup", onKeyUp);
+      };
+    }, [disabled, isRecording, isTranscribing, voiceModeOpen]);
 
     const showSearch = search ?? internalSearch;
     const showThink = think ?? internalThink;
@@ -604,6 +701,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const hasContent = input.trim() !== "" || files.length > 0;
     const currentModel = model ? getModel(models, model) : null;
 
+    function submitVoiceText(text: string) {
+      if (text.trim()) onSend(text.trim(), []);
+    }
+
     return (
       <>
         <PromptInput
@@ -672,6 +773,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             </div>
           )}
           {attachError && <p className="px-1 pb-1 text-xs text-danger">{attachError}</p>}
+          {recordError && <p className="px-1 pb-1 text-xs text-danger">{recordError}</p>}
 
           <div
             className={cn(
@@ -693,7 +795,14 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             />
           </div>
 
-          {isRecording && <VoiceRecorder isRecording={isRecording} />}
+          {isRecording && (
+            <VoiceRecorder
+              isRecording={isRecording}
+              analyser={liveAnalyser}
+              onCancel={cancelRecording}
+              onConfirm={stopRecording}
+            />
+          )}
 
           <PromptInputActions className="flex items-center justify-between gap-2 p-0 pt-2">
             <div
@@ -922,6 +1031,18 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             </div>
 
             <div className="flex items-center gap-1">
+              <PromptInputAction tooltip="Voice mode">
+                <button
+                  type="button"
+                  onClick={() => setVoiceModeOpen(true)}
+                  disabled={disabled}
+                  aria-label="Open voice mode"
+                  className="flex size-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <AudioLines className="h-4 w-4" />
+                </button>
+              </PromptInputAction>
+
               {currentModel && onModelChange && (
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild>
@@ -1016,6 +1137,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
         <ImageViewDialog
           imageUrl={selectedImage}
           onClose={() => setSelectedImage(null)}
+        />
+        <VoiceMode
+          open={voiceModeOpen}
+          onClose={() => setVoiceModeOpen(false)}
+          onSubmit={submitVoiceText}
         />
       </>
     );

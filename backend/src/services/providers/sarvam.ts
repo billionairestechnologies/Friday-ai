@@ -79,3 +79,48 @@ export async function sarvamTranscribe(apiKey: string, audio: Buffer, filename: 
   const body = (await res.json()) as { transcript: string };
   return body.transcript;
 }
+
+export type SarvamVoiceOption = {
+  voiceId: string;
+  name: string;
+  gender: "male" | "female";
+  language: "hi" | "gu";
+  languageLabel: string;
+  languageCode: string;
+  speaker: string;
+};
+
+// Curated Bulbul v3 speakers for Hindi and Gujarati — bulbul:v2 is deprecated, and its old
+// speaker names (meera, arvind, ...) don't exist on v3, so both had to be verified live against
+// the API. Sarvam's speakers aren't language-locked; the language comes from target_language_code.
+export const SARVAM_VOICES: SarvamVoiceOption[] = [
+  { voiceId: "sarvam:rahul:hi-IN", name: "Rahul", gender: "male", language: "hi", languageLabel: "Hindi", languageCode: "hi-IN", speaker: "rahul" },
+  { voiceId: "sarvam:priya:hi-IN", name: "Priya", gender: "female", language: "hi", languageLabel: "Hindi", languageCode: "hi-IN", speaker: "priya" },
+  { voiceId: "sarvam:rahul:gu-IN", name: "Rahul", gender: "male", language: "gu", languageLabel: "Gujarati", languageCode: "gu-IN", speaker: "rahul" },
+  { voiceId: "sarvam:priya:gu-IN", name: "Priya", gender: "female", language: "gu", languageLabel: "Gujarati", languageCode: "gu-IN", speaker: "priya" },
+];
+
+/** Text-to-speech via Sarvam Bulbul v3, used for the Hindi/Gujarati voices and as an emergency
+ *  fallback (English) when ElevenLabs has no working key. */
+export async function sarvamSynthesize(
+  apiKey: string,
+  text: string,
+  speaker = "priya",
+  languageCode = "en-IN",
+): Promise<Buffer> {
+  const res = await fetch(`${BASE_URL}/text-to-speech`, {
+    method: "POST",
+    headers: { "api-subscription-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      inputs: [text],
+      target_language_code: languageCode,
+      speaker,
+      model: "bulbul:v3",
+    }),
+  });
+  if (!res.ok) throw new Error(`Sarvam speech synthesis failed: ${res.status} ${await res.text()}`);
+  const body = (await res.json()) as { audios: string[] };
+  const b64 = body.audios[0];
+  if (!b64) throw new Error("Sarvam speech synthesis returned no audio");
+  return Buffer.from(b64, "base64");
+}

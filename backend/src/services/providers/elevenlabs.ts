@@ -31,7 +31,10 @@ export const elevenlabsAdapter: ProviderAdapter = {
 
   async healthCheck(apiKey: string): Promise<HealthCheckResult> {
     try {
-      const res = await fetch(`${BASE_URL}/user`, { headers: { "xi-api-key": apiKey } });
+      // /v1/user requires a "user_read" scope that a narrowly-scoped key (TTS/STT-only, which is
+      // all Friday needs) won't have — /v1/models only needs basic read access and is what
+      // listModels() already calls, so it's a truer check of "can this key do what we use it for."
+      const res = await fetch(`${BASE_URL}/models`, { headers: { "xi-api-key": apiKey } });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
       return { ok: true };
     } catch (err) {
@@ -54,4 +57,53 @@ export async function elevenlabsTranscribe(apiKey: string, audio: Buffer, filena
   if (!res.ok) throw new Error(`ElevenLabs transcription failed: ${res.status} ${await res.text()}`);
   const body = (await res.json()) as { text: string };
   return body.text;
+}
+
+export type VoiceOption = {
+  voiceId: string;
+  name: string;
+  gender: "male" | "female" | "neutral";
+  /** BCP-47-ish language tag the voice speaks in — drives which demo line gets read for it. */
+  language: string;
+  accent?: string;
+  description?: string;
+  previewUrl: string | null;
+};
+
+/** Lists selectable voices (the admin/user voice picker), each with a ready-made preview clip. */
+export async function elevenlabsListVoices(apiKey: string): Promise<VoiceOption[]> {
+  const res = await fetch(`${BASE_URL}/voices`, { headers: { "xi-api-key": apiKey } });
+  if (!res.ok) throw new Error(`ElevenLabs listVoices failed: ${res.status} ${await res.text()}`);
+  const body = (await res.json()) as {
+    voices: {
+      voice_id: string;
+      name: string;
+      labels?: { gender?: string; accent?: string; description?: string };
+      preview_url?: string | null;
+    }[];
+  };
+
+  return body.voices.map((v) => {
+    const gender = v.labels?.gender;
+    return {
+      voiceId: v.voice_id,
+      name: v.name.split(" - ")[0] ?? v.name,
+      gender: gender === "male" || gender === "female" ? gender : "neutral",
+      language: "en",
+      accent: v.labels?.accent,
+      description: v.labels?.description,
+      previewUrl: v.preview_url ?? null,
+    };
+  });
+}
+
+/** Synthesizes speech for one line of text with the given voice, returning raw MP3 bytes. */
+export async function elevenlabsSynthesize(apiKey: string, text: string, voiceId: string): Promise<Buffer> {
+  const res = await fetch(`${BASE_URL}/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ text, model_id: "eleven_turbo_v2_5" }),
+  });
+  if (!res.ok) throw new Error(`ElevenLabs speech synthesis failed: ${res.status} ${await res.text()}`);
+  return Buffer.from(await res.arrayBuffer());
 }

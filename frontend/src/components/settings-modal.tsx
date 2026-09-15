@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+  AudioLines,
   Bell,
   Check,
   CreditCard,
@@ -17,6 +18,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useModels } from "@/lib/chat/models";
 import { saveFile } from "@/lib/chat/download";
 import { useChat } from "@/lib/chat/store";
+import { VoicePicker } from "@/components/voice-picker";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -26,6 +28,7 @@ const NAV = [
       { id: "account", label: "Account", icon: UserRound },
       { id: "appearance", label: "Appearance", icon: Palette },
       { id: "behavior", label: "Behavior", icon: SlidersHorizontal },
+      { id: "voice", label: "Voice", icon: AudioLines },
       { id: "notifications", label: "Notifications", icon: Bell },
     ],
   },
@@ -112,6 +115,7 @@ export function SettingsModal() {
               {tab === "account" && <AccountPane />}
               {tab === "appearance" && <AppearancePane />}
               {tab === "behavior" && <BehaviorPane />}
+              {tab === "voice" && <VoicePane />}
               {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
               {tab === "customize" && <SimpleNote title="Customize" body="Search, Think, and Canvas live in the composer. Personality stays direct and truthful." />}
               {tab === "billing" && <BillingPane />}
@@ -281,6 +285,21 @@ function BehaviorPane() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function VoicePane() {
+  const voiceId = useChat((s) => s.voiceId);
+  const setVoice = useChat((s) => s.setVoice);
+
+  return (
+    <div>
+      <h2 className="mb-1 text-lg font-semibold">Voice</h2>
+      <p className="mb-4 text-sm text-muted">
+        Picked here or in Voice Mode — this is who reads Friday's replies aloud.
+      </p>
+      <VoicePicker selectedId={voiceId} onSelect={(v) => setVoice(v.voiceId, v.name)} />
     </div>
   );
 }
