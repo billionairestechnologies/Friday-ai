@@ -1,6 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt } from "./types.js";
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -23,8 +23,7 @@ export const anthropicAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const conversation = messages.filter((m) => m.role !== "system");
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -58,8 +57,7 @@ export const anthropicAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const conversation = messages.filter((m) => m.role !== "system");
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",

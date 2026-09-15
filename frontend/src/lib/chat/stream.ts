@@ -12,17 +12,28 @@ async function fetchStream(
   webSearch: boolean,
   signal: AbortSignal,
   isRetry = false,
+  isNetworkRetry = false,
 ): Promise<Response> {
   const token = getAccessToken();
-  const res = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ content, inputMode, think, behavior, webSearch }),
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ content, inputMode, think, behavior, webSearch }),
+      signal,
+    });
+  } catch (err) {
+    // fetch() itself (not the response) can throw on a dropped connection — most visibly on
+    // mobile Safari/WebKit, where a brief network blip surfaces as a bare "TypeError: Load
+    // failed" before any bytes come back. That's usually transient, so retry once before
+    // giving up and showing the user an opaque network error.
+    if (isNetworkRetry || (err as { name?: string }).name === "AbortError") throw err;
+    return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, signal, isRetry, true);
+  }
   // Same short-lived-token gap as fetchSpeech in voices.ts: a raw 401 here surfaces the
   // backend's literal "Missing bearer token"/"Invalid or expired session" text to the user
   // instead of quietly refreshing and retrying like the shared `api` client does.
