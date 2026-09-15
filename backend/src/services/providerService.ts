@@ -174,6 +174,17 @@ export interface ChatCandidate {
   displayName: string;
 }
 
+/** Looks up a single model's friendly display name (e.g. "Sarvam 105B") for reply labels. Falls back to the raw model id. */
+export async function getModelDisplayName(providerId: string, modelId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("provider_models")
+    .select("display_name")
+    .eq("provider_id", providerId)
+    .eq("model_id", modelId)
+    .maybeSingle();
+  return data?.display_name ?? modelId;
+}
+
 /**
  * Enabled, chat-capable models whose provider currently has a working key —
  * the pool that Auto and Team Up modes pick from.
