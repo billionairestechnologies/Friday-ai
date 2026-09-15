@@ -51,3 +51,17 @@ export function safeErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "Unknown error";
 }
+
+/**
+ * Splits a message list into a single combined system prompt and the remaining conversation —
+ * for providers (Anthropic, Gemini) whose API takes one top-level system string rather than
+ * interleaved system-role messages. Joins every system message instead of keeping only the
+ * first: chatService can prepend several (focus/honesty instructions, web search results,
+ * behavior persona, the Think nudge), and dropping all but one silently disables the rest.
+ */
+export function splitSystemPrompt(messages: ChatMessage[]): { system: string | undefined; conversation: ChatMessage[] } {
+  const systemMessages = messages.filter((m) => m.role === "system");
+  const conversation = messages.filter((m) => m.role !== "system");
+  const system = systemMessages.length > 0 ? systemMessages.map((m) => m.content).join("\n\n") : undefined;
+  return { system, conversation };
+}

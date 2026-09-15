@@ -1,6 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt } from "./types.js";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -24,10 +24,11 @@ export const geminiAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const contents = messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+    const { system, conversation } = splitSystemPrompt(messages);
+    const contents = conversation.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
     const res = await fetch(
       `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -58,10 +59,11 @@ export const geminiAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const contents = messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+    const { system, conversation } = splitSystemPrompt(messages);
+    const contents = conversation.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
     const res = await fetch(
       `${BASE_URL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`,

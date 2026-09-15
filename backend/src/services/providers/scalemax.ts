@@ -1,6 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt } from "./types.js";
 
 // ScaleMax (api.scalemax.pro) proxies Claude models behind an Anthropic-compatible
 // /messages API, so this adapter mirrors the Anthropic one but targets ScaleMax's base
@@ -22,8 +22,7 @@ export const scalemaxAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const conversation = messages.filter((m) => m.role !== "system");
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -67,8 +66,7 @@ export const scalemaxAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const conversation = messages.filter((m) => m.role !== "system");
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",

@@ -223,7 +223,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
     promise,
     new Promise<T>((_, reject) => {
       const id = setTimeout(() => reject(new Error(`${label} took too long to respond`)), ms);
-      promise.finally(() => clearTimeout(id));
+      // NOT `promise.finally(...)`: `.finally()` returns a new derived promise that re-throws
+      // the original rejection, and nothing here holds onto or awaits that derived promise. If
+      // `promise` rejects after this race has already settled via the timeout branch (a slow
+      // provider that eventually errors — confirmed in production against a Cloudflare 524 from
+      // ScaleMax), that orphaned derived promise becomes an unhandled rejection and crashes the
+      // whole Node process, taking down every other in-flight request with it. `.then` with both
+      // handlers clears the timer without producing a floating rejection.
+      promise.then(
+        () => clearTimeout(id),
+        () => clearTimeout(id),
+      );
     }),
   ]);
 }
