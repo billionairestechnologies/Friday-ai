@@ -13,8 +13,9 @@
 import { useEffect, useState } from "react";
 
 type AgeBand = "teen" | "twenties" | "thirties_plus";
-/** Mirrors ChatMessage["status"] — "working" covers plain replies and the null/no-status case. */
-export type ThinkingMode = "working" | "thinking" | "searching";
+/** Mirrors ChatMessage["status"] — "working" covers plain replies and the null/no-status case.
+ *  "canvas" is for the Canvas-build step log (writing code), not a status value. */
+export type ThinkingMode = "working" | "thinking" | "searching" | "canvas";
 
 const WORKING_GENERIC = ["Thinking…", "Working on it…", "One sec…", "Putting this together…"];
 
@@ -67,10 +68,31 @@ const SEARCHING_FUN = [
   "Chasing down the latest on this…",
 ];
 
+// "Canvas" mode — writing/building-flavored, for the live code-generation step log.
+const CANVAS_GENERIC = [
+  "Writing the code…",
+  "Laying out the structure…",
+  "Wiring it together…",
+  "Putting the pieces together…",
+];
+
+const CANVAS_BAND: Record<AgeBand, string[]> = {
+  teen: ["Building it out…", "Making it look clean…", "Getting the details right…"],
+  twenties: ["Shipping this…", "Building it properly…", "Getting the layout right…"],
+  thirties_plus: ["Building this out carefully…", "Getting the structure right…", "Assembling the pieces…"],
+};
+
+const CANVAS_FUN = [
+  "Making it pixel-perfect…",
+  "Sweating the small details…",
+  "Making this actually work…",
+];
+
 const MODE_POOLS: Record<ThinkingMode, { generic: string[]; band: Record<AgeBand, string[]>; fun: string[] }> = {
   working: { generic: WORKING_GENERIC, band: WORKING_BAND, fun: [] },
   thinking: { generic: THINKING_GENERIC, band: THINKING_BAND, fun: THINKING_FUN },
   searching: { generic: SEARCHING_GENERIC, band: SEARCHING_BAND, fun: SEARCHING_FUN },
+  canvas: { generic: CANVAS_GENERIC, band: CANVAS_BAND, fun: CANVAS_FUN },
 };
 
 function ageFromBirthday(birthday: string): number | null {
@@ -137,4 +159,22 @@ export function useRotatingThinkingLine(
   }, [mode]);
 
   return line;
+}
+
+/** "Working for Ns" — a live elapsed-time counter while `active`, matching the running timer on
+ *  Grok's own step log. Resets to 0 each time `active` goes from false to true (a fresh turn). */
+export function useElapsedSeconds(active: boolean): number {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    setSeconds(0);
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      setSeconds(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+
+  return seconds;
 }

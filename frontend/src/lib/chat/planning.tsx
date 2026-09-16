@@ -34,7 +34,7 @@ export function planTitle(message: ChatMessage) {
   return "Plan";
 }
 
-export function planningStepsFromMessage(message: ChatMessage): PlanStep[] {
+export function planningStepsFromMessage(message: ChatMessage, writingLine?: string): PlanStep[] {
   const streaming = Boolean(message.streaming);
   const status = message.status;
   const hasContent = Boolean(message.content.trim());
@@ -180,7 +180,7 @@ export function planningStepsFromMessage(message: ChatMessage): PlanStep[] {
 
   steps.push({
     id: "write",
-    title: failed ? "Could not finish the reply" : "Write the reply",
+    title: failed ? "Could not finish the reply" : message.usedCanvas ? "Generate the code" : "Write the reply",
     status: failed && !writeDone ? "error" : writeDone ? "success" : writeActive ? "active" : "pending",
     icon: failed ? <AlertTriangle className="size-3.5" /> : <Code className="size-3.5" />,
     duration: writeActive ? "…" : undefined,
@@ -192,7 +192,7 @@ export function planningStepsFromMessage(message: ChatMessage): PlanStep[] {
     ) : writeActive ? (
       <div className="flex items-center gap-2 font-mono text-[11px] text-sky-400">
         <Loader2 className="size-3.5 animate-spin" />
-        <span>Streaming the answer…</span>
+        <span>{writingLine ?? "Streaming the answer…"}</span>
       </div>
     ) : undefined,
   });

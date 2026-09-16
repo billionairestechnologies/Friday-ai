@@ -8,7 +8,7 @@ import {
 import { ProviderLogo } from "@/components/provider-logos";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { planningStepsFromMessage } from "@/lib/chat/planning";
-import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
+import { useElapsedSeconds, useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import type { ChatMessage } from "@/lib/chat/types";
 
 function hostOf(url: string) {
@@ -51,6 +51,11 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
   const { user } = useCurrentUserState();
   const searchLine = useRotatingThinkingLine(searchActive, user?.birthday, "searching");
   const thinkLine = useRotatingThinkingLine(thinkActive, user?.birthday, "thinking");
+  // Canvas-only path: same "Streaming the answer…" gap, but with a "writing code" flavor and a
+  // live elapsed-time counter — matching the reference product's own "Working for Ns" readout.
+  const canvasWriteActive = canvasOn && streaming && (status === "writing" || hasContent);
+  const canvasWriteLine = useRotatingThinkingLine(canvasWriteActive, user?.birthday, "canvas");
+  const elapsedSeconds = useElapsedSeconds(canvasOn && streaming);
 
   const live = streaming && !failed;
   const label = failed
@@ -83,8 +88,8 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
     return (
       <AgentPlanning
         variant="bare"
-        title={live ? "Planning" : "Plan"}
-        steps={planningStepsFromMessage(message)}
+        title={live ? `Planning · ${elapsedSeconds}s` : "Plan"}
+        steps={planningStepsFromMessage(message, canvasWriteLine)}
       />
     );
   }
