@@ -74,6 +74,7 @@ export function LoginPopout() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthday, setBirthday] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,7 +99,7 @@ export function LoginPopout() {
         await login(email, password);
         setStep("otp");
       } else {
-        await signup(name, email, phone, password);
+        await signup(name, email, phone, birthday, password);
         setStep("otp");
       }
     } catch (err) {
@@ -241,6 +242,17 @@ export function LoginPopout() {
                   required
                   className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
                 />
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-muted">Birthday</span>
+                  <input
+                    type="date"
+                    value={birthday}
+                    onChange={(e) => setBirthday(e.target.value)}
+                    required
+                    max={new Date().toISOString().slice(0, 10)}
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
+                  />
+                </label>
               </>
             )}
             <input

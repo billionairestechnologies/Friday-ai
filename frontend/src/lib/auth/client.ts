@@ -24,9 +24,15 @@ type AuthState = {
   resendOtp: (email: string) => Promise<void>;
   /** The hidden /admin gate's own login — skips the OTP step (see backend adminLogin for why). */
   adminLogin: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, phone: string, password: string) => Promise<{ email: string }>;
-  /** Fills in optional profile fields — phone (the "complete your profile" prompt) and/or
-   *  birthday (Settings → Account, fully optional). */
+  signup: (
+    name: string,
+    email: string,
+    phone: string,
+    birthday: string,
+    password: string,
+  ) => Promise<{ email: string }>;
+  /** Fills in profile fields missing on an account — phone/birthday (the "complete your profile"
+   *  prompt for older accounts) and/or birthday alone (Settings → Account). */
   updateProfile: (patch: { phone?: string; birthday?: string }) => Promise<void>;
   logout: () => void;
   /** Exchanges the stored refresh token for a new access token. Returns whether it worked. */
@@ -96,11 +102,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   /** Creates the account, then sends the same 6-digit OTP flow as login() — signup only
    *  completes once that code is confirmed with verifyOtp(). */
-  signup: async (name, email, phone, password) => {
+  signup: async (name, email, phone, birthday, password) => {
     const res = await api.post<{ otpRequired: true; email: string }>("/auth/signup", {
       name,
       email,
       phone,
+      birthday,
       password,
     });
     return { email: res.email };

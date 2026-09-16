@@ -10,6 +10,10 @@ const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().email(),
   phone: z.string().trim().min(7, "Enter a valid mobile number").max(20),
+  birthday: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
@@ -65,13 +69,13 @@ export async function adminLogin(req: Request, res: Response) {
  * for the other.
  */
 export async function signup(req: Request, res: Response) {
-  const { name, email, phone, password } = signupSchema.parse(req.body);
+  const { name, email, phone, birthday, password } = signupSchema.parse(req.body);
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: name, phone },
+    user_metadata: { full_name: name, phone, birthday },
   });
 
   if (error || !data.user) {
@@ -80,6 +84,10 @@ export async function signup(req: Request, res: Response) {
       : (error?.message ?? "Couldn't create that account");
     throw new HttpError(400, message);
   }
+
+  // The handle_new_user trigger only sets full_name/phone from raw_user_meta_data (it predates
+  // birthday) — set it directly rather than touching that trigger for one more column.
+  await supabaseAdmin.from("profiles").update({ birthday }).eq("id", data.user.id);
 
   const { data: signInData, error: signInError } = await supabasePublic.auth.signInWithPassword({
     email,
