@@ -8,6 +8,16 @@ import type { WebSearchResult } from "../webSearch.js";
 const FOCUS_SYSTEM_PROMPT =
   "Always respond to the user's latest message specifically. Earlier messages in this conversation are context, not the question — if the latest message is a greeting, a short reaction, or changes topic, respond to that directly instead of continuing to elaborate on an earlier topic.";
 
+// Confirmed live in production (2026-09-16): a user attached a screenshot and typed just "see"
+// on an existing long conversation about an unrelated topic (arbitrage). Web search fired on the
+// literal word "see" (garbage results — dictionary entries), and the model, faced with a short
+// caption plus useless search results plus a long prior topic, just continued the OLD topic and
+// never engaged with the attachment at all. FOCUS_SYSTEM_PROMPT alone wasn't enough — a short
+// caption next to a fresh attachment needs to be read as "look at what I just attached," not as
+// a content-free reaction to fall back to whatever was being discussed before.
+const ATTACHMENT_FOCUS_SYSTEM_PROMPT =
+  "The user just attached one or more files to THIS message. Whatever the caption says — even if it's just one word like \"see\" or \"check this\" — that attachment is what this message is actually about. Look at/read it and respond to its actual content directly. Do not fall back to continuing an earlier, unrelated topic from this conversation just because the caption is short.";
+
 // Keeps replies grounded instead of reflexively agreeable — a request that's factually wrong,
 // physically impossible, or a bad idea should be told so plainly, not validated.
 const HONESTY_SYSTEM_PROMPT =
@@ -87,7 +97,7 @@ export function trimHistoryToBudget(history: ChatMessage[]): ChatMessage[] {
   return history.slice(cutoff);
 }
 
-/** Prepends web search results, a persona/behavior instruction, and/or the Think/Canvas nudges, in that order. */
+/** Prepends web search results, a persona/behavior instruction, and/or the Think/Canvas/attachment nudges, in that order. */
 export function withSystemPreamble(
   history: ChatMessage[],
   think: boolean,
@@ -95,6 +105,7 @@ export function withSystemPreamble(
   webSearch: boolean,
   searchResults: WebSearchResult[],
   canvas: boolean = false,
+  hasAttachments: boolean = false,
 ): ChatMessage[] {
   const preamble: ChatMessage[] = [
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
@@ -103,9 +114,12 @@ export function withSystemPreamble(
   if (webSearch) preamble.push(searchResultsToSystemMessage(searchResults));
   if (behavior.trim()) preamble.push({ role: "system", content: behavior.trim() });
   if (think) preamble.push({ role: "system", content: THINK_SYSTEM_PROMPT });
-  // Canvas last so it's the most recent/salient instruction — it overrides Think's "give a clear
-  // direct final answer" framing with "that final answer IS the code fence," not prose about it.
+  // Canvas, then attachment-focus last of all — each overrides what came before it for the same
+  // reason: the most recent instruction is the most salient one. A fresh attachment with a short
+  // caption needs to win over everything else (an old topic, irrelevant search results), which is
+  // exactly the case that failed in production — see ATTACHMENT_FOCUS_SYSTEM_PROMPT's comment.
   if (canvas) preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
+  if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT });
   return preamble.length ? [...preamble, ...history] : history;
 }
 

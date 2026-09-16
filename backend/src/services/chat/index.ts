@@ -101,8 +101,20 @@ export async function streamMessage(
     .order("created_at");
   if (historyError) throw new HttpError(500, historyError.message);
 
+  // Confirmed live in production: Search blindly ran on the literal message text regardless of
+  // whether that text was an actual query — a screenshot attached with the caption "see" searched
+  // the web for the word "see" and got back Thai-English dictionary entries. A short caption next
+  // to a fresh attachment is a reference to the attachment ("look at this"), not a search query,
+  // so it's skipped here rather than handed to a search API that has no way to know that.
+  const SHORT_CAPTION_CHARS = 20;
+  const looksLikeSearchQuery = attachments.length === 0 || content.trim().length >= SHORT_CAPTION_CHARS;
+  // Gates both the actual search call AND the "a search ran" system message below — skipping the
+  // fetch but still telling the model a search happened (and came back empty) would be its own
+  // false statement, not an improvement on the original bug.
+  const searchActuallyRan = webSearch && looksLikeSearchQuery;
+
   let searchResults: Awaited<ReturnType<typeof searchWeb>> = [];
-  if (webSearch) {
+  if (searchActuallyRan) {
     onEvent({ t: "status", s: "searching" });
     searchResults = await searchWeb(content).catch(() => []);
     console.log(`[chat] web search "${content}" -> ${searchResults.length} results`);
@@ -121,14 +133,22 @@ export async function streamMessage(
   }
   const history = appendExtractedText(
     attachImages(
-      withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults, canvas),
+      withSystemPreamble(
+        trimHistoryToBudget(historyRows as ChatMessage[]),
+        think,
+        behavior,
+        searchActuallyRan,
+        searchResults,
+        canvas,
+        attachments.length > 0,
+      ),
       attachments,
     ),
     extractedDocText,
   );
 
   if (mode === "teamup") {
-    await streamTeamUp(conversationId, content, history, searchResults, webSearch, onEvent, signal);
+    await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal);
     return;
   }
 
