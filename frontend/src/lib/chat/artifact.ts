@@ -6,7 +6,7 @@ export type Artifact = {
 };
 
 const FENCE = /```(\w+)?\n([\s\S]*?)```/g;
-// Languages Canvas can actually execute for real (in an isolated CodeSandbox VM), vs. just
+// Languages Canvas can actually execute for real (in an isolated E2B VM), vs. just
 // display as static text — see runnable.ts and the sandbox controller/service on the backend.
 const RUNNABLE_LANGS = new Set(["python", "py", "javascript", "js"]);
 

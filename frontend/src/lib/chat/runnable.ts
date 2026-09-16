@@ -19,7 +19,7 @@ export function normalizeRunLanguage(lang?: string): RunLanguage | null {
   return LANG_ALIASES[lang.toLowerCase()] ?? null;
 }
 
-/** Runs a code snippet for real in the user's own isolated CodeSandbox VM and returns its output. */
+/** Runs a code snippet for real in the user's own isolated E2B VM and returns its output. */
 export async function runSandboxCode(language: RunLanguage, code: string): Promise<RunResult> {
   return api.post<RunResult>("/sandbox/run", { language, code });
 }

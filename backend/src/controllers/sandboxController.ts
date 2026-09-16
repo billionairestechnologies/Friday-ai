@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import * as codesandboxService from "../services/codesandboxService.js";
+import * as e2bService from "../services/e2bService.js";
 
 const runSchema = z.object({
   language: z.enum(["python", "javascript"]),
@@ -9,6 +9,6 @@ const runSchema = z.object({
 
 export async function run(req: Request, res: Response) {
   const { language, code } = runSchema.parse(req.body);
-  const result = await codesandboxService.runCode(req.user!.id, language, code);
+  const result = await e2bService.runCode(req.user!.id, language, code);
   res.json(result);
 }

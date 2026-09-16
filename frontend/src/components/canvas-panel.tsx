@@ -37,7 +37,7 @@ function filenameFor(kind: string, lang?: string) {
 
 /**
  * Python/JS blocks get a real "Run" button — actual execution in the user's own isolated
- * CodeSandbox VM (backend's /api/sandbox/run), not just a static text dump. Runs are opt-in
+ * E2B VM (backend's /api/sandbox/run), not just a static text dump. Runs are opt-in
  * (never automatic) since code execution has real side effects/cost, unlike the html/react
  * previews which just render in a client-side sandboxed iframe.
  */
