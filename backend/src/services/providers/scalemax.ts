@@ -33,7 +33,10 @@ export const scalemaxAdapter: ProviderAdapter = {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2048,
+        // Same reasoning as anthropic.ts: Think mode's step-by-step text shares this budget, and
+        // 2048 was cutting replies off mid-thought (Anthropic max_tokens stop_reason) well before
+        // long-context/reasoning replies were done.
+        max_tokens: 8192,
         system,
         messages: conversation.map((m) => ({ role: m.role, content: m.content })),
       }),
@@ -77,7 +80,7 @@ export const scalemaxAdapter: ProviderAdapter = {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2048,
+        max_tokens: 8192,
         system,
         stream: true,
         messages: conversation.map((m) => ({ role: m.role, content: m.content })),

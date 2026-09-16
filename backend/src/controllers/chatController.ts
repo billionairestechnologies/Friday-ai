@@ -92,6 +92,12 @@ export async function streamMessage(req: Request, res: Response) {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
+  // Team Up and Think mode can go silent for well over a minute while a reasoning model works —
+  // no bytes on the wire in that window looks identical, to Railway's edge/Cloudflare, to a dead
+  // connection, and either can close it. An SSE comment line (ignored by the client's parser,
+  // which only reads `data:` lines) keeps the connection visibly alive without affecting events.
+  const heartbeat = setInterval(() => res.write(": ping\n\n"), 15_000);
+
   try {
     await chatService.streamMessage(
       req.user!.id,
@@ -109,6 +115,7 @@ export async function streamMessage(req: Request, res: Response) {
     send({ t: "err", c: message });
     send({ t: "done" });
   } finally {
+    clearInterval(heartbeat);
     res.end();
   }
 }

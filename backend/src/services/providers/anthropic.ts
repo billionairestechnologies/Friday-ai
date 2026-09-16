@@ -34,7 +34,12 @@ export const anthropicAdapter: ProviderAdapter = {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2048,
+        // Think mode is a prompted nudge, not native extended thinking — the model writes its
+        // step-by-step reasoning as ordinary output text ahead of the final answer, so it shares
+        // this same budget. At 2048 that reasoning (worse with long context) regularly ate the
+        // whole budget and hit Anthropic's max_tokens stop_reason before any final answer came
+        // out — indistinguishable from the reply randomly stopping mid-thought.
+        max_tokens: 8192,
         system,
         messages: conversation.map((m) => ({ role: m.role, content: m.content })),
       }),
@@ -68,7 +73,7 @@ export const anthropicAdapter: ProviderAdapter = {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2048,
+        max_tokens: 8192,
         system,
         stream: true,
         messages: conversation.map((m) => ({ role: m.role, content: m.content })),

@@ -65,6 +65,33 @@ function searchResultsToSystemMessage(results: WebSearchResult[]): ChatMessage {
   };
 }
 
+// Every send refetches and resends the ENTIRE conversation history with no cap — fine for short
+// chats, but a long-running one eventually exceeds a provider's context window outright (a hard
+// 400 from the API, with no partial reply) and gets slower/costlier every single turn regardless.
+// Team Up in particular fans the same history out to whichever smaller-context models happen to
+// be enabled, so the budget has to hold for the smallest realistic context window, not just
+// Claude/Gemini's much larger ones. ~90k chars (~22k tokens at a rough 4 chars/token) comfortably
+// fits everything actually enabled today while still covering a genuinely long conversation.
+const MAX_HISTORY_CHARS = 90_000;
+
+/**
+ * Keeps the most recent messages that fit within MAX_HISTORY_CHARS, always keeping at least the
+ * latest message (a single very long paste can still exceed the budget on its own) and dropping
+ * from the oldest end first — a simple, provider-agnostic stand-in for real summarization.
+ */
+function trimHistoryToBudget(history: ChatMessage[]): ChatMessage[] {
+  let total = 0;
+  let cutoff = history.length;
+  for (let i = history.length - 1; i >= 0; i--) {
+    total += history[i]!.content.length;
+    if (total > MAX_HISTORY_CHARS && i < history.length - 1) {
+      cutoff = i + 1;
+      break;
+    }
+  }
+  return history.slice(cutoff);
+}
+
 /** Prepends web search results, a persona/behavior instruction, and/or the Think nudge, in that order. */
 function withSystemPreamble(
   history: ChatMessage[],
@@ -216,7 +243,15 @@ async function insertAssistantMessage(conversationId: string, content: string, m
 // GPU, a network stall) can hang a fetch indefinitely. That's fatal for Auto/Team Up, which wait
 // on multiple candidates — one hung candidate blocks the whole reply forever with no error shown.
 // This bounds every non-streaming call so a stuck candidate fails instead of hanging the request.
-const CANDIDATE_TIMEOUT_MS = 45_000;
+//
+// Confirmed in production (2026-09-16): Team Up proposers and the synthesis call are always
+// non-streaming (callCandidate), and a reasoning ("Think") model working over a long context can
+// easily run past a minute before it has anything to return. At 45s that reads as every proposer
+// erroring out ("Every model in the team failed to respond") — indistinguishable from the whole
+// feature randomly dying mid-thought. 45s was tuned for a stuck/hung connection, not a slow-but-
+// working one; raised well above realistic Think/long-context latency so it only fires on an
+// actually-dead request.
+const CANDIDATE_TIMEOUT_MS = 150_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -314,7 +349,7 @@ export async function sendMessage(
   if (historyError) throw new HttpError(500, historyError.message);
 
   const searchResults = webSearch ? await searchWeb(content).catch(() => []) : [];
-  const history = withSystemPreamble(historyRows as ChatMessage[], think, behavior, webSearch, searchResults);
+  const history = withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults);
 
   const mode = conversation.mode as ConversationMode;
   let replies: Awaited<ReturnType<typeof insertAssistantMessage>>[];
@@ -511,7 +546,7 @@ export async function streamMessage(
     console.log(`[chat] web search "${content}" -> ${searchResults.length} results`);
     for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
   }
-  const history = withSystemPreamble(historyRows as ChatMessage[], think, behavior, webSearch, searchResults);
+  const history = withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults);
 
   if (mode === "teamup") {
     await streamTeamUp(conversationId, content, history, searchResults, webSearch, onEvent, signal);
