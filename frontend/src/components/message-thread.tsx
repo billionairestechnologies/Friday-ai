@@ -112,11 +112,16 @@ const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage 
 
 const AssistantBlock = memo(function AssistantBlock({ message }: { message: ChatMessage }) {
   const plan = shouldShowPlan(message);
+  // The backend sends `status: "thinking"` almost immediately after a plain (no Think/Search/
+  // Canvas) send starts — before that fix this excluded "thinking", so the typing-dots appeared
+  // for a "working" instant and then vanished the moment that status event landed, leaving
+  // nothing visible until the first token of real content arrived (which can be several seconds
+  // on a slow model). "thinking" now keeps the dots up through that whole gap.
   const waiting =
     message.streaming &&
     !message.content &&
     !message.thinking &&
-    (message.status === "working" || !message.status);
+    (message.status === "working" || message.status === "thinking" || !message.status);
   const done = !message.streaming;
 
   return (

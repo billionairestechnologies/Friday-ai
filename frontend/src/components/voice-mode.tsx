@@ -165,11 +165,31 @@ export function VoiceMode({
         setReplyText(text);
         void speakReply(text);
       } else {
-        onClose();
+        // Previously silently closed here — from the user's side that's indistinguishable from
+        // "the AI just didn't respond," which is exactly what got reported. Every error path in
+        // this component used to close with zero explanation; this is the first of a few fixes
+        // making a real failure visible instead of a bare, unexplained overlay disappearing.
+        setError(msg?.error || "Didn't get a reply — try again.");
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
+
+  // Voice Mode has no way to know WHY a turn never starts streaming (send() bailing out early —
+  // a stuck busy flag, no active conversation, an auth hiccup — never calls startLive, so `live`
+  // never goes truthy and the effect above never fires). Without this, that leaves the user
+  // staring at "Thinking…" forever with no feedback at all — reported live as "not responding
+  // back." This is a plain safety net, not the primary path.
+  useEffect(() => {
+    if (phase !== "responding") return;
+    const timeout = window.setTimeout(() => {
+      if (phase === "responding" && !replyText) {
+        setError("This is taking too long — try again.");
+      }
+    }, 25_000);
+    return () => window.clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   async function speakReply(text: string) {
     try {
@@ -178,10 +198,12 @@ export function VoiceMode({
       setAnalyser(spoken.analyser);
       setHearing(true);
       await spoken.done;
-    } catch {
-      /* TTS failed — the reply is still visible as text in the transcript, just not read aloud */
-    } finally {
       onClose();
+    } catch {
+      // TTS failed — the reply text is already visible in the main chat transcript (it was
+      // inserted before this ever runs), but silently closing the voice overlay here still
+      // reads as "nothing happened" in the moment. Show it instead of vanishing.
+      setError("Couldn't play that reply out loud — it's in the chat as text.");
     }
   }
 
@@ -294,10 +316,26 @@ export function VoiceMode({
               <div className="size-64 max-w-[70vw]">
                 <ParticleSphere analyser={analyser} active={hearing} hue={hue} />
               </div>
-              {phase === "responding" && !replyText && (
+              {phase === "responding" && !replyText && !error && (
                 <Loader2 className="size-5 animate-spin text-muted" />
               )}
-              {error && <p className="text-sm text-danger">{error}</p>}
+              {error && (
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-sm text-danger">{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null);
+                      setCaption("");
+                      setReplyText("");
+                      setPhase("listening");
+                    }}
+                    className="rounded-full border border-border px-4 py-1.5 text-sm text-foreground transition-colors hover:bg-chip"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
