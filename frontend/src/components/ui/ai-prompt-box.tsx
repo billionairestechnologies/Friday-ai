@@ -867,9 +867,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 ref={documentInputRef}
                 type="file"
                 className="hidden"
-                // PDF is the only document type the backend actually sends to a model (Anthropic/
-                // ScaleMax/Gemini support it as a native document block) — anything else here
-                // would look attached in the UI but silently vanish before the request went out.
+                // PDF is the only document type the backend actually processes (extracted to text
+                // server-side via Sarvam's Doc AI, so it works with any model) — anything else
+                // here would look attached in the UI but silently vanish before the request went out.
                 accept=".pdf"
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);

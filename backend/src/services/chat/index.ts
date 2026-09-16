@@ -11,7 +11,14 @@ import {
 } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
-import { attachImages, trimHistoryToBudget, unsupportedAttachmentReason, withSystemPreamble } from "./promptContext.js";
+import { digitisePdf } from "../providers/sarvamDocAI.js";
+import {
+  appendExtractedText,
+  attachImages,
+  trimHistoryToBudget,
+  unsupportedAttachmentReason,
+  withSystemPreamble,
+} from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
 import { getOwnedConversation, insertAssistantMessage } from "./conversations.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
@@ -24,6 +31,27 @@ export {
   deleteConversation,
   listMessages,
 } from "./conversations.js";
+
+/**
+ * Runs every attached PDF through Sarvam's Doc AI digitise pipeline and returns the combined
+ * extracted text, or null if there's no PDF, no working Sarvam key, or extraction failed — never
+ * throws, since this is a best-effort enhancement layered on top of (not required for) whatever
+ * native PDF support the chosen model already has. This is what makes a PDF readable by ANY
+ * model, not just Anthropic/Gemini — see appendExtractedText() in promptContext.ts.
+ */
+async function extractPdfText(attachments: ChatImage[]): Promise<string | null> {
+  const pdfs = attachments.filter((a) => a.mime === "application/pdf");
+  if (pdfs.length === 0) return null;
+
+  const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
+  if (!sarvamKey) return null;
+
+  const texts = await Promise.all(pdfs.map((pdf, i) => digitisePdf(sarvamKey, pdf.dataUrl, `document-${i + 1}.pdf`)));
+  const extracted = texts
+    .map((text, i) => (text ? (pdfs.length > 1 ? `[PDF ${i + 1}]\n${text}` : text) : null))
+    .filter((t): t is string => t !== null);
+  return extracted.length > 0 ? extracted.join("\n\n") : null;
+}
 
 /**
  * Streams a reply token-by-token via `onEvent`. Single/Auto stream one model's answer directly;
@@ -66,9 +94,13 @@ export async function streamMessage(
     console.log(`[chat] web search "${content}" -> ${searchResults.length} results`);
     for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
   }
-  const history = attachImages(
-    withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults, canvas),
-    attachments,
+  const extractedPdfText = await extractPdfText(attachments);
+  const history = appendExtractedText(
+    attachImages(
+      withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults, canvas),
+      attachments,
+    ),
+    extractedPdfText,
   );
 
   if (mode === "teamup") {
@@ -81,8 +113,12 @@ export async function streamMessage(
     if (!conversation.providers || !conversation.model_id) {
       throw new HttpError(500, "Conversation is missing its provider/model");
     }
+    // The vision gate is about actual images needing a multimodal-capable model — a PDF isn't an
+    // image, and once extractedPdfText exists it's just plain text any model can read, so a PDF
+    // must never trip this even on a non-vision model like Sarvam's plain chat model.
+    const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
     const vision = await getModelVisionSupport(conversation.provider_id as string, conversation.model_id);
-    if (attachments.length > 0 && !vision) {
+    if (hasImageAttachment && !vision) {
       onEvent({
         t: "err",
         c: `${conversation.providers.display_name} can't see images — pick a vision-capable model or remove the attachment.`,
@@ -90,7 +126,10 @@ export async function streamMessage(
       onEvent({ t: "done" });
       return;
     }
-    const unsupportedReason = unsupportedAttachmentReason(conversation.providers.slug, attachments);
+    // Only a gate now, not the primary path — extractedPdfText being non-null means Sarvam
+    // already turned the PDF into text that ANY model can read, so a PDF-incapable model is only
+    // actually blocked here if that extraction also failed/wasn't available.
+    const unsupportedReason = extractedPdfText ? null : unsupportedAttachmentReason(conversation.providers.slug, attachments);
     if (unsupportedReason) {
       onEvent({ t: "err", c: `${conversation.providers.display_name} ${unsupportedReason}` });
       onEvent({ t: "done" });

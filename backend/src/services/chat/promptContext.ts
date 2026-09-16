@@ -136,16 +136,40 @@ export function attachImages(history: ChatMessage[], images: ChatImage[]): ChatM
 // no PDF was attached). Their proxy silently strips content types it doesn't recognize, so a
 // ScaleMax-routed Claude model reads a PDF-carrying request as if the PDF were never there. Only
 // the real Anthropic API and Gemini (native, not via any proxy) actually receive the file.
+//
+// This is now a secondary/bonus path, not the primary one — Sarvam's Doc AI digitise pipeline
+// (sarvamDocAI.ts, verified live against the real API) extracts a PDF's text server-side, which
+// works with ANY provider since it becomes ordinary message text rather than a file the model
+// has to natively understand. unsupportedAttachmentReason() only fires when that extraction
+// wasn't available/succeeded (no working Sarvam key, or the document itself failed digitising)
+// AND the chosen model has no native fallback either — see streamMessage() in index.ts.
 const PDF_CAPABLE_SLUGS = new Set(["anthropic", "gemini"]);
 
 /**
  * Returns a human-readable reason the given provider can't see one of these attachments, or null
  * if every attachment is something that provider's adapter actually forwards. Vision-gate the
  * image case separately (via getModelVisionSupport) before calling this — this only covers the
- * "attached a file type this specific provider doesn't support" case (currently: PDF).
+ * "attached a file type this specific provider doesn't support" case (currently: PDF), and only
+ * matters once Sarvam extraction has already been tried and failed/was unavailable.
  */
 export function unsupportedAttachmentReason(providerSlug: string, images: ChatImage[]): string | null {
   const unsupportedPdf = images.some((img) => img.mime === "application/pdf") && !PDF_CAPABLE_SLUGS.has(providerSlug);
   if (unsupportedPdf) return "can't read PDFs — pick a Claude (direct Anthropic, not ScaleMax) or Gemini model, or remove the attachment.";
   return null;
+}
+
+/**
+ * Folds Sarvam-extracted PDF text into the most recent message's content, in-memory only (same
+ * "current turn only" limitation as attachImages — not persisted to the messages table). Applied
+ * after attachImages() so the last message can carry both the raw file (for a PDF-native
+ * provider) and its extracted text (for everyone else) at once.
+ */
+export function appendExtractedText(history: ChatMessage[], extractedText: string | null): ChatMessage[] {
+  if (!extractedText || history.length === 0) return history;
+  const last = history[history.length - 1]!;
+  const withText: ChatMessage = {
+    ...last,
+    content: `${last.content}\n\n--- Extracted text from an attached PDF ---\n${extractedText}`,
+  };
+  return [...history.slice(0, -1), withText];
 }

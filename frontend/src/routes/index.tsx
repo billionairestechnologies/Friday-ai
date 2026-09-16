@@ -204,10 +204,10 @@ export function Home() {
       applyLive(acc);
     });
 
-    // Images and PDFs actually reach the backend (Anthropic/ScaleMax/Gemini understand both;
-    // OpenAI/OpenRouter understand images only, and their adapter drops a PDF rather than
-    // sending it malformed). Anything else picked via drag-and-drop (the file picker itself only
-    // offers these two) is dropped here before it ever leaves the client.
+    // Images and PDFs actually reach the backend. Every model can read a PDF via Sarvam's Doc AI
+    // text extraction the backend runs server-side; a PDF-native provider (Anthropic direct,
+    // Gemini) also gets the raw file as a fallback. Anything else picked via drag-and-drop (the
+    // file picker itself only offers these two) is dropped here before it ever leaves the client.
     const sendableAttachments = attachments
       .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf")
       .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl }));
