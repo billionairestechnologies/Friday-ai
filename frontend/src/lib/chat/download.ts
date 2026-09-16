@@ -27,8 +27,6 @@ const EXT: Record<string, string> = {
   cpp: "cpp",
 };
 
-const FRAME = "friday-download-frame";
-
 export function extForLang(lang?: string) {
   if (!lang) return "txt";
   return EXT[lang.toLowerCase()] ?? "txt";
@@ -61,46 +59,6 @@ function mimeForName(filename: string, fallback = "application/octet-stream") {
   return fallback;
 }
 
-function ensureFrame() {
-  let frame = document.querySelector(`iframe[name="${FRAME}"]`) as HTMLIFrameElement | null;
-  if (!frame) {
-    frame = document.createElement("iframe");
-    frame.name = FRAME;
-    frame.setAttribute("aria-hidden", "true");
-    frame.setAttribute("tabindex", "-1");
-    Object.assign(frame.style, {
-      position: "fixed",
-      width: "0",
-      height: "0",
-      border: "0",
-      opacity: "0",
-      pointerEvents: "none",
-    });
-    document.body.appendChild(frame);
-  }
-  return frame;
-}
-
-function postThroughIframe(filename: string, content: string, mime: string) {
-  ensureFrame();
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = "/api/download";
-  form.target = FRAME;
-  form.acceptCharset = "UTF-8";
-  const fields: Record<string, string> = { filename, mime, content };
-  for (const [name, value] of Object.entries(fields)) {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
-  }
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
-}
-
 function clickBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -114,19 +72,23 @@ function clickBlob(filename: string, blob: Blob) {
   window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-async function asText(data: string | Blob): Promise<string> {
-  if (typeof data === "string") return data;
-  if (data.type.startsWith("text/") || data.type.includes("json") || data.type.includes("svg")) {
-    return await data.text();
-  }
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("read failed"));
-    reader.readAsDataURL(data);
-  });
+// A data: URL (e.g. an attached image's dataUrl) has to be decoded through fetch() into real
+// binary — wrapping the string itself in `new Blob([dataUrl])` would save a text file containing
+// the literal "data:image/png;base64,...." rather than the actual image.
+async function toBlob(data: string | Blob, type: string): Promise<Blob> {
+  if (data instanceof Blob) return data;
+  if (data.startsWith("data:")) return (await fetch(data)).blob();
+  return new Blob([data], { type });
 }
 
+/**
+ * Previously POSTed through a hidden iframe to a backend `/api/download` route that was never
+ * actually implemented — the request 404'd silently inside the hidden iframe (no JS exception,
+ * so the function returned `true` and looked like it worked), and nothing ever downloaded.
+ * Confirmed live: the download button in Canvas and the chat message actions did nothing. Fixed
+ * by dropping that dead round-trip entirely and saving directly via a Blob + `<a download>`,
+ * which needs no backend at all.
+ */
 export async function saveFile(
   filename: string,
   data: string | Blob,
@@ -135,25 +97,18 @@ export async function saveFile(
   const name = sanitizeFilename(filename);
   const type = mime || mimeForName(name);
   try {
-    const text = await asText(data);
-    postThroughIframe(name, text, type);
+    const blob = await toBlob(data, type);
+    clickBlob(name, blob);
     return true;
   } catch {
-    try {
-      const blob =
-        data instanceof Blob ? data : new Blob([data], { type });
-      clickBlob(name, blob);
-      return true;
-    } catch {
-      if (typeof data === "string" && !data.startsWith("data:")) {
-        try {
-          await navigator.clipboard.writeText(data);
-          return true;
-        } catch {
-          return false;
-        }
+    if (typeof data === "string" && !data.startsWith("data:")) {
+      try {
+        await navigator.clipboard.writeText(data);
+        return true;
+      } catch {
+        return false;
       }
-      return false;
     }
+    return false;
   }
 }
