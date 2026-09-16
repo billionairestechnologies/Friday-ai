@@ -452,7 +452,7 @@ const PromptInputAction: React.FC<{
 };
 
 const CustomDivider: React.FC = () => (
-  <div className="relative mx-1 h-6 w-[1.5px]">
+  <div className="relative mx-1 h-6 w-[1.5px] shrink-0">
     <div
       className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-[#9b87f5]/70 to-transparent"
       style={{
@@ -816,7 +816,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   <DropdownMenu.Trigger asChild>
                     <button
                       type="button"
-                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground"
+                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground"
                       disabled={isRecording}
                     >
                       <Paperclip className="h-5 w-5 transition-colors" />
@@ -893,7 +893,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   type="button"
                   onClick={() => setSearch(!showSearch)}
                   className={cn(
-                    "flex h-8 items-center gap-1 rounded-full border px-2 py-1 transition-all",
+                    "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 py-1 transition-all",
                     showSearch
                       ? "border-search bg-search/15 text-search"
                       : "border-transparent bg-transparent text-muted hover:text-foreground",
@@ -941,7 +941,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   type="button"
                   onClick={() => setThink(!showThink)}
                   className={cn(
-                    "flex h-8 items-center gap-1 rounded-full border px-2 py-1 transition-all",
+                    "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 py-1 transition-all",
                     showThink
                       ? "border-think bg-think/15 text-think"
                       : "border-transparent bg-transparent text-muted hover:text-foreground",
@@ -989,7 +989,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   type="button"
                   onClick={() => setCanvas(!showCanvas)}
                   className={cn(
-                    "flex h-8 items-center gap-1 rounded-full border px-2 py-1 transition-all",
+                    "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 py-1 transition-all",
                     showCanvas
                       ? "border-canvas bg-canvas/15 text-canvas"
                       : "border-transparent bg-transparent text-muted hover:text-foreground",
@@ -1033,7 +1033,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <PromptInputAction tooltip="Voice mode">
                 <button
                   type="button"
