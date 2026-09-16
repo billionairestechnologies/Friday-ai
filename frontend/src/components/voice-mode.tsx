@@ -67,6 +67,13 @@ export function VoiceMode({
   const latestCaptionRef = useRef("");
   const lastSpeechAtRef = useRef(0);
   const autoSubmitFiredRef = useRef(false);
+  // iOS Safari, and most non-Chrome mobile browsers, implement no Web Speech API at all — on
+  // those, latestCaptionRef never gets a transcript (see the `if (Ctor)` guard below), so the
+  // silence-based auto-submit used to require text that could never arrive and the "continuous
+  // conversation" loop just sat there looking dead. Falls back to audio-level-only silence
+  // detection there; finishAndSubmit() already has an audio-blob transcription fallback for the
+  // empty-transcript case, so this just lets that path actually get reached automatically.
+  const recognitionSupportedRef = useRef(false);
   const finishAndSubmitRef = useRef<() => Promise<void>>(async () => {});
   const awaitingReplyRef = useRef(false);
   const watchingAssistantIdRef = useRef<string | null>(null);
@@ -114,9 +121,12 @@ export function VoiceMode({
           if (isHearing) lastSpeechAtRef.current = now;
 
           const transcript = latestCaptionRef.current.trim();
+          const readyToSubmit = transcript
+            ? true
+            : !recognitionSupportedRef.current && lastSpeechAtRef.current > 0;
           if (
             !autoSubmitFiredRef.current &&
-            transcript &&
+            readyToSubmit &&
             lastSpeechAtRef.current &&
             now - lastSpeechAtRef.current > SILENCE_MS
           ) {
@@ -138,6 +148,7 @@ export function VoiceMode({
         recorder.start();
 
         const Ctor = getSpeechRecognitionCtor();
+        recognitionSupportedRef.current = Boolean(Ctor);
         if (Ctor) {
           const recognition = new Ctor();
           recognition.continuous = true;
