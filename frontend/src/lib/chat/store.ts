@@ -59,6 +59,10 @@ type ChatState = {
   voiceName: string | null;
   /** Whether the first-time voice picker has been shown, so Voice Mode only shows it once. */
   voiceIntroSeen: boolean;
+  /** Which signed-in account (or null for guest) the current `chats` belong to — lets
+   *  syncOwner() detect an account switch on a shared device and wipe stale chats instead of
+   *  leaking one user's conversations into another user's session. */
+  ownerUserId: string | null;
   setHydrated: () => void;
   setSidebarOpen: (open: boolean) => void;
   setQuery: (q: string) => void;
@@ -81,6 +85,11 @@ type ChatState = {
   selectChat: (id: string) => void;
   deleteChat: (id: string) => void;
   clearAllChats: () => void;
+  /** Call whenever the authenticated identity resolves or changes (login, signup, logout,
+   *  bootstrap). If it differs from the account the currently-loaded chats belong to, wipes the
+   *  local chat cache so the next account never sees the previous one's conversations on a
+   *  shared device. No-op when it's the same account reconnecting (e.g. a page reload). */
+  syncOwner: (userId: string | null) => void;
   beginTurn: (user: ChatMessage) => { chatId: string; assistantId: string };
   commitTurn: (chatId: string, assistantId: string, data: TurnCommit) => void;
   setConversationId: (chatId: string, conversationId: string) => void;
@@ -105,6 +114,7 @@ type Persisted = Pick<
   | "voiceId"
   | "voiceName"
   | "voiceIntroSeen"
+  | "ownerUserId"
 >;
 
 function createThrottledStorage(ms = 700): PersistStorage<Persisted> {
@@ -174,6 +184,7 @@ export const useChat = create<ChatState>()(
       voiceId: null,
       voiceName: null,
       voiceIntroSeen: false,
+      ownerUserId: null,
       setHydrated: () => set({ hydrated: true }),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setQuery: (query) => set({ query }),
@@ -181,7 +192,20 @@ export const useChat = create<ChatState>()(
       setThink: (think) => set({ think }),
       setBehavior: (behavior) => set({ behavior }),
       setWebSearch: (webSearch) => set({ webSearch }),
-      setCanvas: (canvas) => set({ canvas, canvasOpen: canvas }),
+      // On mobile the canvas panel is a fullscreen overlay (`max-md:fixed max-md:inset-0`) — if
+      // arming Canvas also opened it immediately, tapping the toggle buried the composer under an
+      // empty panel before the user could even type a message. Only auto-open on desktop widths,
+      // where it's a harmless side panel; on mobile the panel still opens naturally once a reply
+      // actually starts building (see beginTurn's `canvasOpen: canvas ? true : ...`).
+      setCanvas: (canvas) =>
+        set((s) => ({
+          canvas,
+          canvasOpen: canvas
+            ? typeof window !== "undefined" && window.innerWidth < 768
+              ? s.canvasOpen
+              : true
+            : false,
+        })),
       setCanvasOpen: (canvasOpen) => set({ canvasOpen }),
       setSettingsTab: (settingsTab) => set({ settingsTab }),
       setAppearance: (appearance) => set({ appearance }),
@@ -210,6 +234,11 @@ export const useChat = create<ChatState>()(
         }),
       clearAllChats: () =>
         set({ chats: [], activeId: null, draft: "", attachments: [] }),
+      syncOwner: (userId) =>
+        set((s) => {
+          if (userId === s.ownerUserId) return {};
+          return { ownerUserId: userId, chats: [], activeId: null, draft: "", attachments: [] };
+        }),
       beginTurn: (user) => {
         const { think, webSearch, canvas } = get();
         const assistant: ChatMessage = {
@@ -405,6 +434,7 @@ export const useChat = create<ChatState>()(
         voiceId: s.voiceId,
         voiceName: s.voiceName,
         voiceIntroSeen: s.voiceIntroSeen,
+        ownerUserId: s.ownerUserId,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
