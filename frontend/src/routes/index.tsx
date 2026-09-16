@@ -150,7 +150,13 @@ export function Home() {
       }
     }
     if (!trimmed && attachments.length === 0) return;
-    if (!available || busyRef.current) return;
+    if (!available || busyRef.current) {
+      // A stuck busyRef (an earlier request that never cleared it) used to make every send
+      // after it — voice included — silently do nothing forever. Surface it instead.
+      setSendError(available ? "Still working on the last message — try again in a moment." : "No models available right now.");
+      window.setTimeout(() => setSendError(null), 4000);
+      return;
+    }
 
     if (!useAuthStore.getState().user) {
       s.setDialog("login");

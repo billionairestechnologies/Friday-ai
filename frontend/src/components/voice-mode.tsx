@@ -64,6 +64,10 @@ export function VoiceMode({
   // actual reply later — activation is commonly tied to the element instance, not just the tab.
   const unlockedAudioRef = useRef<HTMLAudioElement | null>(null);
   const finalTranscriptRef = useRef("");
+  const latestCaptionRef = useRef("");
+  const lastSpeechAtRef = useRef(0);
+  const autoSubmitFiredRef = useRef(false);
+  const finishAndSubmitRef = useRef<() => Promise<void>>(async () => {});
   const awaitingReplyRef = useRef(false);
   const watchingAssistantIdRef = useRef<string | null>(null);
   const spokenStopRef = useRef<(() => void) | null>(null);
@@ -94,9 +98,31 @@ export function VoiceMode({
         const liveA = createLiveAnalyser(stream);
         setAnalyser(liveA);
 
+        // Silence threshold for auto-submit: once the user has said something and then goes
+        // quiet for this long, treat that as "done talking" and submit automatically — a real
+        // voice agent doesn't wait for a manual "stop" click on every single turn.
+        const SILENCE_MS = 1300;
+        lastSpeechAtRef.current = 0;
+        autoSubmitFiredRef.current = false;
+
         const hearingLoop = () => {
           if (cancelled) return;
-          setHearing(liveA.getLevel() > 0.08);
+          const level = liveA.getLevel();
+          const isHearing = level > 0.08;
+          setHearing(isHearing);
+          const now = Date.now();
+          if (isHearing) lastSpeechAtRef.current = now;
+
+          const transcript = latestCaptionRef.current.trim();
+          if (
+            !autoSubmitFiredRef.current &&
+            transcript &&
+            lastSpeechAtRef.current &&
+            now - lastSpeechAtRef.current > SILENCE_MS
+          ) {
+            autoSubmitFiredRef.current = true;
+            void finishAndSubmitRef.current();
+          }
           window.setTimeout(hearingLoop, 120);
         };
         hearingLoop();
@@ -125,7 +151,9 @@ export function VoiceMode({
               if (res.isFinal) finalTranscriptRef.current += res[0].transcript;
               else interim += res[0].transcript;
             }
-            setCaption((finalTranscriptRef.current + " " + interim).trim());
+            const combined = (finalTranscriptRef.current + " " + interim).trim();
+            latestCaptionRef.current = combined;
+            setCaption(combined);
           };
           recognition.onerror = () => {
             /* keep listening — a transient no-speech/network blip shouldn't end the session */
@@ -154,6 +182,7 @@ export function VoiceMode({
       setCaption("");
       setHearing(false);
       finalTranscriptRef.current = "";
+      latestCaptionRef.current = "";
     };
   }, [open, phase]);
 
@@ -223,7 +252,11 @@ export function VoiceMode({
       setAnalyser(spoken.analyser);
       setHearing(true);
       await spoken.done;
-      onClose();
+      spokenStopRef.current = null;
+      // A voice agent that hangs up after every single reply isn't a conversation — loop back
+      // into listening instead of closing the whole overlay, so the user can just keep talking.
+      setReplyText("");
+      setPhase("listening");
     } catch {
       // TTS failed — the reply text is already visible in the main chat transcript (it was
       // inserted before this ever runs), but silently closing the voice overlay here still
@@ -234,6 +267,7 @@ export function VoiceMode({
 
   function stopEverything() {
     spokenStopRef.current?.();
+    spokenStopRef.current = null;
     recognitionRef.current?.abort();
     if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current?.stop();
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -242,6 +276,16 @@ export function VoiceMode({
   function handleClose() {
     stopEverything();
     onClose();
+  }
+
+  // The mic button while Friday is talking doubles as barge-in: stop the reply mid-sentence and
+  // go straight back to listening, instead of forcing the user to wait out the whole reply.
+  function interruptAndListen() {
+    spokenStopRef.current?.();
+    spokenStopRef.current = null;
+    setError(null);
+    setReplyText("");
+    setPhase("listening");
   }
 
   function pickVoice(v: VoiceOption) {
@@ -254,12 +298,17 @@ export function VoiceMode({
   }
 
   async function finishAndSubmit() {
+    if (phase !== "listening") return;
+    // Marks this utterance as submitted so the silence-detector in the listening effect above
+    // doesn't also fire once the mic-click path (this function) already has.
+    autoSubmitFiredRef.current = true;
+
     // Must happen synchronously, before any `await` in this function — that's what keeps it
     // inside the same user-activation window as the click that called this.
     unlockAudioForLaterPlayback();
 
     recognitionRef.current?.stop();
-    const text = (finalTranscriptRef.current || caption).trim();
+    const text = (finalTranscriptRef.current || latestCaptionRef.current || caption).trim();
     const recorder = mediaRecorderRef.current;
 
     async function submit(finalText: string) {
@@ -297,6 +346,8 @@ export function VoiceMode({
     }
     setError("Didn't catch anything — try again");
   }
+
+  finishAndSubmitRef.current = finishAndSubmit;
 
   return (
     <AnimatePresence>
@@ -390,15 +441,25 @@ export function VoiceMode({
           )}
 
           {phase === "responding" && (
-            <div className="pb-4">
+            <div className="flex items-center gap-6 pb-4">
               <button
                 type="button"
                 onClick={handleClose}
-                aria-label="Stop"
+                aria-label="Cancel"
                 className="flex size-14 items-center justify-center rounded-full border border-border text-muted transition-colors hover:bg-chip hover:text-foreground"
               >
                 <X className="size-5" />
               </button>
+              {replyText && (
+                <button
+                  type="button"
+                  onClick={interruptAndListen}
+                  aria-label="Interrupt and ask something new"
+                  className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-composer)] transition-opacity hover:opacity-90"
+                >
+                  <Mic className="size-6" />
+                </button>
+              )}
             </div>
           )}
         </motion.div>
