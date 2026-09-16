@@ -21,7 +21,7 @@ export function CompleteProfileModal() {
     setError(null);
     setBusy(true);
     try {
-      await updateProfile(phone.trim());
+      await updateProfile({ phone: phone.trim() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save that — try again");
     } finally {

@@ -3,6 +3,8 @@ export interface AuthUser {
   email: string | null;
   name: string | null;
   phone?: string | null;
+  /** ISO date (YYYY-MM-DD), optional — powers the birthday greeting and age-banded thinking lines. */
+  birthday?: string | null;
   role?: "user" | "admin";
 }
 

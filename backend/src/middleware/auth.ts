@@ -7,6 +7,8 @@ export interface AuthedUser {
   email: string | null;
   name: string | null;
   phone: string | null;
+  /** ISO date (YYYY-MM-DD), optional — powers the birthday greeting and age-banded thinking lines. */
+  birthday: string | null;
   role: "user" | "admin";
 }
 
@@ -30,7 +32,7 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("full_name, phone, role")
+    .select("full_name, phone, birthday, role")
     .eq("id", data.user.id)
     .single();
 
@@ -39,6 +41,7 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
     email: data.user.email ?? null,
     name: profile?.full_name ?? (data.user.user_metadata?.full_name as string | undefined) ?? null,
     phone: profile?.phone ?? null,
+    birthday: profile?.birthday ?? null,
     role: (profile?.role as "user" | "admin") ?? "user",
   };
   next();

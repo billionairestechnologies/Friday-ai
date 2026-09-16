@@ -38,7 +38,7 @@ export function Home() {
   const greeting = useGreeting();
   const { user, isPending } = useCurrentUserState();
   const firstName = user?.displayName?.trim().split(/\s+/)[0];
-  const heroLine = useHeroLine(greeting, firstName);
+  const heroLine = useHeroLine(greeting, firstName, user?.birthday);
   const models = useModels((s) => s.models);
   const loadModels = useModels((s) => s.load);
   const available = models.length > 2; // beyond the Auto/Team Up sentinels

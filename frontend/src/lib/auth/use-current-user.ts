@@ -7,6 +7,8 @@ export type AppUser = {
   primaryEmail: string | null;
   profileImageUrl: string | null;
   isDevFallback: boolean;
+  /** ISO date (YYYY-MM-DD), optional — powers the birthday greeting and age-banded thinking lines. */
+  birthday: string | null;
 };
 
 export type CurrentUserState = {
@@ -25,6 +27,7 @@ export function useCurrentUserState(): CurrentUserState {
           primaryEmail: user.email,
           profileImageUrl: null,
           isDevFallback: false,
+          birthday: user.birthday ?? null,
         }
       : null,
     isPending,

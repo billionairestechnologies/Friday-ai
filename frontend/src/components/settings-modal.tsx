@@ -13,7 +13,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { authEnabled, signOut } from "@/lib/auth/client";
+import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useModels } from "@/lib/chat/models";
 import { saveFile } from "@/lib/chat/download";
@@ -182,6 +182,61 @@ function AccountPane() {
         )}
       </div>
       <Row label="Plan" value="Friday" action={<span className="text-xs text-muted">Active</span>} />
+      {signedIn && <BirthdayRow />}
+    </div>
+  );
+}
+
+/** Optional — powers the birthday greeting and age-banded "thinking" one-liners. Fully removable:
+ *  delete this component, its <BirthdayRow /> call above, and the birthday plumbing in
+ *  lib/auth/client.ts / lib/types.ts with no other cleanup needed. */
+function BirthdayRow() {
+  const { user } = useCurrentUserState();
+  const updateProfile = useAuthStore((s) => s.updateProfile);
+  const [value, setValue] = useState(user?.birthday ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dirty = value !== (user?.birthday ?? "");
+
+  async function save() {
+    if (!value || !dirty) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateProfile({ birthday: value });
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border py-3 last:border-0">
+      <div>
+        <p className="text-sm font-medium">Birthday</p>
+        <p className="text-xs text-muted">Used for a birthday greeting — optional.</p>
+        {error && <p className="text-xs text-danger">{error}</p>}
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="h-8 rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none"
+        />
+        <button
+          type="button"
+          disabled={!dirty || saving || !value}
+          onClick={() => void save()}
+          className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip disabled:opacity-60"
+        >
+          {saving ? "Saving…" : saved ? "Saved" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

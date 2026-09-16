@@ -18,9 +18,15 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-async function getProfileExtras(userId: string): Promise<{ role: "user" | "admin"; phone: string | null }> {
-  const { data } = await supabaseAdmin.from("profiles").select("role, phone").eq("id", userId).single();
-  return { role: data?.role === "admin" ? "admin" : "user", phone: data?.phone ?? null };
+async function getProfileExtras(
+  userId: string,
+): Promise<{ role: "user" | "admin"; phone: string | null; birthday: string | null }> {
+  const { data } = await supabaseAdmin.from("profiles").select("role, phone, birthday").eq("id", userId).single();
+  return {
+    role: data?.role === "admin" ? "admin" : "user",
+    phone: data?.phone ?? null,
+    birthday: data?.birthday ?? null,
+  };
 }
 
 /**
@@ -36,7 +42,7 @@ export async function adminLogin(req: Request, res: Response) {
   const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
   if (error || !data.session) throw new HttpError(401, "Invalid email or password");
 
-  const { role, phone } = await getProfileExtras(data.user.id);
+  const { role, phone, birthday } = await getProfileExtras(data.user.id);
   if (role !== "admin") throw new HttpError(403, "This account doesn't have admin access");
 
   res.json({
@@ -45,6 +51,7 @@ export async function adminLogin(req: Request, res: Response) {
       email: data.user.email,
       name: (data.user.user_metadata?.full_name as string | undefined) ?? null,
       phone,
+      birthday,
       role,
     },
     session: data.session,
@@ -88,18 +95,30 @@ export async function signup(req: Request, res: Response) {
 }
 
 const updateProfileSchema = z.object({
-  phone: z.string().trim().min(7, "Enter a valid mobile number").max(20),
+  phone: z.string().trim().min(7, "Enter a valid mobile number").max(20).optional(),
+  // Optional — collected from Settings → Account, powers the birthday greeting and age-banded
+  // thinking lines. Nothing breaks if it's never set.
+  birthday: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+    .optional(),
 });
 
-/** Lets a signed-in user fill in profile fields collected after signup started requiring them
- *  (currently just phone) — the "complete your profile" prompt shown for older accounts. */
+/** Lets a signed-in user fill in optional profile fields — phone (required by the "complete your
+ *  profile" prompt shown for older accounts) and birthday (fully optional, from Settings). */
 export async function updateProfile(req: Request, res: Response) {
-  const { phone } = updateProfileSchema.parse(req.body);
+  const { phone, birthday } = updateProfileSchema.parse(req.body);
+  if (phone === undefined && birthday === undefined) throw new HttpError(400, "Nothing to update");
 
-  const { error } = await supabaseAdmin.from("profiles").update({ phone }).eq("id", req.user!.id);
+  const patch: { phone?: string; birthday?: string } = {};
+  if (phone !== undefined) patch.phone = phone;
+  if (birthday !== undefined) patch.birthday = birthday;
+
+  const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", req.user!.id);
   if (error) throw new HttpError(500, "Failed to update profile");
 
-  res.json({ user: { ...req.user!, phone } });
+  res.json({ user: { ...req.user!, ...patch } });
 }
 
 const OTP_TTL_MINUTES = 10;
@@ -172,13 +191,14 @@ export async function verifyOtp(req: Request, res: Response) {
   await supabaseAdmin.from("login_otps").delete().eq("id", row.id as string);
 
   const session = row.session as Session;
-  const { role, phone } = await getProfileExtras(session.user.id);
+  const { role, phone, birthday } = await getProfileExtras(session.user.id);
   res.json({
     user: {
       id: session.user.id,
       email: session.user.email,
       name: (session.user.user_metadata?.full_name as string | undefined) ?? null,
       phone,
+      birthday,
       role,
     },
     session,
@@ -216,13 +236,14 @@ export async function refresh(req: Request, res: Response) {
   const { data, error } = await supabasePublic.auth.refreshSession({ refresh_token: refreshToken });
   if (error || !data.session || !data.user) throw new HttpError(401, "Session expired — please sign in again");
 
-  const { role, phone } = await getProfileExtras(data.user.id);
+  const { role, phone, birthday } = await getProfileExtras(data.user.id);
   res.json({
     user: {
       id: data.user.id,
       email: data.user.email,
       name: (data.user.user_metadata?.full_name as string | undefined) ?? null,
       phone,
+      birthday,
       role,
     },
     session: data.session,

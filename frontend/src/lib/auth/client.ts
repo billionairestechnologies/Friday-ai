@@ -25,8 +25,9 @@ type AuthState = {
   /** The hidden /admin gate's own login — skips the OTP step (see backend adminLogin for why). */
   adminLogin: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, phone: string, password: string) => Promise<{ email: string }>;
-  /** Fills in a profile field missing on an older account (currently just phone). */
-  updateProfile: (phone: string) => Promise<void>;
+  /** Fills in optional profile fields — phone (the "complete your profile" prompt) and/or
+   *  birthday (Settings → Account, fully optional). */
+  updateProfile: (patch: { phone?: string; birthday?: string }) => Promise<void>;
   logout: () => void;
   /** Exchanges the stored refresh token for a new access token. Returns whether it worked. */
   refresh: () => Promise<boolean>;
@@ -105,8 +106,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     return { email: res.email };
   },
 
-  updateProfile: async (phone) => {
-    const res = await api.patch<{ user: AuthUser }>("/auth/profile", { phone });
+  updateProfile: async (patch) => {
+    const res = await api.patch<{ user: AuthUser }>("/auth/profile", patch);
     const stored = loadStored();
     if (stored) persist(stored.session, res.user);
     set({ user: res.user });

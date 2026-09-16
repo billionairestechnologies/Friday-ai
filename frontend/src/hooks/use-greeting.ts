@@ -34,13 +34,27 @@ const FRIENDLY_LINES = [
 
 export type HeroLine = { kind: "greeting"; greeting: string; name?: string } | { kind: "line"; text: string };
 
+/** True when today is the given ISO (YYYY-MM-DD) birthday's month+day, regardless of year. Its
+ *  own tiny function (not folded into useHeroLine) so it's easy to spot and remove on its own if
+ *  the birthday feature gets pulled. */
+function isBirthdayToday(birthday: string): boolean {
+  const parsed = new Date(birthday);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const now = new Date();
+  return now.getMonth() === parsed.getMonth() && now.getDate() === parsed.getDate();
+}
+
 /**
  * Picks the dashboard's headline once per visit — the time-of-day greeting (with the user's
  * name) most of the time, occasionally a friendly generic line instead, for variety. Stable
- * for the lifetime of the mount so it doesn't shuffle mid-visit.
+ * for the lifetime of the mount so it doesn't shuffle mid-visit. On the user's birthday, always
+ * shows a birthday line instead of the usual pool.
  */
-export function useHeroLine(greeting: string, name?: string): HeroLine {
+export function useHeroLine(greeting: string, name?: string, birthday?: string | null): HeroLine {
   const [line] = useState<HeroLine>(() => {
+    if (birthday && isBirthdayToday(birthday)) {
+      return { kind: "line", text: name ? `Happy birthday, ${name}! 🎉` : "Happy birthday! 🎉" };
+    }
     // Weighted so the personal greeting still shows more often than not.
     const pool: HeroLine[] = [
       { kind: "greeting", greeting, name },
