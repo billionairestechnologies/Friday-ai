@@ -9,7 +9,7 @@ import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
-import { pickThinkingLine } from "@/lib/chat/thinking-lines";
+import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import type { ChatMessage } from "@/lib/chat/types";
 
 const EMPTY: ChatMessage[] = [];
@@ -115,19 +115,20 @@ const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage 
 const AssistantBlock = memo(function AssistantBlock({ message }: { message: ChatMessage }) {
   const plan = shouldShowPlan(message);
   const { user } = useCurrentUserState();
-  // Stable per message (not per render) so the line doesn't shuffle every frame while waiting.
-  const thinkingLine = useMemo(() => pickThinkingLine(user?.birthday), [message.id, user?.birthday]);
   // The backend sends `status: "thinking"` almost immediately after a plain (no Think/Search/
   // Canvas) send starts — before that fix this excluded "thinking", so the typing-dots appeared
   // for a "working" instant and then vanished the moment that status event landed, leaving
   // nothing visible until the first token of real content arrived (which can be several seconds
   // on a slow model). "thinking" now keeps the dots up through that whole gap.
-  const waiting =
+  const waiting = Boolean(
     message.streaming &&
-    !message.content &&
-    !message.thinking &&
-    (message.status === "working" || message.status === "thinking" || !message.status);
+      !message.content &&
+      !message.thinking &&
+      (message.status === "working" || message.status === "thinking" || !message.status),
+  );
   const done = !message.streaming;
+  // Rotates every ~2.6s while actually waiting, so a slow reply doesn't sit on one static line.
+  const thinkingLine = useRotatingThinkingLine(waiting, user?.birthday);
 
   return (
     <div
@@ -153,7 +154,18 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
             <span className="think-dot size-1.5 rounded-full bg-muted" />
             <span className="think-dot size-1.5 rounded-full bg-muted" />
             <span className="think-dot size-1.5 rounded-full bg-muted" />
-            <span className="text-xs text-muted">{thinkingLine}</span>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={thinkingLine}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="text-xs font-medium tracking-wide text-muted italic"
+              >
+                {thinkingLine}
+              </motion.span>
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

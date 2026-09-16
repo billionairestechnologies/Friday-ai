@@ -8,6 +8,8 @@
  * content that could be slow or arrive after the real reply already lands.
  */
 
+import { useEffect, useState } from "react";
+
 type AgeBand = "teen" | "twenties" | "thirties_plus";
 
 const GENERIC_LINES = [
@@ -60,4 +62,29 @@ export function pickThinkingLine(birthday?: string | null): string {
   const band = age !== null ? bandForAge(age) : null;
   const pool = band ? [...BAND_LINES[band], ...GENERIC_LINES] : GENERIC_LINES;
   return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
+/**
+ * Rotates through the pool every `intervalMs` while `active` is true, so the wait feels alive
+ * instead of a single static line sitting there for however long the reply takes. Resets
+ * naturally each time — a fresh assistant message mounts a fresh AssistantBlock, so this hook's
+ * state (and thus its first line) starts over per turn without any extra reset logic.
+ */
+export function useRotatingThinkingLine(active: boolean, birthday?: string | null, intervalMs = 2600): string {
+  const [line, setLine] = useState(() => pickThinkingLine(birthday));
+
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
+      setLine((prev) => {
+        // Avoid an immediate repeat so the rotation actually reads as movement.
+        let next = pickThinkingLine(birthday);
+        for (let i = 0; next === prev && i < 5; i++) next = pickThinkingLine(birthday);
+        return next;
+      });
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, [active, birthday, intervalMs]);
+
+  return line;
 }
