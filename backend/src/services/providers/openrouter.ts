@@ -4,6 +4,13 @@ import { mergeSystemMessages, safeErrorMessage, toOpenAiStyleMessages } from "./
 
 const BASE_URL = "https://openrouter.ai/api/v1";
 
+// OpenRouter defaults max_tokens to the model's full context window when omitted — for a 262K-
+// context model that means every request needs credit headroom for a 131K-token reply even when
+// the actual answer is a sentence. Confirmed in production: a request errored with 402 ("you
+// requested up to 131072 tokens, but can only afford 82121") purely from this default, well
+// before the account was actually out of credits. Capped like every other adapter.
+const MAX_TOKENS = 8192;
+
 export const openrouterAdapter: ProviderAdapter = {
   slug: "openrouter",
 
@@ -23,7 +30,7 @@ export const openrouterAdapter: ProviderAdapter = {
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) }),
+      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) }),
     });
     if (!res.ok) throw new Error(`OpenRouter chat failed: ${res.status} ${await res.text()}`);
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
@@ -44,7 +51,7 @@ export const openrouterAdapter: ProviderAdapter = {
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/chat/completions`,
       { Authorization: `Bearer ${apiKey}` },
-      { model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) },
+      { model, max_tokens: MAX_TOKENS, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) },
       onDelta,
       signal,
       onThink,
