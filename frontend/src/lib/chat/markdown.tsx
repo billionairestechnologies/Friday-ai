@@ -122,9 +122,17 @@ export const StreamingMarkdown = memo(function StreamingMarkdown({
   streaming: boolean;
 }) {
   const committedRef = useRef("");
+  // Every completed block (a whole paragraph, table, list, code block — whatever
+  // splitStreamingMarkdown's `\n\n`/fence boundary just closed off) gets pushed here once and
+  // rendered as its OWN Markdown instance, so it can fade in as a unit right when it completes.
+  // Previously the entire growing prefix re-rendered as one plain, unanimated block on every
+  // commit — for content-heavy replies (tables, multi-paragraph answers) that's most of what's
+  // on screen, so animating only the last couple of in-progress words barely registered.
+  const chunksRef = useRef<string[]>([]);
 
   if (!streaming) {
     committedRef.current = "";
+    chunksRef.current = [];
     return (
       <div className="relative min-h-[1.65em] w-full">
         <Markdown text={text} />
@@ -133,22 +141,34 @@ export const StreamingMarkdown = memo(function StreamingMarkdown({
   }
 
   const { stable } = splitStreamingMarkdown(text);
-  if (stable.startsWith(committedRef.current)) {
+  if (stable.length > committedRef.current.length && stable.startsWith(committedRef.current)) {
+    chunksRef.current = [...chunksRef.current, stable.slice(committedRef.current.length)];
     committedRef.current = stable;
   } else if (!text.startsWith(committedRef.current)) {
+    // Defensive fallback for the rare case text didn't purely grow from what we'd committed —
+    // same guard the original single-prefix version had, just resetting the chunk list too.
+    chunksRef.current = stable ? [stable] : [];
     committedRef.current = stable;
   }
   const prefix = committedRef.current;
   const rest = text.startsWith(prefix) ? text.slice(prefix.length) : text;
   // Word-chunked, not the whole tail as one flat string — each new word mounts (and fades in)
   // exactly once; a still-growing last word just gets its text updated in place since its array
-  // index — and therefore its React key — doesn't change. Was previously a flat re-render on
-  // every single delta, which read as the text glitching/jumping rather than flowing in.
+  // index — and therefore its React key — doesn't change.
   const words = rest.match(/\S+\s*/g) ?? [];
 
   return (
     <div className="relative min-h-[1.65em] w-full [overflow-anchor:none]">
-      {prefix ? <Markdown text={prefix} /> : null}
+      {chunksRef.current.map((chunk, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Markdown text={chunk} />
+        </motion.div>
+      ))}
       <span className="md whitespace-pre-wrap text-[0.975rem] leading-[1.65]">
         {words.map((word, i) => (
           <motion.span
