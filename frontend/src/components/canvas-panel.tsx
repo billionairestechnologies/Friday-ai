@@ -1,8 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, Download, ExternalLink, Globe, PanelRightClose, Play, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  Code2,
+  Download,
+  Eye,
+  ExternalLink,
+  Globe,
+  PanelRightClose,
+  Play,
+  RefreshCw,
+} from "lucide-react";
 import { Markdown } from "@/lib/chat/markdown";
-import { extractArtifact, type Artifact } from "@/lib/chat/artifact";
+import { extractArtifact, extractStreamingCodeBody, type Artifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
 import { normalizeRunLanguage, runSandboxCode, type RunResult } from "@/lib/chat/runnable";
@@ -109,6 +119,30 @@ function RunnablePane({ artifact }: { artifact: Artifact }) {
   );
 }
 
+/** Live "writing code" view — raw source with a blinking cursor, auto-scrolling to the bottom as
+ *  it grows, so Canvas shows the code actually being typed out instead of a bare spinner for the
+ *  whole time it's being generated. Used both while streaming (partial, open fence) and as the
+ *  Code tab's content once the artifact is complete. */
+function LiveCode({ lang, body, live }: { lang?: string; body: string; live: boolean }) {
+  const ref = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (!live) return;
+    const el = ref.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [body, live]);
+
+  return (
+    <pre
+      ref={ref}
+      className="h-full overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground"
+    >
+      {lang && <span className="mb-2 block text-[11px] text-subtle">{lang}</span>}
+      {body}
+      {live && <span className="stream-caret" aria-hidden />}
+    </pre>
+  );
+}
+
 function CanvasBody({ onClose }: { onClose: () => void }) {
   const liveAll = useLiveStream();
   const activeId = useChat((s) => s.activeId);
@@ -122,18 +156,18 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
     }
     return "";
   });
-  const usedCanvas = useChat((s) => {
-    const chat = s.chats.find((c) => c.id === s.activeId);
-    const list = chat?.messages ?? [];
-    for (let i = list.length - 1; i >= 0; i--) {
-      const m = list[i]!;
-      if (m.role === "assistant") return Boolean(m.usedCanvas);
-    }
-    return false;
-  });
   const content = live?.text || stored;
-  const building = Boolean(live && usedCanvas);
+  const streaming = Boolean(live);
   const artifact = content ? extractArtifact(content) : null;
+  // Covers both a manually-toggled Canvas build and an auto-opened one (see routes/index.tsx) —
+  // purely content-driven (an open code fence) rather than gated on the Canvas toggle having been
+  // on, so the live "writing" view below shows in either case.
+  const streamingCode = !artifact && streaming ? extractStreamingCodeBody(content) : null;
+  const building = streaming && !artifact;
+  // Only html/react have a real "Preview" to toggle back to — everything else (code/runnable/
+  // markdown) only ever has one view.
+  const [view, setView] = useState<"preview" | "code">("preview");
+  const hasPreview = artifact?.kind === "html" || artifact?.kind === "react";
 
   return (
     <aside className="flex h-full w-full min-w-0 flex-col border-l border-border bg-background max-md:fixed max-md:inset-0 max-md:z-40 md:w-[min(100%,28rem)] lg:w-[32rem]">
@@ -142,6 +176,32 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
         <span className="min-w-0 flex-1 truncate text-xs text-muted">
           {artifact?.title ?? "Canvas"}
         </span>
+        {hasPreview && (
+          <div className="flex items-center rounded-full bg-chip p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("preview")}
+              aria-pressed={view === "preview"}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                view === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted hover:text-foreground"
+              }`}
+            >
+              <Eye className="size-3" />
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("code")}
+              aria-pressed={view === "code"}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                view === "code" ? "bg-background text-foreground shadow-sm" : "text-muted hover:text-foreground"
+              }`}
+            >
+              <Code2 className="size-3" />
+              Code
+            </button>
+          </div>
+        )}
         {artifact && (
           <button
             type="button"
@@ -181,7 +241,18 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         <AnimatePresence mode="wait">
-          {building && !artifact ? (
+          {building && streamingCode ? (
+            <motion.div
+              key="streaming-code"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="h-full"
+            >
+              <LiveCode lang={streamingCode.lang} body={streamingCode.body} live />
+            </motion.div>
+          ) : building && !artifact ? (
             <motion.div
               key="building"
               initial={{ opacity: 0 }}
@@ -192,6 +263,16 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
             >
               <RefreshCw className="size-4 animate-spin" />
               Building on canvas…
+            </motion.div>
+          ) : artifact?.kind === "html" && view === "code" ? (
+            <motion.div
+              key="html-code"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              <LiveCode lang={artifact.lang} body={artifact.body} live={false} />
             </motion.div>
           ) : artifact?.kind === "html" ? (
             <motion.iframe
@@ -204,6 +285,16 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               srcDoc={artifact.body}
               className="h-full min-h-[24rem] w-full border-0 bg-white"
             />
+          ) : artifact?.kind === "react" && view === "code" ? (
+            <motion.div
+              key="react-code"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              <LiveCode lang={artifact.lang} body={artifact.body} live={false} />
+            </motion.div>
           ) : artifact?.kind === "react" ? (
             <motion.iframe
               key="react"

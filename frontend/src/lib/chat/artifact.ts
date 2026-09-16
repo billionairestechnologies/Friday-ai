@@ -49,3 +49,36 @@ export function extractArtifact(content: string): Artifact | null {
   }
   return null;
 }
+
+/**
+ * Whatever's been typed into an OPEN (not yet closed) fenced code block, for the live "writing
+ * code" view in Canvas while a reply is still streaming — extractArtifact() only returns once the
+ * closing ``` has actually arrived, so without this Canvas had nothing to show but a bare spinner
+ * for the entire time the code was being generated.
+ */
+export function extractStreamingCodeBody(content: string): { lang?: string; body: string } | null {
+  const openFence = /```(\w+)?\n([\s\S]*)$/.exec(content);
+  if (!openFence) return null;
+  return { lang: openFence[1], body: openFence[2] ?? "" };
+}
+
+const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx)$/i;
+
+/**
+ * Cuts a visual artifact's fenced code block (html/jsx/tsx — the kinds Canvas renders as a live
+ * preview) out of a message's text before it's shown in the chat bubble, so the same code doesn't
+ * appear twice — once flooding the chat as a giant raw block, once properly rendered in Canvas.
+ * Handles the still-streaming case too (an opened but not yet closed fence), not just a completed
+ * one, so the code never appears in chat even momentarily while it's being generated. A no-op for
+ * any message that doesn't contain one of these fences.
+ */
+export function stripVisualArtifactForChat(content: string): string {
+  const closed = /```(html|jsx|tsx)\n[\s\S]*?```/i.exec(content);
+  if (closed && VISUAL_FENCE_LANGS.test(closed[1] ?? "")) {
+    const start = closed.index;
+    return (content.slice(0, start) + content.slice(start + closed[0].length)).trim();
+  }
+  const open = /```(html|jsx|tsx)\b/i.exec(content);
+  if (open) return content.slice(0, open.index).trim();
+  return content;
+}
