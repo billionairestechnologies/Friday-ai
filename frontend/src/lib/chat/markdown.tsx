@@ -1,4 +1,5 @@
 import { memo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Copy, Download } from "lucide-react";
@@ -139,12 +140,27 @@ export const StreamingMarkdown = memo(function StreamingMarkdown({
   }
   const prefix = committedRef.current;
   const rest = text.startsWith(prefix) ? text.slice(prefix.length) : text;
+  // Word-chunked, not the whole tail as one flat string — each new word mounts (and fades in)
+  // exactly once; a still-growing last word just gets its text updated in place since its array
+  // index — and therefore its React key — doesn't change. Was previously a flat re-render on
+  // every single delta, which read as the text glitching/jumping rather than flowing in.
+  const words = rest.match(/\S+\s*/g) ?? [];
 
   return (
     <div className="relative min-h-[1.65em] w-full [overflow-anchor:none]">
       {prefix ? <Markdown text={prefix} /> : null}
       <span className="md whitespace-pre-wrap text-[0.975rem] leading-[1.65]">
-        {rest}
+        {words.map((word, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, y: 6, filter: "blur(3px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-block"
+          >
+            {word}
+          </motion.span>
+        ))}
         <span className="stream-caret" aria-hidden />
       </span>
     </div>
