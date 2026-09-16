@@ -1,5 +1,5 @@
 export type Artifact = {
-  kind: "html" | "markdown" | "code";
+  kind: "html" | "markdown" | "code" | "react";
   body: string;
   lang?: string;
   title: string;
@@ -15,7 +15,11 @@ export function extractArtifact(content: string): Artifact | null {
   if (html?.[2]?.trim()) {
     return { kind: "html", body: html[2].trim(), title: "Canvas", lang: "html" };
   }
-  const preferred = ["tsx", "jsx", "javascript", "typescript", "css", "python"];
+  const react = blocks.find((b) => ["tsx", "jsx"].includes((b[1] ?? "").toLowerCase()));
+  if (react?.[2]?.trim()) {
+    return { kind: "react", body: react[2].trim(), lang: react[1], title: `${react[1]} canvas` };
+  }
+  const preferred = ["javascript", "typescript", "css", "python"];
   const code = blocks.find((b) => preferred.includes((b[1] ?? "").toLowerCase()));
   if (code?.[2]?.trim()) {
     return {

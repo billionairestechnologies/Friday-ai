@@ -3,6 +3,7 @@ import { Download, ExternalLink, Globe, PanelRightClose, RefreshCw } from "lucid
 import { Markdown } from "@/lib/chat/markdown";
 import { extractArtifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
+import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
 import { useLiveStream } from "@/lib/chat/live-stream";
 import { useChat } from "@/lib/chat/store";
 
@@ -77,12 +78,13 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
             <Download className="size-3.5" />
           </button>
         )}
-        {artifact?.kind === "html" && (
+        {(artifact?.kind === "html" || artifact?.kind === "react") && (
           <button
             type="button"
             aria-label="Open in new tab"
             onClick={() => {
-              const blob = new Blob([artifact.body], { type: "text/html;charset=utf-8" });
+              const html = artifact.kind === "react" ? buildReactPreviewHtml(artifact.body) : artifact.body;
+              const blob = new Blob([html], { type: "text/html;charset=utf-8" });
               const url = URL.createObjectURL(blob);
               window.open(url, "_blank", "noopener,noreferrer");
               window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
@@ -112,6 +114,13 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
             title="Canvas"
             sandbox="allow-scripts"
             srcDoc={artifact.body}
+            className="h-full min-h-[24rem] w-full border-0 bg-white"
+          />
+        ) : artifact?.kind === "react" ? (
+          <iframe
+            title="Canvas"
+            sandbox="allow-scripts"
+            srcDoc={buildReactPreviewHtml(artifact.body)}
             className="h-full min-h-[24rem] w-full border-0 bg-white"
           />
         ) : artifact?.kind === "code" ? (
