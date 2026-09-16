@@ -6,7 +6,9 @@ import {
   type SearchHit,
 } from "@/components/ui/chain-of-thought";
 import { ProviderLogo } from "@/components/provider-logos";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { planningStepsFromMessage } from "@/lib/chat/planning";
+import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import type { ChatMessage } from "@/lib/chat/types";
 
 function hostOf(url: string) {
@@ -43,6 +45,12 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
     thinkOn &&
     streaming &&
     (status === "thinking" || (hasThink && !hasContent && status !== "writing"));
+
+  // Age-banded, mode-flavored one-liners in place of the plain "Searching the web…" / "Reasoning…"
+  // step text while each is actually active — see lib/chat/thinking-lines.ts.
+  const { user } = useCurrentUserState();
+  const searchLine = useRotatingThinkingLine(searchActive, user?.birthday, "searching");
+  const thinkLine = useRotatingThinkingLine(thinkActive, user?.birthday, "thinking");
 
   const live = streaming && !failed;
   const label = failed
@@ -109,7 +117,7 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
 
       {searchOn && (
         <ThoughtStep
-          title={searchActive ? "Searching the web" : hits.length ? `Found ${hits.length} sources` : "Searched the web"}
+          title={searchActive ? searchLine : hits.length ? `Found ${hits.length} sources` : "Searched the web"}
           status={searchActive ? "active" : "complete"}
         >
           <ThoughtSources results={hits} />
@@ -118,7 +126,7 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
 
       {thinkOn && (
         <ThoughtStep
-          title={thinkActive ? "Reasoning" : "Reasoned through it"}
+          title={thinkActive ? thinkLine : "Reasoned through it"}
           status={thinkActive ? "active" : hasThink || !streaming ? "complete" : "pending"}
         >
           {hasThink && (

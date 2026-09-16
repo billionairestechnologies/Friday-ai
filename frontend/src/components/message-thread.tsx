@@ -128,7 +128,13 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
   );
   const done = !message.streaming;
   // Rotates every ~2.6s while actually waiting, so a slow reply doesn't sit on one static line.
-  const thinkingLine = useRotatingThinkingLine(waiting, user?.birthday);
+  // "searching" is handled by LiveChainOfThought's own step instead (see chain-of-thought-live.tsx)
+  // — this plain pill only ever needs "working" or "thinking".
+  const thinkingLine = useRotatingThinkingLine(
+    waiting,
+    user?.birthday,
+    message.status === "thinking" ? "thinking" : "working",
+  );
 
   return (
     <div
