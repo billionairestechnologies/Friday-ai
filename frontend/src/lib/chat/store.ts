@@ -166,7 +166,7 @@ export const useChat = create<ChatState>()(
       canvas: false,
       canvasOpen: false,
       settingsTab: "account",
-      appearance: "dark",
+      appearance: "light",
       behavior: "",
       draft: "",
       attachments: [],
@@ -408,6 +408,17 @@ export const useChat = create<ChatState>()(
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
+      },
+      // Bumped once to force everyone already sitting on the old default ("dark", never
+      // explicitly chosen) onto the new default ("light"). Anyone who picked a theme
+      // deliberately after this ships will have it persist normally going forward — this
+      // migration only overrides what a prior *default* left behind, not a real user choice
+      // made post-migration.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as Persisted;
+        if (version < 1) state.appearance = "light";
+        return state;
       },
     },
   ),

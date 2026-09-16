@@ -56,6 +56,13 @@ export function VoiceMode({
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // Chrome/Safari's autoplay "user activation" window frequently doesn't survive the network
+  // round trip for TTS synthesis (several seconds), so calling .play() on a brand-new <audio>
+  // element once the reply is ready gets silently blocked — reported live as "not speaking
+  // back." Standard fix: play a near-silent clip on THIS element synchronously inside the "Stop
+  // and send" click handler (a real, fresh user gesture), then reuse the same element for the
+  // actual reply later — activation is commonly tied to the element instance, not just the tab.
+  const unlockedAudioRef = useRef<HTMLAudioElement | null>(null);
   const finalTranscriptRef = useRef("");
   const awaitingReplyRef = useRef(false);
   const watchingAssistantIdRef = useRef<string | null>(null);
@@ -191,9 +198,27 @@ export function VoiceMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // A single silent PCM sample as a WAV data URI — enough for the browser to register a real
+  // play() call on this element without the user actually hearing anything.
+  const SILENT_CLIP =
+    "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==";
+
+  function unlockAudioForLaterPlayback() {
+    try {
+      const audio = unlockedAudioRef.current ?? new Audio();
+      unlockedAudioRef.current = audio;
+      audio.src = SILENT_CLIP;
+      void audio.play().catch(() => {
+        /* if even this gets blocked, the reply is still fully readable as text in the transcript */
+      });
+    } catch {
+      /* same fallback as above */
+    }
+  }
+
   async function speakReply(text: string) {
     try {
-      const spoken = await speak(text, voiceId);
+      const spoken = await speak(text, voiceId, unlockedAudioRef.current ?? undefined);
       spokenStopRef.current = spoken.stop;
       setAnalyser(spoken.analyser);
       setHearing(true);
@@ -229,6 +254,10 @@ export function VoiceMode({
   }
 
   async function finishAndSubmit() {
+    // Must happen synchronously, before any `await` in this function — that's what keeps it
+    // inside the same user-activation window as the click that called this.
+    unlockAudioForLaterPlayback();
+
     recognitionRef.current?.stop();
     const text = (finalTranscriptRef.current || caption).trim();
     const recorder = mediaRecorderRef.current;

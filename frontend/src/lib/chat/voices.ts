@@ -70,14 +70,20 @@ async function fetchSpeech(text: string, voiceId: string | null | undefined, isR
   return res;
 }
 
-/** Synthesizes and plays one line through the backend TTS endpoint, wired to a live analyser for visuals. */
-export async function speak(text: string, voiceId?: string | null): Promise<SpokenAudio> {
+/**
+ * Synthesizes and plays one line through the backend TTS endpoint, wired to a live analyser for
+ * visuals. Pass `reuseAudio` — an `<audio>` element that already had `.play()` called on it
+ * synchronously within a real user gesture (see voice-mode.tsx's unlockAudioForLaterPlayback) —
+ * to inherit that element's autoplay activation instead of getting blocked on a brand-new one.
+ */
+export async function speak(text: string, voiceId?: string | null, reuseAudio?: HTMLAudioElement): Promise<SpokenAudio> {
   const res = await fetchSpeech(text, voiceId);
   if (!res.ok) throw new Error(`Speech synthesis failed: ${res.status}`);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
 
-  const audio = new Audio(url);
+  const audio = reuseAudio ?? new Audio();
+  audio.src = url;
   const analyser: LiveAnalyser | null = attachAnalyserToElement(audio);
 
   let resolveDone: () => void;
@@ -91,7 +97,21 @@ export async function speak(text: string, voiceId?: string | null): Promise<Spok
   };
   audio.addEventListener("ended", cleanup, { once: true });
   audio.addEventListener("error", cleanup, { once: true });
-  void audio.play().catch(cleanup);
+
+  // `void audio.play().catch(cleanup)` used to treat a BLOCKED play() (the browser's autoplay
+  // policy rejecting it — very plausible here: the actual play() call happens well after the
+  // "Stop and send" click, once TTS synthesis finishes over the network, by which point Chrome's
+  // user-activation window can have expired) exactly the same as a successful, completed
+  // playback — cleanup() only ever RESOLVES `done`, never rejects it. speak() returned
+  // successfully either way, so the caller had no way to know audio never actually started, and
+  // reported "not speaking back" with zero error surfaced anywhere. Awaiting play() here and
+  // throwing on failure makes that a real, catchable error instead of a silent no-op.
+  try {
+    await audio.play();
+  } catch (err) {
+    cleanup();
+    throw err instanceof Error ? err : new Error("Playback was blocked by the browser");
+  }
 
   return {
     audio,
