@@ -17,6 +17,8 @@ export const FEATURED_PLUGINS: PluginItem[] = [
   { id: "gmail", name: "Gmail", desc: "Read and draft mail", group: "featured" },
   { id: "drive", name: "Google Drive", desc: "Search files and docs", group: "featured" },
   { id: "notion", name: "Notion", desc: "Search pages and docs", group: "featured" },
+  { id: "supabase", name: "Supabase", desc: "Query your database and tables", group: "featured" },
+  { id: "railway", name: "Railway", desc: "Check deploys and service status", group: "featured" },
   { id: "finance", name: "Finance", desc: "Connect financial accounts", group: "featured" },
   { id: "box", name: "Box", desc: "Search files and docs", group: "featured" },
   { id: "canva", name: "Canva", desc: "Create and edit designs", group: "featured" },

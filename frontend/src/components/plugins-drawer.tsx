@@ -2,6 +2,7 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Puzzle, Search, X } from "lucide-react";
 import { FEATURED_PLUGINS, FRIDAY_TOOLS, type PluginItem } from "@/lib/plugins";
+import { PLUGIN_LOGOS, PluginLogo } from "@/components/plugin-logos";
 import { useChat } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 
@@ -128,7 +129,7 @@ export function PluginsDrawer() {
                           className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
                         >
                           <span className="grid size-9 place-items-center rounded-lg bg-chip text-sm font-semibold">
-                            {p.name.charAt(0)}
+                            {PLUGIN_LOGOS[p.id] ? <PluginLogo id={p.id} className="size-4.5" /> : p.name.charAt(0)}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block text-sm font-medium">{p.name}</span>
