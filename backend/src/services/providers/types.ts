@@ -11,15 +11,21 @@ export interface ProviderModel {
 
 export interface ChatImage {
   mime: string;
-  /** A full `data:<mime>;base64,<...>` URL, exactly as the browser's FileReader produced it. */
+  /** A full `data:<mime>;base64,<...>` URL, exactly as the browser's FileReader produced it.
+   *  Despite the name (kept for a smaller diff against existing call sites), this carries any
+   *  attachment — images, PDFs, and (for Gemini, whose inline_data is mime-agnostic) short
+   *  video/audio clips, not just images. Adapters branch on `mime` to build the right content
+   *  block and skip file types their provider doesn't understand. */
   dataUrl: string;
 }
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
-  /** Image attachments on a user message — only ever set on the most recent turn (see
-   *  chatService's attachImages()); adapters without vision support ignore this field. */
+  /** File attachments on a user message — only ever set on the most recent turn (see
+   *  chatService's attachImages()); adapters without any attachment support ignore this field,
+   *  and adapters that only support some mime types (e.g. Anthropic: images + PDF, not video)
+   *  filter accordingly rather than sending a request their provider will reject. */
   images?: ChatImage[];
 }
 
@@ -71,23 +77,29 @@ export function base64PayloadOf(dataUrl: string): string {
 
 /**
  * Anthropic's /messages API (and ScaleMax, which proxies it) wants plain string content for a
- * text-only turn, but a content-block array — images before text, per Anthropic's own examples —
- * for a turn carrying attachments. Shared by anthropic.ts and scalemax.ts since they're the same
- * wire format.
+ * text-only turn, but a content-block array — attachments before text, per Anthropic's own
+ * examples — for a turn carrying attachments. Shared by anthropic.ts and scalemax.ts since
+ * they're the same wire format.
+ *
+ * Anthropic natively understands images and PDFs (as a "document" block, not "image") but
+ * nothing else — a video/audio attachment is silently dropped here rather than sent as a
+ * malformed block the API would reject outright.
  */
 export function toAnthropicStyleMessages(conversation: ChatMessage[]) {
   return conversation.map((m) => {
-    if (!m.images?.length) return { role: m.role, content: m.content };
-    return {
-      role: m.role,
-      content: [
-        ...m.images.map((img) => ({
-          type: "image",
-          source: { type: "base64", media_type: img.mime, data: base64PayloadOf(img.dataUrl) },
-        })),
-        { type: "text", text: m.content },
-      ],
-    };
+    const attachments = (m.images ?? []).filter((img) => img.mime.startsWith("image/") || img.mime === "application/pdf");
+    if (attachments.length === 0) return { role: m.role, content: m.content };
+
+    const blocks: Record<string, unknown>[] = attachments.map((img) =>
+      img.mime === "application/pdf"
+        ? { type: "document", source: { type: "base64", media_type: img.mime, data: base64PayloadOf(img.dataUrl) } }
+        : { type: "image", source: { type: "base64", media_type: img.mime, data: base64PayloadOf(img.dataUrl) } },
+    );
+    // An empty text block ({type:"text", text:""}) is invalid — Anthropic rejects it the same
+    // way it rejected an empty `messages` array (confirmed in production, 2026-09-16). Only add
+    // the text block when there's actually text, e.g. an image sent with no caption.
+    if (m.content.trim()) blocks.push({ type: "text", text: m.content });
+    return { role: m.role, content: blocks };
   });
 }
 
@@ -123,16 +135,18 @@ export function mergeSystemMessages(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /** OpenAI-style `image_url` content blocks (OpenAI, OpenRouter) — unlike Anthropic/Gemini, these
- *  take the data URL as-is, no base64 stripping. */
+ *  take the data URL as-is, no base64 stripping. `image_url` only ever means an image on these
+ *  APIs (no PDF/document block in the standard chat-completions shape), so anything else in
+ *  `images` is dropped here rather than sent as a broken image reference. */
 export function toOpenAiStyleMessages(messages: ChatMessage[]) {
   return messages.map((m) => {
-    if (!m.images?.length) return { role: m.role, content: m.content };
-    return {
-      role: m.role,
-      content: [
-        { type: "text", text: m.content },
-        ...m.images.map((img) => ({ type: "image_url", image_url: { url: img.dataUrl } })),
-      ],
-    };
+    const images = (m.images ?? []).filter((img) => img.mime.startsWith("image/"));
+    if (images.length === 0) return { role: m.role, content: m.content };
+
+    const parts: Record<string, unknown>[] = images.map((img) => ({ type: "image_url", image_url: { url: img.dataUrl } }));
+    // Same as Anthropic: an empty text part is invalid on some OpenAI-compatible backends
+    // (confirmed for Anthropic-family APIs in production; skip it defensively here too).
+    if (m.content.trim()) parts.unshift({ type: "text", text: m.content });
+    return { role: m.role, content: parts };
   });
 }

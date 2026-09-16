@@ -128,3 +128,24 @@ export function attachImages(history: ChatMessage[], images: ChatImage[]): ChatM
   const withImages: ChatMessage = { ...last, images: images.slice(0, MAX_ATTACHMENTS) };
   return [...history.slice(0, -1), withImages];
 }
+
+// Anthropic's real API understands a PDF as a "document" content block. ScaleMax, despite
+// proxying an Anthropic-compatible /messages API, does NOT forward it — confirmed directly
+// against their API (2026-09-16): a document block sent with or without the anthropic-beta PDF
+// header comes back with input_tokens matching the text prompt alone (the model explicitly says
+// no PDF was attached). Their proxy silently strips content types it doesn't recognize, so a
+// ScaleMax-routed Claude model reads a PDF-carrying request as if the PDF were never there. Only
+// the real Anthropic API and Gemini (native, not via any proxy) actually receive the file.
+const PDF_CAPABLE_SLUGS = new Set(["anthropic", "gemini"]);
+
+/**
+ * Returns a human-readable reason the given provider can't see one of these attachments, or null
+ * if every attachment is something that provider's adapter actually forwards. Vision-gate the
+ * image case separately (via getModelVisionSupport) before calling this — this only covers the
+ * "attached a file type this specific provider doesn't support" case (currently: PDF).
+ */
+export function unsupportedAttachmentReason(providerSlug: string, images: ChatImage[]): string | null {
+  const unsupportedPdf = images.some((img) => img.mime === "application/pdf") && !PDF_CAPABLE_SLUGS.has(providerSlug);
+  if (unsupportedPdf) return "can't read PDFs — pick a Claude (direct Anthropic, not ScaleMax) or Gemini model, or remove the attachment.";
+  return null;
+}

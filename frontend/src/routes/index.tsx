@@ -204,12 +204,16 @@ export function Home() {
       applyLive(acc);
     });
 
-    const imageAttachments = attachments
-      .filter((a) => a.kind === "image")
+    // Images and PDFs actually reach the backend (Anthropic/ScaleMax/Gemini understand both;
+    // OpenAI/OpenRouter understand images only, and their adapter drops a PDF rather than
+    // sending it malformed). Anything else picked via drag-and-drop (the file picker itself only
+    // offers these two) is dropped here before it ever leaves the client.
+    const sendableAttachments = attachments
+      .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf")
       .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl }));
 
     try {
-      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, imageAttachments, (ev) => {
+      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
         if (ev.t === "status") batch.status(ev.s);
         else if (ev.t === "think") batch.think(ev.c);
         else if (ev.t === "text") batch.text(ev.c);

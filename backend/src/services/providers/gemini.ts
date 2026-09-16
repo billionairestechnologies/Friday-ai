@@ -4,16 +4,18 @@ import { base64PayloadOf, safeErrorMessage, splitSystemPrompt } from "./types.js
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
+// Gemini's inline_data is mime-agnostic — this already handles PDFs (and anything else Gemini's
+// API accepts inline) with no changes, unlike Anthropic/OpenAI which need a mime-specific block.
 function toGeminiContents(conversation: ChatMessage[]) {
-  return conversation.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: m.images?.length
-      ? [
-          { text: m.content },
-          ...m.images.map((img) => ({ inline_data: { mime_type: img.mime, data: base64PayloadOf(img.dataUrl) } })),
-        ]
-      : [{ text: m.content }],
-  }));
+  return conversation.map((m) => {
+    const fileParts = (m.images ?? []).map((img) => ({
+      inline_data: { mime_type: img.mime, data: base64PayloadOf(img.dataUrl) },
+    }));
+    // Same reasoning as the Anthropic/OpenAI adapters: an empty text part alongside an
+    // attachment (an image sent with no caption) shouldn't be sent as {text: ""}.
+    const parts = m.content.trim() ? [{ text: m.content }, ...fileParts] : fileParts.length ? fileParts : [{ text: "" }];
+    return { role: m.role === "assistant" ? "model" : "user", parts };
+  });
 }
 
 export const geminiAdapter: ProviderAdapter = {

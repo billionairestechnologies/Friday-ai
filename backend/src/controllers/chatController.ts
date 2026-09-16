@@ -59,15 +59,24 @@ const attachmentSchema = z.object({
   dataUrl: z.string().min(1),
 });
 
-const sendMessageSchema = z.object({
-  content: z.string().trim().min(1, "Message cannot be empty"),
-  inputMode: z.enum(["text", "voice"]).optional().default("text"),
-  think: z.boolean().optional().default(false),
-  behavior: z.string().trim().max(1000).optional().default(""),
-  webSearch: z.boolean().optional().default(false),
-  canvas: z.boolean().optional().default(false),
-  attachments: z.array(attachmentSchema).max(4).optional().default([]),
-});
+const sendMessageSchema = z
+  .object({
+    content: z.string().trim().max(50_000),
+    inputMode: z.enum(["text", "voice"]).optional().default("text"),
+    think: z.boolean().optional().default(false),
+    behavior: z.string().trim().max(1000).optional().default(""),
+    webSearch: z.boolean().optional().default(false),
+    canvas: z.boolean().optional().default(false),
+    attachments: z.array(attachmentSchema).max(4).optional().default([]),
+  })
+  // The composer already allows sending an attachment with no caption text (an image with
+  // nothing typed is a completely normal thing to send) — this used to require non-empty
+  // content unconditionally, so that exact case landed a raw Zod error on the user's screen
+  // instead of an image-only message. Empty is fine as long as something was attached.
+  .refine((data) => data.content.length > 0 || data.attachments.length > 0, {
+    message: "Message cannot be empty",
+    path: ["content"],
+  });
 
 export async function streamMessage(req: Request, res: Response) {
   const { content, inputMode, think, behavior, webSearch, canvas, attachments } = sendMessageSchema.parse(req.body);

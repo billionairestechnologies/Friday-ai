@@ -11,7 +11,7 @@ import {
 } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
-import { attachImages, trimHistoryToBudget, withSystemPreamble } from "./promptContext.js";
+import { attachImages, trimHistoryToBudget, unsupportedAttachmentReason, withSystemPreamble } from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
 import { getOwnedConversation, insertAssistantMessage } from "./conversations.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
@@ -87,6 +87,12 @@ export async function streamMessage(
         t: "err",
         c: `${conversation.providers.display_name} can't see images — pick a vision-capable model or remove the attachment.`,
       });
+      onEvent({ t: "done" });
+      return;
+    }
+    const unsupportedReason = unsupportedAttachmentReason(conversation.providers.slug, attachments);
+    if (unsupportedReason) {
+      onEvent({ t: "err", c: `${conversation.providers.display_name} ${unsupportedReason}` });
       onEvent({ t: "done" });
       return;
     }

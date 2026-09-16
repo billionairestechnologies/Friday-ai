@@ -834,7 +834,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       className="flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-foreground outline-none data-[highlighted]:bg-chip"
                     >
                       <ImageIcon className="size-4 text-muted" />
-                      Photos &amp; videos
+                      Photos
                     </DropdownMenu.Item>
                     <DropdownMenu.Item
                       onSelect={() => documentInputRef.current?.click()}
@@ -857,7 +857,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 ref={photoVideoInputRef}
                 type="file"
                 className="hidden"
-                accept="image/*,video/*"
+                accept="image/*"
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);
                   if (e.target) e.target.value = "";
@@ -867,7 +867,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 ref={documentInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.txt,.md,.csv,.xls,.xlsx,.ppt,.pptx"
+                // PDF is the only document type the backend actually sends to a model (Anthropic/
+                // ScaleMax/Gemini support it as a native document block) — anything else here
+                // would look attached in the UI but silently vanish before the request went out.
+                accept=".pdf"
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);
                   if (e.target) e.target.value = "";

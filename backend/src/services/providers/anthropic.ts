@@ -4,6 +4,10 @@ import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from ".
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
+// Needed for the "document" content block (PDF attachments) — confirmed via ScaleMax's proxy
+// that this header alone doesn't make a proxy forward the block if it doesn't support it, but
+// the real Anthropic API does need it present to process a PDF at all.
+const ANTHROPIC_BETA = "pdfs-2024-09-25";
 
 export const anthropicAdapter: ProviderAdapter = {
   slug: "anthropic",
@@ -30,6 +34,7 @@ export const anthropicAdapter: ProviderAdapter = {
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": ANTHROPIC_VERSION,
+        "anthropic-beta": ANTHROPIC_BETA,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -69,6 +74,7 @@ export const anthropicAdapter: ProviderAdapter = {
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": ANTHROPIC_VERSION,
+        "anthropic-beta": ANTHROPIC_BETA,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
