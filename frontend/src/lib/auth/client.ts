@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api, API_BASE_URL, setAccessToken, setUnauthorizedHandler } from "@/lib/api";
+import { useChat } from "@/lib/chat/store";
 import type { AuthUser, Session } from "@/lib/types";
 
 const STORAGE_KEY = "friday-ai-session";
@@ -23,7 +24,7 @@ type AuthState = {
   resendOtp: (email: string) => Promise<void>;
   /** The hidden /admin gate's own login — skips the OTP step (see backend adminLogin for why). */
   adminLogin: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, phone: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, phone: string, password: string) => Promise<{ email: string }>;
   /** Fills in a profile field missing on an older account (currently just phone). */
   updateProfile: (phone: string) => Promise<void>;
   logout: () => void;
@@ -60,10 +61,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await api.get<{ user: AuthUser }>("/auth/me");
       set({ user: res.user, isPending: false });
+      useChat.getState().syncOwner(res.user.id);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       setAccessToken(null);
       set({ user: null, isPending: false });
+      useChat.getState().syncOwner(null);
     }
   },
 
@@ -76,6 +79,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     const res = await api.post<{ user: AuthUser; session: Session }>("/auth/verify-otp", { email, code });
     persist(res.session, res.user);
     set({ user: res.user, isPending: false });
+    useChat.getState().syncOwner(res.user.id);
   },
 
   resendOtp: async (email) => {
@@ -86,21 +90,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     const res = await api.post<{ user: AuthUser; session: Session }>("/auth/admin-login", { email, password });
     persist(res.session, res.user);
     set({ user: res.user, isPending: false });
+    useChat.getState().syncOwner(res.user.id);
   },
 
+  /** Creates the account, then sends the same 6-digit OTP flow as login() — signup only
+   *  completes once that code is confirmed with verifyOtp(). */
   signup: async (name, email, phone, password) => {
-    const res = await api.post<{ user: AuthUser; session: Session | null }>("/auth/signup", {
+    const res = await api.post<{ otpRequired: true; email: string }>("/auth/signup", {
       name,
       email,
       phone,
       password,
     });
-    if (res.session && res.user) {
-      persist(res.session, res.user);
-      set({ user: res.user, isPending: false });
-    } else {
-      throw new Error("Check your email to confirm your account, then log in.");
-    }
+    return { email: res.email };
   },
 
   updateProfile: async (phone) => {
@@ -114,6 +116,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem(STORAGE_KEY);
     setAccessToken(null);
     set({ user: null });
+    useChat.getState().syncOwner(null);
   },
 
   refresh: async () => {

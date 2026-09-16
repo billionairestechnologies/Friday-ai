@@ -99,8 +99,7 @@ export function LoginPopout() {
         setStep("otp");
       } else {
         await signup(name, email, phone, password);
-        setDialog(null);
-        setPassword("");
+        setStep("otp");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

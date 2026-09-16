@@ -51,22 +51,40 @@ export async function adminLogin(req: Request, res: Response) {
   });
 }
 
+/**
+ * Creates the account pre-confirmed (via the service-role admin API, bypassing Supabase's own
+ * email-confirmation-link flow entirely) then sends it through the same OTP step as login() —
+ * signup and login share one verification UX instead of a link-based flow for one and a code
+ * for the other.
+ */
 export async function signup(req: Request, res: Response) {
   const { name, email, phone, password } = signupSchema.parse(req.body);
 
-  const { data, error } = await supabasePublic.auth.signUp({
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    options: { data: { full_name: name, phone } },
+    email_confirm: true,
+    user_metadata: { full_name: name, phone },
   });
 
-  if (error) throw new HttpError(400, error.message);
+  if (error || !data.user) {
+    const message = error?.message.includes("already been registered")
+      ? "An account with that email already exists"
+      : (error?.message ?? "Couldn't create that account");
+    throw new HttpError(400, message);
+  }
 
-  res.status(201).json({
-    user: data.user ? { id: data.user.id, email: data.user.email, name, phone, role: "user" as const } : null,
-    session: data.session,
-    requiresEmailConfirmation: !data.session,
+  const { data: signInData, error: signInError } = await supabasePublic.auth.signInWithPassword({
+    email,
+    password,
   });
+  if (signInError || !signInData.session) {
+    throw new HttpError(500, "Account created but sign-in failed — try logging in");
+  }
+
+  await issueOtp(email, name, signInData.session);
+
+  res.status(201).json({ otpRequired: true, email });
 }
 
 const updateProfileSchema = z.object({
