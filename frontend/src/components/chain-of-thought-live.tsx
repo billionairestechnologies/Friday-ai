@@ -1,4 +1,4 @@
-import { AgentPlanning } from "@/components/ui/ai-planning";
+import { Check, Clock, Loader2 } from "lucide-react";
 import {
   ThoughtSources,
   ThoughtStep,
@@ -7,8 +7,8 @@ import {
 } from "@/components/ui/chain-of-thought";
 import { ProviderLogo } from "@/components/provider-logos";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { planningStepsFromMessage } from "@/lib/chat/planning";
 import { useElapsedSeconds, useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
+import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/chat/types";
 
 function hostOf(url: string) {
@@ -84,13 +84,39 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
               ? "Plan"
               : "Done";
 
+  // Flat, unboxed step log for the canvas-only path — no bordered card, no collapsible header,
+  // matching the reference product's plain running list instead of an accordion box. Nothing to
+  // show once it's done: the chat bubble already has a "Built in Canvas" note for this case
+  // (see stripVisualArtifactForChat in message-thread.tsx).
   if (canvasOn && !message.usedThink && !searchOn) {
+    if (!live) return null;
+    const analyzing = !canvasWriteActive;
     return (
-      <AgentPlanning
-        variant="bare"
-        title={live ? `Planning · ${elapsedSeconds}s` : "Plan"}
-        steps={planningStepsFromMessage(message, canvasWriteLine)}
-      />
+      <div className="flex flex-col gap-1.5 py-1">
+        <div
+          className={cn(
+            "flex items-center gap-2 text-sm",
+            analyzing ? "font-medium text-foreground" : "text-muted",
+          )}
+        >
+          {analyzing ? (
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-sky-400" />
+          ) : (
+            <Check className="size-3.5 shrink-0 text-emerald-400" />
+          )}
+          <span>Analyzing the request</span>
+        </div>
+        {!analyzing && (
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-sky-400" />
+            <span>{canvasWriteLine}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 text-xs text-subtle">
+          <Clock className="size-3 shrink-0" />
+          <span>Working for {elapsedSeconds}s</span>
+        </div>
+      </div>
     );
   }
 
