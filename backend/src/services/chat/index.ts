@@ -12,6 +12,7 @@ import {
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
+import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import {
   appendExtractedText,
   attachImages,
@@ -33,28 +34,35 @@ export {
 } from "./conversations.js";
 
 /**
- * Runs every PDF/PNG/JPEG attachment through Sarvam's Doc AI digitise pipeline (OCR/layout
- * extraction — verified directly against the real API for both PDFs and images) and returns the
- * combined extracted text, or null if there's nothing digitisable, no working Sarvam key, or
- * extraction failed — never throws, since this is a best-effort enhancement layered on top of
- * (not required for) whatever native support the chosen model already has. This is what makes a
- * PDF readable by ANY model (not just Anthropic/Gemini), and gives even a non-vision model a way
- * to "read" an image. For a vision-capable model, this runs *alongside* native image
- * understanding, not instead of it — exact OCR text is often more reliable than a vision model
- * transcribing text out of a picture.
+ * Extracts text from every PDF/PNG/JPEG/DOCX/XLSX attachment and returns it combined, or null if
+ * nothing extractable was attached or every extraction failed. PDF/image goes through Sarvam's
+ * Doc AI digitise pipeline (OCR — verified directly against the real API); DOCX/XLSX are parsed
+ * locally (mammoth/exceljs — these are structured XML formats, not scanned documents, and
+ * Sarvam's API rejects them outright, confirmed directly: "only JPEG and PNG entries are
+ * allowed"). Never throws — extraction is a best-effort enhancement layered on top of (not
+ * required for) whatever native support the chosen model already has. This is what makes any of
+ * these files readable by ANY model, not just ones with native document/vision support, and gives
+ * even a non-vision model a way to "read" an image's text.
  */
 async function extractDocumentText(attachments: ChatImage[]): Promise<string | null> {
-  const files = attachments.filter((a) => isDigitisable(a.mime));
-  if (files.length === 0) return null;
+  const officeFiles = attachments.filter((a) => isOfficeDocument(a.mime));
+  const digitisableFiles = attachments.filter((a) => isDigitisable(a.mime));
+  if (officeFiles.length === 0 && digitisableFiles.length === 0) return null;
 
-  const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
-  if (!sarvamKey) return null;
+  const officeTexts = officeFiles.map((f) => extractOfficeText(f.dataUrl, f.mime));
+  const digitiseTexts = (async () => {
+    if (digitisableFiles.length === 0) return [];
+    const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
+    if (!sarvamKey) return digitisableFiles.map(() => Promise.resolve(null));
+    return digitisableFiles.map((f, i) => digitiseDocument(sarvamKey, f.dataUrl, f.mime, `attachment-${i + 1}`));
+  })();
 
-  const texts = await Promise.all(
-    files.map((f, i) => digitiseDocument(sarvamKey, f.dataUrl, f.mime, `attachment-${i + 1}`)),
-  );
-  const extracted = texts
-    .map((text, i) => (text ? (files.length > 1 ? `[Attachment ${i + 1}]\n${text}` : text) : null))
+  const [officeResults, digitiseResultPromises] = await Promise.all([Promise.all(officeTexts), digitiseTexts]);
+  const digitiseResults = await Promise.all(digitiseResultPromises);
+  const allResults = [...officeResults, ...digitiseResults];
+
+  const extracted = allResults
+    .map((text, i) => (text ? (allResults.length > 1 ? `[Attachment ${i + 1}]\n${text}` : text) : null))
     .filter((t): t is string => t !== null);
   return extracted.length > 0 ? extracted.join("\n\n") : null;
 }
@@ -101,6 +109,16 @@ export async function streamMessage(
     for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
   }
   const extractedDocText = await extractDocumentText(attachments);
+  // DOCX/XLSX have no native fallback on ANY provider — extraction succeeding is the only way
+  // one of these ever reaches the model at all, so a failure here (corrupt file, unsupported
+  // internal structure) needs to surface regardless of mode, not just single's per-provider
+  // gates below. Checked once, up front, before any mode-specific branching.
+  const hasOfficeAttachment = attachments.some((a) => isOfficeDocument(a.mime));
+  if (hasOfficeAttachment && !extractedDocText) {
+    onEvent({ t: "err", c: "Couldn't read that document — it may be corrupted or empty." });
+    onEvent({ t: "done" });
+    return;
+  }
   const history = appendExtractedText(
     attachImages(
       withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults, canvas),

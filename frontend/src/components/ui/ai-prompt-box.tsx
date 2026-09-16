@@ -867,10 +867,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 ref={documentInputRef}
                 type="file"
                 className="hidden"
-                // PDF is the only document type the backend actually processes (extracted to text
-                // server-side via Sarvam's Doc AI, so it works with any model) — anything else
-                // here would look attached in the UI but silently vanish before the request went out.
-                accept=".pdf"
+                // PDF/DOCX/XLSX are the document types the backend actually processes (PDF via
+                // Sarvam's Doc AI OCR, DOCX/XLSX parsed directly) — anything else here would look
+                // attached in the UI but silently vanish before the request went out.
+                accept=".pdf,.docx,.xlsx"
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);
                   if (e.target) e.target.value = "";

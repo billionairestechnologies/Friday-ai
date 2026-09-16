@@ -204,12 +204,17 @@ export function Home() {
       applyLive(acc);
     });
 
-    // Images and PDFs actually reach the backend. Every model can read a PDF via Sarvam's Doc AI
-    // text extraction the backend runs server-side; a PDF-native provider (Anthropic direct,
-    // Gemini) also gets the raw file as a fallback. Anything else picked via drag-and-drop (the
-    // file picker itself only offers these two) is dropped here before it ever leaves the client.
+    // Images/PDF/DOCX/XLSX actually reach the backend. Every model can read a PDF or image via
+    // Sarvam's Doc AI OCR the backend runs server-side (a PDF-native provider — Anthropic direct,
+    // Gemini — also gets the raw file as a fallback); DOCX/XLSX are parsed directly server-side,
+    // no OCR needed. Anything else picked via drag-and-drop (the file picker itself only offers
+    // these four) is dropped here before it ever leaves the client.
+    const OFFICE_MIMES = new Set([
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ]);
     const sendableAttachments = attachments
-      .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf")
+      .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf" || OFFICE_MIMES.has(a.mime))
       .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl }));
 
     try {
