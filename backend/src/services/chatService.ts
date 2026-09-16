@@ -42,6 +42,14 @@ const HONESTY_SYSTEM_PROMPT =
 const THINK_SYSTEM_PROMPT =
   "Think through this step by step before answering. Reason carefully about the request, consider edge cases, then give a clear, direct final answer.";
 
+// The Canvas toggle used to be purely cosmetic frontend state — the boolean never reached the
+// backend, so the model had no idea it was supposed to produce a renderable artifact and just
+// answered conversationally. The client's Canvas panel then had nothing to show but that plain
+// text. This is what actually makes the toggle do something: it must produce a single fenced code
+// block that the client's extractArtifact() can find and render live in the sandboxed iframe.
+const CANVAS_SYSTEM_PROMPT =
+  "Canvas mode is ON: the user is looking at a live preview panel that renders your reply, not just this chat, so a conversational answer is not useful right now — they want a working result. Respond with ONE fenced code block containing complete, self-contained, runnable code: use ```html for a full standalone HTML page (inline <style>/<script>, no external files) for UI/visual/design requests, or ```jsx for a single React component (a default-exported function component using only React and its own hooks — no imports beyond react). A single short sentence before the code fence is fine, but do not explain what you would build instead of building it, and do not split the result across multiple code blocks.";
+
 function searchResultsToSystemMessage(results: WebSearchResult[]): ChatMessage {
   if (results.length === 0) {
     return {
@@ -92,13 +100,14 @@ function trimHistoryToBudget(history: ChatMessage[]): ChatMessage[] {
   return history.slice(cutoff);
 }
 
-/** Prepends web search results, a persona/behavior instruction, and/or the Think nudge, in that order. */
+/** Prepends web search results, a persona/behavior instruction, and/or the Think/Canvas nudges, in that order. */
 function withSystemPreamble(
   history: ChatMessage[],
   think: boolean,
   behavior: string,
   webSearch: boolean,
   searchResults: WebSearchResult[],
+  canvas: boolean = false,
 ): ChatMessage[] {
   const preamble: ChatMessage[] = [
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
@@ -107,6 +116,9 @@ function withSystemPreamble(
   if (webSearch) preamble.push(searchResultsToSystemMessage(searchResults));
   if (behavior.trim()) preamble.push({ role: "system", content: behavior.trim() });
   if (think) preamble.push({ role: "system", content: THINK_SYSTEM_PROMPT });
+  // Canvas last so it's the most recent/salient instruction — it overrides Think's "give a clear
+  // direct final answer" framing with "that final answer IS the code fence," not prose about it.
+  if (canvas) preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
   return preamble.length ? [...preamble, ...history] : history;
 }
 
@@ -333,6 +345,7 @@ export async function sendMessage(
   think = false,
   behavior = "",
   webSearch = false,
+  canvas = false,
 ) {
   const conversation = await getOwnedConversation(userId, conversationId);
 
@@ -349,7 +362,14 @@ export async function sendMessage(
   if (historyError) throw new HttpError(500, historyError.message);
 
   const searchResults = webSearch ? await searchWeb(content).catch(() => []) : [];
-  const history = withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults);
+  const history = withSystemPreamble(
+    trimHistoryToBudget(historyRows as ChatMessage[]),
+    think,
+    behavior,
+    webSearch,
+    searchResults,
+    canvas,
+  );
 
   const mode = conversation.mode as ConversationMode;
   let replies: Awaited<ReturnType<typeof insertAssistantMessage>>[];
@@ -523,6 +543,7 @@ export async function streamMessage(
   think = false,
   behavior = "",
   webSearch = false,
+  canvas = false,
 ): Promise<void> {
   const conversation = await getOwnedConversation(userId, conversationId);
   const mode = conversation.mode as ConversationMode;
@@ -546,7 +567,14 @@ export async function streamMessage(
     console.log(`[chat] web search "${content}" -> ${searchResults.length} results`);
     for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
   }
-  const history = withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults);
+  const history = withSystemPreamble(
+    trimHistoryToBudget(historyRows as ChatMessage[]),
+    think,
+    behavior,
+    webSearch,
+    searchResults,
+    canvas,
+  );
 
   if (mode === "teamup") {
     await streamTeamUp(conversationId, content, history, searchResults, webSearch, onEvent, signal);

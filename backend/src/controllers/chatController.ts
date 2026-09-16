@@ -60,10 +60,11 @@ const sendMessageSchema = z.object({
   think: z.boolean().optional().default(false),
   behavior: z.string().trim().max(1000).optional().default(""),
   webSearch: z.boolean().optional().default(false),
+  canvas: z.boolean().optional().default(false),
 });
 
 export async function sendMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas } = sendMessageSchema.parse(req.body);
   const replies = await chatService.sendMessage(
     req.user!.id,
     req.params.id,
@@ -72,12 +73,13 @@ export async function sendMessage(req: Request, res: Response) {
     think,
     behavior,
     webSearch,
+    canvas,
   );
   res.status(201).json({ messages: replies });
 }
 
 export async function streamMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas } = sendMessageSchema.parse(req.body);
 
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -109,6 +111,7 @@ export async function streamMessage(req: Request, res: Response) {
       think,
       behavior,
       webSearch,
+      canvas,
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong";

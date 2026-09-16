@@ -104,38 +104,73 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        {building && !artifact ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted">
-            <RefreshCw className="size-4 animate-spin" />
-            Building on canvas…
-          </div>
-        ) : artifact?.kind === "html" ? (
-          <iframe
-            title="Canvas"
-            sandbox="allow-scripts"
-            srcDoc={artifact.body}
-            className="h-full min-h-[24rem] w-full border-0 bg-white"
-          />
-        ) : artifact?.kind === "react" ? (
-          <iframe
-            title="Canvas"
-            sandbox="allow-scripts"
-            srcDoc={buildReactPreviewHtml(artifact.body)}
-            className="h-full min-h-[24rem] w-full border-0 bg-white"
-          />
-        ) : artifact?.kind === "code" ? (
-          <pre className="p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap">
-            {artifact.body}
-          </pre>
-        ) : artifact?.kind === "markdown" ? (
-          <div className="p-5">
-            <Markdown text={artifact.body} />
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-subtle">
-            Turn on Canvas and ask Friday to build something — the output lands here.
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {building && !artifact ? (
+            <motion.div
+              key="building"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted"
+            >
+              <RefreshCw className="size-4 animate-spin" />
+              Building on canvas…
+            </motion.div>
+          ) : artifact?.kind === "html" ? (
+            <motion.iframe
+              key="html"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.22 }}
+              title="Canvas"
+              sandbox="allow-scripts"
+              srcDoc={artifact.body}
+              className="h-full min-h-[24rem] w-full border-0 bg-white"
+            />
+          ) : artifact?.kind === "react" ? (
+            <motion.iframe
+              key="react"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.22 }}
+              title="Canvas"
+              sandbox="allow-scripts"
+              srcDoc={buildReactPreviewHtml(artifact.body)}
+              className="h-full min-h-[24rem] w-full border-0 bg-white"
+            />
+          ) : artifact?.kind === "code" ? (
+            <motion.pre
+              key="code"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap"
+            >
+              {artifact.body}
+            </motion.pre>
+          ) : artifact?.kind === "markdown" ? (
+            <motion.div
+              key="markdown"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="p-5"
+            >
+              <Markdown text={artifact.body} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.18 }}
+              className="flex h-full items-center justify-center px-6 text-center text-sm text-subtle"
+            >
+              Turn on Canvas and ask Friday to build something — the output lands here.
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </aside>
   );

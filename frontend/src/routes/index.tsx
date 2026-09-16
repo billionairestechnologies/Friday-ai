@@ -205,7 +205,7 @@ export function Home() {
     });
 
     try {
-      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, (ev) => {
+      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, (ev) => {
         if (ev.t === "status") batch.status(ev.s);
         else if (ev.t === "think") batch.think(ev.c);
         else if (ev.t === "text") batch.text(ev.c);

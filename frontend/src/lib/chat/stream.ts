@@ -10,6 +10,7 @@ async function fetchStream(
   think: boolean,
   behavior: string,
   webSearch: boolean,
+  canvas: boolean,
   signal: AbortSignal,
   isRetry = false,
   isNetworkRetry = false,
@@ -23,7 +24,7 @@ async function fetchStream(
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content, inputMode, think, behavior, webSearch }),
+      body: JSON.stringify({ content, inputMode, think, behavior, webSearch, canvas }),
       signal,
     });
   } catch (err) {
@@ -32,14 +33,14 @@ async function fetchStream(
     // failed" before any bytes come back. That's usually transient, so retry once before
     // giving up and showing the user an opaque network error.
     if (isNetworkRetry || (err as { name?: string }).name === "AbortError") throw err;
-    return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, signal, isRetry, true);
+    return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, signal, isRetry, true);
   }
   // Same short-lived-token gap as fetchSpeech in voices.ts: a raw 401 here surfaces the
   // backend's literal "Missing bearer token"/"Invalid or expired session" text to the user
   // instead of quietly refreshing and retrying like the shared `api` client does.
   if (res.status === 401 && !isRetry) {
     const refreshed = await useAuthStore.getState().refresh();
-    if (refreshed) return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, signal, true);
+    if (refreshed) return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, signal, true);
   }
   return res;
 }
@@ -52,10 +53,11 @@ export async function streamMessage(
   think: boolean,
   behavior: string,
   webSearch: boolean,
+  canvas: boolean,
   onEvent: (ev: StreamEvent) => void,
   signal: AbortSignal,
 ) {
-  const res = await fetchStream(conversationId, content, inputMode, think, behavior, webSearch, signal);
+  const res = await fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, signal);
 
   if (!res.ok || !res.body) {
     let message = `Request failed (${res.status})`;
