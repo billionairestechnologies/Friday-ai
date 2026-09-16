@@ -172,6 +172,7 @@ export interface ChatCandidate {
   providerDisplayName: string;
   modelId: string;
   displayName: string;
+  vision: boolean;
 }
 
 /** Looks up a single model's friendly display name (e.g. "Sarvam 105B") for reply labels. Falls back to the raw model id. */
@@ -183,6 +184,17 @@ export async function getModelDisplayName(providerId: string, modelId: string): 
     .eq("model_id", modelId)
     .maybeSingle();
   return data?.display_name ?? modelId;
+}
+
+/** Whether a single specific model supports image input — used to gate attachments in single mode. */
+export async function getModelVisionSupport(providerId: string, modelId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from("provider_models")
+    .select("capabilities")
+    .eq("provider_id", providerId)
+    .eq("model_id", modelId)
+    .maybeSingle();
+  return (data?.capabilities as Record<string, boolean> | null)?.vision === true;
 }
 
 /**
@@ -209,7 +221,14 @@ export async function listChatCandidates(): Promise<ChatCandidate[]> {
     .filter((m) => (m.capabilities as Record<string, boolean> | null)?.chat === true)
     .map((m) => {
       const provider = (m as unknown as { providers: { slug: string; display_name: string } }).providers;
-      return { slug: provider.slug, providerDisplayName: provider.display_name, modelId: m.model_id, displayName: m.display_name };
+      const vision = (m.capabilities as Record<string, boolean> | null)?.vision === true;
+      return {
+        slug: provider.slug,
+        providerDisplayName: provider.display_name,
+        modelId: m.model_id,
+        displayName: m.display_name,
+        vision,
+      };
     });
 }
 

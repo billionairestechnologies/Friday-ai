@@ -1,5 +1,5 @@
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage } from "./types.js";
+import { mergeSystemMessages, safeErrorMessage } from "./types.js";
 
 const DEFAULT_LOCAL_BASE_URL = "http://localhost:11434";
 const CLOUD_BASE_URL = "https://ollama.com";
@@ -37,7 +37,7 @@ export const ollamaAdapter: ProviderAdapter = {
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages, stream: false }),
+      body: JSON.stringify({ model, messages: mergeSystemMessages(messages), stream: false }),
     });
     if (!res.ok) throw new Error(`Ollama chat failed: ${res.status} ${await res.text()}`);
     const body = (await res.json()) as { message: { content: string } };
@@ -49,7 +49,7 @@ export const ollamaAdapter: ProviderAdapter = {
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages, stream: true }),
+      body: JSON.stringify({ model, messages: mergeSystemMessages(messages), stream: true }),
       signal,
     });
     if (!res.ok || !res.body) {

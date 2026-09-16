@@ -27,7 +27,11 @@ export function createApp() {
   // which are same-origin-safe but hosted externally; the rest of Helmet's protections still apply.
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
-  app.use(express.json({ limit: "2mb" }));
+  // Image attachments ride along as base64 data URLs on the chat message body (no separate
+  // upload endpoint yet) — base64 inflates size by ~33%, and up to MAX_ATTACHMENTS images can be
+  // attached per message, so 2mb was rejecting any real photo outright with a bare 413 before it
+  // ever reached chatService's own, more specific vision-support error.
+  app.use(express.json({ limit: "30mb" }));
   app.use(morgan("dev"));
 
   app.use("/api/health", healthRouter);

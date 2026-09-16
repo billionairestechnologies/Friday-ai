@@ -1,9 +1,10 @@
 import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { getProviderAdapter } from "./providers/registry.js";
-import type { ChatMessage } from "./providers/types.js";
+import type { ChatImage, ChatMessage } from "./providers/types.js";
 import {
   getModelDisplayName,
+  getModelVisionSupport,
   getWorkingKeyForProvider,
   listChatCandidates,
   type ChatCandidate,
@@ -120,6 +121,26 @@ function withSystemPreamble(
   // direct final answer" framing with "that final answer IS the code fence," not prose about it.
   if (canvas) preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
   return preamble.length ? [...preamble, ...history] : history;
+}
+
+// Images ride along as base64 data URLs in the request body (no upload endpoint/storage yet), so
+// this bounds the request size and the number of images a single vision call has to process.
+const MAX_ATTACHMENTS = 4;
+
+/**
+ * Attaches image data to the most recent message in `history` (always the user's just-sent
+ * message — see sendMessage/streamMessage). Previously the "Canvas" bug's sibling: the composer
+ * already let a user attach an image and showed a thumbnail for it, but the attachment was never
+ * sent to the backend at all, so the model silently answered with no image and no error. Images
+ * aren't persisted to the messages table (no column for them yet), so they're only usable for the
+ * turn they were attached to, not for later turns referencing "that image" — a real limitation,
+ * not the bug being fixed here.
+ */
+function attachImages(history: ChatMessage[], images: ChatImage[]): ChatMessage[] {
+  if (images.length === 0 || history.length === 0) return history;
+  const last = history[history.length - 1]!;
+  const withImages: ChatMessage = { ...last, images: images.slice(0, MAX_ATTACHMENTS) };
+  return [...history.slice(0, -1), withImages];
 }
 
 // Team Up fans a message out to at most this many distinct providers, one model each,
@@ -346,6 +367,7 @@ export async function sendMessage(
   behavior = "",
   webSearch = false,
   canvas = false,
+  attachments: ChatImage[] = [],
 ) {
   const conversation = await getOwnedConversation(userId, conversationId);
 
@@ -362,13 +384,9 @@ export async function sendMessage(
   if (historyError) throw new HttpError(500, historyError.message);
 
   const searchResults = webSearch ? await searchWeb(content).catch(() => []) : [];
-  const history = withSystemPreamble(
-    trimHistoryToBudget(historyRows as ChatMessage[]),
-    think,
-    behavior,
-    webSearch,
-    searchResults,
-    canvas,
+  const history = attachImages(
+    withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults, canvas),
+    attachments,
   );
 
   const mode = conversation.mode as ConversationMode;
@@ -378,9 +396,18 @@ export async function sendMessage(
     if (!conversation.providers || !conversation.model_id) {
       throw new HttpError(500, "Conversation is missing its provider/model");
     }
+    if (attachments.length > 0 && !(await getModelVisionSupport(conversation.provider_id as string, conversation.model_id))) {
+      throw new HttpError(400, `${conversation.providers.display_name} can't see images — pick a vision-capable model or remove the attachment.`);
+    }
     const displayName = await getModelDisplayName(conversation.provider_id as string, conversation.model_id);
     const text = await callCandidate(
-      { slug: conversation.providers.slug, providerDisplayName: conversation.providers.display_name, modelId: conversation.model_id, displayName },
+      {
+        slug: conversation.providers.slug,
+        providerDisplayName: conversation.providers.display_name,
+        modelId: conversation.model_id,
+        displayName,
+        vision: true,
+      },
       history,
     );
     replies = [await insertAssistantMessage(conversationId, text, displayName)];
@@ -544,6 +571,7 @@ export async function streamMessage(
   behavior = "",
   webSearch = false,
   canvas = false,
+  attachments: ChatImage[] = [],
 ): Promise<void> {
   const conversation = await getOwnedConversation(userId, conversationId);
   const mode = conversation.mode as ConversationMode;
@@ -567,13 +595,9 @@ export async function streamMessage(
     console.log(`[chat] web search "${content}" -> ${searchResults.length} results`);
     for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
   }
-  const history = withSystemPreamble(
-    trimHistoryToBudget(historyRows as ChatMessage[]),
-    think,
-    behavior,
-    webSearch,
-    searchResults,
-    canvas,
+  const history = attachImages(
+    withSystemPreamble(trimHistoryToBudget(historyRows as ChatMessage[]), think, behavior, webSearch, searchResults, canvas),
+    attachments,
   );
 
   if (mode === "teamup") {
@@ -586,12 +610,22 @@ export async function streamMessage(
     if (!conversation.providers || !conversation.model_id) {
       throw new HttpError(500, "Conversation is missing its provider/model");
     }
+    const vision = await getModelVisionSupport(conversation.provider_id as string, conversation.model_id);
+    if (attachments.length > 0 && !vision) {
+      onEvent({
+        t: "err",
+        c: `${conversation.providers.display_name} can't see images — pick a vision-capable model or remove the attachment.`,
+      });
+      onEvent({ t: "done" });
+      return;
+    }
     candidates = [
       {
         slug: conversation.providers.slug,
         providerDisplayName: conversation.providers.display_name,
         modelId: conversation.model_id,
         displayName: await getModelDisplayName(conversation.provider_id as string, conversation.model_id),
+        vision,
       },
     ];
   } else {

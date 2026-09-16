@@ -1,6 +1,6 @@
 import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage } from "./types.js";
+import { mergeSystemMessages, safeErrorMessage, toOpenAiStyleMessages } from "./types.js";
 
 const BASE_URL = "https://api.openai.com/v1";
 
@@ -30,7 +30,7 @@ export const openaiAdapter: ProviderAdapter = {
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages }),
+      body: JSON.stringify({ model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) }),
     });
     if (!res.ok) throw new Error(`OpenAI chat failed: ${res.status} ${await res.text()}`);
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
@@ -51,7 +51,7 @@ export const openaiAdapter: ProviderAdapter = {
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/chat/completions`,
       { Authorization: `Bearer ${apiKey}` },
-      { model, messages },
+      { model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) },
       onDelta,
       signal,
       onThink,

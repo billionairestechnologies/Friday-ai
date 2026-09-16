@@ -54,6 +54,11 @@ export async function listMessages(req: Request, res: Response) {
   res.json({ messages: await chatService.listMessages(req.user!.id, req.params.id) });
 }
 
+const attachmentSchema = z.object({
+  mime: z.string().min(1),
+  dataUrl: z.string().min(1),
+});
+
 const sendMessageSchema = z.object({
   content: z.string().trim().min(1, "Message cannot be empty"),
   inputMode: z.enum(["text", "voice"]).optional().default("text"),
@@ -61,10 +66,11 @@ const sendMessageSchema = z.object({
   behavior: z.string().trim().max(1000).optional().default(""),
   webSearch: z.boolean().optional().default(false),
   canvas: z.boolean().optional().default(false),
+  attachments: z.array(attachmentSchema).max(4).optional().default([]),
 });
 
 export async function sendMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas, attachments } = sendMessageSchema.parse(req.body);
   const replies = await chatService.sendMessage(
     req.user!.id,
     req.params.id,
@@ -74,12 +80,13 @@ export async function sendMessage(req: Request, res: Response) {
     behavior,
     webSearch,
     canvas,
+    attachments,
   );
   res.status(201).json({ messages: replies });
 }
 
 export async function streamMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -112,6 +119,7 @@ export async function streamMessage(req: Request, res: Response) {
       behavior,
       webSearch,
       canvas,
+      attachments,
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong";

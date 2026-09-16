@@ -1,8 +1,20 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage, splitSystemPrompt } from "./types.js";
+import { base64PayloadOf, safeErrorMessage, splitSystemPrompt } from "./types.js";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+function toGeminiContents(conversation: ChatMessage[]) {
+  return conversation.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: m.images?.length
+      ? [
+          { text: m.content },
+          ...m.images.map((img) => ({ inline_data: { mime_type: img.mime, data: base64PayloadOf(img.dataUrl) } })),
+        ]
+      : [{ text: m.content }],
+  }));
+}
 
 export const geminiAdapter: ProviderAdapter = {
   slug: "gemini",
@@ -25,10 +37,7 @@ export const geminiAdapter: ProviderAdapter = {
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
     const { system, conversation } = splitSystemPrompt(messages);
-    const contents = conversation.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+    const contents = toGeminiContents(conversation);
 
     const res = await fetch(
       `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -60,10 +69,7 @@ export const geminiAdapter: ProviderAdapter = {
 
   async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
     const { system, conversation } = splitSystemPrompt(messages);
-    const contents = conversation.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+    const contents = toGeminiContents(conversation);
 
     const res = await fetch(
       `${BASE_URL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`,

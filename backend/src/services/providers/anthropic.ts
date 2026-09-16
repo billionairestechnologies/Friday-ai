@@ -1,6 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage, splitSystemPrompt } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -41,7 +41,7 @@ export const anthropicAdapter: ProviderAdapter = {
         // out — indistinguishable from the reply randomly stopping mid-thought.
         max_tokens: 8192,
         system,
-        messages: conversation.map((m) => ({ role: m.role, content: m.content })),
+        messages: toAnthropicStyleMessages(conversation),
       }),
     });
     if (!res.ok) throw new Error(`Anthropic chat failed: ${res.status} ${await res.text()}`);
@@ -76,7 +76,7 @@ export const anthropicAdapter: ProviderAdapter = {
         max_tokens: 8192,
         system,
         stream: true,
-        messages: conversation.map((m) => ({ role: m.role, content: m.content })),
+        messages: toAnthropicStyleMessages(conversation),
       }),
       signal,
     });

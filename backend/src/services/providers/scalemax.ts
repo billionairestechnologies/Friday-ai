@@ -1,6 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage, splitSystemPrompt } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
 
 // ScaleMax (api.scalemax.pro) proxies Claude models behind an Anthropic-compatible
 // /messages API, so this adapter mirrors the Anthropic one but targets ScaleMax's base
@@ -38,7 +38,7 @@ export const scalemaxAdapter: ProviderAdapter = {
         // long-context/reasoning replies were done.
         max_tokens: 8192,
         system,
-        messages: conversation.map((m) => ({ role: m.role, content: m.content })),
+        messages: toAnthropicStyleMessages(conversation),
       }),
     });
     if (!res.ok) throw new Error(`ScaleMax chat failed: ${res.status} ${await res.text()}`);
@@ -83,7 +83,7 @@ export const scalemaxAdapter: ProviderAdapter = {
         max_tokens: 8192,
         system,
         stream: true,
-        messages: conversation.map((m) => ({ role: m.role, content: m.content })),
+        messages: toAnthropicStyleMessages(conversation),
       }),
       signal,
     });

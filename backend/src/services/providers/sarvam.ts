@@ -1,6 +1,6 @@
 import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage } from "./types.js";
+import { mergeSystemMessages, safeErrorMessage } from "./types.js";
 
 const BASE_URL = "https://api.sarvam.ai";
 
@@ -27,7 +27,7 @@ export const sarvamAdapter: ProviderAdapter = {
       // sarvam-105b is a reasoning model that spends its token budget on a hidden
       // "reasoning_content" trace before writing the final answer, so it needs a
       // generous max_tokens or it can run out mid-thought and leave content null.
-      body: JSON.stringify({ model, messages, max_tokens: 8192 }),
+      body: JSON.stringify({ model, messages: mergeSystemMessages(messages), max_tokens: 8192 }),
     });
     if (!res.ok) throw new Error(`Sarvam chat failed: ${res.status} ${await res.text()}`);
     const body = (await res.json()) as {
@@ -56,7 +56,7 @@ export const sarvamAdapter: ProviderAdapter = {
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/v1/chat/completions`,
       { "api-subscription-key": apiKey },
-      { model, messages, max_tokens: 8192 },
+      { model, messages: mergeSystemMessages(messages), max_tokens: 8192 },
       onDelta,
       signal,
       onThink,

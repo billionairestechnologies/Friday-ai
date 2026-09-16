@@ -204,8 +204,12 @@ export function Home() {
       applyLive(acc);
     });
 
+    const imageAttachments = attachments
+      .filter((a) => a.kind === "image")
+      .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl }));
+
     try {
-      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, (ev) => {
+      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, imageAttachments, (ev) => {
         if (ev.t === "status") batch.status(ev.s);
         else if (ev.t === "think") batch.think(ev.c);
         else if (ev.t === "text") batch.text(ev.c);
