@@ -90,7 +90,15 @@ const MAX_HISTORY_CHARS = 90_000;
  */
 function trimHistoryToBudget(history: ChatMessage[]): ChatMessage[] {
   let total = 0;
-  let cutoff = history.length;
+  // Default to keeping EVERYTHING — cutoff only moves forward if the loop below actually finds
+  // a point where the budget is exceeded. This was wrongly initialized to `history.length`
+  // (the "trim everything" value), so any conversation under the budget — i.e. nearly every
+  // real conversation — silently sent an EMPTY messages array to every provider. That's not a
+  // subtle context bug: it's the actual root cause of the "model answers something totally
+  // unrelated" reports (Sarvam quoting its own system prompt back, ScaleMax hard-rejecting with
+  // "'messages' must be a non-empty array") — the model was never shown the user's message at
+  // all, current turn included, so of course it had nothing real to respond to.
+  let cutoff = 0;
   for (let i = history.length - 1; i >= 0; i--) {
     total += history[i]!.content.length;
     if (total > MAX_HISTORY_CHARS && i < history.length - 1) {
