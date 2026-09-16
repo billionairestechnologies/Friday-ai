@@ -12,5 +12,4 @@ chatRouter.patch("/conversations/:id", asyncHandler(controller.updateConversatio
 chatRouter.get("/conversations", asyncHandler(controller.listConversations));
 chatRouter.delete("/conversations/:id", asyncHandler(controller.deleteConversation));
 chatRouter.get("/conversations/:id/messages", asyncHandler(controller.listMessages));
-chatRouter.post("/conversations/:id/messages", asyncHandler(controller.sendMessage));
 chatRouter.post("/conversations/:id/messages/stream", asyncHandler(controller.streamMessage));

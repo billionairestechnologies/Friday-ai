@@ -1,6 +1,5 @@
-import { API_BASE_URL, api, getAccessToken } from "@/lib/api";
+import { API_BASE_URL, getAccessToken } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
-import type { ServerMessage } from "./store";
 import type { StreamEvent } from "./types";
 
 export type OutgoingAttachment = { mime: string; dataUrl: string };
@@ -102,23 +101,4 @@ export async function streamMessage(
       }
     }
   }
-}
-
-/** Team Up mode: fans out server-side, returns every reply at once (no streaming). */
-export async function sendTeamUpMessage(
-  conversationId: string,
-  content: string,
-  inputMode: "text" | "voice",
-  think: boolean,
-  behavior: string,
-  webSearch: boolean,
-): Promise<ServerMessage[]> {
-  const res = await api.post<{ messages: ServerMessage[] }>(`/chat/conversations/${conversationId}/messages`, {
-    content,
-    inputMode,
-    think,
-    behavior,
-    webSearch,
-  });
-  return res.messages;
 }

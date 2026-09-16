@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import * as chatService from "../services/chatService.js";
+import * as chatService from "../services/chat/index.js";
 
 const createConversationSchema = z
   .object({
@@ -68,22 +68,6 @@ const sendMessageSchema = z.object({
   canvas: z.boolean().optional().default(false),
   attachments: z.array(attachmentSchema).max(4).optional().default([]),
 });
-
-export async function sendMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas, attachments } = sendMessageSchema.parse(req.body);
-  const replies = await chatService.sendMessage(
-    req.user!.id,
-    req.params.id,
-    content,
-    inputMode,
-    think,
-    behavior,
-    webSearch,
-    canvas,
-    attachments,
-  );
-  res.status(201).json({ messages: replies });
-}
 
 export async function streamMessage(req: Request, res: Response) {
   const { content, inputMode, think, behavior, webSearch, canvas, attachments } = sendMessageSchema.parse(req.body);
