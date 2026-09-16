@@ -13,6 +13,7 @@ import { adminProvidersRouter } from "./routes/adminProviders.js";
 import { modelsRouter } from "./routes/models.js";
 import { chatRouter } from "./routes/chat.js";
 import { voiceRouter } from "./routes/voice.js";
+import { sandboxRouter } from "./routes/sandbox.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/models", modelsRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/voice", voiceRouter);
+  app.use("/api/sandbox", sandboxRouter);
 
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist));

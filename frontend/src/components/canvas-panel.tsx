@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Download, ExternalLink, Globe, PanelRightClose, RefreshCw } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Globe, PanelRightClose, Play, RefreshCw } from "lucide-react";
 import { Markdown } from "@/lib/chat/markdown";
-import { extractArtifact } from "@/lib/chat/artifact";
+import { extractArtifact, type Artifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
+import { normalizeRunLanguage, runSandboxCode, type RunResult } from "@/lib/chat/runnable";
 import { useLiveStream } from "@/lib/chat/live-stream";
 import { useChat } from "@/lib/chat/store";
 
@@ -31,6 +33,80 @@ function filenameFor(kind: string, lang?: string) {
   if (kind === "html") return "canvas.html";
   if (kind === "markdown") return "canvas.md";
   return `canvas.${extForLang(lang)}`;
+}
+
+/**
+ * Python/JS blocks get a real "Run" button — actual execution in the user's own isolated
+ * CodeSandbox VM (backend's /api/sandbox/run), not just a static text dump. Runs are opt-in
+ * (never automatic) since code execution has real side effects/cost, unlike the html/react
+ * previews which just render in a client-side sandboxed iframe.
+ */
+function RunnablePane({ artifact }: { artifact: Artifact }) {
+  const [result, setResult] = useState<RunResult | null>(null);
+  const [running, setRunning] = useState(false);
+
+  // A new artifact (different code, or a fresh message) should show a clean slate, not the
+  // previous run's stale output sitting under different code.
+  useEffect(() => {
+    setResult(null);
+    setRunning(false);
+  }, [artifact.body]);
+
+  const language = normalizeRunLanguage(artifact.lang);
+
+  async function handleRun() {
+    if (!language || running) return;
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await runSandboxCode(language, artifact.body);
+      setResult(res);
+    } catch (err) {
+      setResult({ ok: false, output: err instanceof Error ? err.message : "Run failed" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+        <span className="text-xs text-muted">{artifact.lang}</span>
+        <button
+          type="button"
+          onClick={() => void handleRun()}
+          disabled={!language || running}
+          className="flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+        >
+          {running ? <RefreshCw className="size-3 animate-spin" /> : <Play className="size-3" />}
+          {running ? "Running…" : "Run"}
+        </button>
+      </div>
+      <pre className="flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap">
+        {artifact.body}
+      </pre>
+      {result && (
+        <div className="max-h-64 shrink-0 overflow-auto border-t border-border p-4">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium">
+            {result.ok ? (
+              <span className="text-muted">Output</span>
+            ) : (
+              <span className="flex items-center gap-1 text-red-500">
+                <AlertTriangle className="size-3" /> Error
+              </span>
+            )}
+          </div>
+          <pre
+            className={`font-mono text-xs leading-relaxed whitespace-pre-wrap ${
+              result.ok ? "text-foreground" : "text-red-500"
+            }`}
+          >
+            {result.output || "(no output)"}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function CanvasBody({ onClose }: { onClose: () => void }) {
@@ -139,6 +215,16 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               srcDoc={buildReactPreviewHtml(artifact.body)}
               className="h-full min-h-[24rem] w-full border-0 bg-white"
             />
+          ) : artifact?.kind === "runnable" ? (
+            <motion.div
+              key="runnable"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              <RunnablePane artifact={artifact} />
+            </motion.div>
           ) : artifact?.kind === "code" ? (
             <motion.pre
               key="code"
