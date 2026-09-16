@@ -10,6 +10,7 @@ import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
+import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
 
 const EMPTY: ChatMessage[] = [];
@@ -182,9 +183,19 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
         </span>
       )}
 
-      {message.content && (
-        <StreamingMarkdown text={message.content} streaming={Boolean(message.streaming)} />
-      )}
+      {/* A visual artifact (html/jsx/tsx) is fully shown in Canvas — dumping the same raw code
+          into the chat bubble too was redundant clutter, so it's cut out here (see
+          stripVisualArtifactForChat's own comment; no-op for any other kind of reply). */}
+      {(() => {
+        const displayContent = message.content ? stripVisualArtifactForChat(message.content) : "";
+        if (displayContent) {
+          return <StreamingMarkdown text={displayContent} streaming={Boolean(message.streaming)} />;
+        }
+        if (message.content) {
+          return <p className="text-sm text-muted">Built in Canvas — see the panel →</p>;
+        }
+        return null;
+      })()}
 
       {message.error && !plan && (
         <p className="rounded-md border border-border bg-elevated px-3 py-2 text-sm text-danger">
