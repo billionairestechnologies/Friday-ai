@@ -123,6 +123,11 @@ export function overlayLive(
       status: live.status,
       error: live.error ?? m.error,
       streaming: true,
+      // Search can now auto-trigger server-side even when the Search toggle was off (see
+      // backend's liveSearchIntent.ts) — a live "searching" status or arriving citations is
+      // authoritative that search happened for this message, regardless of the toggle state at
+      // send time, so the chain-of-thought panel/sources still render for it.
+      usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
     };
   });
   return hit ? next : messages;

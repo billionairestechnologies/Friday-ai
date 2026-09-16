@@ -20,6 +20,10 @@ export type TurnCommit = {
   citations?: Citation[];
   error?: string;
   modelLabel?: string;
+  /** Set true when search auto-triggered server-side for this turn (Search toggle was off but the
+   *  model judged it needed live info) — persists the chain-of-thought/sources display past the
+   *  end of streaming, when the live-only override in overlayLive() no longer applies. */
+  usedSearch?: boolean;
 };
 
 export type ServerConversation = {
@@ -301,6 +305,7 @@ export const useChat = create<ChatState>()(
                           citations: data.citations,
                           error: data.error,
                           modelLabel: data.modelLabel,
+                          usedSearch: m.usedSearch || data.usedSearch,
                           streaming: false,
                           status: null,
                         }

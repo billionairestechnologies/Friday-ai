@@ -11,6 +11,7 @@ import {
 } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
+import { detectNeedsLiveSearch } from "./liveSearchIntent.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import {
@@ -108,10 +109,21 @@ export async function streamMessage(
   // so it's skipped here rather than handed to a search API that has no way to know that.
   const SHORT_CAPTION_CHARS = 20;
   const looksLikeSearchQuery = attachments.length === 0 || content.trim().length >= SHORT_CAPTION_CHARS;
+
+  // If the user didn't already toggle Search on, ask the model itself whether this specific
+  // message actually needs live/current information — see liveSearchIntent.ts for why that beats
+  // a keyword list. Skipped entirely when Search is already on (nothing to detect) or the message
+  // doesn't look like a real query (short caption on an attachment).
+  const autoSearch =
+    !webSearch && looksLikeSearchQuery && content.trim().length > 0
+      ? await detectNeedsLiveSearch(content)
+      : false;
+  const effectiveWebSearch = webSearch || autoSearch;
+
   // Gates both the actual search call AND the "a search ran" system message below — skipping the
   // fetch but still telling the model a search happened (and came back empty) would be its own
   // false statement, not an improvement on the original bug.
-  const searchActuallyRan = webSearch && looksLikeSearchQuery;
+  const searchActuallyRan = effectiveWebSearch && looksLikeSearchQuery;
 
   let searchResults: Awaited<ReturnType<typeof searchWeb>> = [];
   if (searchActuallyRan) {

@@ -15,6 +15,7 @@ import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
 import { streamMessage } from "@/lib/chat/stream";
 import { useChat, type ServerConversation, type ServerMessage } from "@/lib/chat/store";
+import { extractArtifact } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
@@ -210,6 +211,22 @@ export function Home() {
       applyLive(acc);
     });
 
+    // Auto-canvas: open the panel the moment the reply is actually producing a visual artifact
+    // (a full HTML page or a React component — the two kinds meant to be previewed, not an
+    // ordinary inline code snippet), instead of requiring the Canvas toggle beforehand. Skipped
+    // when Canvas was already manually on (beginTurn already opened the panel for that case).
+    let streamedText = "";
+    let autoCanvasOpened = s.canvas;
+    function maybeAutoOpenCanvas(delta: string) {
+      if (autoCanvasOpened) return;
+      streamedText += delta;
+      const artifact = extractArtifact(streamedText);
+      if (artifact && (artifact.kind === "html" || artifact.kind === "react")) {
+        autoCanvasOpened = true;
+        useChat.getState().setCanvasOpen(true);
+      }
+    }
+
     // Images/PDF/DOCX/XLSX actually reach the backend. Every model can read a PDF or image via
     // Sarvam's Doc AI OCR the backend runs server-side (a PDF-native provider — Anthropic direct,
     // Gemini — also gets the raw file as a fallback); DOCX/XLSX are parsed directly server-side,
@@ -227,7 +244,10 @@ export function Home() {
       await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
         if (ev.t === "status") batch.status(ev.s);
         else if (ev.t === "think") batch.think(ev.c);
-        else if (ev.t === "text") batch.text(ev.c);
+        else if (ev.t === "text") {
+          batch.text(ev.c);
+          maybeAutoOpenCanvas(ev.c);
+        }
         else if (ev.t === "cite") batch.cite({ url: ev.u, title: ev.title });
         else if (ev.t === "agent") batch.agent({ slug: ev.slug, model: ev.model, state: ev.state, error: ev.error });
         else if (ev.t === "err") batch.error(ev.c);
@@ -250,6 +270,11 @@ export function Home() {
         thinking: live?.think,
         citations: live?.cites,
         error: live?.error,
+        // Citations only ever arrive when a search actually ran — a reliable persisted signal
+        // even if status has since moved on to "thinking"/"writing" by the time streaming ends.
+        // Covers auto-triggered search (Search toggle off, backend judged it was needed) same as
+        // manual, so the chain-of-thought/sources panel still renders after the turn completes.
+        usedSearch: Boolean(live?.cites?.length),
       });
       clearLive();
       busyRef.current = false;
