@@ -15,6 +15,7 @@ import { chatRouter } from "./routes/chat.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
 import { requestContext } from "./middleware/requestContext.js";
+import { usageRouter } from "./routes/usage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -57,6 +58,7 @@ export function createApp() {
   app.use("/api/chat", chatRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/sandbox", sandboxRouter);
+  app.use("/api/usage", usageRouter);
 
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist));

@@ -6,6 +6,7 @@ import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import { listVoices, synthesizeSpeech, transcribeAudio } from "../services/voiceService.js";
 import { env } from "../config/env.js";
 import { concurrencyLimit, rateLimit } from "../middleware/rateLimit.js";
+import { recordUsageEvent } from "../services/usageService.js";
 
 export const voiceRouter = Router();
 
@@ -29,6 +30,10 @@ voiceRouter.post(
   asyncHandler(async (req, res) => {
     if (!req.file) throw new HttpError(400, "No audio file uploaded");
     const result = await transcribeAudio(req.file.buffer, req.file.originalname || "recording.webm");
+    void recordUsageEvent(req.user!.id, "voice_second", Math.max(1, Math.ceil(req.file.size / 16_000)), {
+      direction: "transcribe",
+      bytes: req.file.size,
+    });
     res.json(result);
   }),
 );
@@ -54,6 +59,10 @@ voiceRouter.post(
   asyncHandler(async (req, res) => {
     const { text, voiceId } = speakSchema.parse(req.body);
     const { audio, mime } = await synthesizeSpeech(text, voiceId);
+    void recordUsageEvent(req.user!.id, "voice_second", Math.max(1, Math.ceil(text.length / 15)), {
+      direction: "speak",
+      characters: text.length,
+    });
     res.setHeader("Content-Type", mime);
     res.send(audio);
   }),

@@ -11,6 +11,7 @@ import {
 } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
+import { recordUsageEvent } from "../usageService.js";
 import { detectNeedsLiveSearch } from "./liveSearchIntent.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
@@ -92,6 +93,12 @@ export async function streamMessage(
   const mode = conversation.mode as ConversationMode;
 
   await insertUserMessage(conversationId, content, inputMode, attachments);
+  void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
+  if (attachments.length > 0) {
+    void recordUsageEvent(userId, "attachment_upload", attachments.length, {
+      totalBytes: attachments.reduce((sum, attachment) => sum + (attachment.size ?? 0), 0),
+    });
+  }
 
   const { data: historyRows, error: historyError } = await supabaseAdmin
     .from("messages")
@@ -127,6 +134,7 @@ export async function streamMessage(
   if (searchActuallyRan) {
     onEvent({ t: "status", s: "searching" });
     searchResults = await searchWeb(content).catch(() => []);
+    void recordUsageEvent(userId, "web_search", 1, { resultCount: searchResults.length, auto: autoSearch });
     console.log(`[chat] web search "${content}" -> ${searchResults.length} results`);
     for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
   }

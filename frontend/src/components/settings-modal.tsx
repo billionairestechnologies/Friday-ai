@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   AudioLines,
@@ -120,7 +120,7 @@ export function SettingsModal() {
               {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
               {tab === "customize" && <SimpleNote title="Customize" body="Search, Think, and Canvas live in the composer. Personality stays direct and truthful." />}
               {tab === "billing" && <BillingPane />}
-              {tab === "usage" && <SimpleNote title="Usage" body="Chat, search, and canvas run against the xAI key in this environment. There’s no separate meter here." />}
+              {tab === "usage" && <UsagePane />}
               {tab === "data" && <DataPane />}
             </div>
           </div>
@@ -378,6 +378,70 @@ function BillingPane() {
           </button>
         }
       />
+    </div>
+  );
+}
+
+type UsageSummary = {
+  periodStart: string;
+  totals: {
+    chatMessages: number;
+    searches: number;
+    voiceSeconds: number;
+    sandboxRuns: number;
+    attachmentUploads: number;
+    estimatedCostCents: number;
+  };
+};
+
+function UsagePane() {
+  const { user } = useCurrentUserState();
+  const [summary, setSummary] = useState<UsageSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const signedIn = Boolean(user && !user.isDevFallback);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<UsageSummary>("/usage/summary")
+      .then((res) => {
+        setSummary(res);
+        setError(null);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load usage"));
+  }, [signedIn]);
+
+  if (!signedIn) {
+    return <SimpleNote title="Usage" body="Sign in to track monthly chat, search, voice, attachment, and sandbox usage." />;
+  }
+
+  const rows = summary
+    ? [
+        ["Chat messages", summary.totals.chatMessages],
+        ["Searches", summary.totals.searches],
+        ["Voice seconds", summary.totals.voiceSeconds],
+        ["Sandbox runs", summary.totals.sandboxRuns],
+        ["Attachments", summary.totals.attachmentUploads],
+      ]
+    : [];
+
+  return (
+    <div>
+      <h2 className="mb-1 text-lg font-semibold">Usage</h2>
+      <p className="mb-4 text-sm text-muted">
+        {summary
+          ? `Current period started ${new Date(summary.periodStart).toLocaleDateString()}.`
+          : "Loading current period usage..."}
+      </p>
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-border bg-background p-3">
+            <p className="text-xs text-muted">{label}</p>
+            <p className="mt-1 font-mono text-2xl font-semibold">{value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

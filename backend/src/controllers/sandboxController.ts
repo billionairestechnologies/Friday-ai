@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import * as e2bService from "../services/e2bService.js";
+import { recordUsageEvent } from "../services/usageService.js";
 
 const runSchema = z.object({
   language: z.enum(["python", "javascript"]),
@@ -15,9 +16,17 @@ const runSchema = z.object({
 export async function run(req: Request, res: Response) {
   const { language, code, autoFix } = runSchema.parse(req.body);
   if (autoFix) {
-    res.json(await e2bService.runWithAutoFix(req.user!.id, language, code));
+    const result = await e2bService.runWithAutoFix(req.user!.id, language, code);
+    void recordUsageEvent(req.user!.id, "sandbox_run", 1, {
+      language,
+      autoFix,
+      attempts: result.attempts.length,
+      ok: result.ok,
+    });
+    res.json(result);
     return;
   }
   const result = await e2bService.runCode(req.user!.id, language, code);
+  void recordUsageEvent(req.user!.id, "sandbox_run", 1, { language, autoFix, ok: result.ok });
   res.json({ ...result, code, attempts: [{ code, result }] });
 }
