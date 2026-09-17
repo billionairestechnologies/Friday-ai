@@ -3,6 +3,7 @@ import { HttpError } from "../../middleware/errorHandler.js";
 import type { ConversationMode } from "./types.js";
 import type { ChatImage } from "../providers/types.js";
 import { getOwnedProject } from "../projectService.js";
+import { resolveAttachmentDataUrl, storeAttachments } from "../attachmentStorage.js";
 
 export type MessageMetadata = {
   thinking?: string;
@@ -150,6 +151,29 @@ export async function deleteConversation(userId: string, conversationId: string)
   if (error) throw new HttpError(500, error.message);
 }
 
+async function withResolvedAttachments<T extends { message_attachments?: Array<Record<string, unknown>> | null }>(
+  rows: T[],
+): Promise<T[]> {
+  return Promise.all(
+    rows.map(async (row) => {
+      const attachments = row.message_attachments;
+      if (!attachments?.length) return row;
+      const resolved = await Promise.all(
+        attachments.map(async (attachment) => ({
+          ...attachment,
+          data_url: await resolveAttachmentDataUrl({
+            data_url: (attachment.data_url as string | null) ?? null,
+            storage_bucket: (attachment.storage_bucket as string | null) ?? null,
+            storage_path: (attachment.storage_path as string | null) ?? null,
+            mime: String(attachment.mime ?? "application/octet-stream"),
+          }),
+        })),
+      );
+      return { ...row, message_attachments: resolved };
+    }),
+  );
+}
+
 export async function listMessages(userId: string, conversationId: string, page: PageOptions = {}) {
   await getOwnedConversation(userId, conversationId);
   let query = supabaseAdmin
@@ -161,7 +185,7 @@ export async function listMessages(userId: string, conversationId: string, page:
   if (page.before) query = query.lt("created_at", page.before);
   const { data, error } = await query;
   if (error) throw new HttpError(500, error.message);
-  return [...(data ?? [])].reverse();
+  return withResolvedAttachments([...(data ?? [])].reverse());
 }
 
 export async function insertUserMessage(
@@ -169,6 +193,7 @@ export async function insertUserMessage(
   content: string,
   inputMode: "text" | "voice",
   attachments: ChatImage[],
+  userId?: string,
 ) {
   const { data, error } = await supabaseAdmin
     .from("messages")
@@ -178,14 +203,18 @@ export async function insertUserMessage(
   if (error || !data) throw new HttpError(500, error?.message ?? "Failed to save message");
 
   if (attachments.length > 0) {
+    const ownerId = userId ?? "anonymous";
+    const stored = await storeAttachments(ownerId, data.id as string, attachments);
     const { error: attachmentError } = await supabaseAdmin.from("message_attachments").insert(
-      attachments.map((attachment, index) => ({
+      stored.map((attachment) => ({
         message_id: data.id,
-        name: attachment.name || `attachment-${index + 1}`,
+        name: attachment.name,
         mime: attachment.mime,
-        size_bytes: attachment.size ?? 0,
-        kind: attachment.kind ?? (attachment.mime.startsWith("image/") ? "image" : "file"),
-        data_url: attachment.dataUrl,
+        size_bytes: attachment.size_bytes,
+        kind: attachment.kind,
+        data_url: attachment.data_url,
+        storage_bucket: attachment.storage_bucket,
+        storage_path: attachment.storage_path,
       })),
     );
     if (attachmentError) throw new HttpError(500, attachmentError.message);

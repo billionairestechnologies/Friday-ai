@@ -55,7 +55,7 @@ export type ServerMessage = {
     mime: string;
     size_bytes: number;
     kind: "image" | "file";
-    data_url: string;
+    data_url: string | null;
   }[];
   created_at: string;
 };
@@ -452,7 +452,7 @@ export const useChat = create<ChatState>()(
                         mime: a.mime,
                         size: a.size_bytes,
                         kind: a.kind,
-                        dataUrl: a.data_url,
+                        dataUrl: a.data_url ?? "",
                       })),
                       createdAt: new Date(m.created_at).getTime(),
                     })),
@@ -471,7 +471,7 @@ export const useChat = create<ChatState>()(
             streaming: false,
             status: null,
             attachments: m.attachments?.map((a) =>
-              a.dataUrl.length > 400_000
+              (a.dataUrl?.length ?? 0) > 400_000
                 ? { ...a, dataUrl: "", mime: a.mime }
                 : a,
             ),

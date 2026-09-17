@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { LogIn, Settings, UserRound, X } from "lucide-react";
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
@@ -6,6 +6,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
 import { PluginsDrawer } from "@/components/plugins-drawer";
 import { SettingsModal } from "@/components/settings-modal";
+import { api } from "@/lib/api";
 
 function Shell({
   open,
@@ -82,7 +83,15 @@ export function LoginPopout() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [sso, setSso] = useState<{ enabled: boolean; entryUrl: string | null; providerLabel: string } | null>(null);
   const signedIn = Boolean(user && !user.isDevFallback);
+
+  useEffect(() => {
+    api
+      .get<{ enabled: boolean; entryUrl: string | null; providerLabel: string }>("/organizations/sso")
+      .then(setSso)
+      .catch(() => setSso(null));
+  }, []);
 
   function resetForm() {
     setStep("credentials");
@@ -335,6 +344,14 @@ export function LoginPopout() {
             Continue with Google
             <span className="ml-1 rounded-full bg-chip px-2 py-0.5 text-[10px] font-medium text-subtle">Coming soon</span>
           </button>
+          {sso?.enabled && sso.entryUrl && (
+            <a
+              href={sso.entryUrl}
+              className="flex h-11 items-center justify-center gap-2.5 rounded-full border border-border text-sm font-medium text-foreground hover:bg-chip"
+            >
+              Continue with {sso.providerLabel}
+            </a>
+          )}
         </div>
       )}
     </Shell>

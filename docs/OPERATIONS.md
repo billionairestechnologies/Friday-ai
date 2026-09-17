@@ -25,6 +25,9 @@ Production must set:
 - `RESEND_API_KEY`
 - `CORS_ORIGIN`
 - `TRUST_PROXY` when behind a reverse proxy
+- `REDIS_URL` when running more than one API instance
+- `PUBLIC_APP_URL` / `PUBLIC_API_URL` for OAuth redirects
+- Razorpay + GitHub connector secrets when those features are enabled
 
 Optional provider keys are managed through the admin panel. Missing provider keys should degrade
 model availability, not process startup.
@@ -83,7 +86,10 @@ For failed deploys:
 
 ## Current limitations
 
-- The built-in limiter is per-process. Multi-instance deployments need Redis-backed limits.
-- Attachments are persisted for reload parity, but large blob storage should move to Supabase
-  Storage or S3 before broad public launch.
+- Set `REDIS_URL` for multi-instance deployments. Without it, rate and concurrency limits are
+  per-process and fall back automatically if Redis is unreachable.
+- Attachments prefer Supabase Storage (`message-attachments` bucket) when
+  `ATTACHMENT_OBJECT_STORAGE=true`. Inline `data_url` remains as a fallback for failed uploads.
+- GitHub is the first live OAuth connector. Other featured connectors still need provider apps.
 - Provider cost telemetry is not yet tied to token usage from every model.
+- SSO is entry-point ready via `SSO_ENABLED` / `SSO_ENTRY_URL`; configure the IdP in Supabase Auth.

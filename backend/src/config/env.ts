@@ -19,17 +19,33 @@ function commaSeparated(value: string | undefined, fallback: string): string[] {
     .filter(Boolean);
 }
 
+function truthy(value: string | undefined, fallback = false): boolean {
+  if (value === undefined || value === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
   corsOrigins: commaSeparated(process.env.CORS_ORIGIN, "http://localhost:5173"),
   trustProxy: process.env.TRUST_PROXY ?? "",
+  publicAppUrl: process.env.PUBLIC_APP_URL ?? "http://localhost:5173",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   keyEncryptionSecret: process.env.KEY_ENCRYPTION_SECRET ?? "dev-only-insecure-secret",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  githubClientId: process.env.GITHUB_CLIENT_ID ?? "",
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+  githubRedirectUri:
+    process.env.GITHUB_REDIRECT_URI ??
+    `${process.env.PUBLIC_API_URL ?? "http://localhost:4000"}/api/connectors/github/callback`,
+  redisUrl: process.env.REDIS_URL ?? "",
+  attachmentObjectStorageEnabled: truthy(process.env.ATTACHMENT_OBJECT_STORAGE, true),
+  ssoEnabled: truthy(process.env.SSO_ENABLED, false),
+  ssoEntryUrl: process.env.SSO_ENTRY_URL ?? "",
+  ssoProviderLabel: process.env.SSO_PROVIDER_LABEL ?? "Company SSO",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Friday <onboarding@resend.dev>",
   e2bApiKey: process.env.E2B_API_KEY ?? "",
@@ -59,6 +75,10 @@ type EnvironmentInput = {
   razorpayKeyId?: string;
   razorpayKeySecret?: string;
   razorpayWebhookSecret?: string;
+  githubClientId?: string;
+  githubClientSecret?: string;
+  ssoEnabled?: boolean;
+  ssoEntryUrl?: string;
 };
 
 export function validateEnvironment(input: EnvironmentInput): string[] {
@@ -80,6 +100,15 @@ export function validateEnvironment(input: EnvironmentInput): string[] {
   const razorpayValues = [input.razorpayKeyId, input.razorpayKeySecret, input.razorpayWebhookSecret].filter(Boolean);
   if (razorpayValues.length > 0 && razorpayValues.length < 3) {
     errors.push("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_WEBHOOK_SECRET must be configured together");
+  }
+
+  const githubValues = [input.githubClientId, input.githubClientSecret].filter(Boolean);
+  if (githubValues.length === 1) {
+    errors.push("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be configured together");
+  }
+
+  if (input.ssoEnabled && !input.ssoEntryUrl) {
+    errors.push("SSO_ENTRY_URL is required when SSO_ENABLED=true");
   }
 
   return errors;

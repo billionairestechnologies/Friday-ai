@@ -18,6 +18,8 @@ import { requestContext } from "./middleware/requestContext.js";
 import { usageRouter } from "./routes/usage.js";
 import { projectsRouter } from "./routes/projects.js";
 import { billingRouter } from "./routes/billing.js";
+import { connectorsRouter } from "./routes/connectors.js";
+import { organizationsRouter } from "./routes/organizations.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -70,6 +72,8 @@ export function createApp() {
   app.use("/api/usage", usageRouter);
   app.use("/api/projects", projectsRouter);
   app.use("/api/billing", billingRouter);
+  app.use("/api/connectors", connectorsRouter);
+  app.use("/api/organizations", organizationsRouter);
 
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist));

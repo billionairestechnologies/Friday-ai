@@ -18,9 +18,8 @@ Server runs on `http://localhost:4000`.
 - Security tests: `npm test`
 
 When deployed behind a trusted reverse proxy, set `TRUST_PROXY` to its hop count so IP-based
-rate limits cannot be bypassed through forwarded headers. The built-in limiter protects a single
-process; multi-instance deployments must use the distributed limiter introduced with the platform
-operations layer.
+rate limits cannot be bypassed through forwarded headers. Set `REDIS_URL` so rate and concurrency
+limits are shared across API instances; without it the in-memory limiter is used automatically.
 
 ## Structure
 

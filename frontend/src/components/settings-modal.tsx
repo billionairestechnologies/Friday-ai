@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
   AudioLines,
   Bell,
+  Building2,
   Check,
   CreditCard,
   Palette,
@@ -42,6 +43,7 @@ const NAV = [
     items: [
       { id: "billing", label: "Billing", icon: CreditCard },
       { id: "usage", label: "Usage", icon: Zap },
+      { id: "team", label: "Team", icon: Building2 },
     ],
   },
   {
@@ -121,6 +123,7 @@ export function SettingsModal() {
               {tab === "customize" && <ProjectsPane />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
+              {tab === "team" && <TeamPane />}
               {tab === "data" && <DataPane />}
             </div>
           </div>
@@ -655,6 +658,200 @@ function UsagePane() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function TeamPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [organizations, setOrganizations] = useState<
+    {
+      id: string;
+      name: string;
+      slug: string;
+      plan: string;
+      monthlyBudgetCents: number;
+      role: string;
+    }[]
+  >([]);
+  const [name, setName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [budget, setBudget] = useState("0");
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [sso, setSso] = useState<{ enabled: boolean; entryUrl: string | null; providerLabel: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    if (!signedIn) return;
+    api
+      .get<{ organizations: typeof organizations }>("/organizations")
+      .then((res) => {
+        setOrganizations(res.organizations);
+        if (!selectedOrgId && res.organizations[0]) {
+          setSelectedOrgId(res.organizations[0].id);
+          setBudget(String(res.organizations[0].monthlyBudgetCents));
+        }
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load teams"));
+    api
+      .get<{ enabled: boolean; entryUrl: string | null; providerLabel: string }>("/organizations/sso")
+      .then(setSso)
+      .catch(() => setSso(null));
+  }
+
+  useEffect(refresh, [signedIn]);
+
+  if (!signedIn) {
+    return <SimpleNote title="Team" body="Sign in to create an organization, invite members, and set budgets." />;
+  }
+
+  const selected = organizations.find((org) => org.id === selectedOrgId) ?? null;
+
+  async function createOrg() {
+    if (!name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ organization: (typeof organizations)[number] }>("/organizations", { name });
+      setOrganizations((current) => [res.organization, ...current]);
+      setSelectedOrgId(res.organization.id);
+      setBudget(String(res.organization.monthlyBudgetCents));
+      setName("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create team");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveBudget() {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.patch<{ organization: (typeof organizations)[number] }>(
+        `/organizations/${selected.id}/budget`,
+        { monthlyBudgetCents: Number(budget) || 0 },
+      );
+      setOrganizations((current) =>
+        current.map((org) => (org.id === res.organization.id ? { ...org, ...res.organization } : org)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't update budget");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function inviteMember() {
+    if (!selected || !inviteEmail.trim()) return;
+    setBusy(true);
+    setError(null);
+    setInviteToken(null);
+    try {
+      const res = await api.post<{ invite: { inviteToken: string } }>(`/organizations/${selected.id}/invites`, {
+        email: inviteEmail,
+        role: "member",
+      });
+      setInviteToken(res.invite.inviteToken);
+      setInviteEmail("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create invite");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="mb-1 text-lg font-semibold">Team</h2>
+      <p className="mb-4 text-sm text-muted">Create an organization, invite members, and set a monthly budget.</p>
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      {sso?.enabled && sso.entryUrl && (
+        <p className="mb-3 rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted">
+          {sso.providerLabel} is enabled for this workspace. Members can enter through the sign-in SSO button.
+        </p>
+      )}
+      <div className="mb-5 flex flex-col gap-2 rounded-xl border border-border bg-background p-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Organization name"
+          className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
+        />
+        <button
+          type="button"
+          disabled={busy || !name.trim()}
+          onClick={() => void createOrg()}
+          className="h-9 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {busy ? "Working..." : "Create organization"}
+        </button>
+      </div>
+      {organizations.length > 0 && (
+        <div className="mb-4 flex flex-col gap-2">
+          <select
+            value={selectedOrgId ?? ""}
+            onChange={(e) => {
+              const next = organizations.find((org) => org.id === e.target.value);
+              setSelectedOrgId(e.target.value);
+              if (next) setBudget(String(next.monthlyBudgetCents));
+            }}
+            className="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none"
+          >
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name} ({org.role})
+              </option>
+            ))}
+          </select>
+          {selected && (
+            <>
+              <div className="flex gap-2">
+                <input
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="Monthly budget (cents)"
+                  className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void saveBudget()}
+                  className="h-9 rounded-full border border-border px-3 text-sm disabled:opacity-50"
+                >
+                  Save budget
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="Invite email"
+                  className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={busy || !inviteEmail.trim()}
+                  onClick={() => void inviteMember()}
+                  className="h-9 rounded-full border border-border px-3 text-sm disabled:opacity-50"
+                >
+                  Invite
+                </button>
+              </div>
+              {inviteToken && (
+                <p className="rounded-xl border border-border bg-elevated px-3 py-2 text-xs text-muted">
+                  Invite token (share once): <span className="font-mono text-foreground">{inviteToken}</span>
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

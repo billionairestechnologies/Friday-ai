@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { supabaseAdmin } from "../config/supabase.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { isShuttingDown } from "../services/lifecycle.js";
+import { redisConfigured, redisPing } from "../services/redisClient.js";
 
 export const healthRouter = Router();
 
@@ -32,17 +33,29 @@ async function readiness(_req: Request, res: Response) {
     });
     if (result.error) throw result.error;
 
+    const redis = await redisPing();
+    const redisRequired = redisConfigured();
+    if (redisRequired && redis !== "ok") {
+      res.status(503).json({
+        status: "unavailable",
+        service: "friday-ai-backend",
+        dependencies: { database: "ok", redis },
+        time: new Date().toISOString(),
+      });
+      return;
+    }
+
     res.json({
       status: "ready",
       service: "friday-ai-backend",
-      dependencies: { database: "ok" },
+      dependencies: { database: "ok", redis },
       time: new Date().toISOString(),
     });
   } catch {
     res.status(503).json({
       status: "unavailable",
       service: "friday-ai-backend",
-      dependencies: { database: "unavailable" },
+      dependencies: { database: "unavailable", redis: await redisPing() },
       time: new Date().toISOString(),
     });
   }

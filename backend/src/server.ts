@@ -1,6 +1,7 @@
 import type { Socket } from "node:net";
 import { assertEnvironmentConfigured, env } from "./config/env.js";
 import { beginShutdown } from "./services/lifecycle.js";
+import { closeRedisClient } from "./services/redisClient.js";
 import { logger } from "./utils/logger.js";
 
 assertEnvironmentConfigured();
@@ -10,7 +11,10 @@ const app = createApp();
 const sockets = new Set<Socket>();
 
 const server = app.listen(env.port, () => {
-  logger.info("server_listening", { port: env.port });
+  logger.info("server_listening", {
+    port: env.port,
+    redis: env.redisUrl ? "configured" : "disabled",
+  });
 });
 
 server.on("connection", (socket) => {
@@ -33,6 +37,7 @@ async function shutdown(reason: string, exitCode = 0) {
 
   server.closeIdleConnections?.();
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  await closeRedisClient().catch(() => undefined);
   clearTimeout(forceTimer);
 }
 

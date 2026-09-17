@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Request, RequestHandler } from "express";
+import { getRedisClient, redisConfigured } from "../services/redisClient.js";
 
 type Bucket = {
   count: number;
@@ -76,6 +77,60 @@ export class ConcurrencyLimiter {
   }
 }
 
+class RedisFixedWindowRateLimiter {
+  constructor(
+    private readonly limit: number,
+    private readonly windowMs: number,
+  ) {}
+
+  async consume(key: string): Promise<LimitResult | null> {
+    const redis = await getRedisClient();
+    if (!redis) return null;
+
+    const redisKey = `rl:fw:${key}`;
+    const count = await redis.incr(redisKey);
+    if (count === 1) {
+      await redis.pExpire(redisKey, this.windowMs);
+    }
+    const ttl = await redis.pTTL(redisKey);
+    const resetAt = Date.now() + Math.max(ttl, 0);
+
+    return {
+      allowed: count <= this.limit,
+      limit: this.limit,
+      remaining: Math.max(0, this.limit - count),
+      resetAt,
+    };
+  }
+}
+
+class RedisConcurrencyLimiter {
+  constructor(private readonly limit: number) {}
+
+  async acquire(key: string): Promise<boolean | null> {
+    const redis = await getRedisClient();
+    if (!redis) return null;
+
+    const redisKey = `rl:cc:${key}`;
+    const count = await redis.incr(redisKey);
+    // Recover from crashed holders; active chat/voice/sandbox runs should finish sooner.
+    await redis.expire(redisKey, 15 * 60);
+    if (count > this.limit) {
+      await redis.decr(redisKey);
+      return false;
+    }
+    return true;
+  }
+
+  async release(key: string) {
+    const redis = await getRedisClient();
+    if (!redis) return;
+    const redisKey = `rl:cc:${key}`;
+    const count = await redis.decr(redisKey);
+    if (count <= 0) await redis.del(redisKey);
+  }
+}
+
 type RateLimitOptions = {
   name: string;
   limit: number;
@@ -97,53 +152,86 @@ export function credentialKey(req: Request): string {
   return `${clientKey(req)}:${email}`;
 }
 
+function applyLimitHeaders(res: import("express").Response, result: LimitResult, windowMs: number) {
+  res.setHeader("RateLimit-Policy", `${result.limit};w=${Math.ceil(windowMs / 1_000)}`);
+  res.setHeader("RateLimit-Limit", String(result.limit));
+  res.setHeader("RateLimit-Remaining", String(result.remaining));
+  res.setHeader("RateLimit-Reset", String(Math.ceil(result.resetAt / 1_000)));
+}
+
 export function rateLimit(options: RateLimitOptions): RequestHandler {
-  const limiter = new FixedWindowRateLimiter(options.limit, options.windowMs);
+  const memory = new FixedWindowRateLimiter(options.limit, options.windowMs);
+  const redisLimiter = redisConfigured() ? new RedisFixedWindowRateLimiter(options.limit, options.windowMs) : null;
 
   return (req, res, next) => {
     const rawKey = options.key?.(req) ?? clientKey(req);
-    const result = limiter.consume(hashKey(`${options.name}:${rawKey}`));
+    const key = hashKey(`${options.name}:${rawKey}`);
 
-    res.setHeader("RateLimit-Policy", `${result.limit};w=${Math.ceil(options.windowMs / 1_000)}`);
-    res.setHeader("RateLimit-Limit", String(result.limit));
-    res.setHeader("RateLimit-Remaining", String(result.remaining));
-    res.setHeader("RateLimit-Reset", String(Math.ceil(result.resetAt / 1_000)));
+    void (async () => {
+      let result: LimitResult | null = null;
+      if (redisLimiter) {
+        try {
+          result = await redisLimiter.consume(key);
+        } catch {
+          result = null;
+        }
+      }
+      if (!result) result = memory.consume(key);
 
-    if (!result.allowed) {
-      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000))));
-      res.status(429).json({
-        error: "Too many requests. Please wait and try again.",
-        requestId: req.requestId,
-      });
-      return;
-    }
-
-    next();
+      applyLimitHeaders(res, result, options.windowMs);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000))));
+        res.status(429).json({
+          error: "Too many requests. Please wait and try again.",
+          requestId: req.requestId,
+        });
+        return;
+      }
+      next();
+    })().catch(next);
   };
 }
 
 export function concurrencyLimit(name: string, limit: number): RequestHandler {
-  const limiter = new ConcurrencyLimiter(limit);
+  const memory = new ConcurrencyLimiter(limit);
+  const redisLimiter = redisConfigured() ? new RedisConcurrencyLimiter(limit) : null;
 
   return (req, res, next) => {
     const key = hashKey(`${name}:${clientKey(req)}`);
-    if (!limiter.acquire(key)) {
-      res.setHeader("Retry-After", "1");
-      res.status(429).json({
-        error: "Too many requests are already running. Wait for one to finish.",
-        requestId: req.requestId,
-      });
-      return;
-    }
 
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      limiter.release(key);
-    };
-    res.once("finish", release);
-    res.once("close", release);
-    next();
+    void (async () => {
+      let acquired: boolean | null = null;
+      if (redisLimiter) {
+        try {
+          acquired = await redisLimiter.acquire(key);
+        } catch {
+          acquired = null;
+        }
+      }
+      if (acquired === null) acquired = memory.acquire(key);
+
+      if (!acquired) {
+        res.setHeader("Retry-After", "1");
+        res.status(429).json({
+          error: "Too many requests are already running. Wait for one to finish.",
+          requestId: req.requestId,
+        });
+        return;
+      }
+
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        if (redisLimiter) {
+          void redisLimiter.release(key).catch(() => memory.release(key));
+        } else {
+          memory.release(key);
+        }
+      };
+      res.once("finish", release);
+      res.once("close", release);
+      next();
+    })().catch(next);
   };
 }

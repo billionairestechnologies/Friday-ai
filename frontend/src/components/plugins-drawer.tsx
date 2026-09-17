@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Puzzle, Search, X } from "lucide-react";
 import { FEATURED_PLUGINS, FRIDAY_TOOLS, type PluginItem } from "@/lib/plugins";
 import { PLUGIN_LOGOS, PluginLogo } from "@/components/plugin-logos";
 import { useChat } from "@/lib/chat/store";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+type ConnectorAccount = {
+  id: string;
+  provider: "github";
+  accountLogin: string | null;
+  accountName: string | null;
+  connectedAt: string;
+};
 
 export function PluginsDrawer() {
   const dialog = useChat((s) => s.dialog);
@@ -15,9 +25,15 @@ export function PluginsDrawer() {
   const setWebSearch = useChat((s) => s.setWebSearch);
   const canvas = useChat((s) => s.canvas);
   const setCanvas = useChat((s) => s.setCanvas);
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
   const [tab, setTab] = useState<"connectors" | "skills">("connectors");
   const [q, setQ] = useState("");
   const [active, setActive] = useState<PluginItem | null>(null);
+  const [accounts, setAccounts] = useState<ConnectorAccount[]>([]);
+  const [githubConfigured, setGithubConfigured] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const on = { search: webSearch, think, canvas };
   const toggle = {
@@ -25,6 +41,54 @@ export function PluginsDrawer() {
     think: setThink,
     canvas: setCanvas,
   };
+
+  const githubAccount = accounts.find((account) => account.provider === "github");
+
+  function refreshConnectors() {
+    if (!signedIn) {
+      setAccounts([]);
+      return;
+    }
+    Promise.all([
+      api.get<{ accounts: ConnectorAccount[] }>("/connectors"),
+      api.get<{ connectors: { github: { configured: boolean } } }>("/connectors/config"),
+    ])
+      .then(([accountRes, configRes]) => {
+        setAccounts(accountRes.accounts);
+        setGithubConfigured(configRes.connectors.github.configured);
+      })
+      .catch(() => {
+        setAccounts([]);
+      });
+  }
+
+  useEffect(refreshConnectors, [signedIn]);
+
+  async function connectGitHub() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await api.get<{ url: string }>("/connectors/github/start?returnTo=" + encodeURIComponent("/?dialog=plugins"));
+      window.location.assign(res.url);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't start GitHub connect");
+      setBusy(false);
+    }
+  }
+
+  async function disconnectGitHub() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await api.delete("/connectors/github");
+      setAccounts((current) => current.filter((account) => account.provider !== "github"));
+      setNotice("GitHub disconnected.");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't disconnect GitHub");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const featured = FEATURED_PLUGINS.filter(
     (p) =>
@@ -79,6 +143,7 @@ export function PluginsDrawer() {
             <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-5">
               {tab === "connectors" ? (
                 <>
+                  {notice && <p className="mb-3 text-sm text-muted">{notice}</p>}
                   <p className="mb-3 text-sm font-semibold">Connected</p>
                   <ul className="mb-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {FRIDAY_TOOLS.map((p) => {
@@ -118,29 +183,54 @@ export function PluginsDrawer() {
                         </li>
                       );
                     })}
-                  </ul>
-                  <p className="mb-3 text-sm font-semibold">Featured</p>
-                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {featured.map((p) => (
-                      <li key={p.id}>
+                    {githubAccount && (
+                      <li>
                         <button
                           type="button"
-                          onClick={() => setActive(p)}
+                          onClick={() => setActive(FEATURED_PLUGINS.find((p) => p.id === "github") ?? null)}
                           className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
                         >
-                          <span className="grid size-9 place-items-center rounded-lg bg-chip text-sm font-semibold">
-                            {PLUGIN_LOGOS[p.id] ? <PluginLogo id={p.id} className="size-4.5" /> : p.name.charAt(0)}
+                          <span className="grid size-9 place-items-center rounded-lg bg-chip">
+                            <PluginLogo id="github" className="size-4.5" />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium">{p.name}</span>
-                            <span className="block truncate text-xs text-muted">{p.desc}</span>
+                            <span className="block text-sm font-medium">GitHub</span>
+                            <span className="block truncate text-xs text-muted">
+                              @{githubAccount.accountLogin ?? "connected"}
+                            </span>
                           </span>
-                          <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted">
-                            Add
+                          <span className="inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-0.5 text-xs">
+                            <Check className="size-3" /> On
                           </span>
                         </button>
                       </li>
-                    ))}
+                    )}
+                  </ul>
+                  <p className="mb-3 text-sm font-semibold">Featured</p>
+                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {featured.map((p) => {
+                      const connected = p.id === "github" && Boolean(githubAccount);
+                      return (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => setActive(p)}
+                            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
+                          >
+                            <span className="grid size-9 place-items-center rounded-lg bg-chip text-sm font-semibold">
+                              {PLUGIN_LOGOS[p.id] ? <PluginLogo id={p.id} className="size-4.5" /> : p.name.charAt(0)}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-medium">{p.name}</span>
+                              <span className="block truncate text-xs text-muted">{p.desc}</span>
+                            </span>
+                            <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted">
+                              {connected ? "Connected" : "Add"}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </>
               ) : (
@@ -167,8 +257,43 @@ export function PluginsDrawer() {
                 <p>{active.desc}</p>
                 {active.group === "connected" ? (
                   <p className="mt-3">This is a Friday tool. Toggle it here or from the composer.</p>
+                ) : active.id === "github" ? (
+                  <div className="mt-3 space-y-3">
+                    {githubAccount ? (
+                      <>
+                        <p>
+                          Connected as <span className="text-foreground">@{githubAccount.accountLogin}</span>.
+                          Friday can search your repositories for Developer projects.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void disconnectGitHub()}
+                          className="h-9 rounded-full border border-border px-3 text-sm text-foreground disabled:opacity-50"
+                        >
+                          Disconnect
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          {githubConfigured
+                            ? "Connect GitHub to search repos and attach repository context."
+                            : "GitHub OAuth keys are not configured on this environment yet."}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={busy || !githubConfigured || !signedIn}
+                          onClick={() => void connectGitHub()}
+                          className="h-9 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                        >
+                          {signedIn ? "Connect GitHub" : "Sign in to connect"}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 ) : (
-                  <p className="mt-3">External connectors aren’t wired in this preview. Search, Think, and Canvas work now.</p>
+                  <p className="mt-3">This connector isn’t live yet. GitHub works when OAuth keys are configured.</p>
                 )}
               </div>
             </aside>

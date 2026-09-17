@@ -39,3 +39,19 @@ test("development still requires Supabase but permits local-only secrets", () =>
     [],
   );
 });
+
+test("partial GitHub and SSO config are rejected", () => {
+  assert.ok(
+    validateEnvironment({
+      ...validProductionEnvironment,
+      githubClientId: "only-id",
+    }).some((error) => error.includes("GITHUB_CLIENT_ID")),
+  );
+  assert.ok(
+    validateEnvironment({
+      ...validProductionEnvironment,
+      ssoEnabled: true,
+      ssoEntryUrl: "",
+    }).some((error) => error.includes("SSO_ENTRY_URL")),
+  );
+});

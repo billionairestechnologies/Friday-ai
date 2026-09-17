@@ -92,7 +92,7 @@ export async function streamMessage(
   const conversation = await getOwnedConversation(userId, conversationId);
   const mode = conversation.mode as ConversationMode;
 
-  await insertUserMessage(conversationId, content, inputMode, attachments);
+  await insertUserMessage(conversationId, content, inputMode, attachments, userId);
   void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
   if (attachments.length > 0) {
     void recordUsageEvent(userId, "attachment_upload", attachments.length, {
