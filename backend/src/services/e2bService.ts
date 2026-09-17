@@ -112,15 +112,18 @@ export async function runCode(userId: string, language: RunLanguage, code: strin
   }
 }
 
-// Caps the self-healing loop at 2 fix rounds (3 sandbox runs total) — enough to catch the
-// syntax-error/typo class of bug a model usually introduces, without letting one bad script
-// burn unbounded sandbox time and LLM calls if it's wrong in a way that can't be auto-fixed.
-const MAX_FIX_ATTEMPTS = 2;
+// Not truly unbounded — one HTTP request is holding the line open for every attempt (sandbox
+// run + a model fix call, back to back), and a browser/proxy timeout would kill the request and
+// hand the user nothing at all, which is worse than a bounded "still couldn't fix it" result.
+// 25 is high enough that in practice the real stop condition below (a fix that repeats one
+// already tried, i.e. the model is out of new ideas) is what ends the loop, not this number.
+const MAX_FIX_ATTEMPTS = 25;
 
 /**
- * Runs code for real, and on failure asks a model to fix it and tries again — up to
- * MAX_FIX_ATTEMPTS times — instead of just handing the user a stack trace. Stops early if a fix
- * attempt comes back empty (the model couldn't produce a fix) rather than looping on nothing.
+ * Runs code for real, and on failure asks a model to fix it and tries again — genuinely "until
+ * it stops working", not an arbitrary small cap: it keeps going as long as each fix attempt is
+ * actually new. It only gives up when the model repeats a fix already tried (stuck oscillating,
+ * not making progress) or returns nothing, or MAX_FIX_ATTEMPTS is hit as a last-resort ceiling.
  */
 export async function runWithAutoFix(
   userId: string,
@@ -129,6 +132,7 @@ export async function runWithAutoFix(
 ): Promise<AutoRunResult> {
   let currentCode = code;
   const attempts: RunAttempt[] = [];
+  const tried = new Set<string>([code]);
 
   for (let i = 0; i <= MAX_FIX_ATTEMPTS; i++) {
     const result = await runCode(userId, language, currentCode);
@@ -137,9 +141,10 @@ export async function runWithAutoFix(
       return { ok: result.ok, output: result.output, code: currentCode, attempts };
     }
     const fixed = await fixCode(language, currentCode, result.output);
-    if (!fixed || fixed === currentCode) {
+    if (!fixed || tried.has(fixed)) {
       return { ok: false, output: result.output, code: currentCode, attempts };
     }
+    tried.add(fixed);
     currentCode = fixed;
   }
 
