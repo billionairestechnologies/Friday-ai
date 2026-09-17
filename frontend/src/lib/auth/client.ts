@@ -22,8 +22,8 @@ type AuthState = {
   login: (email: string, password: string) => Promise<{ email: string }>;
   verifyOtp: (email: string, code: string) => Promise<void>;
   resendOtp: (email: string) => Promise<void>;
-  /** The hidden /admin gate's own login — skips the OTP step (see backend adminLogin for why). */
-  adminLogin: (email: string, password: string) => Promise<void>;
+  /** Verifies admin credentials and starts the mandatory email OTP challenge. */
+  adminLogin: (email: string, password: string) => Promise<{ email: string }>;
   signup: (
     name: string,
     email: string,
@@ -94,10 +94,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   adminLogin: async (email, password) => {
-    const res = await api.post<{ user: AuthUser; session: Session }>("/auth/admin-login", { email, password });
-    persist(res.session, res.user);
-    set({ user: res.user, isPending: false });
-    useChat.getState().syncOwner(res.user.id);
+    const res = await api.post<{ otpRequired: true; email: string }>("/auth/admin-login", { email, password });
+    return { email: res.email };
   },
 
   /** Creates the account, then sends the same 6-digit OTP flow as login() — signup only

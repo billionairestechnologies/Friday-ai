@@ -1,17 +1,47 @@
-import { createApp } from "./app.js";
-import { env } from "./config/env.js";
+import type { Socket } from "node:net";
+import { assertEnvironmentConfigured, env } from "./config/env.js";
+import { beginShutdown } from "./services/lifecycle.js";
 
-// A single stray unhandled rejection anywhere (a provider adapter, a background task) otherwise
-// crashes this whole process by default on Node 15+ — taking down every other in-flight
-// request/SSE stream with it. Confirmed live: a slow ScaleMax response rejecting after
-// withTimeout's race had already settled did exactly this. Log and keep running instead; the
-// promise's own call site should still surface a proper error to whoever awaited it.
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection (process kept alive):", reason);
+assertEnvironmentConfigured();
+
+const { createApp } = await import("./app.js");
+const app = createApp();
+const sockets = new Set<Socket>();
+
+const server = app.listen(env.port, () => {
+  console.log(`Friday AI backend listening on http://localhost:${env.port}`);
 });
 
-const app = createApp();
+server.on("connection", (socket) => {
+  sockets.add(socket);
+  socket.once("close", () => sockets.delete(socket));
+});
 
-app.listen(env.port, () => {
-  console.log(`Friday AI backend listening on http://localhost:${env.port}`);
+let shutdownStarted = false;
+async function shutdown(reason: string, exitCode = 0) {
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  beginShutdown();
+  process.exitCode = exitCode;
+  console.log(`Shutting down Friday AI backend (${reason})`);
+
+  const forceTimer = setTimeout(() => {
+    console.error("Graceful shutdown timed out; closing remaining connections");
+    for (const socket of sockets) socket.destroy();
+  }, 10_000);
+
+  server.closeIdleConnections?.();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  clearTimeout(forceTimer);
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+  void shutdown("uncaughtException", 1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+  void shutdown("unhandledRejection", 1);
 });

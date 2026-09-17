@@ -14,6 +14,7 @@ import { modelsRouter } from "./routes/models.js";
 import { chatRouter } from "./routes/chat.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
+import { requestContext } from "./middleware/requestContext.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -24,16 +25,30 @@ const frontendDist = path.join(__dirname, "../../frontend/dist");
 export function createApp() {
   const app = express();
 
+  if (env.trustProxy) {
+    const numericTrustProxy = Number(env.trustProxy);
+    app.set(
+      "trust proxy",
+      env.trustProxy === "true"
+        ? true
+        : Number.isInteger(numericTrustProxy)
+          ? numericTrustProxy
+          : env.trustProxy,
+    );
+  }
+
   // Content-Security-Policy defaults would block the app's Google Fonts stylesheet/font files,
   // which are same-origin-safe but hosted externally; the rest of Helmet's protections still apply.
   app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(cors({ origin: env.corsOrigins, credentials: true }));
+  app.use(requestContext);
   // Image attachments ride along as base64 data URLs on the chat message body (no separate
   // upload endpoint yet) — base64 inflates size by ~33%, and up to MAX_ATTACHMENTS images can be
   // attached per message, so 2mb was rejecting any real photo outright with a bare 413 before it
   // ever reached chatService's own, more specific vision-support error.
   app.use(express.json({ limit: "30mb" }));
-  app.use(morgan("dev"));
+  morgan.token("request-id", (req) => (req as express.Request).requestId);
+  app.use(morgan(':method :url :status :response-time ms request_id=:request-id'));
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);

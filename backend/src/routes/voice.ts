@@ -4,10 +4,18 @@ import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import { listVoices, synthesizeSpeech, transcribeAudio } from "../services/voiceService.js";
+import { env } from "../config/env.js";
+import { concurrencyLimit, rateLimit } from "../middleware/rateLimit.js";
 
 export const voiceRouter = Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const voiceLimit = rateLimit({
+  name: "voice",
+  limit: env.rateLimits.voicePer15Minutes,
+  windowMs: 15 * 60_000,
+});
+const voiceConcurrencyLimit = concurrencyLimit("voice", env.rateLimits.voiceConcurrency);
 
 voiceRouter.use(requireAuth);
 
@@ -15,6 +23,8 @@ voiceRouter.use(requireAuth);
 // to drop into the chat input (or send straight away).
 voiceRouter.post(
   "/transcribe",
+  voiceLimit,
+  voiceConcurrencyLimit,
   upload.single("audio"),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new HttpError(400, "No audio file uploaded");
@@ -39,6 +49,8 @@ const speakSchema = z.object({
 // Voice mode speaking a reply aloud, or previewing a voice with a custom line.
 voiceRouter.post(
   "/speak",
+  voiceLimit,
+  voiceConcurrencyLimit,
   asyncHandler(async (req, res) => {
     const { text, voiceId } = speakSchema.parse(req.body);
     const { audio, mime } = await synthesizeSpeech(text, voiceId);

@@ -2,10 +2,18 @@ import { Router } from "express";
 import * as controller from "../controllers/adminProvidersController.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 export const adminProvidersRouter = Router();
 
 adminProvidersRouter.use(requireAuth, requireAdmin);
+adminProvidersRouter.use(
+  rateLimit({
+    name: "admin-provider-management",
+    limit: 60,
+    windowMs: 15 * 60_000,
+  }),
+);
 
 adminProvidersRouter.get("/", asyncHandler(controller.listProviders));
 adminProvidersRouter.post("/:slug/keys", asyncHandler(controller.addKey));

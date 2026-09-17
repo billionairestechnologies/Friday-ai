@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { ZodError } from "zod";
 
 export class HttpError extends Error {
   status: number;
@@ -16,10 +17,15 @@ export function asyncHandler(fn: (req: Request, res: Response, next: NextFunctio
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
-  const status = err instanceof HttpError ? err.status : 500;
-  const message = err instanceof Error ? err.message : "Unexpected error";
+  const status = err instanceof HttpError ? err.status : err instanceof ZodError ? 400 : 500;
+  const message =
+    err instanceof HttpError
+      ? err.message
+      : err instanceof ZodError
+        ? (err.issues[0]?.message ?? "Invalid request")
+        : "Unexpected server error";
   if (status >= 500) {
-    console.error(err);
+    console.error(`[${req.requestId}]`, err);
   }
-  res.status(status).json({ error: message });
+  res.status(status).json({ error: message, requestId: req.requestId });
 }

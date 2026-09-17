@@ -5,10 +5,17 @@ import { supabasePublic } from "../config/supabasePublic.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { sendOtpEmail } from "../services/emailService.js";
 import type { Session } from "@supabase/supabase-js";
+import {
+  decryptPendingSession,
+  encryptPendingSession,
+  generateOtp,
+  hashOtp,
+  verifyOtpHash,
+} from "../utils/authSecurity.js";
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
-  email: z.string().trim().email(),
+  email: z.string().trim().email().toLowerCase(),
   phone: z.string().trim().min(7, "Enter a valid mobile number").max(20),
   birthday: z
     .string()
@@ -18,7 +25,7 @@ const signupSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().email().toLowerCase(),
   password: z.string().min(1),
 });
 
@@ -33,33 +40,19 @@ async function getProfileExtras(
   };
 }
 
-/**
- * The hidden /admin gate skips the OTP step — it's a separate, rarely-used, already-locked-down
- * entry point (its own URL, its own username+password), and gating it behind the consumer OTP
- * flow would tie admin access to whichever inbox happens to be reachable through the configured
- * email sender. Still re-verifies the resulting user is actually an admin, so this endpoint can't
- * be used as a back door around OTP for a regular account.
- */
+/** Verifies admin credentials and requires the same email OTP as every other privileged login. */
 export async function adminLogin(req: Request, res: Response) {
   const { email, password } = loginSchema.parse(req.body);
 
   const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
   if (error || !data.session) throw new HttpError(401, "Invalid email or password");
 
-  const { role, phone, birthday } = await getProfileExtras(data.user.id);
+  const { role } = await getProfileExtras(data.user.id);
   if (role !== "admin") throw new HttpError(403, "This account doesn't have admin access");
 
-  res.json({
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      name: (data.user.user_metadata?.full_name as string | undefined) ?? null,
-      phone,
-      birthday,
-      role,
-    },
-    session: data.session,
-  });
+  const name = (data.user.user_metadata?.full_name as string | undefined) ?? "admin";
+  await issueOtp(email, name, data.session);
+  res.json({ otpRequired: true, email });
 }
 
 /**
@@ -132,12 +125,7 @@ export async function updateProfile(req: Request, res: Response) {
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
 
-function generateOtp(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
-/** Stores the OTP (replacing any prior pending one for this email) and emails it. The Supabase
- *  session obtained from the password check rides along in the row until the code is confirmed. */
+/** Stores only a keyed OTP hash and encrypted pending session until the code is confirmed. */
 async function issueOtp(email: string, name: string, session: Session) {
   const code = generateOtp();
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString();
@@ -145,7 +133,12 @@ async function issueOtp(email: string, name: string, session: Session) {
   await supabaseAdmin.from("login_otps").delete().eq("email", email);
   const { error } = await supabaseAdmin
     .from("login_otps")
-    .insert({ email, code, session, expires_at: expiresAt });
+    .insert({
+      email,
+      code_hash: hashOtp(email, code),
+      session_ciphertext: encryptPendingSession(session),
+      expires_at: expiresAt,
+    });
   if (error) throw new HttpError(500, "Failed to start sign-in");
 
   await sendOtpEmail(email, name, code);
@@ -164,7 +157,7 @@ export async function login(req: Request, res: Response) {
 }
 
 const verifyOtpSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().email().toLowerCase(),
   code: z.string().trim().length(6),
 });
 
@@ -188,7 +181,7 @@ export async function verifyOtp(req: Request, res: Response) {
     await supabaseAdmin.from("login_otps").delete().eq("id", row.id as string);
     throw new HttpError(429, "Too many attempts — request a new code");
   }
-  if (row.code !== code) {
+  if (!verifyOtpHash(email, code, row.code_hash as string)) {
     await supabaseAdmin
       .from("login_otps")
       .update({ attempts: (row.attempts as number) + 1 })
@@ -198,7 +191,12 @@ export async function verifyOtp(req: Request, res: Response) {
 
   await supabaseAdmin.from("login_otps").delete().eq("id", row.id as string);
 
-  const session = row.session as Session;
+  let session: Session;
+  try {
+    session = decryptPendingSession<Session>(row.session_ciphertext as string);
+  } catch {
+    throw new HttpError(400, "That sign-in expired or is invalid. Please log in again.");
+  }
   const { role, phone, birthday } = await getProfileExtras(session.user.id);
   res.json({
     user: {
@@ -213,7 +211,7 @@ export async function verifyOtp(req: Request, res: Response) {
   });
 }
 
-const resendOtpSchema = z.object({ email: z.string().trim().email() });
+const resendOtpSchema = z.object({ email: z.string().trim().email().toLowerCase() });
 
 export async function resendOtp(req: Request, res: Response) {
   const { email } = resendOtpSchema.parse(req.body);
@@ -227,7 +225,13 @@ export async function resendOtp(req: Request, res: Response) {
     .maybeSingle();
   if (error || !row) throw new HttpError(400, "No pending sign-in for this email — log in again");
 
-  const session = row.session as Session;
+  let session: Session;
+  try {
+    session = decryptPendingSession<Session>(row.session_ciphertext as string);
+  } catch {
+    await supabaseAdmin.from("login_otps").delete().eq("id", row.id as string);
+    throw new HttpError(400, "That sign-in expired or is invalid. Please log in again.");
+  }
   const name = (session.user.user_metadata?.full_name as string | undefined) ?? "there";
   await issueOtp(email, name, session);
 

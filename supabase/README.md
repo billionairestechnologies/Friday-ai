@@ -1,6 +1,13 @@
 # Supabase schema
 
-Run `migrations/0001_init.sql` once against your Supabase project (SQL editor, or `supabase db push` if you use the CLI).
+Apply every SQL file in `migrations/` in numeric order. New environments need the complete
+sequence, not only `0001_init.sql`; later migrations contain fields and security changes required
+by the current backend.
+
+For a manually managed project, run each unapplied file in the Supabase SQL editor and record the
+filename in your release log. For automated environments, initialize the Supabase CLI project,
+link it to the target project, and use `supabase db push` before deploying the matching backend.
+Never deploy a backend release that depends on a migration before that migration has completed.
 
 ## Making the first admin
 

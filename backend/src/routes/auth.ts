@@ -13,15 +13,35 @@ import {
 } from "../controllers/authController.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { requireAuth } from "../middleware/auth.js";
+import { env } from "../config/env.js";
+import { credentialKey, rateLimit } from "../middleware/rateLimit.js";
 
 export const authRouter = Router();
 
-authRouter.post("/signup", asyncHandler(signup));
-authRouter.post("/login", asyncHandler(login));
-authRouter.post("/admin-login", asyncHandler(adminLogin));
-authRouter.post("/verify-otp", asyncHandler(verifyOtp));
-authRouter.post("/resend-otp", asyncHandler(resendOtp));
-authRouter.post("/refresh", asyncHandler(refresh));
+const credentialLimit = rateLimit({
+  name: "auth-credential",
+  limit: env.rateLimits.authPer15Minutes,
+  windowMs: 15 * 60_000,
+  key: credentialKey,
+});
+const otpLimit = rateLimit({
+  name: "auth-otp",
+  limit: env.rateLimits.otpPer10Minutes,
+  windowMs: 10 * 60_000,
+  key: credentialKey,
+});
+const refreshLimit = rateLimit({
+  name: "auth-refresh",
+  limit: 60,
+  windowMs: 15 * 60_000,
+});
+
+authRouter.post("/signup", credentialLimit, asyncHandler(signup));
+authRouter.post("/login", credentialLimit, asyncHandler(login));
+authRouter.post("/admin-login", credentialLimit, asyncHandler(adminLogin));
+authRouter.post("/verify-otp", otpLimit, asyncHandler(verifyOtp));
+authRouter.post("/resend-otp", otpLimit, asyncHandler(resendOtp));
+authRouter.post("/refresh", refreshLimit, asyncHandler(refresh));
 authRouter.post("/logout", asyncHandler(logout));
 authRouter.get("/me", requireAuth, asyncHandler(me));
 authRouter.patch("/profile", requireAuth, asyncHandler(updateProfile));

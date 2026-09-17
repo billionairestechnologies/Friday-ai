@@ -32,16 +32,24 @@ export function AdminGate() {
 function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [otpEmail, setOtpEmail] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const adminLogin = useAuthStore((s) => s.adminLogin);
+  const verifyOtp = useAuthStore((s) => s.verifyOtp);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await adminLogin(resolveLoginEmail(username), password);
+      if (otpEmail) {
+        await verifyOtp(otpEmail, otp);
+      } else {
+        const result = await adminLogin(resolveLoginEmail(username), password);
+        setOtpEmail(result.email);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -56,27 +64,45 @@ function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
         <p className="mt-1 text-sm text-muted">Restricted area.</p>
 
         <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm text-muted">
-            Username
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              placeholder="admin"
-              autoFocus
-              className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-muted">
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
-            />
-          </label>
+          {otpEmail ? (
+            <label className="flex flex-col gap-1 text-sm text-muted">
+              Verification code sent to {otpEmail}
+              <input
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                required
+                minLength={6}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                className="h-10 rounded-xl border border-border bg-background px-3 font-mono text-sm tracking-[0.3em] text-foreground outline-none"
+              />
+            </label>
+          ) : (
+            <>
+              <label className="flex flex-col gap-1 text-sm text-muted">
+                Username
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  placeholder="admin"
+                  autoFocus
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-muted">
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
+                />
+              </label>
+            </>
+          )}
 
           {(error || deniedMessage) && <p className="text-sm text-danger">{error ?? deniedMessage}</p>}
 
@@ -85,7 +111,7 @@ function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
             disabled={busy}
             className="mt-2 h-10 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
           >
-            {busy ? "Checking…" : "Enter"}
+            {busy ? "Checking…" : otpEmail ? "Verify and enter" : "Continue"}
           </button>
         </form>
       </div>

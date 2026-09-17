@@ -28,7 +28,7 @@ The frontend from `feature/frontend-scaffold` was later replaced wholesale with 
 
 ## Getting started
 
-1. Create a Supabase project, then run `supabase/migrations/0001_init.sql` in its SQL editor (see `supabase/README.md`, including how to promote your account to admin).
+1. Create a Supabase project, then apply every file in `supabase/migrations/` in numeric order (see `supabase/README.md`, including how to promote your account to admin).
 2. `cd backend && npm install && cp .env.example .env` — fill in `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, then `npm run dev` (http://localhost:4000).
 3. `cd frontend && npm install && npm run dev` (http://localhost:5173, proxies `/api` to the backend).
 4. Sign up from the account menu in the chat app, promote yourself to admin in Supabase, open `/admin`, and add API keys for whichever of OpenAI / Anthropic / Gemini / OpenRouter / Sarvam AI / ElevenLabs / Ollama you want live — models are auto-discovered and health-checked as soon as a key is added. Toggle which models are enabled, and they immediately appear in the model picker in the composer.

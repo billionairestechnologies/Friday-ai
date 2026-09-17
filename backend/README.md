@@ -7,11 +7,20 @@ Express + TypeScript API. Supabase (Postgres + Auth) is the database and identit
 ```bash
 cd backend
 npm install
-cp .env.example .env   # fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
+cp .env.example .env   # fill in Supabase values; production also requires a strong encryption secret and Resend
 npm run dev
 ```
 
-Server runs on `http://localhost:4000`. Health check: `GET /api/health`.
+Server runs on `http://localhost:4000`.
+
+- Readiness (database included): `GET /api/health` or `GET /api/health/ready`
+- Process liveness only: `GET /api/health/live`
+- Security tests: `npm test`
+
+When deployed behind a trusted reverse proxy, set `TRUST_PROXY` to its hop count so IP-based
+rate limits cannot be bypassed through forwarded headers. The built-in limiter protects a single
+process; multi-instance deployments must use the distributed limiter introduced with the platform
+operations layer.
 
 ## Structure
 
