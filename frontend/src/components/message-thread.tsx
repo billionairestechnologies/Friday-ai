@@ -197,7 +197,7 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
         return null;
       })()}
 
-      {message.error && !plan && (
+      {message.error && (!plan || message.streaming) && (
         <p className="rounded-md border border-border bg-elevated px-3 py-2 text-sm text-danger">
           {message.error}
         </p>

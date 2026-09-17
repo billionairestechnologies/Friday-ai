@@ -88,8 +88,7 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
   // matching the reference product's plain running list instead of an accordion box. Nothing to
   // show once it's done: the chat bubble already has a "Built in Canvas" note for this case
   // (see stripVisualArtifactForChat in message-thread.tsx).
-  if (canvasOn && !message.usedThink && !searchOn) {
-    if (!live) return null;
+  if (canvasOn && !message.usedThink && !searchOn && live) {
     const analyzing = !canvasWriteActive;
     return (
       <div className="flex flex-col gap-1.5 py-1">
