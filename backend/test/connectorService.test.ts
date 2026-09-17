@@ -23,6 +23,18 @@ test("OAuth state round-trips user id and return path", async () => {
   });
 });
 
+test("Google login state only accepts login purpose", async () => {
+  process.env.SUPABASE_URL = process.env.SUPABASE_URL || "https://example.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "service-role-key";
+  process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "anon-key";
+  process.env.GOOGLE_CLIENT_ID = "gid";
+  process.env.GOOGLE_CLIENT_SECRET = "gsecret";
+  const { parseGoogleLoginState } = await import("../src/services/googleAuth.js");
+  const state = Buffer.from(JSON.stringify({ purpose: "login", returnTo: "/app" }), "utf8").toString("base64url");
+  assert.deepEqual(parseGoogleLoginState(state), { returnTo: "/app" });
+  assert.throws(() => parseGoogleLoginState("nope"));
+});
+
 test("invite token hashing is stable", () => {
   const token = "invite-token-example";
   const hash = createHash("sha256").update(token).digest("hex");

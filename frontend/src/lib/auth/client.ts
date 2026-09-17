@@ -40,6 +40,21 @@ type AuthState = {
   refresh: () => Promise<boolean>;
 };
 
+function consumeHashSession(): StoredAuth | null {
+  if (typeof window === "undefined") return null;
+  const packed = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("friday_session");
+  if (!packed) return null;
+  try {
+    const padded = packed.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (packed.length % 4)) % 4);
+    const parsed = JSON.parse(atob(padded)) as StoredAuth;
+    history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    if (parsed.session?.access_token && parsed.user?.id) return parsed;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function loadStored(): StoredAuth | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -59,7 +74,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   isPending: true,
 
   bootstrap: async () => {
-    const stored = loadStored();
+    const fromHash = consumeHashSession();
+    const stored = fromHash ?? loadStored();
+    if (fromHash) persist(fromHash.session, fromHash.user);
     if (!stored) {
       set({ isPending: false });
       return;
@@ -70,6 +87,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await api.get<{ user: AuthUser }>("/auth/me");
       set({ user: res.user, isPending: false });
       useChat.getState().syncOwner(res.user.id);
+      const invite = new URLSearchParams(window.location.search).get("invite");
+      if (invite) {
+        try {
+          await api.post("/organizations/invites/accept", { token: invite });
+        } catch {
+          /* invite may already be used */
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete("invite");
+        history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       setAccessToken(null);

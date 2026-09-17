@@ -92,5 +92,7 @@ For failed deploys:
   `ATTACHMENT_OBJECT_STORAGE=true`. Inline `data_url` remains as a fallback for failed uploads.
 - Provider cost telemetry records `token_usage` events from stream usage when available, with a
   conservative character-based estimate fallback. Figures are for budgets, not invoices.
-- GitHub and Google (Calendar/Gmail/Drive) OAuth connectors are live when client credentials are set.
-- SSO is entry-point ready via `SSO_ENABLED` / `SSO_ENTRY_URL` (and `/api/auth/sso`); configure the IdP in Supabase Auth.
+- GitHub and Google (Calendar/Gmail/Drive) use OAuth. Notion, Supabase, Railway, Vercel,
+  Razorpay, Box, Canva, and Finance accept verified user tokens, encrypted at rest.
+- Google sign-in is live when `GOOGLE_CLIENT_*` are set (`GET /api/auth/google/start`).
+- SSO is entry-point ready via `SSO_ENABLED` / `SSO_ENTRY_URL` (and `/api/auth/sso`); configure the IdP in Supabase Auth. Team invites can be accepted from Settings or `?invite=`.

@@ -83,7 +83,12 @@ export function LoginPopout() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
-  const [sso, setSso] = useState<{ enabled: boolean; entryUrl: string | null; providerLabel: string } | null>(null);
+  const [sso, setSso] = useState<{
+    enabled: boolean;
+    entryUrl: string | null;
+    providerLabel: string;
+    google?: boolean;
+  } | null>(null);
   const signedIn = Boolean(user && !user.isDevFallback);
 
   useEffect(() => {
@@ -336,13 +341,25 @@ export function LoginPopout() {
           </div>
           <button
             type="button"
-            disabled
-            title="Coming soon"
-            className="flex h-11 items-center justify-center gap-2.5 rounded-full border border-border text-sm font-medium text-muted opacity-60"
+            disabled={busy || !sso?.google}
+            title={sso?.google ? "Continue with Google" : "Google sign-in is not configured on this environment yet"}
+            onClick={() => {
+              setBusy(true);
+              void api
+                .get<{ url: string }>("/auth/google/start")
+                .then((res) => window.location.assign(res.url))
+                .catch((err) => {
+                  setError(err instanceof Error ? err.message : "Couldn't start Google sign-in");
+                  setBusy(false);
+                });
+            }}
+            className="flex h-11 items-center justify-center gap-2.5 rounded-full border border-border text-sm font-medium text-foreground hover:bg-chip disabled:opacity-60"
           >
             <GoogleLogo className="size-4" />
             Continue with Google
-            <span className="ml-1 rounded-full bg-chip px-2 py-0.5 text-[10px] font-medium text-subtle">Coming soon</span>
+            {!sso?.google && (
+              <span className="ml-1 rounded-full bg-chip px-2 py-0.5 text-[10px] font-medium text-subtle">Needs keys</span>
+            )}
           </button>
           {sso?.enabled && sso.entryUrl && (
             <a

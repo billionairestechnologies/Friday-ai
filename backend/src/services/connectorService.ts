@@ -1,11 +1,19 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { decryptSecret, encryptSecret } from "../utils/crypto.js";
 import { recordAdminAuditLog } from "./usageService.js";
+import {
+  isTokenConnector,
+  TOKEN_CONNECTORS,
+  type TokenConnectorId,
+} from "./tokenConnectors.js";
 
-export type ConnectorProvider = "github" | "google";
+export type ConnectorProvider =
+  | "github"
+  | "google"
+  | TokenConnectorId;
 
 export type ConnectorAccountPublic = {
   id: string;
@@ -41,16 +49,38 @@ function requireGoogleOAuth() {
 export function connectorConfig() {
   return {
     github: {
+      mode: "oauth" as const,
       configured: Boolean(env.githubClientId && env.githubClientSecret),
+      pluginIds: ["github"],
+      fields: [] as const,
       scopes: ["read:user", "repo"],
     },
     google: {
+      mode: "oauth" as const,
       configured: Boolean(env.googleClientId && env.googleClientSecret),
+      pluginIds: ["calendar", "gmail", "drive"],
+      fields: [] as const,
       scopes: GOOGLE_CONNECTOR_SCOPES,
-      plugins: ["calendar", "gmail", "drive"],
     },
+    ...Object.fromEntries(
+      Object.entries(TOKEN_CONNECTORS).map(([provider, spec]) => [
+        provider,
+        {
+          mode: "token" as const,
+          configured: true,
+          pluginIds: spec.pluginIds,
+          fields: spec.fields,
+        },
+      ]),
+    ),
   };
 }
+
+export const CONNECTOR_PROVIDERS = [
+  "github",
+  "google",
+  ...Object.keys(TOKEN_CONNECTORS),
+] as const;
 
 export async function listConnectorAccounts(userId: string): Promise<ConnectorAccountPublic[]> {
   const { data, error } = await supabaseAdmin
@@ -364,6 +394,76 @@ export async function searchGitHubRepositories(userId: string, query: string) {
   }));
 }
 
-export function hashInviteToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+async function loadTokenCredentials(userId: string, provider: TokenConnectorId) {
+  const { data, error } = await supabaseAdmin
+    .from("connector_accounts")
+    .select("access_token_encrypted, refresh_token_encrypted, metadata")
+    .eq("user_id", userId)
+    .eq("provider", provider)
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!data?.access_token_encrypted) throw new HttpError(400, `Connect ${provider} first`);
+  return {
+    token: decryptSecret(data.access_token_encrypted as string),
+    secret: data.refresh_token_encrypted ? decryptSecret(data.refresh_token_encrypted as string) : undefined,
+    url: ((data.metadata as { url?: string } | null)?.url) ?? undefined,
+  };
+}
+
+export async function connectTokenConnector(
+  userId: string,
+  provider: TokenConnectorId,
+  input: { token?: string; secret?: string; url?: string },
+) {
+  const spec = TOKEN_CONNECTORS[provider];
+  const verified = await spec.verify(input);
+  const { data, error } = await supabaseAdmin
+    .from("connector_accounts")
+    .upsert(
+      {
+        user_id: userId,
+        provider,
+        external_account_id: verified.externalAccountId,
+        account_login: verified.accountLogin,
+        account_name: verified.accountName,
+        access_token_encrypted: encryptSecret(input.token!.trim()),
+        refresh_token_encrypted: input.secret?.trim() ? encryptSecret(input.secret.trim()) : null,
+        scopes: [],
+        metadata: verified.metadata,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,provider" },
+    )
+    .select("id, provider, account_login, account_name, scopes, connected_at")
+    .single();
+  if (error || !data) throw new HttpError(500, error?.message ?? "Failed to save connector");
+
+  await recordAdminAuditLog(userId, "connector.connect", "connector", data.id as string, { provider });
+
+  return {
+    id: data.id as string,
+    provider: data.provider as ConnectorProvider,
+    accountLogin: (data.account_login as string | null) ?? null,
+    accountName: (data.account_name as string | null) ?? null,
+    scopes: (data.scopes as string[] | null) ?? [],
+    connectedAt: data.connected_at as string,
+    configured: true,
+  };
+}
+
+export async function previewConnector(userId: string, provider: ConnectorProvider, query = "") {
+  if (provider === "github") {
+    const repositories = await searchGitHubRepositories(userId, query);
+    return repositories.map((repo) => ({
+      title: repo.fullName,
+      subtitle: repo.description,
+      url: repo.url,
+    }));
+  }
+  if (provider === "google") {
+    return [{ title: "Google connected", subtitle: "Calendar, Gmail, and Drive share this account" }];
+  }
+  if (!isTokenConnector(provider)) throw new HttpError(400, "Unknown connector");
+  const credentials = await loadTokenCredentials(userId, provider);
+  return TOKEN_CONNECTORS[provider].preview(credentials);
 }

@@ -44,6 +44,9 @@ export const env = {
   googleConnectorRedirectUri:
     process.env.GOOGLE_CONNECTOR_REDIRECT_URI ??
     `${process.env.PUBLIC_API_URL ?? "http://localhost:4000"}/api/connectors/google/callback`,
+  googleLoginRedirectUri:
+    process.env.GOOGLE_LOGIN_REDIRECT_URI ??
+    `${process.env.PUBLIC_API_URL ?? "http://localhost:4000"}/api/auth/google/callback`,
   redisUrl: process.env.REDIS_URL ?? "",
   attachmentObjectStorageEnabled: truthy(process.env.ATTACHMENT_OBJECT_STORAGE, true),
   ssoEnabled: truthy(process.env.SSO_ENABLED, false),

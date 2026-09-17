@@ -12,6 +12,13 @@ import {
   hashOtp,
   verifyOtpHash,
 } from "../utils/authSecurity.js";
+import { env } from "../config/env.js";
+import {
+  buildGoogleLoginUrl,
+  completeGoogleLogin,
+  googleLoginConfigured,
+  parseGoogleLoginState,
+} from "../services/googleAuth.js";
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
@@ -310,7 +317,43 @@ export async function deleteAccount(req: Request, res: Response) {
   res.status(204).send();
 }
 
-/** Google sign-in is wired for later — kept locked/disabled on the frontend for now. */
+/** Google sign-in is started at GET /auth/google/start and completed by the callback. */
+export async function startGoogleLogin(req: Request, res: Response) {
+  const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
+  res.json({ url: buildGoogleLoginUrl(returnTo), enabled: googleLoginConfigured() });
+}
+
+export async function googleCallback(req: Request, res: Response) {
+  const code = typeof req.query.code === "string" ? req.query.code : "";
+  const state = typeof req.query.state === "string" ? req.query.state : "";
+  if (!code || !state) throw new HttpError(400, "Missing Google sign-in code or state");
+
+  const { returnTo } = parseGoogleLoginState(state);
+  const completed = await completeGoogleLogin(code);
+  const { role, phone, birthday } = await getProfileExtras(completed.user.id);
+  const payload = Buffer.from(
+    JSON.stringify({
+      session: {
+        access_token: completed.session.access_token,
+        refresh_token: completed.session.refresh_token,
+      },
+      user: {
+        id: completed.user.id,
+        email: completed.user.email,
+        name: completed.name,
+        phone,
+        birthday,
+        role,
+      },
+    }),
+    "utf8",
+  ).toString("base64url");
+
+  const target = new URL(returnTo, env.publicAppUrl);
+  target.hash = `friday_session=${payload}`;
+  res.redirect(target.toString());
+}
+
 export async function googleSignIn(_req: Request, res: Response) {
-  throw new HttpError(501, "Google sign-in is coming soon");
+  throw new HttpError(405, "Use GET /api/auth/google/start");
 }

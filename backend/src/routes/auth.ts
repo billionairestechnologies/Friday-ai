@@ -3,6 +3,7 @@ import {
   adminLogin,
   deleteAccount,
   exportAccount,
+  googleCallback,
   googleSignIn,
   login,
   logout,
@@ -11,9 +12,11 @@ import {
   requestPasswordReset,
   resendOtp,
   signup,
+  startGoogleLogin,
   updateProfile,
   verifyOtp,
 } from "../controllers/authController.js";
+import { googleLoginConfigured } from "../services/googleAuth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { env } from "../config/env.js";
@@ -51,7 +54,9 @@ authRouter.get("/me", requireAuth, asyncHandler(me));
 authRouter.get("/export", requireAuth, asyncHandler(exportAccount));
 authRouter.delete("/account", requireAuth, asyncHandler(deleteAccount));
 authRouter.patch("/profile", requireAuth, asyncHandler(updateProfile));
-authRouter.post("/google", asyncHandler(googleSignIn)); // locked, returns 501 for now
+authRouter.post("/google", asyncHandler(googleSignIn));
+authRouter.get("/google/start", credentialLimit, asyncHandler(startGoogleLogin));
+authRouter.get("/google/callback", asyncHandler(googleCallback));
 authRouter.get(
   "/sso",
   asyncHandler(async (_req, res) => {
@@ -59,6 +64,7 @@ authRouter.get(
       enabled: env.ssoEnabled,
       entryUrl: env.ssoEnabled ? env.ssoEntryUrl || null : null,
       providerLabel: env.ssoProviderLabel,
+      google: googleLoginConfigured(),
     });
   }),
 );
