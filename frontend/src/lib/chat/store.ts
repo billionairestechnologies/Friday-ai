@@ -24,6 +24,10 @@ export type TurnCommit = {
    *  model judged it needed live info) — persists the chain-of-thought/sources display past the
    *  end of streaming, when the live-only override in overlayLive() no longer applies. */
   usedSearch?: boolean;
+  /** Set true when Canvas auto-opened mid-stream for this turn (see markLiveCanvasOn) — persists
+   *  the chain-of-thought canvas step log past the end of streaming, same reasoning as usedSearch
+   *  above. */
+  usedCanvas?: boolean;
 };
 
 export type ServerConversation = {
@@ -306,6 +310,7 @@ export const useChat = create<ChatState>()(
                           error: data.error,
                           modelLabel: data.modelLabel,
                           usedSearch: m.usedSearch || data.usedSearch,
+                          usedCanvas: m.usedCanvas || data.usedCanvas,
                           streaming: false,
                           status: null,
                         }

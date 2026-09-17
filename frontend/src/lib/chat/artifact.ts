@@ -62,23 +62,24 @@ export function extractStreamingCodeBody(content: string): { lang?: string; body
   return { lang: openFence[1], body: openFence[2] ?? "" };
 }
 
-const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx)$/i;
+const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx|python|py|javascript|js)$/i;
 
 /**
- * Cuts a visual artifact's fenced code block (html/jsx/tsx — the kinds Canvas renders as a live
- * preview) out of a message's text before it's shown in the chat bubble, so the same code doesn't
- * appear twice — once flooding the chat as a giant raw block, once properly rendered in Canvas.
+ * Cuts an auto-canvas fenced code block (html/jsx/tsx, plus the runnable langs python/js — see
+ * RUNNABLE_LANGS above, everything maybeAutoOpenCanvas in routes/index.tsx opens Canvas for) out
+ * of a message's text before it's shown in the chat bubble, so the same code doesn't appear
+ * twice — once flooding the chat as a giant raw block, once properly rendered in Canvas.
  * Handles the still-streaming case too (an opened but not yet closed fence), not just a completed
  * one, so the code never appears in chat even momentarily while it's being generated. A no-op for
  * any message that doesn't contain one of these fences.
  */
 export function stripVisualArtifactForChat(content: string): string {
-  const closed = /```(html|jsx|tsx)\n[\s\S]*?```/i.exec(content);
+  const closed = /```(html|jsx|tsx|python|py|javascript|js)\n[\s\S]*?```/i.exec(content);
   if (closed && VISUAL_FENCE_LANGS.test(closed[1] ?? "")) {
     const start = closed.index;
     return (content.slice(0, start) + content.slice(start + closed[0].length)).trim();
   }
-  const open = /```(html|jsx|tsx)\b/i.exec(content);
+  const open = /```(html|jsx|tsx|python|py|javascript|js)\b/i.exec(content);
   if (open) return content.slice(0, open.index).trim();
   return content;
 }

@@ -10,7 +10,7 @@ import { useGreeting, useHeroLine } from "@/hooks/use-greeting";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { applyLive, clearLive, peekLive, startLive } from "@/lib/chat/live-stream";
+import { applyLive, clearLive, markLiveCanvasOn, peekLive, startLive } from "@/lib/chat/live-stream";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/chat/models";
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
 import { streamMessage } from "@/lib/chat/stream";
@@ -199,7 +199,7 @@ export function Home() {
     const initial =
       useChat.getState().chats.find((c) => c.id === chatId)?.messages.find((m) => m.id === assistantId)
         ?.status ?? "working";
-    startLive(chatId, assistantId, initial);
+    startLive(chatId, assistantId, initial, s.canvas);
 
     abortRef.current?.abort();
     const ac = new AbortController();
@@ -221,9 +221,10 @@ export function Home() {
       if (autoCanvasOpened) return;
       streamedText += delta;
       const artifact = extractArtifact(streamedText);
-      if (artifact && (artifact.kind === "html" || artifact.kind === "react")) {
+      if (artifact && (artifact.kind === "html" || artifact.kind === "react" || artifact.kind === "runnable")) {
         autoCanvasOpened = true;
         useChat.getState().setCanvasOpen(true);
+        markLiveCanvasOn();
       }
     }
 
@@ -275,6 +276,7 @@ export function Home() {
         // Covers auto-triggered search (Search toggle off, backend judged it was needed) same as
         // manual, so the chain-of-thought/sources panel still renders after the turn completes.
         usedSearch: Boolean(live?.cites?.length),
+        usedCanvas: live?.canvasOn,
       });
       clearLive();
       busyRef.current = false;

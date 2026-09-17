@@ -11,6 +11,7 @@ export type LiveSnapshot = {
   cites: Citation[];
   agents: AgentStatus[];
   error?: string;
+  canvasOn: boolean;
 };
 
 type Draft = LiveSnapshot;
@@ -30,6 +31,7 @@ function emit() {
         cites: draft.cites.slice(),
         agents: draft.agents.slice(),
         error: draft.error,
+        canvasOn: draft.canvasOn,
       }
     : null;
   listeners.forEach((l) => l());
@@ -39,6 +41,7 @@ export function startLive(
   chatId: string,
   assistantId: string,
   status: AssistantStatus,
+  canvasOn = false,
 ) {
   draft = {
     chatId,
@@ -48,7 +51,20 @@ export function startLive(
     status,
     cites: [],
     agents: [],
+    canvasOn,
   };
+  emit();
+}
+
+/**
+ * Marks the in-flight message as canvas-driven once Canvas auto-opens mid-stream (see
+ * maybeAutoOpenCanvas in routes/index.tsx) — startLive only knows the toggle state at send time,
+ * so without this, a message that earns Canvas later (an html/react/runnable artifact appearing)
+ * never gets usedCanvas set, and the chain-of-thought panel's canvas step log never shows for it.
+ */
+export function markLiveCanvasOn() {
+  if (!draft || draft.canvasOn) return;
+  draft.canvasOn = true;
   emit();
 }
 
@@ -128,6 +144,7 @@ export function overlayLive(
       // authoritative that search happened for this message, regardless of the toggle state at
       // send time, so the chain-of-thought panel/sources still render for it.
       usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
+      usedCanvas: m.usedCanvas || live.canvasOn,
     };
   });
   return hit ? next : messages;
