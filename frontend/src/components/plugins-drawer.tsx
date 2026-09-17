@@ -10,10 +10,11 @@ import { cn } from "@/lib/utils";
 
 type ConnectorAccount = {
   id: string;
-  provider: "github";
+  provider: "github" | "google";
   accountLogin: string | null;
   accountName: string | null;
   connectedAt: string;
+  scopes?: string[];
 };
 
 export function PluginsDrawer() {
@@ -32,6 +33,7 @@ export function PluginsDrawer() {
   const [active, setActive] = useState<PluginItem | null>(null);
   const [accounts, setAccounts] = useState<ConnectorAccount[]>([]);
   const [githubConfigured, setGithubConfigured] = useState(false);
+  const [googleConfigured, setGoogleConfigured] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -43,6 +45,8 @@ export function PluginsDrawer() {
   };
 
   const githubAccount = accounts.find((account) => account.provider === "github");
+  const googleAccount = accounts.find((account) => account.provider === "google");
+  const googlePluginIds = new Set(["calendar", "gmail", "drive"]);
 
   function refreshConnectors() {
     if (!signedIn) {
@@ -51,11 +55,12 @@ export function PluginsDrawer() {
     }
     Promise.all([
       api.get<{ accounts: ConnectorAccount[] }>("/connectors"),
-      api.get<{ connectors: { github: { configured: boolean } } }>("/connectors/config"),
+      api.get<{ connectors: { github: { configured: boolean }; google: { configured: boolean } } }>("/connectors/config"),
     ])
       .then(([accountRes, configRes]) => {
         setAccounts(accountRes.accounts);
         setGithubConfigured(configRes.connectors.github.configured);
+        setGoogleConfigured(configRes.connectors.google.configured);
       })
       .catch(() => {
         setAccounts([]);
@@ -76,6 +81,18 @@ export function PluginsDrawer() {
     }
   }
 
+  async function connectGoogle() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await api.get<{ url: string }>("/connectors/google/start?returnTo=" + encodeURIComponent("/?dialog=plugins"));
+      window.location.assign(res.url);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't start Google connect");
+      setBusy(false);
+    }
+  }
+
   async function disconnectGitHub() {
     setBusy(true);
     setNotice(null);
@@ -85,6 +102,20 @@ export function PluginsDrawer() {
       setNotice("GitHub disconnected.");
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Couldn't disconnect GitHub");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnectGoogle() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await api.delete("/connectors/google");
+      setAccounts((current) => current.filter((account) => account.provider !== "google"));
+      setNotice("Google connectors disconnected.");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't disconnect Google");
     } finally {
       setBusy(false);
     }
@@ -205,11 +236,35 @@ export function PluginsDrawer() {
                         </button>
                       </li>
                     )}
+                    {googleAccount && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => setActive(FEATURED_PLUGINS.find((p) => p.id === "calendar") ?? null)}
+                          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
+                        >
+                          <span className="grid size-9 place-items-center rounded-lg bg-chip">
+                            <PluginLogo id="drive" className="size-4.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">Google</span>
+                            <span className="block truncate text-xs text-muted">
+                              {googleAccount.accountLogin ?? "connected"} · Calendar, Gmail, Drive
+                            </span>
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-0.5 text-xs">
+                            <Check className="size-3" /> On
+                          </span>
+                        </button>
+                      </li>
+                    )}
                   </ul>
                   <p className="mb-3 text-sm font-semibold">Featured</p>
                   <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {featured.map((p) => {
-                      const connected = p.id === "github" && Boolean(githubAccount);
+                      const connected =
+                        (p.id === "github" && Boolean(githubAccount)) ||
+                        (googlePluginIds.has(p.id) && Boolean(googleAccount));
                       return (
                         <li key={p.id}>
                           <button
@@ -292,8 +347,44 @@ export function PluginsDrawer() {
                       </>
                     )}
                   </div>
+                ) : googlePluginIds.has(active.id) ? (
+                  <div className="mt-3 space-y-3">
+                    {googleAccount ? (
+                      <>
+                        <p>
+                          Google is connected as{" "}
+                          <span className="text-foreground">{googleAccount.accountLogin}</span>. Calendar,
+                          Gmail, and Drive share this connection.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void disconnectGoogle()}
+                          className="h-9 rounded-full border border-border px-3 text-sm text-foreground disabled:opacity-50"
+                        >
+                          Disconnect Google
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          {googleConfigured
+                            ? "Connect Google once to enable Calendar, Gmail, and Drive read access."
+                            : "Google OAuth keys are not configured on this environment yet."}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={busy || !googleConfigured || !signedIn}
+                          onClick={() => void connectGoogle()}
+                          className="h-9 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                        >
+                          {signedIn ? "Connect Google" : "Sign in to connect"}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 ) : (
-                  <p className="mt-3">This connector isn’t live yet. GitHub works when OAuth keys are configured.</p>
+                  <p className="mt-3">This connector isn’t live yet. GitHub and Google work when OAuth keys are configured.</p>
                 )}
               </div>
             </aside>

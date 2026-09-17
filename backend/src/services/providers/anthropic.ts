@@ -66,7 +66,7 @@ export const anthropicAdapter: ProviderAdapter = {
     }
   },
 
-  async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
+  async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
     const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
@@ -92,6 +92,17 @@ export const anthropicAdapter: ProviderAdapter = {
 
     let full = "";
     await readSseStream(res.body, (data) => {
+      if (data.type === "message_delta") {
+        const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+        if (usage && onUsage) {
+          onUsage({
+            promptTokens: Number(usage.input_tokens ?? 0),
+            completionTokens: Number(usage.output_tokens ?? 0),
+            totalTokens: Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0),
+          });
+        }
+        return;
+      }
       if (data.type !== "content_block_delta") return;
       const delta = data.delta as { type?: string; text?: string } | undefined;
       if (delta?.type === "text_delta" && delta.text) {

@@ -4,7 +4,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import {
   buildGitHubAuthorizeUrl,
+  buildGoogleAuthorizeUrl,
   completeGitHubOAuth,
+  completeGoogleOAuth,
   connectorConfig,
   disconnectConnector,
   listConnectorAccounts,
@@ -41,6 +43,15 @@ connectorsRouter.get(
 );
 
 connectorsRouter.get(
+  "/google/start",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : null;
+    res.json({ url: buildGoogleAuthorizeUrl(req.user!.id, returnTo) });
+  }),
+);
+
+connectorsRouter.get(
   "/github/callback",
   asyncHandler(async (req, res) => {
     const code = typeof req.query.code === "string" ? req.query.code : "";
@@ -57,11 +68,28 @@ connectorsRouter.get(
   }),
 );
 
+connectorsRouter.get(
+  "/google/callback",
+  asyncHandler(async (req, res) => {
+    const code = typeof req.query.code === "string" ? req.query.code : "";
+    const state = typeof req.query.state === "string" ? req.query.state : "";
+    if (!code || !state) throw new HttpError(400, "Missing Google OAuth code or state");
+
+    const { userId, returnTo } = parseOAuthState(state);
+    await completeGoogleOAuth(userId, code);
+
+    const target = new URL(returnTo, env.publicAppUrl);
+    target.searchParams.set("connector", "google");
+    target.searchParams.set("status", "connected");
+    res.redirect(target.toString());
+  }),
+);
+
 connectorsRouter.delete(
   "/:provider",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const provider = z.enum(["github"]).parse(req.params.provider);
+    const provider = z.enum(["github", "google"]).parse(req.params.provider);
     await disconnectConnector(req.user!.id, provider);
     res.status(204).send();
   }),

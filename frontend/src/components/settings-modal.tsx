@@ -606,6 +606,7 @@ type UsageSummary = {
     voiceSeconds: number;
     sandboxRuns: number;
     attachmentUploads: number;
+    tokens: number;
     estimatedCostCents: number;
   };
 };
@@ -638,6 +639,7 @@ function UsagePane() {
         ["Voice seconds", summary.totals.voiceSeconds],
         ["Sandbox runs", summary.totals.sandboxRuns],
         ["Attachments", summary.totals.attachmentUploads],
+        ["Tokens", summary.totals.tokens],
       ]
     : [];
 
@@ -646,7 +648,9 @@ function UsagePane() {
       <h2 className="mb-1 text-lg font-semibold">Usage</h2>
       <p className="mb-4 text-sm text-muted">
         {summary
-          ? `Current period started ${new Date(summary.periodStart).toLocaleDateString()}.`
+          ? `Current period started ${new Date(summary.periodStart).toLocaleDateString()}. Est. cost $${(
+              summary.totals.estimatedCostCents / 100
+            ).toFixed(2)}.`
           : "Loading current period usage..."}
       </p>
       {error && <p className="mb-3 text-sm text-danger">{error}</p>}
@@ -677,6 +681,7 @@ function TeamPane() {
   >([]);
   const [name, setName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteAcceptToken, setInviteAcceptToken] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [budget, setBudget] = useState("0");
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -765,6 +770,21 @@ function TeamPane() {
     }
   }
 
+  async function acceptInvite() {
+    if (!inviteAcceptToken.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/organizations/invites/accept", { token: inviteAcceptToken.trim() });
+      setInviteAcceptToken("");
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't accept invite");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <h2 className="mb-1 text-lg font-semibold">Team</h2>
@@ -790,6 +810,22 @@ function TeamPane() {
         >
           {busy ? "Working..." : "Create organization"}
         </button>
+        <div className="mt-1 flex gap-2">
+          <input
+            value={inviteAcceptToken}
+            onChange={(e) => setInviteAcceptToken(e.target.value)}
+            placeholder="Accept invite token"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
+          />
+          <button
+            type="button"
+            disabled={busy || !inviteAcceptToken.trim()}
+            onClick={() => void acceptInvite()}
+            className="h-9 rounded-full border border-border px-3 text-sm disabled:opacity-50"
+          >
+            Join
+          </button>
+        </div>
       </div>
       {organizations.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">

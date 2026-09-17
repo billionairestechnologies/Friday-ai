@@ -11,7 +11,12 @@ import {
 } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
-import { recordUsageEvent } from "../usageService.js";
+import { recordTokenUsage, recordUsageEvent } from "../usageService.js";
+import {
+  emptyTokenUsage,
+  estimateTokenUsageFromText,
+  type TokenUsage,
+} from "../tokenUsage.js";
 import { detectNeedsLiveSearch } from "./liveSearchIntent.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
@@ -239,6 +244,8 @@ export async function streamMessage(
   let full = "";
   let thinking = "";
   let lastError: string | undefined;
+  let tokenUsage: TokenUsage = emptyTokenUsage();
+  let sawProviderUsage = false;
 
   for (const candidate of candidates) {
     const adapter = getProviderAdapter(candidate.slug);
@@ -256,10 +263,14 @@ export async function streamMessage(
             onEvent({ t: "text", c: delta });
           },
           signal,
-          (think) => {
+          (thinkDelta) => {
             started = true;
-            thinking += think;
-            onEvent({ t: "think", c: think });
+            thinking += thinkDelta;
+            onEvent({ t: "think", c: thinkDelta });
+          },
+          (usage) => {
+            tokenUsage = usage;
+            sawProviderUsage = true;
           },
         );
       } else {
@@ -283,6 +294,16 @@ export async function streamMessage(
     onEvent({ t: "done" });
     return;
   }
+
+  if (!sawProviderUsage || tokenUsage.totalTokens <= 0) {
+    const promptChars = history.reduce((sum, message) => sum + message.content.length, 0);
+    tokenUsage = estimateTokenUsageFromText(promptChars, full.length + thinking.length);
+  }
+
+  void recordTokenUsage(userId, usedCandidate.slug, usedCandidate.modelId, tokenUsage, {
+    conversationId,
+    mode,
+  });
 
   const label = mode === "auto" ? `Auto → ${usedCandidate.displayName}` : usedCandidate.displayName;
   await insertAssistantMessage(conversationId, full, label, {

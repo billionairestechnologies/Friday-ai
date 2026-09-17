@@ -185,6 +185,43 @@ export async function inviteOrganizationMember(
   };
 }
 
+export async function acceptOrganizationInvite(userId: string, inviteToken: string) {
+  const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
+  const { data: invite, error } = await supabaseAdmin
+    .from("organization_invites")
+    .select("id, organization_id, email, role, expires_at, accepted_at")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!invite) throw new HttpError(404, "Invite not found");
+  if (invite.accepted_at) throw new HttpError(409, "Invite already accepted");
+  if (new Date(invite.expires_at as string).getTime() < Date.now()) {
+    throw new HttpError(410, "Invite expired");
+  }
+
+  const { error: membershipError } = await supabaseAdmin.from("organization_memberships").upsert(
+    {
+      organization_id: invite.organization_id,
+      user_id: userId,
+      role: invite.role === "admin" ? "admin" : "member",
+    },
+    { onConflict: "organization_id,user_id" },
+  );
+  if (membershipError) throw new HttpError(500, membershipError.message);
+
+  const { error: acceptError } = await supabaseAdmin
+    .from("organization_invites")
+    .update({ accepted_at: new Date().toISOString() })
+    .eq("id", invite.id);
+  if (acceptError) throw new HttpError(500, acceptError.message);
+
+  await recordAdminAuditLog(userId, "organization.invite_accept", "organization", invite.organization_id as string, {
+    inviteId: invite.id,
+  });
+
+  return { organizationId: invite.organization_id as string, role: invite.role as string };
+}
+
 export async function listOrganizationMembers(userId: string, organizationId: string) {
   await requireOrgRole(userId, organizationId, ["owner", "admin", "member"]);
   const { data, error } = await supabaseAdmin

@@ -1,28 +1,56 @@
 import { supabaseAdmin } from "../config/supabase.js";
 import { logger } from "../utils/logger.js";
+import { estimateCostCents, type TokenUsage } from "./tokenUsage.js";
 
 export type UsageEventType =
   | "chat_message"
   | "web_search"
   | "voice_second"
   | "sandbox_run"
-  | "attachment_upload";
+  | "attachment_upload"
+  | "token_usage";
 
 export async function recordUsageEvent(
   userId: string,
   eventType: UsageEventType,
   quantity = 1,
   metadata: Record<string, unknown> = {},
+  estimatedCostCents = 0,
 ) {
   const { error } = await supabaseAdmin.from("usage_events").insert({
     user_id: userId,
     event_type: eventType,
     quantity,
+    estimated_cost_cents: estimatedCostCents,
     metadata,
   });
   if (error) {
     logger.warn("usage_event_failed", { userId, eventType, error: error.message });
   }
+}
+
+export async function recordTokenUsage(
+  userId: string,
+  providerSlug: string,
+  modelId: string,
+  usage: TokenUsage,
+  metadata: Record<string, unknown> = {},
+) {
+  const estimatedCostCents = estimateCostCents(providerSlug, usage);
+  await recordUsageEvent(
+    userId,
+    "token_usage",
+    usage.totalTokens,
+    {
+      providerSlug,
+      modelId,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      estimated: Boolean(usage.estimated),
+      ...metadata,
+    },
+    estimatedCostCents,
+  );
 }
 
 export async function usageSummary(userId: string) {
@@ -44,6 +72,7 @@ export async function usageSummary(userId: string) {
     voiceSeconds: 0,
     sandboxRuns: 0,
     attachmentUploads: 0,
+    tokens: 0,
     estimatedCostCents: 0,
   };
 
@@ -55,6 +84,7 @@ export async function usageSummary(userId: string) {
     else if (row.event_type === "voice_second") totals.voiceSeconds += quantity;
     else if (row.event_type === "sandbox_run") totals.sandboxRuns += quantity;
     else if (row.event_type === "attachment_upload") totals.attachmentUploads += quantity;
+    else if (row.event_type === "token_usage") totals.tokens += quantity;
   }
 
   return {

@@ -69,7 +69,7 @@ export const geminiAdapter: ProviderAdapter = {
     }
   },
 
-  async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
+  async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
     const { system, conversation } = splitSystemPrompt(messages);
     const contents = toGeminiContents(conversation);
 
@@ -91,7 +91,25 @@ export const geminiAdapter: ProviderAdapter = {
 
     let full = "";
     await readSseStream(res.body, (data) => {
-      const body = data as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const body = data as {
+        candidates?: { content?: { parts?: { text?: string }[] } }[];
+        usageMetadata?: {
+          promptTokenCount?: number;
+          candidatesTokenCount?: number;
+          totalTokenCount?: number;
+        };
+      };
+      if (body.usageMetadata && onUsage) {
+        onUsage({
+          promptTokens: Number(body.usageMetadata.promptTokenCount ?? 0),
+          completionTokens: Number(body.usageMetadata.candidatesTokenCount ?? 0),
+          totalTokens: Number(
+            body.usageMetadata.totalTokenCount ??
+              Number(body.usageMetadata.promptTokenCount ?? 0) +
+                Number(body.usageMetadata.candidatesTokenCount ?? 0),
+          ),
+        });
+      }
       const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
       if (text) {
         full += text;

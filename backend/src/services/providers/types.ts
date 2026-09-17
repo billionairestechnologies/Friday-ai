@@ -62,6 +62,7 @@ export interface ProviderAdapter {
     onDelta: (text: string) => void,
     signal?: AbortSignal,
     onThink?: (text: string) => void,
+    onUsage?: (usage: import("../tokenUsage.js").TokenUsage) => void,
   ): Promise<string>;
 }
 

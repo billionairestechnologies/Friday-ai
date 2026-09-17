@@ -19,6 +19,7 @@ test("OAuth state round-trips user id and return path", async () => {
   assert.deepEqual(parseOAuthState(state), {
     userId: "user-1",
     returnTo: "/?dialog=plugins",
+    provider: undefined,
   });
 });
 

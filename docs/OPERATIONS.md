@@ -90,6 +90,7 @@ For failed deploys:
   per-process and fall back automatically if Redis is unreachable.
 - Attachments prefer Supabase Storage (`message-attachments` bucket) when
   `ATTACHMENT_OBJECT_STORAGE=true`. Inline `data_url` remains as a fallback for failed uploads.
-- GitHub is the first live OAuth connector. Other featured connectors still need provider apps.
-- Provider cost telemetry is not yet tied to token usage from every model.
-- SSO is entry-point ready via `SSO_ENABLED` / `SSO_ENTRY_URL`; configure the IdP in Supabase Auth.
+- Provider cost telemetry records `token_usage` events from stream usage when available, with a
+  conservative character-based estimate fallback. Figures are for budgets, not invoices.
+- GitHub and Google (Calendar/Gmail/Drive) OAuth connectors are live when client credentials are set.
+- SSO is entry-point ready via `SSO_ENABLED` / `SSO_ENTRY_URL` (and `/api/auth/sso`); configure the IdP in Supabase Auth.

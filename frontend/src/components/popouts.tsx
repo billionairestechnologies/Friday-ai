@@ -88,7 +88,7 @@ export function LoginPopout() {
 
   useEffect(() => {
     api
-      .get<{ enabled: boolean; entryUrl: string | null; providerLabel: string }>("/organizations/sso")
+      .get<{ enabled: boolean; entryUrl: string | null; providerLabel: string }>("/auth/sso")
       .then(setSso)
       .catch(() => setSso(null));
   }, []);

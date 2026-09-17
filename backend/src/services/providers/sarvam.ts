@@ -51,15 +51,16 @@ export const sarvamAdapter: ProviderAdapter = {
     }
   },
 
-  async chatStream(apiKey, model, messages, onDelta, signal, onThink) {
+  async chatStream(apiKey, model, messages, onDelta, signal, onThink, onUsage) {
     // Same generous budget as chat() — sarvam-105b burns tokens on a hidden reasoning trace first.
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/v1/chat/completions`,
       { "api-subscription-key": apiKey },
-      { model, messages: mergeSystemMessages(messages), max_tokens: 8192 },
+      { model, messages: mergeSystemMessages(messages), max_tokens: 8192, stream_options: null },
       onDelta,
       signal,
       onThink,
+      onUsage,
     );
   },
 };

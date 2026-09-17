@@ -1,3 +1,5 @@
+import type { TokenUsage } from "../tokenUsage.js";
+
 /**
  * Reads an SSE (`data: {...}\n\n`) response body, parsing each event's JSON payload and handing
  * it to `onEvent`. Stops on a `[DONE]` sentinel or stream end. Shared by every SSE-based provider
@@ -35,6 +37,11 @@ export async function readSseStream(
 
 type OpenAiCompatibleChunk = {
   choices?: { delta?: { content?: string | null; reasoning_content?: string | null } }[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 };
 
 /**
@@ -54,11 +61,20 @@ export async function streamOpenAiCompatibleChat(
   onDelta: (text: string) => void,
   signal?: AbortSignal,
   onThink?: (text: string) => void,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<string> {
   const res = await fetch(url, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, stream: true }),
+    body: JSON.stringify((() => {
+      const payload: Record<string, unknown> = { ...body, stream: true };
+      if (!("stream_options" in body)) {
+        payload.stream_options = { include_usage: true };
+      } else if (body.stream_options == null) {
+        delete payload.stream_options;
+      }
+      return payload;
+    })()),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -69,6 +85,16 @@ export async function streamOpenAiCompatibleChat(
   let reasoningFull = "";
   await readSseStream(res.body, (data) => {
     const chunk = data as OpenAiCompatibleChunk;
+    if (chunk.usage && onUsage) {
+      onUsage({
+        promptTokens: Number(chunk.usage.prompt_tokens ?? 0),
+        completionTokens: Number(chunk.usage.completion_tokens ?? 0),
+        totalTokens: Number(
+          chunk.usage.total_tokens ??
+            Number(chunk.usage.prompt_tokens ?? 0) + Number(chunk.usage.completion_tokens ?? 0),
+        ),
+      });
+    }
     const delta = chunk.choices?.[0]?.delta;
     if (delta?.content) {
       full += delta.content;

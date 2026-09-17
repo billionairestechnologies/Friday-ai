@@ -47,7 +47,7 @@ export const openaiAdapter: ProviderAdapter = {
     }
   },
 
-  async chatStream(apiKey, model, messages, onDelta, signal, onThink) {
+  async chatStream(apiKey, model, messages, onDelta, signal, onThink, onUsage) {
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/chat/completions`,
       { Authorization: `Bearer ${apiKey}` },
@@ -55,6 +55,7 @@ export const openaiAdapter: ProviderAdapter = {
       onDelta,
       signal,
       onThink,
+      onUsage,
     );
   },
 };

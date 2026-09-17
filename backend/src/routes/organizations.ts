@@ -5,6 +5,7 @@ import { asyncHandler } from "../middleware/errorHandler.js";
 import {
   createOrganization,
   inviteOrganizationMember,
+  acceptOrganizationInvite,
   listOrganizationMembers,
   listOrganizationsForUser,
   updateOrganizationBudget,
@@ -42,6 +43,18 @@ organizationsRouter.post(
   asyncHandler(async (req, res) => {
     const { name } = createOrgSchema.parse(req.body);
     res.status(201).json({ organization: await createOrganization(req.user!.id, name) });
+  }),
+);
+
+const acceptInviteSchema = z.object({
+  token: z.string().trim().min(16).max(200),
+});
+
+organizationsRouter.post(
+  "/invites/accept",
+  asyncHandler(async (req, res) => {
+    const { token } = acceptInviteSchema.parse(req.body);
+    res.json({ membership: await acceptOrganizationInvite(req.user!.id, token) });
   }),
 );
 

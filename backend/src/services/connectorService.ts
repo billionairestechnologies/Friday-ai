@@ -5,7 +5,7 @@ import { HttpError } from "../middleware/errorHandler.js";
 import { decryptSecret, encryptSecret } from "../utils/crypto.js";
 import { recordAdminAuditLog } from "./usageService.js";
 
-export type ConnectorProvider = "github";
+export type ConnectorProvider = "github" | "google";
 
 export type ConnectorAccountPublic = {
   id: string;
@@ -17,9 +17,24 @@ export type ConnectorAccountPublic = {
   configured: boolean;
 };
 
+const GOOGLE_CONNECTOR_SCOPES = [
+  "openid",
+  "email",
+  "profile",
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/drive.readonly",
+];
+
 function requireGitHubOAuth() {
   if (!env.githubClientId || !env.githubClientSecret) {
     throw new HttpError(503, "GitHub connector is not configured yet");
+  }
+}
+
+function requireGoogleOAuth() {
+  if (!env.googleClientId || !env.googleClientSecret) {
+    throw new HttpError(503, "Google connector is not configured yet");
   }
 }
 
@@ -28,6 +43,11 @@ export function connectorConfig() {
     github: {
       configured: Boolean(env.githubClientId && env.githubClientSecret),
       scopes: ["read:user", "repo"],
+    },
+    google: {
+      configured: Boolean(env.googleClientId && env.googleClientSecret),
+      scopes: GOOGLE_CONNECTOR_SCOPES,
+      plugins: ["calendar", "gmail", "drive"],
     },
   };
 }
@@ -56,6 +76,7 @@ export function buildGitHubAuthorizeUrl(userId: string, returnTo?: string | null
   const statePayload = Buffer.from(
     JSON.stringify({
       userId,
+      provider: "github",
       nonce: randomBytes(16).toString("hex"),
       returnTo: returnTo || "/?dialog=plugins",
     }),
@@ -72,11 +93,37 @@ export function buildGitHubAuthorizeUrl(userId: string, returnTo?: string | null
   return `https://github.com/login/oauth/authorize?${params.toString()}`;
 }
 
-export function parseOAuthState(state: string): { userId: string; returnTo: string } {
+export function buildGoogleAuthorizeUrl(userId: string, returnTo?: string | null) {
+  requireGoogleOAuth();
+  const statePayload = Buffer.from(
+    JSON.stringify({
+      userId,
+      provider: "google",
+      nonce: randomBytes(16).toString("hex"),
+      returnTo: returnTo || "/?dialog=plugins",
+    }),
+    "utf8",
+  ).toString("base64url");
+
+  const params = new URLSearchParams({
+    client_id: env.googleClientId,
+    redirect_uri: env.googleConnectorRedirectUri,
+    response_type: "code",
+    scope: GOOGLE_CONNECTOR_SCOPES.join(" "),
+    access_type: "offline",
+    include_granted_scopes: "true",
+    prompt: "consent",
+    state: statePayload,
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+export function parseOAuthState(state: string): { userId: string; returnTo: string; provider?: ConnectorProvider } {
   try {
     const parsed = JSON.parse(Buffer.from(state, "base64url").toString("utf8")) as {
       userId?: unknown;
       returnTo?: unknown;
+      provider?: unknown;
     };
     if (typeof parsed.userId !== "string" || !parsed.userId) {
       throw new Error("missing user");
@@ -84,6 +131,10 @@ export function parseOAuthState(state: string): { userId: string; returnTo: stri
     return {
       userId: parsed.userId,
       returnTo: typeof parsed.returnTo === "string" ? parsed.returnTo : "/?dialog=plugins",
+      provider:
+        parsed.provider === "github" || parsed.provider === "google"
+          ? parsed.provider
+          : undefined,
     };
   } catch {
     throw new HttpError(400, "Invalid OAuth state");
@@ -167,6 +218,86 @@ export async function completeGitHubOAuth(userId: string, code: string) {
   return {
     id: data.id as string,
     provider: "github" as const,
+    accountLogin: (data.account_login as string | null) ?? null,
+    accountName: (data.account_name as string | null) ?? null,
+    scopes: (data.scopes as string[] | null) ?? [],
+    connectedAt: data.connected_at as string,
+    configured: true,
+  };
+}
+
+export async function completeGoogleOAuth(userId: string, code: string) {
+  requireGoogleOAuth();
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: env.googleClientId,
+      client_secret: env.googleClientSecret,
+      redirect_uri: env.googleConnectorRedirectUri,
+      grant_type: "authorization_code",
+    }),
+  });
+  const tokenBody = (await tokenResponse.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+    scope?: string;
+    error?: string;
+    error_description?: string;
+  };
+  if (!tokenResponse.ok || !tokenBody.access_token) {
+    throw new HttpError(502, tokenBody.error_description || tokenBody.error || "Google token exchange failed");
+  }
+
+  const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${tokenBody.access_token}` },
+  });
+  const profile = (await profileResponse.json()) as {
+    id?: string;
+    email?: string;
+    name?: string;
+    error?: { message?: string };
+  };
+  if (!profileResponse.ok || !profile.id) {
+    throw new HttpError(502, profile.error?.message || "Failed to load Google profile");
+  }
+
+  const scopes = (tokenBody.scope ?? GOOGLE_CONNECTOR_SCOPES.join(" "))
+    .split(/\s+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+
+  const { data, error } = await supabaseAdmin
+    .from("connector_accounts")
+    .upsert(
+      {
+        user_id: userId,
+        provider: "google",
+        external_account_id: profile.id,
+        account_login: profile.email ?? profile.id,
+        account_name: profile.name ?? profile.email ?? profile.id,
+        access_token_encrypted: encryptSecret(tokenBody.access_token),
+        refresh_token_encrypted: tokenBody.refresh_token ? encryptSecret(tokenBody.refresh_token) : null,
+        scopes,
+        metadata: { google_id: profile.id, email: profile.email ?? null },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,provider" },
+    )
+    .select("id, provider, account_login, account_name, scopes, connected_at")
+    .single();
+  if (error || !data) throw new HttpError(500, error?.message ?? "Failed to save connector");
+
+  await recordAdminAuditLog(userId, "connector.connect", "connector", data.id as string, {
+    provider: "google",
+    email: profile.email ?? null,
+  });
+
+  return {
+    id: data.id as string,
+    provider: "google" as const,
     accountLogin: (data.account_login as string | null) ?? null,
     accountName: (data.account_name as string | null) ?? null,
     scopes: (data.scopes as string[] | null) ?? [],

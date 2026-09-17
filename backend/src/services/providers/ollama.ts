@@ -44,7 +44,7 @@ export const ollamaAdapter: ProviderAdapter = {
     return body.message?.content ?? "";
   },
 
-  async chatStream(apiKey, model, messages, onDelta, signal): Promise<string> {
+  async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
     const { baseUrl, headers } = resolveTarget(apiKey);
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
@@ -61,6 +61,8 @@ export const ollamaAdapter: ProviderAdapter = {
     const decoder = new TextDecoder();
     let buf = "";
     let full = "";
+    let promptEvalCount = 0;
+    let evalCount = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -70,16 +72,30 @@ export const ollamaAdapter: ProviderAdapter = {
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
-          const chunk = JSON.parse(line) as { message?: { content?: string }; done?: boolean };
+          const chunk = JSON.parse(line) as {
+            message?: { content?: string };
+            done?: boolean;
+            prompt_eval_count?: number;
+            eval_count?: number;
+          };
           const text = chunk.message?.content;
           if (text) {
             full += text;
             onDelta(text);
           }
+          if (typeof chunk.prompt_eval_count === "number") promptEvalCount = chunk.prompt_eval_count;
+          if (typeof chunk.eval_count === "number") evalCount = chunk.eval_count;
         } catch {
           /* skip malformed */
         }
       }
+    }
+    if (onUsage && (promptEvalCount > 0 || evalCount > 0)) {
+      onUsage({
+        promptTokens: promptEvalCount,
+        completionTokens: evalCount,
+        totalTokens: promptEvalCount + evalCount,
+      });
     }
     return full;
   },
