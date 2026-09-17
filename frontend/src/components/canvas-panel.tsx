@@ -323,7 +323,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout" initial={false}>
           {building && streamingCode ? (
             <motion.div
               key="streaming-code"
@@ -336,12 +336,22 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               <LiveCode lang={streamingCode.lang} body={streamingCode.body} live />
             </motion.div>
           ) : building && !artifact ? (
-            <CanvasBuildSkeleton />
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="h-full"
+            >
+              <CanvasBuildSkeleton />
+            </motion.div>
           ) : artifact?.kind === "html" && view === "code" ? (
             <motion.div
               key="html-code"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="h-full"
             >
@@ -352,6 +362,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="html"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.22 }}
               title="Canvas"
               sandbox="allow-scripts"
@@ -363,6 +374,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="react-code"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="h-full"
             >
@@ -373,6 +385,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="react"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.22 }}
               title="Canvas"
               sandbox="allow-scripts"
@@ -384,6 +397,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="runnable"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="h-full"
             >
@@ -394,6 +408,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="code"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap"
             >
@@ -404,6 +419,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="markdown"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="p-5"
             >
@@ -414,6 +430,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               className="flex h-full items-center justify-center px-6 text-center text-sm text-subtle"
             >
