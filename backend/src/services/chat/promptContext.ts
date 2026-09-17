@@ -26,6 +26,18 @@ const HONESTY_SYSTEM_PROMPT =
   "agreeable. When something is genuinely reasonable or achievable, be encouraging and helpful about it — " +
   "but stay honest and grounded rather than telling the user what they want to hear.";
 
+// Confirmed live in production (2026-09-17): asked to "run the code you made" in a follow-up
+// message, the model claimed "my tool calls aren't going through" — there is no code-execution
+// tool wired to the chat API at all (Canvas's Run button calls E2B directly from the browser, the
+// model never sees the result), so this was pure confabulation dressed up as a system error.
+const EXECUTION_HONESTY_SYSTEM_PROMPT =
+  "You cannot execute code, run tools, or browse anything outside of what a system message " +
+  "explicitly hands you for this turn — there is no code-execution tool wired to you, so never " +
+  "claim a 'tool call' failed or 'didn't go through'; that describes a mechanism you don't have. " +
+  "If asked to run/execute/test code you wrote, say plainly that you can't execute it yourself. " +
+  "For python/javascript code in Canvas specifically, tell the user to click the Run button in " +
+  "the Canvas panel to execute it themselves and see the real output — do not invent output.";
+
 // "Think" has no per-provider API today, so it's implemented as a universal system-prompt nudge
 // that works the same across every adapter rather than a provider-specific reasoning param.
 const THINK_SYSTEM_PROMPT =
@@ -37,7 +49,7 @@ const THINK_SYSTEM_PROMPT =
 // text. This is what actually makes the toggle do something: it must produce a single fenced code
 // block that the client's extractArtifact() can find and render live in the sandboxed iframe.
 const CANVAS_SYSTEM_PROMPT =
-  "Canvas mode is ON: the user is looking at a live preview panel that renders your reply, not just this chat, so a conversational answer is not useful right now — they want a working result. Respond with ONE fenced code block containing complete, self-contained, runnable code: use ```html for a full standalone HTML page (inline <style>/<script>, no external files) for UI/visual/design requests, ```jsx for a single React component (a default-exported function component using only React and its own hooks — no imports beyond react), or ```python for a script that actually gets executed in a real Python sandbox and shows its printed output — use that for anything computational (data processing, algorithms, math) rather than a UI. A single short sentence before the code fence is fine, but do not explain what you would build instead of building it, and do not split the result across multiple code blocks.";
+  "Canvas mode is ON: the user is looking at a live preview panel that renders your reply, not just this chat, so a conversational answer is not useful right now — they want a working result. Respond with ONE fenced code block containing complete, self-contained, runnable code: use ```html for a full standalone HTML page (inline <style>/<script>, no external files) for UI/visual/design requests, ```jsx for a single React component (a default-exported function component using only React and its own hooks — no imports beyond react), or ```python for a script the user can run themselves with one click via Canvas's own Run button (backed by a real sandbox) — use that for anything computational (data processing, algorithms, math) rather than a UI. You will NOT see that output yourself; it displays directly to the user in Canvas. A single short sentence before the code fence is fine, but do not explain what you would build instead of building it, do not claim you already ran it or describe output you haven't seen, and do not split the result across multiple code blocks.";
 
 export function searchResultsToSystemMessage(results: WebSearchResult[]): ChatMessage {
   if (results.length === 0) {
@@ -110,6 +122,7 @@ export function withSystemPreamble(
   const preamble: ChatMessage[] = [
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
     { role: "system", content: HONESTY_SYSTEM_PROMPT },
+    { role: "system", content: EXECUTION_HONESTY_SYSTEM_PROMPT },
   ];
   if (webSearch) preamble.push(searchResultsToSystemMessage(searchResults));
   if (behavior.trim()) preamble.push({ role: "system", content: behavior.trim() });

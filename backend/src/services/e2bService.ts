@@ -2,12 +2,28 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { supabaseAdmin } from "../config/supabase.js";
 import { env } from "../config/env.js";
 import { HttpError } from "../middleware/errorHandler.js";
+import { fixCode } from "./chat/codeFix.js";
 
 export type RunLanguage = "python" | "javascript";
 
 export interface RunResult {
   output: string;
   ok: boolean;
+}
+
+export interface RunAttempt {
+  code: string;
+  result: RunResult;
+}
+
+export interface AutoRunResult {
+  ok: boolean;
+  output: string;
+  /** The code that was actually run last — identical to the input unless auto-fix rewrote it. */
+  code: string;
+  /** One entry per attempt, in order, so the UI can show "attempt 1 failed, fixed, attempt 2
+   *  passed" instead of just the final result. Always has at least one entry. */
+  attempts: RunAttempt[];
 }
 
 // One real E2B microVM per user — actual hardware-level isolation between users' code, not
@@ -94,4 +110,40 @@ export async function runCode(userId: string, language: RunLanguage, code: strin
     const message = err instanceof Error ? err.message : "Sandbox run failed";
     return { output: message, ok: false };
   }
+}
+
+// Caps the self-healing loop at 2 fix rounds (3 sandbox runs total) — enough to catch the
+// syntax-error/typo class of bug a model usually introduces, without letting one bad script
+// burn unbounded sandbox time and LLM calls if it's wrong in a way that can't be auto-fixed.
+const MAX_FIX_ATTEMPTS = 2;
+
+/**
+ * Runs code for real, and on failure asks a model to fix it and tries again — up to
+ * MAX_FIX_ATTEMPTS times — instead of just handing the user a stack trace. Stops early if a fix
+ * attempt comes back empty (the model couldn't produce a fix) rather than looping on nothing.
+ */
+export async function runWithAutoFix(
+  userId: string,
+  language: RunLanguage,
+  code: string,
+): Promise<AutoRunResult> {
+  let currentCode = code;
+  const attempts: RunAttempt[] = [];
+
+  for (let i = 0; i <= MAX_FIX_ATTEMPTS; i++) {
+    const result = await runCode(userId, language, currentCode);
+    attempts.push({ code: currentCode, result });
+    if (result.ok || i === MAX_FIX_ATTEMPTS) {
+      return { ok: result.ok, output: result.output, code: currentCode, attempts };
+    }
+    const fixed = await fixCode(language, currentCode, result.output);
+    if (!fixed || fixed === currentCode) {
+      return { ok: false, output: result.output, code: currentCode, attempts };
+    }
+    currentCode = fixed;
+  }
+
+  // Unreachable — the loop above always returns by the time i === MAX_FIX_ATTEMPTS.
+  const last = attempts[attempts.length - 1]!;
+  return { ok: last.result.ok, output: last.result.output, code: currentCode, attempts };
 }

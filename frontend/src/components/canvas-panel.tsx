@@ -15,7 +15,7 @@ import { Markdown } from "@/lib/chat/markdown";
 import { extractArtifact, extractStreamingCodeBody, type Artifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
-import { normalizeRunLanguage, runSandboxCode, type RunResult } from "@/lib/chat/runnable";
+import { normalizeRunLanguage, runSandboxCode, type AutoRunResult } from "@/lib/chat/runnable";
 import { useLiveStream } from "@/lib/chat/live-stream";
 import { useChat } from "@/lib/chat/store";
 
@@ -46,21 +46,16 @@ function filenameFor(kind: string, lang?: string) {
 }
 
 /**
- * Python/JS blocks get a real "Run" button — actual execution in the user's own isolated
- * E2B VM (backend's /api/sandbox/run), not just a static text dump. Runs are opt-in
- * (never automatic) since code execution has real side effects/cost, unlike the html/react
- * previews which just render in a client-side sandboxed iframe.
+ * Python/JS blocks run for real the moment they land — actual execution in the user's own
+ * isolated E2B VM (backend's /api/sandbox/run) — and on failure the backend automatically asks
+ * a model to fix the code and retries a couple of times before giving up (see e2bService's
+ * runWithAutoFix), so a typo in generated code self-heals instead of just handing the user a
+ * stack trace. A manual "Run again" re-triggers the same auto-fix loop for edits/flaky runs.
  */
 function RunnablePane({ artifact }: { artifact: Artifact }) {
-  const [result, setResult] = useState<RunResult | null>(null);
+  const [result, setResult] = useState<AutoRunResult | null>(null);
   const [running, setRunning] = useState(false);
-
-  // A new artifact (different code, or a fresh message) should show a clean slate, not the
-  // previous run's stale output sitting under different code.
-  useEffect(() => {
-    setResult(null);
-    setRunning(false);
-  }, [artifact.body]);
+  const ranForBody = useRef<string | null>(null);
 
   const language = normalizeRunLanguage(artifact.lang);
 
@@ -72,16 +67,37 @@ function RunnablePane({ artifact }: { artifact: Artifact }) {
       const res = await runSandboxCode(language, artifact.body);
       setResult(res);
     } catch (err) {
-      setResult({ ok: false, output: err instanceof Error ? err.message : "Run failed" });
+      setResult({
+        ok: false,
+        output: err instanceof Error ? err.message : "Run failed",
+        code: artifact.body,
+        attempts: [],
+      });
     } finally {
       setRunning(false);
     }
   }
 
+  // Auto-run once per distinct artifact body (a fresh message, or the same one re-streamed) —
+  // not on every re-render, and not again just because the user switched Canvas tabs and back.
+  useEffect(() => {
+    if (ranForBody.current === artifact.body) return;
+    ranForBody.current = artifact.body;
+    void handleRun();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artifact.body]);
+
+  const displayedCode = result?.code ?? artifact.body;
+  const wasFixed = Boolean(result && result.code !== artifact.body);
+  const failedAttempts = result ? result.attempts.filter((a) => !a.result.ok).length : 0;
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <span className="text-xs text-muted">{artifact.lang}</span>
+        <span className="text-xs text-muted">
+          {artifact.lang}
+          {wasFixed && " · auto-fixed"}
+        </span>
         <button
           type="button"
           onClick={() => void handleRun()}
@@ -89,20 +105,26 @@ function RunnablePane({ artifact }: { artifact: Artifact }) {
           className="flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
         >
           {running ? <RefreshCw className="size-3 animate-spin" /> : <Play className="size-3" />}
-          {running ? "Running…" : "Run"}
+          {running ? (failedAttempts ? "Fixing & retrying…" : "Running…") : "Run again"}
         </button>
       </div>
       <pre className="flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap">
-        {artifact.body}
+        {displayedCode}
       </pre>
       {result && (
         <div className="max-h-64 shrink-0 overflow-auto border-t border-border p-4">
+          {failedAttempts > 0 && (
+            <div className="mb-2 text-xs text-muted">
+              {failedAttempts} failed attempt{failedAttempts === 1 ? "" : "s"} auto-fixed before
+              this {result.ok ? "run succeeded" : "final run"}.
+            </div>
+          )}
           <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium">
             {result.ok ? (
               <span className="text-muted">Output</span>
             ) : (
               <span className="flex items-center gap-1 text-red-500">
-                <AlertTriangle className="size-3" /> Error
+                <AlertTriangle className="size-3" /> Error (couldn't auto-fix)
               </span>
             )}
           </div>
