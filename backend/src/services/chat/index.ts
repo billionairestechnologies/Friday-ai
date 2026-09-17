@@ -22,7 +22,7 @@ import {
   withSystemPreamble,
 } from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
-import { getOwnedConversation, insertAssistantMessage } from "./conversations.js";
+import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
 
 export type { StreamEvent, ConversationMode } from "./types.js";
@@ -31,6 +31,7 @@ export {
   updateConversationModel,
   listConversations,
   deleteConversation,
+  deleteAllConversations,
   listMessages,
 } from "./conversations.js";
 
@@ -90,10 +91,7 @@ export async function streamMessage(
   const conversation = await getOwnedConversation(userId, conversationId);
   const mode = conversation.mode as ConversationMode;
 
-  const { error: insertError } = await supabaseAdmin
-    .from("messages")
-    .insert({ conversation_id: conversationId, role: "user", content, input_mode: inputMode });
-  if (insertError) throw new HttpError(500, insertError.message);
+  await insertUserMessage(conversationId, content, inputMode, attachments);
 
   const { data: historyRows, error: historyError } = await supabaseAdmin
     .from("messages")
@@ -160,7 +158,10 @@ export async function streamMessage(
   );
 
   if (mode === "teamup") {
-    await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal);
+    await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal, {
+      think,
+      canvas,
+    });
     return;
   }
 
@@ -211,6 +212,7 @@ export async function streamMessage(
 
   let usedCandidate: ChatCandidate | null = null;
   let full = "";
+  let thinking = "";
   let lastError: string | undefined;
 
   for (const candidate of candidates) {
@@ -231,6 +233,7 @@ export async function streamMessage(
           signal,
           (think) => {
             started = true;
+            thinking += think;
             onEvent({ t: "think", c: think });
           },
         );
@@ -257,7 +260,13 @@ export async function streamMessage(
   }
 
   const label = mode === "auto" ? `Auto → ${usedCandidate.displayName}` : usedCandidate.displayName;
-  await insertAssistantMessage(conversationId, full, label);
+  await insertAssistantMessage(conversationId, full, label, {
+    thinking,
+    citations: searchResults.map((result) => ({ url: result.url, title: result.title })),
+    usedThink: think || Boolean(thinking),
+    usedSearch: searchActuallyRan,
+    usedCanvas: canvas,
+  });
   await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
   onEvent({ t: "done" });
 }

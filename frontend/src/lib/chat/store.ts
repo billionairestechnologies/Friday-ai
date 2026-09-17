@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import { DEFAULT_MODEL_ID } from "./models";
-import type { Attachment, Chat, ChatMessage, Citation } from "./types";
+import type { AgentStatus, Attachment, Chat, ChatMessage, Citation } from "./types";
 import { uid } from "../utils";
 
 const TITLE_FROM = 48;
@@ -20,6 +20,7 @@ export type TurnCommit = {
   citations?: Citation[];
   error?: string;
   modelLabel?: string;
+  agents?: AgentStatus[];
   /** Set true when search auto-triggered server-side for this turn (Search toggle was off but the
    *  model judged it needed live info) — persists the chain-of-thought/sources display past the
    *  end of streaming, when the live-only override in overlayLive() no longer applies. */
@@ -41,6 +42,21 @@ export type ServerMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   model_label?: string | null;
+  thinking?: string | null;
+  citations?: Citation[] | null;
+  agents?: AgentStatus[] | null;
+  used_think?: boolean | null;
+  used_search?: boolean | null;
+  used_canvas?: boolean | null;
+  error?: string | null;
+  message_attachments?: {
+    id: string;
+    name: string;
+    mime: string;
+    size_bytes: number;
+    kind: "image" | "file";
+    data_url: string;
+  }[];
   created_at: string;
 };
 
@@ -309,6 +325,7 @@ export const useChat = create<ChatState>()(
                           citations: data.citations,
                           error: data.error,
                           modelLabel: data.modelLabel,
+                          agents: data.agents,
                           usedSearch: m.usedSearch || data.usedSearch,
                           usedCanvas: m.usedCanvas || data.usedCanvas,
                           streaming: false,
@@ -410,6 +427,21 @@ export const useChat = create<ChatState>()(
                       role: m.role as "user" | "assistant",
                       content: m.content,
                       modelLabel: m.model_label ?? undefined,
+                      thinking: m.thinking ?? undefined,
+                      citations: m.citations ?? undefined,
+                      agents: m.agents ?? undefined,
+                      usedThink: Boolean(m.used_think),
+                      usedSearch: Boolean(m.used_search),
+                      usedCanvas: Boolean(m.used_canvas),
+                      error: m.error ?? undefined,
+                      attachments: m.message_attachments?.map((a) => ({
+                        id: a.id,
+                        name: a.name,
+                        mime: a.mime,
+                        size: a.size_bytes,
+                        kind: a.kind,
+                        dataUrl: a.data_url,
+                      })),
                       createdAt: new Date(m.created_at).getTime(),
                     })),
                 },

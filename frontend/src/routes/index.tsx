@@ -239,7 +239,7 @@ export function Home() {
     ]);
     const sendableAttachments = attachments
       .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf" || OFFICE_MIMES.has(a.mime))
-      .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl }));
+      .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl, name: a.name, size: a.size, kind: a.kind }));
 
     try {
       await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
@@ -270,6 +270,7 @@ export function Home() {
         content: live?.text ?? "",
         thinking: live?.think,
         citations: live?.cites,
+        agents: live?.agents,
         error: live?.error,
         // Citations only ever arrive when a search actually ran — a reliable persisted signal
         // even if status has since moved on to "thinking"/"writing" by the time streaming ends.

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   adminLogin,
+  deleteAccount,
+  exportAccount,
   googleSignIn,
   login,
   logout,
@@ -44,5 +46,7 @@ authRouter.post("/resend-otp", otpLimit, asyncHandler(resendOtp));
 authRouter.post("/refresh", refreshLimit, asyncHandler(refresh));
 authRouter.post("/logout", asyncHandler(logout));
 authRouter.get("/me", requireAuth, asyncHandler(me));
+authRouter.get("/export", requireAuth, asyncHandler(exportAccount));
+authRouter.delete("/account", requireAuth, asyncHandler(deleteAccount));
 authRouter.patch("/profile", requireAuth, asyncHandler(updateProfile));
 authRouter.post("/google", asyncHandler(googleSignIn)); // locked, returns 501 for now

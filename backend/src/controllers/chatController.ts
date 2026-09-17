@@ -2,6 +2,11 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import * as chatService from "../services/chat/index.js";
 
+const pageSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  before: z.string().datetime().optional(),
+});
+
 const createConversationSchema = z
   .object({
     mode: z.enum(["single", "auto", "teamup"]).optional().default("single"),
@@ -42,7 +47,13 @@ export async function updateConversation(req: Request, res: Response) {
 }
 
 export async function listConversations(req: Request, res: Response) {
-  res.json({ conversations: await chatService.listConversations(req.user!.id) });
+  const page = pageSchema.parse(req.query);
+  res.json({ conversations: await chatService.listConversations(req.user!.id, page) });
+}
+
+export async function deleteAllConversations(req: Request, res: Response) {
+  await chatService.deleteAllConversations(req.user!.id);
+  res.status(204).send();
 }
 
 export async function deleteConversation(req: Request, res: Response) {
@@ -51,12 +62,16 @@ export async function deleteConversation(req: Request, res: Response) {
 }
 
 export async function listMessages(req: Request, res: Response) {
-  res.json({ messages: await chatService.listMessages(req.user!.id, req.params.id) });
+  const page = pageSchema.parse(req.query);
+  res.json({ messages: await chatService.listMessages(req.user!.id, req.params.id, page) });
 }
 
 const attachmentSchema = z.object({
   mime: z.string().min(1),
   dataUrl: z.string().min(1),
+  name: z.string().trim().min(1).max(255).optional(),
+  size: z.number().int().min(0).optional(),
+  kind: z.enum(["image", "file"]).optional(),
 });
 
 const sendMessageSchema = z

@@ -20,6 +20,7 @@ import { saveFile } from "@/lib/chat/download";
 import { useChat } from "@/lib/chat/store";
 import { VoicePicker } from "@/components/voice-picker";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 const NAV = [
   {
@@ -384,51 +385,112 @@ function BillingPane() {
 function DataPane() {
   const chats = useChat((s) => s.chats);
   const clearAllChats = useChat((s) => s.clearAllChats);
+  const { user } = useCurrentUserState();
   const [cleared, setCleared] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState<"download" | "clear" | "delete" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const signedIn = Boolean(user && !user.isDevFallback);
+
+  async function downloadChats() {
+    setBusy("download");
+    setError(null);
+    try {
+      const payload = signedIn
+        ? await api.get<unknown>("/auth/export")
+        : chats.map((c) => ({
+            title: c.title,
+            createdAt: c.createdAt,
+            messages: c.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              thinking: m.thinking,
+              citations: m.citations,
+              agents: m.agents,
+              attachments: m.attachments?.map(({ dataUrl: _dataUrl, ...attachment }) => attachment),
+            })),
+          }));
+      const ok = await saveFile(
+        "friday-chats.json",
+        JSON.stringify(payload, null, 2),
+        "application/json;charset=utf-8",
+      );
+      if (ok) {
+        setSaved(true);
+        window.setTimeout(() => setSaved(false), 1400);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't download chats");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function clearChats() {
+    setBusy("clear");
+    setError(null);
+    try {
+      if (signedIn) await api.delete("/chat/conversations");
+      clearAllChats();
+      setCleared(true);
+      window.setTimeout(() => setCleared(false), 1400);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't clear chats");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteAccount() {
+    if (!signedIn) return;
+    if (!window.confirm("Delete your Friday account and all saved conversations? This cannot be undone.")) return;
+    setBusy("delete");
+    setError(null);
+    try {
+      await api.delete("/auth/account");
+      useAuthStore.getState().logout();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete account");
+      setBusy(null);
+    }
+  }
+
   return (
     <div>
       <h2 className="mb-4 text-lg font-semibold">Data Controls</h2>
-      <p className="mb-4 text-sm text-muted">Chats stay in this browser. Clearing them can’t be undone.</p>
+      <p className="mb-4 text-sm text-muted">
+        {signedIn
+          ? "Chats sync to your Friday account. Export or delete the server copy here."
+          : "Chats stay in this browser until you sign in. Clearing them can't be undone."}
+      </p>
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={chats.length === 0}
-          onClick={async () => {
-            const payload = JSON.stringify(
-              chats.map((c) => ({
-                title: c.title,
-                createdAt: c.createdAt,
-                messages: c.messages.map((m) => ({
-                  role: m.role,
-                  content: m.content,
-                })),
-              })),
-              null,
-              2,
-            );
-            const ok = await saveFile("friday-chats.json", payload, "application/json;charset=utf-8");
-            if (ok) {
-              setSaved(true);
-              window.setTimeout(() => setSaved(false), 1400);
-            }
-          }}
+          disabled={busy !== null || (!signedIn && chats.length === 0)}
+          onClick={() => void downloadChats()}
           className="h-10 rounded-full border border-border px-4 text-sm font-medium hover:bg-chip disabled:opacity-40"
         >
-          {saved ? "Downloaded" : "Download chats"}
+          {busy === "download" ? "Preparing..." : saved ? "Downloaded" : "Download data"}
         </button>
         <button
           type="button"
-          disabled={chats.length === 0}
-          onClick={() => {
-            clearAllChats();
-            setCleared(true);
-            window.setTimeout(() => setCleared(false), 1400);
-          }}
+          disabled={busy !== null || (!signedIn && chats.length === 0)}
+          onClick={() => void clearChats()}
           className="h-10 rounded-full border border-border px-4 text-sm font-medium hover:bg-chip disabled:opacity-40"
         >
-          {cleared ? "Cleared" : "Clear all chats"}
+          {busy === "clear" ? "Clearing..." : cleared ? "Cleared" : "Clear all chats"}
         </button>
+        {signedIn && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void deleteAccount()}
+            className="h-10 rounded-full border border-danger/60 px-4 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
+          >
+            {busy === "delete" ? "Deleting..." : "Delete account"}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -44,6 +44,7 @@ export async function streamTeamUp(
   webSearch: boolean,
   onEvent: (ev: StreamEvent) => void,
   signal?: AbortSignal,
+  options: { think?: boolean; canvas?: boolean } = {},
 ): Promise<void> {
   const pool = await listChatCandidates();
   const proposers = pickDistinctProviders(pool, TEAMUP_MAX_MODELS);
@@ -54,22 +55,28 @@ export async function streamTeamUp(
   }
 
   onEvent({ t: "status", s: "thinking" });
+  const agents: { slug: string; model: string; state: "start" | "done" | "error"; error?: string }[] = [];
 
   const settled = await Promise.all(
     proposers.map(async (candidate) => {
-      onEvent({ t: "agent", slug: candidate.slug, model: candidate.displayName, state: "start" });
+      const started = { slug: candidate.slug, model: candidate.displayName, state: "start" as const };
+      agents.push(started);
+      onEvent({ t: "agent", ...started });
       try {
         const text = await callCandidate(candidate, history);
-        onEvent({ t: "agent", slug: candidate.slug, model: candidate.displayName, state: "done" });
+        const done = { slug: candidate.slug, model: candidate.displayName, state: "done" as const };
+        agents.push(done);
+        onEvent({ t: "agent", ...done });
         return { candidate, text };
       } catch (err) {
-        onEvent({
-          t: "agent",
+        const failed = {
           slug: candidate.slug,
           model: candidate.displayName,
-          state: "error",
+          state: "error" as const,
           error: err instanceof Error ? err.message : "failed",
-        });
+        };
+        agents.push(failed);
+        onEvent({ t: "agent", ...failed });
         return null;
       }
     }),
@@ -84,6 +91,7 @@ export async function streamTeamUp(
 
   let finalCandidate: ChatCandidate;
   let full: string;
+  let thinking = "";
 
   if (drafts.length === 1) {
     // Nothing to synthesize against — the lone draft just is the final answer.
@@ -104,7 +112,10 @@ export async function streamTeamUp(
         synthMessages,
         (delta) => onEvent({ t: "text", c: delta }),
         signal,
-        (think) => onEvent({ t: "think", c: think }),
+        (think) => {
+          thinking += think;
+          onEvent({ t: "think", c: think });
+        },
       );
     } else {
       full = await adapter.chat(apiKey, finalCandidate.modelId, synthMessages);
@@ -113,7 +124,14 @@ export async function streamTeamUp(
   }
 
   const label = drafts.length > 1 ? `Team → ${finalCandidate.displayName}` : finalCandidate.displayName;
-  await insertAssistantMessage(conversationId, full, label);
+  await insertAssistantMessage(conversationId, full, label, {
+    thinking,
+    citations: searchResults.map((result) => ({ url: result.url, title: result.title })),
+    agents,
+    usedThink: options.think || Boolean(thinking),
+    usedSearch: webSearch,
+    usedCanvas: options.canvas ?? false,
+  });
   await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
   onEvent({ t: "done" });
 }

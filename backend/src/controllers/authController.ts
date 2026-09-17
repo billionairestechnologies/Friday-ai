@@ -271,6 +271,36 @@ export async function me(req: Request, res: Response) {
   res.json({ user: req.user });
 }
 
+export async function exportAccount(req: Request, res: Response) {
+  const userId = req.user!.id;
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, full_name, phone, birthday, role, created_at")
+    .eq("id", userId)
+    .single();
+  if (profileError) throw new HttpError(500, profileError.message);
+
+  const { data: conversations, error: conversationsError } = await supabaseAdmin
+    .from("conversations")
+    .select("*, providers(slug, display_name), messages(*, message_attachments(*))")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+  if (conversationsError) throw new HttpError(500, conversationsError.message);
+
+  res.json({
+    exportedAt: new Date().toISOString(),
+    user: req.user,
+    profile,
+    conversations: conversations ?? [],
+  });
+}
+
+export async function deleteAccount(req: Request, res: Response) {
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(req.user!.id);
+  if (error) throw new HttpError(500, error.message);
+  res.status(204).send();
+}
+
 /** Google sign-in is wired for later — kept locked/disabled on the frontend for now. */
 export async function googleSignIn(_req: Request, res: Response) {
   throw new HttpError(501, "Google sign-in is coming soon");

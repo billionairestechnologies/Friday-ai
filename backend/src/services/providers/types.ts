@@ -11,6 +11,9 @@ export interface ProviderModel {
 
 export interface ChatImage {
   mime: string;
+  name?: string;
+  size?: number;
+  kind?: "image" | "file";
   /** A full `data:<mime>;base64,<...>` URL, exactly as the browser's FileReader produced it.
    *  Despite the name (kept for a smaller diff against existing call sites), this carries any
    *  attachment — images, PDFs, and (for Gemini, whose inline_data is mime-agnostic) short

@@ -24,6 +24,7 @@ const chatConcurrencyLimit = concurrencyLimit("chat-stream", env.rateLimits.chat
 chatRouter.post("/conversations", asyncHandler(controller.createConversation));
 chatRouter.patch("/conversations/:id", asyncHandler(controller.updateConversation));
 chatRouter.get("/conversations", asyncHandler(controller.listConversations));
+chatRouter.delete("/conversations", asyncHandler(controller.deleteAllConversations));
 chatRouter.delete("/conversations/:id", asyncHandler(controller.deleteConversation));
 chatRouter.get("/conversations/:id/messages", asyncHandler(controller.listMessages));
 chatRouter.post(

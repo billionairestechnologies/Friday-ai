@@ -2,7 +2,13 @@ import { API_BASE_URL, getAccessToken } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import type { StreamEvent } from "./types";
 
-export type OutgoingAttachment = { mime: string; dataUrl: string };
+export type OutgoingAttachment = {
+  mime: string;
+  dataUrl: string;
+  name?: string;
+  size?: number;
+  kind?: "image" | "file";
+};
 
 async function fetchStream(
   conversationId: string,
