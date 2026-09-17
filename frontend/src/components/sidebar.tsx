@@ -1,4 +1,5 @@
 import { PanelLeft, Puzzle, Search, SquarePen, Trash2, X } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
 import { api } from "@/lib/api";
@@ -6,6 +7,7 @@ import { filteredChats, useChat } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
+  const navigate = useNavigate();
   const open = useChat((s) => s.sidebarOpen);
   const setOpen = useChat((s) => s.setSidebarOpen);
   const chats = useChat((s) => s.chats);
@@ -21,6 +23,7 @@ export function Sidebar() {
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
     deleteChatLocal(id);
+    if (id === activeId) void navigate({ to: "/" });
     if (conversationId) void api.delete(`/chat/conversations/${conversationId}`).catch(() => {});
   }
 
@@ -58,6 +61,7 @@ export function Sidebar() {
             type="button"
             onClick={() => {
               newChat();
+              void navigate({ to: "/" });
               if (window.innerWidth < 768) setOpen(false);
             }}
             className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-chip"
@@ -89,6 +93,9 @@ export function Sidebar() {
                     type="button"
                     onClick={() => {
                       selectChat(c.id);
+                      if (c.conversationId) {
+                        void navigate({ to: "/c/$conversationId", params: { conversationId: c.conversationId } });
+                      }
                       if (window.innerWidth < 768) setOpen(false);
                     }}
                     className={cn(
@@ -104,7 +111,7 @@ export function Sidebar() {
                     type="button"
                     aria-label="Delete chat"
                     onClick={() => handleDelete(c.id)}
-                    className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-subtle opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-elevated hover:text-danger"
+                    className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-subtle opacity-100 transition-opacity duration-150 hover:bg-elevated hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                   >
                     <Trash2 className="size-3.5" />
                   </button>

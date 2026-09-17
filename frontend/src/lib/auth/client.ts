@@ -22,6 +22,7 @@ type AuthState = {
   login: (email: string, password: string) => Promise<{ email: string }>;
   verifyOtp: (email: string, code: string) => Promise<void>;
   resendOtp: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
   /** Verifies admin credentials and starts the mandatory email OTP challenge. */
   adminLogin: (email: string, password: string) => Promise<{ email: string }>;
   signup: (
@@ -91,6 +92,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   resendOtp: async (email) => {
     await api.post("/auth/resend-otp", { email });
+  },
+
+  requestPasswordReset: async (email) => {
+    await api.post("/auth/password-reset", { email });
   },
 
   adminLogin: async (email, password) => {

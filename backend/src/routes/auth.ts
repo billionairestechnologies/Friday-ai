@@ -8,6 +8,7 @@ import {
   logout,
   me,
   refresh,
+  requestPasswordReset,
   resendOtp,
   signup,
   updateProfile,
@@ -44,6 +45,7 @@ authRouter.post("/admin-login", credentialLimit, asyncHandler(adminLogin));
 authRouter.post("/verify-otp", otpLimit, asyncHandler(verifyOtp));
 authRouter.post("/resend-otp", otpLimit, asyncHandler(resendOtp));
 authRouter.post("/refresh", refreshLimit, asyncHandler(refresh));
+authRouter.post("/password-reset", credentialLimit, asyncHandler(requestPasswordReset));
 authRouter.post("/logout", asyncHandler(logout));
 authRouter.get("/me", requireAuth, asyncHandler(me));
 authRouter.get("/export", requireAuth, asyncHandler(exportAccount));

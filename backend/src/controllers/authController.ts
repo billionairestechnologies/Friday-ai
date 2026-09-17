@@ -239,6 +239,7 @@ export async function resendOtp(req: Request, res: Response) {
 }
 
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
+const passwordResetSchema = z.object({ email: z.string().trim().email().toLowerCase() });
 
 /** Exchanges a refresh token for a new access token — the session's access token is a short-lived
  *  JWT (~1hr), so long-running tabs need this instead of forcing a re-login every hour. */
@@ -260,6 +261,14 @@ export async function refresh(req: Request, res: Response) {
     },
     session: data.session,
   });
+}
+
+export async function requestPasswordReset(req: Request, res: Response) {
+  const { email } = passwordResetSchema.parse(req.body);
+  await supabasePublic.auth.resetPasswordForEmail(email, {
+    redirectTo: `${req.protocol}://${req.get("host") ?? ""}/`,
+  });
+  res.json({ ok: true });
 }
 
 export async function logout(_req: Request, res: Response) {

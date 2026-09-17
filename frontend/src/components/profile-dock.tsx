@@ -20,8 +20,15 @@ export function ProfileDock() {
     const onDoc = (e: MouseEvent) => {
       if (!wrap.current?.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   function go(id: "settings" | "plugins" | "help" | "upgrade" | "login") {
@@ -32,7 +39,7 @@ export function ProfileDock() {
   return (
     <div ref={wrap} className="relative px-2 pb-3 pt-1">
       {open && (
-        <div className="absolute right-2 bottom-[calc(100%+8px)] left-2 z-20 overflow-hidden rounded-2xl border border-border bg-elevated py-1.5 shadow-[var(--shadow-composer)]">
+        <div role="menu" className="absolute right-2 bottom-[calc(100%+8px)] left-2 z-20 overflow-hidden rounded-2xl border border-border bg-elevated py-1.5 shadow-[var(--shadow-composer)]">
           <p className="px-3 py-2">
             <span className="block truncate text-sm font-medium">{name}</span>
             {email && <span className="block truncate text-xs text-muted">{email}</span>}
@@ -60,6 +67,8 @@ export function ProfileDock() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
         className="flex h-12 w-full items-center gap-2.5 rounded-xl px-2 text-left transition-colors hover:bg-chip"
       >
         {signedIn && user?.profileImageUrl ? (
@@ -91,6 +100,7 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
+      role="menuitem"
       className="flex h-9 w-full items-center gap-2.5 px-3 text-sm text-foreground hover:bg-chip"
     >
       <span className="text-muted">{icon}</span>

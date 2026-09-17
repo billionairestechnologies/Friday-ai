@@ -107,6 +107,7 @@ type ChatState = {
   clearDraft: () => void;
   newChat: () => void;
   selectChat: (id: string) => void;
+  selectConversation: (conversationId: string) => boolean;
   deleteChat: (id: string) => void;
   clearAllChats: () => void;
   /** Call whenever the authenticated identity resolves or changes (login, signup, logout,
@@ -248,6 +249,12 @@ export const useChat = create<ChatState>()(
       clearDraft: () => set({ draft: "", attachments: [] }),
       newChat: () => set({ activeId: null, draft: "", attachments: [] }),
       selectChat: (id) => set({ activeId: id, draft: "", attachments: [] }),
+      selectConversation: (conversationId) => {
+        const chat = get().chats.find((c) => c.conversationId === conversationId);
+        if (!chat) return false;
+        set({ activeId: chat.id, draft: "", attachments: [] });
+        return true;
+      },
       deleteChat: (id) =>
         set((s) => {
           const chats = s.chats.filter((c) => c.id !== id);

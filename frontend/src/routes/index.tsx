@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Composer } from "@/components/composer";
 import { CanvasPanel } from "@/components/canvas-panel";
@@ -35,7 +36,8 @@ function modeForModel(model: string): ConversationMode {
   return "single";
 }
 
-export function Home() {
+export function Home({ conversationId }: { conversationId?: string } = {}) {
+  const navigate = useNavigate();
   const greeting = useGreeting();
   const { user, isPending } = useCurrentUserState();
   const firstName = user?.displayName?.trim().split(/\s+/)[0];
@@ -60,6 +62,7 @@ export function Home() {
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -69,8 +72,11 @@ export function Home() {
     if (isPending || !user) return;
     api
       .get<{ conversations: ServerConversation[] }>("/chat/conversations")
-      .then((res) => useChat.getState().hydrateFromServer(res.conversations))
-      .catch(() => {});
+      .then((res) => {
+        useChat.getState().hydrateFromServer(res.conversations);
+        setSyncError(null);
+      })
+      .catch((err) => setSyncError(err instanceof Error ? err.message : "Couldn't sync conversations"));
   }, [loadModels, isPending, user]);
 
   useEffect(() => {
@@ -82,6 +88,11 @@ export function Home() {
   }, []);
 
   useEffect(() => {
+    if (!conversationId) return;
+    useChat.getState().selectConversation(conversationId);
+  }, [conversationId]);
+
+  useEffect(() => {
     if (isPending || !user) return;
     if (!activeId) return;
     const chat = useChat.getState().chats.find((c) => c.id === activeId);
@@ -91,8 +102,11 @@ export function Home() {
     loadedConversations.current.add(chat.conversationId);
     api
       .get<{ messages: ServerMessage[] }>(`/chat/conversations/${chat.conversationId}/messages`)
-      .then((res) => useChat.getState().loadMessagesInto(activeId, res.messages))
-      .catch(() => {});
+      .then((res) => {
+        useChat.getState().loadMessagesInto(activeId, res.messages);
+        setSyncError(null);
+      })
+      .catch((err) => setSyncError(err instanceof Error ? err.message : "Couldn't load messages"));
   }, [activeId, isPending, user]);
 
   async function ensureConversation(model: string): Promise<{ chatId: string; conversationId: string }> {
@@ -101,6 +115,9 @@ export function Home() {
     const mode = modeForModel(model);
 
     if (chat?.conversationId) {
+      if (!conversationId || conversationId !== chat.conversationId) {
+        void navigate({ to: "/c/$conversationId", params: { conversationId: chat.conversationId } });
+      }
       // Same conversation, but the user picked a different model since the last message —
       // switch the conversation over to it so the next reply actually comes from that model
       // instead of silently continuing on whatever it was created with.
@@ -126,6 +143,7 @@ export function Home() {
       body.modelId = decoded.modelId;
     }
     const res = await api.post<{ conversation: { id: string } }>("/chat/conversations", body);
+    void navigate({ to: "/c/$conversationId", params: { conversationId: res.conversation.id } });
 
     if (chat) {
       useChat.getState().setConversationId(chat.id, res.conversation.id);
@@ -302,6 +320,11 @@ export function Home() {
           <span className="min-w-0 flex-1 truncate text-sm text-muted">{title}</span>
           <HeaderActions />
         </header>
+        {syncError && (
+          <div className="mx-4 mb-2 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger md:mx-6">
+            {syncError}
+          </div>
+        )}
 
         <AnimatePresence mode="wait" initial={false}>
           {empty ? (

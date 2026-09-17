@@ -68,6 +68,7 @@ export function LoginPopout() {
   const login = useAuthStore((s) => s.login);
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
   const resendOtp = useAuthStore((s) => s.resendOtp);
+  const requestPasswordReset = useAuthStore((s) => s.requestPasswordReset);
   const signup = useAuthStore((s) => s.signup);
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [step, setStep] = useState<"credentials" | "otp">("credentials");
@@ -134,6 +135,23 @@ export function LoginPopout() {
       setNotice("Sent a new code.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't resend the code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePasswordReset() {
+    if (!email.trim()) {
+      setError("Enter your email first.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await requestPasswordReset(email);
+      setNotice("If that email has an account, a recovery link has been sent.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start password recovery");
     } finally {
       setBusy(false);
     }
@@ -281,6 +299,16 @@ export function LoginPopout() {
             >
               {busy ? "Please wait…" : mode === "login" ? "Continue" : "Create account"}
             </button>
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => void handlePasswordReset()}
+                disabled={busy}
+                className="text-center text-xs text-muted hover:text-foreground disabled:opacity-60"
+              >
+                Forgot password?
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
