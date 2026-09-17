@@ -27,6 +27,15 @@
   --radius-xl: 22px;
   --radius-2xl: 28px;
   --shadow-composer: 0 8px 30px rgba(0, 0, 0, 0.24);
+  --shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.34);
+  --shadow-soft: 0 14px 40px rgba(0, 0, 0, 0.18);
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 120ms;
+  --motion-control: 190ms;
+  --motion-panel: 300ms;
+  --hairline: color-mix(in oklab, var(--color-border) 70%, transparent);
+  --surface-highlight: color-mix(in oklab, var(--color-foreground) 7%, transparent);
+  --focus-ring: color-mix(in oklab, var(--color-foreground) 72%, transparent);
 }
 
 html.light {
@@ -43,6 +52,8 @@ html.light {
   --color-accent: #3f3f46;
   --color-chip: #e4e4e7;
   --color-chip-on: #d4d4d8;
+  --shadow-panel: 0 24px 70px rgba(24, 24, 27, 0.12);
+  --shadow-soft: 0 14px 36px rgba(24, 24, 27, 0.08);
 }
 
 @layer base {
@@ -71,6 +82,55 @@ html.light {
 
   ::selection {
     background: color-mix(in oklab, var(--color-foreground) 22%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .premium-panel {
+    border: 1px solid var(--hairline);
+    background:
+      linear-gradient(180deg, var(--surface-highlight), transparent 32%),
+      var(--color-background);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .premium-control {
+    transition:
+      background-color var(--motion-control) var(--ease-premium),
+      border-color var(--motion-control) var(--ease-premium),
+      color var(--motion-control) var(--ease-premium),
+      opacity var(--motion-fast) var(--ease-premium),
+      transform var(--motion-fast) var(--ease-premium);
+  }
+
+  .premium-control:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .skeleton-shine {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-chip);
+  }
+
+  .skeleton-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--surface-highlight), transparent);
+    animation: skeleton-shine 1.4s var(--ease-premium) infinite;
+  }
+}
+
+@keyframes skeleton-shine {
+  to {
+    transform: translateX(100%);
   }
 }
 
@@ -313,7 +373,12 @@ textarea::-webkit-scrollbar-thumb {
   .think-dot,
   .enter-up,
   .msg-enter,
-  .spin-slow {
+  .spin-slow,
+  .skeleton-shine::after {
     animation: none !important;
+  }
+
+  .premium-control {
+    transition: none !important;
   }
 }

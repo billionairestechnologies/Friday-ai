@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Composer } from "@/components/composer";
-import { CanvasPanel } from "@/components/canvas-panel";
 import { MessageThread } from "@/components/message-thread";
 import { HeaderActions, Popouts } from "@/components/popouts";
 import { CompleteProfileModal } from "@/components/complete-profile-modal";
@@ -22,6 +21,10 @@ import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 
 type ConversationMode = "single" | "auto" | "teamup";
+
+const CanvasPanel = lazy(() =>
+  import("@/components/canvas-panel").then((module) => ({ default: module.CanvasPanel })),
+);
 
 const PROMPTS = [
   "Catch me up on the biggest stories today",
@@ -313,7 +316,8 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
+    <div className="relative flex h-dvh overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_50%_0%,var(--surface-highlight),transparent_62%)]" />
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-1 px-3">
@@ -401,7 +405,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.08 + i * 0.05, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                         onClick={() => usePrompt(p)}
-                        className="rounded-xl border border-border bg-transparent px-3.5 py-3 text-left text-sm text-muted transition-colors duration-150 hover:bg-elevated hover:text-foreground active:scale-[0.98]"
+                        className="premium-control rounded-xl border border-border bg-transparent px-3.5 py-3 text-left text-sm text-muted shadow-[var(--shadow-soft)] hover:bg-elevated hover:text-foreground"
                       >
                         {p}
                       </motion.button>
@@ -438,11 +442,13 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
           )}
         </AnimatePresence>
       </div>
-      <CanvasPanel />
+      <Suspense fallback={null}>
+        <CanvasPanel />
+      </Suspense>
       <Popouts />
       <CompleteProfileModal />
       {sendError && (
-        <div className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-elevated px-4 py-2 text-sm text-danger shadow-[var(--shadow-composer)]">
+        <div className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-elevated px-4 py-2 text-sm text-danger shadow-[var(--shadow-panel)]">
           {sendError}
         </div>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -29,7 +29,7 @@ export function CanvasPanel() {
           initial={{ x: "100%", opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: "100%", opacity: 0 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           className="flex h-full min-w-0"
         >
           <CanvasBody onClose={() => setOpen(false)} />
@@ -165,7 +165,45 @@ function LiveCode({ lang, body, live }: { lang?: string; body: string; live: boo
   );
 }
 
+function CanvasBuildSkeleton() {
+  return (
+    <motion.div
+      key="building"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="flex h-full flex-col p-4"
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-foreground">Preparing Canvas</p>
+          <p className="text-xs text-muted">Generating the preview and code workspace.</p>
+        </div>
+        <RefreshCw className="size-4 animate-spin text-muted" />
+      </div>
+      <div className="grid flex-1 grid-rows-[auto_1fr] gap-3 rounded-2xl border border-border/80 bg-surface/70 p-3">
+        <div className="flex items-center gap-2">
+          <span className="skeleton-shine h-3 w-20 rounded-full" />
+          <span className="skeleton-shine h-3 w-14 rounded-full" />
+          <span className="skeleton-shine ml-auto h-3 w-10 rounded-full" />
+        </div>
+        <div className="space-y-3 rounded-xl border border-border/70 bg-background/80 p-4">
+          <span className="skeleton-shine block h-5 w-2/3 rounded-full" />
+          <span className="skeleton-shine block h-3 w-full rounded-full" />
+          <span className="skeleton-shine block h-3 w-5/6 rounded-full" />
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <span className="skeleton-shine h-24 rounded-xl" />
+            <span className="skeleton-shine h-24 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function CanvasBody({ onClose }: { onClose: () => void }) {
+  const [width, setWidth] = useState(512);
   const liveAll = useLiveStream();
   const activeId = useChat((s) => s.activeId);
   const live = liveAll && liveAll.chatId === activeId ? liveAll : null;
@@ -190,21 +228,44 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
   // markdown) only ever has one view.
   const [view, setView] = useState<"preview" | "code">("preview");
   const hasPreview = artifact?.kind === "html" || artifact?.kind === "react";
+  const style = { "--canvas-width": `${width}px` } as CSSProperties;
+
+  function startResize(e: PointerEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    const onMove = (event: globalThis.PointerEvent) => {
+      const next = Math.min(720, Math.max(384, startWidth - (event.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   return (
-    <aside className="flex h-full w-full min-w-0 flex-col border-l border-border bg-background max-md:fixed max-md:inset-0 max-md:z-40 md:w-[min(100%,28rem)] lg:w-[32rem]">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+    <aside style={style} className="premium-panel relative flex h-full w-full min-w-0 flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-40 md:w-[min(100%,var(--canvas-width))]">
+      <button
+        type="button"
+        aria-label="Resize canvas"
+        onPointerDown={startResize}
+        className="premium-control absolute top-0 bottom-0 left-0 hidden w-2 -translate-x-1 cursor-col-resize md:block"
+      />
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/80 px-3">
         <Globe className="size-3.5 text-muted" />
         <span className="min-w-0 flex-1 truncate text-xs text-muted">
           {artifact?.title ?? "Canvas"}
         </span>
         {hasPreview && (
-          <div className="flex items-center rounded-full bg-chip p-0.5">
+          <div className="flex items-center rounded-full bg-chip p-0.5 shadow-[inset_0_1px_0_var(--surface-highlight)]">
             <button
               type="button"
               onClick={() => setView("preview")}
               aria-pressed={view === "preview"}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`premium-control flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                 view === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted hover:text-foreground"
               }`}
             >
@@ -215,7 +276,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={() => setView("code")}
               aria-pressed={view === "code"}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`premium-control flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                 view === "code" ? "bg-background text-foreground shadow-sm" : "text-muted hover:text-foreground"
               }`}
             >
@@ -231,7 +292,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
             onClick={() =>
               void saveFile(filenameFor(artifact.kind, artifact.lang), artifact.body)
             }
-            className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground"
+            className="premium-control flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground"
           >
             <Download className="size-3.5" />
           </button>
@@ -247,7 +308,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               window.open(url, "_blank", "noopener,noreferrer");
               window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
             }}
-            className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground"
+            className="premium-control flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
           </button>
@@ -256,7 +317,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
           type="button"
           aria-label="Close canvas"
           onClick={onClose}
-          className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground"
+          className="premium-control flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground"
         >
           <PanelRightClose className="size-4" />
         </button>
@@ -275,17 +336,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               <LiveCode lang={streamingCode.lang} body={streamingCode.body} live />
             </motion.div>
           ) : building && !artifact ? (
-            <motion.div
-              key="building"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted"
-            >
-              <RefreshCw className="size-4 animate-spin" />
-              Building on canvas…
-            </motion.div>
+            <CanvasBuildSkeleton />
           ) : artifact?.kind === "html" && view === "code" ? (
             <motion.div
               key="html-code"

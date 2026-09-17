@@ -38,7 +38,7 @@ export function Sidebar() {
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-surface transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:static md:z-0 md:w-64 md:shrink-0",
+          "premium-panel fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:static md:z-0 md:w-64 md:shrink-0",
           open ? "translate-x-0" : "-translate-x-full md:hidden",
         )}
       >
@@ -64,7 +64,7 @@ export function Sidebar() {
               void navigate({ to: "/" });
               if (window.innerWidth < 768) setOpen(false);
             }}
-            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-chip"
+            className="premium-control flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-foreground hover:bg-chip"
           >
             <SquarePen className="size-4" />
             New chat
@@ -99,7 +99,7 @@ export function Sidebar() {
                       if (window.innerWidth < 768) setOpen(false);
                     }}
                     className={cn(
-                      "flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm transition-colors duration-150",
+                      "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm",
                       c.id === activeId
                         ? "bg-chip text-foreground"
                         : "text-muted hover:bg-chip/70 hover:text-foreground",
