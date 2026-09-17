@@ -113,12 +113,14 @@ class RedisConcurrencyLimiter {
 
     const redisKey = `rl:cc:${key}`;
     const count = await redis.incr(redisKey);
-    // Recover from crashed holders; active chat/voice/sandbox runs should finish sooner.
-    await redis.expire(redisKey, 15 * 60);
     if (count > this.limit) {
       await redis.decr(redisKey);
       return false;
     }
+    // Recover from crashed holders; active chat/voice/sandbox runs should finish sooner.
+    // Only refreshed on a successful acquire — a rejected attempt must never extend a stale
+    // holder's TTL, or a stuck key from a killed process never expires while someone keeps retrying.
+    await redis.expire(redisKey, 15 * 60);
     return true;
   }
 
