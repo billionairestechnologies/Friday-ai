@@ -17,6 +17,7 @@ import { sandboxRouter } from "./routes/sandbox.js";
 import { requestContext } from "./middleware/requestContext.js";
 import { usageRouter } from "./routes/usage.js";
 import { projectsRouter } from "./routes/projects.js";
+import { billingRouter } from "./routes/billing.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -48,7 +49,14 @@ export function createApp() {
   // upload endpoint yet) — base64 inflates size by ~33%, and up to MAX_ATTACHMENTS images can be
   // attached per message, so 2mb was rejecting any real photo outright with a bare 413 before it
   // ever reached chatService's own, more specific vision-support error.
-  app.use(express.json({ limit: "30mb" }));
+  app.use(
+    express.json({
+      limit: "30mb",
+      verify: (req, _res, buf) => {
+        (req as express.Request).rawBody = Buffer.from(buf);
+      },
+    }),
+  );
   morgan.token("request-id", (req) => (req as express.Request).requestId);
   app.use(morgan(':method :url :status :response-time ms request_id=:request-id'));
 
@@ -61,6 +69,7 @@ export function createApp() {
   app.use("/api/sandbox", sandboxRouter);
   app.use("/api/usage", usageRouter);
   app.use("/api/projects", projectsRouter);
+  app.use("/api/billing", billingRouter);
 
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist));

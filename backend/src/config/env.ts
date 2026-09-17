@@ -33,6 +33,9 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Friday <onboarding@resend.dev>",
   e2bApiKey: process.env.E2B_API_KEY ?? "",
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? "",
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
   rateLimits: {
     authPer15Minutes: positiveInteger(process.env.AUTH_RATE_LIMIT_MAX, 10),
     otpPer10Minutes: positiveInteger(process.env.OTP_RATE_LIMIT_MAX, 5),
@@ -53,6 +56,9 @@ type EnvironmentInput = {
   supabaseAnonKey: string;
   keyEncryptionSecret: string;
   resendApiKey: string;
+  razorpayKeyId?: string;
+  razorpayKeySecret?: string;
+  razorpayWebhookSecret?: string;
 };
 
 export function validateEnvironment(input: EnvironmentInput): string[] {
@@ -69,6 +75,11 @@ export function validateEnvironment(input: EnvironmentInput): string[] {
       errors.push("KEY_ENCRYPTION_SECRET must be a unique secret of at least 32 bytes");
     }
     if (!input.resendApiKey) errors.push("RESEND_API_KEY is required because login uses email OTP");
+  }
+
+  const razorpayValues = [input.razorpayKeyId, input.razorpayKeySecret, input.razorpayWebhookSecret].filter(Boolean);
+  if (razorpayValues.length > 0 && razorpayValues.length < 3) {
+    errors.push("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_WEBHOOK_SECRET must be configured together");
   }
 
   return errors;

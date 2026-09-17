@@ -22,6 +22,6 @@ export const FEATURED_PLUGINS: PluginItem[] = [
   { id: "finance", name: "Finance", desc: "Connect financial accounts", group: "featured" },
   { id: "box", name: "Box", desc: "Search files and docs", group: "featured" },
   { id: "canva", name: "Canva", desc: "Create and edit designs", group: "featured" },
-  { id: "stripe", name: "Stripe", desc: "Look up payments", group: "featured" },
+  { id: "razorpay", name: "Razorpay", desc: "Track payments and orders", group: "featured" },
   { id: "vercel", name: "Vercel", desc: "Manage your deploys", group: "featured" },
 ];

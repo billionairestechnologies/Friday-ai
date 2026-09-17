@@ -495,23 +495,102 @@ function ProjectsPane() {
 }
 
 function BillingPane() {
-  const setDialog = useChat((s) => s.setDialog);
+  const [config, setConfig] = useState<{
+    provider: "razorpay";
+    keyId: string | null;
+    plans: { id: "pro" | "business"; name: string; amountPaise: number; currency: string; description: string }[];
+  } | null>(null);
+  const [busyPlan, setBusyPlan] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<NonNullable<typeof config>>("/billing/config").then(setConfig).catch(() => setConfig(null));
+  }, []);
+
+  async function loadRazorpayCheckout() {
+    const existing = (window as typeof window & { Razorpay?: unknown }).Razorpay;
+    if (existing) return true;
+    return new Promise<boolean>((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  }
+
+  async function startCheckout(planId: "pro" | "business") {
+    setBusyPlan(planId);
+    setNotice(null);
+    try {
+      const res = await api.post<{
+        checkout: {
+          key: string;
+          orderId: string;
+          amount: number;
+          currency: string;
+          name: string;
+          description: string;
+        };
+      }>("/billing/orders", { planId });
+      const loaded = await loadRazorpayCheckout();
+      const Razorpay = (window as typeof window & {
+        Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+      }).Razorpay;
+      if (!loaded || !Razorpay) {
+        setNotice(`Order created: ${res.checkout.orderId}. Razorpay Checkout could not load in this browser.`);
+        return;
+      }
+      new Razorpay({
+        key: res.checkout.key,
+        amount: res.checkout.amount,
+        currency: res.checkout.currency,
+        name: res.checkout.name,
+        description: res.checkout.description,
+        order_id: res.checkout.orderId,
+        theme: { color: "#18181b" },
+      }).open();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't start Razorpay checkout");
+    } finally {
+      setBusyPlan(null);
+    }
+  }
+
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold">Billing</h2>
-      <Row
-        label="Friday"
-        value="Included in this workspace"
-        action={
-          <button
-            type="button"
-            onClick={() => setDialog("upgrade")}
-            className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
-          >
-            Manage
-          </button>
-        }
-      />
+      <h2 className="mb-1 text-lg font-semibold">Billing</h2>
+      <p className="mb-4 text-sm text-muted">Payments are handled through Razorpay.</p>
+      {notice && <p className="mb-3 rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted">{notice}</p>}
+      <div className="grid gap-3">
+        {(config?.plans ?? []).map((plan) => (
+          <div key={plan.id} className="rounded-xl border border-border bg-background p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{plan.name}</p>
+                <p className="mt-1 text-sm text-muted">{plan.description}</p>
+                <p className="mt-3 font-mono text-xl font-semibold">
+                  ₹{(plan.amountPaise / 100).toLocaleString("en-IN")}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busyPlan !== null || !config?.keyId}
+                onClick={() => void startCheckout(plan.id)}
+                className="h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {busyPlan === plan.id ? "Starting..." : "Pay"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {config && !config.keyId && (
+        <p className="mt-3 text-xs text-muted">
+          Razorpay keys are not configured on this environment yet.
+        </p>
+      )}
     </div>
   );
 }
