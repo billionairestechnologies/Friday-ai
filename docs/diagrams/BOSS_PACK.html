@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Friday AI — diagram pack for leadership</title>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose" });
+
+    async function renderAll() {
+      const blocks = document.querySelectorAll("pre.mermaid-src");
+      for (const block of blocks) {
+        const id = block.dataset.id;
+        const target = document.getElementById("render-" + id);
+        const { svg } = await mermaid.render("svg-" + id, block.textContent);
+        target.innerHTML = svg;
+      }
+    }
+
+    window.downloadSvg = function (id, filename) {
+      const svg = document.querySelector("#render-" + id + " svg");
+      if (!svg) return;
+      const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    window.downloadPng = async function (id, filename) {
+      const svg = document.querySelector("#render-" + id + " svg");
+      if (!svg) return;
+      const xml = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+      const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      const canvas = document.createElement("canvas");
+      const scale = 2;
+      canvas.width = Math.max(img.width, 1200) * scale;
+      canvas.height = Math.max(img.height, 700) * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = filename;
+      a.click();
+    };
+
+    window.addEventListener("DOMContentLoaded", renderAll);
+  </script>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: Georgia, "Times New Roman", serif; margin: 0; background: #f6f4ef; color: #1a1a1a; }
+    header { background: #18181b; color: #fafafa; padding: 32px 40px; }
+    header p, header li { font-family: ui-sans-serif, system-ui, sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 80px; }
+    h1 { margin: 0 0 8px; font-size: 32px; }
+    h2 { font-size: 22px; margin-top: 0; }
+    .meta { opacity: 0.8; font-size: 14px; }
+    section { background: #fff; border: 1px solid #e7e5e4; border-radius: 16px; padding: 20px; margin: 20px 0; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; font-family: ui-sans-serif, system-ui, sans-serif; }
+    button, .print { background: #18181b; color: #fff; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: 13px; text-decoration: none; }
+    button.secondary { background: #e7e5e4; color: #18181b; }
+    .diagram { overflow: auto; background: #fff; padding: 8px; }
+    .diagram svg { max-width: 100%; height: auto; }
+    pre.mermaid-src { display: none; }
+    ul.share { font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.5; }
+    @media print {
+      header { background: #fff; color: #000; }
+      button, .print { display: none; }
+      section { break-inside: avoid; border: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Friday AI — what we built</h1>
+    <p class="meta">Leadership pack · branch <code>cursor/cloud-agent-1789643679414-qaev6</code> · PR #2 · folder <code>docs/diagrams/</code></p>
+    <p>Open this file in a browser. Download SVG or PNG under each diagram, or use Print → Save as PDF for the whole pack.</p>
+    <p><button class="print" onclick="window.print()">Print / Save as PDF</button></p>
+  </header>
+  <main>
+    <section>
+      <h2>Share with leadership</h2>
+      <ul class="share">
+        <li><strong>Friday is now a full assistant platform:</strong> secure login, saved chats and files, teams, Razorpay billing, connectors, and usage/cost tracking.</li>
+        <li><strong>Users can:</strong> sign in, chat, attach files, use Search/Think/Canvas/voice, create Work/Developer projects, connect apps, pay, export or delete data.</li>
+        <li><strong>To go live:</strong> apply Supabase migrations 0001–0014, set production secrets, deploy, then check <code>/api/health/ready</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>1. System architecture</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('01','01-system-architecture.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('01','01-system-architecture.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="01">
+flowchart TB
+  subgraph clients [Clients]
+    Browser[Web app - React Vite]
+  end
+  subgraph api [Friday API - Express TypeScript]
+    MW[Helmet CORS request ID rate limits]
+    AuthR["/api/auth"]
+    ChatR["/api/chat SSE"]
+    BillR["/api/billing"]
+    ConnR["/api/connectors"]
+    OrgR["/api/organizations"]
+    UseR["/api/usage /projects /voice /sandbox"]
+    Health["/api/health live+ready"]
+  end
+  subgraph data [Data plane]
+    SB[(Supabase Postgres + Auth)]
+    Store[Supabase Storage]
+    Redis[(Redis optional)]
+  end
+  subgraph vendors [External vendors]
+    Models[AI model providers]
+    Pay[Razorpay]
+    Mail[Resend OTP email]
+    Apps[GitHub Google Notion Vercel ...]
+  end
+  Browser --> MW
+  MW --> AuthR
+  MW --> ChatR
+  MW --> BillR
+  MW --> ConnR
+  MW --> OrgR
+  MW --> UseR
+  MW --> Health
+  AuthR --> SB
+  AuthR --> Mail
+  ChatR --> SB
+  ChatR --> Store
+  ChatR --> Models
+  BillR --> Pay
+  ConnR --> Apps
+  OrgR --> SB
+  UseR --> SB
+  Health --> SB
+  MW -.-> Redis
+      </pre>
+      <div class="diagram" id="render-01"></div>
+    </section>
+
+    <section>
+      <h2>2. What the system can do</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('02','02-what-system-can-do.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('02','02-what-system-can-do.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="02">
+mindmap
+  root((Friday AI can now))
+    Secure access
+      Email plus OTP
+      Google sign-in
+      Company SSO button
+    Conversations
+      Streamed chat
+      Think Search Canvas
+      Voice and sandbox
+    Memory
+      History files export delete
+    Work modes
+      Personal Work Developer
+    Teams and money
+      Orgs invites budgets
+      Razorpay and usage cost
+    Connectors
+      GitHub Google Notion
+      Supabase Railway Vercel
+    Operations
+      Rate limits Redis health CI
+      </pre>
+      <div class="diagram" id="render-02"></div>
+    </section>
+
+    <section>
+      <h2>3. What users can do</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('03','03-what-users-can-do.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('03','03-what-users-can-do.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="03">
+flowchart TB
+  Guest[Visitor] --> SignIn{Sign in}
+  SignIn --> Email[Email + OTP]
+  SignIn --> Google[Google]
+  SignIn --> SSO[Company SSO]
+  Email --> User[Signed-in user]
+  Google --> User
+  SSO --> User
+  User --> Chat[Chat with Friday]
+  User --> Files[Attach files]
+  User --> Tools[Search Think Canvas]
+  User --> Voice[Voice mode]
+  User --> Projects[Work or Developer project]
+  User --> Plugins[Connect apps]
+  User --> Settings[Settings]
+  User --> Team[Team org invite budget]
+  User --> Pay[Pay via Razorpay]
+  User --> Data[Download or delete data]
+  User --> Usage[See usage and cost]
+      </pre>
+      <div class="diagram" id="render-03"></div>
+    </section>
+
+    <section>
+      <h2>4. How chat works</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('04','04-how-chat-works.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('04','04-how-chat-works.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="04">
+sequenceDiagram
+  actor U as User
+  participant FE as Web app
+  participant API as Friday API
+  participant DB as Supabase
+  participant M as AI model
+  U->>FE: Message and files
+  FE->>API: POST /api/chat with JWT
+  API->>DB: Save user message
+  API->>M: Stream prompt
+  M-->>API: Tokens plus usage
+  API->>DB: Save reply and cost
+  API-->>FE: Live SSE
+  FE-->>U: Answer appears live
+      </pre>
+      <div class="diagram" id="render-04"></div>
+    </section>
+
+    <section>
+      <h2>5. How login works</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('05','05-how-login-works.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('05','05-how-login-works.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="05">
+flowchart LR
+  A[Email + password] --> B[6-digit OTP email]
+  B --> C[Session JWT]
+  D[Google OAuth] --> E[Create or reuse user]
+  E --> C
+  F[Company SSO button] --> G[Supabase IdP URL]
+  G --> C
+  C --> H[Chat Settings Billing Connectors]
+      </pre>
+      <div class="diagram" id="render-05"></div>
+    </section>
+
+    <section>
+      <h2>6. How Razorpay billing works</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('06','06-how-billing-works.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('06','06-how-billing-works.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="06">
+sequenceDiagram
+  actor U as User
+  participant FE as Settings Billing
+  participant API as Friday API
+  participant RZ as Razorpay
+  U->>FE: Pay Pro or Business
+  FE->>API: Create order
+  API->>RZ: Create order
+  API-->>FE: orderId
+  FE->>RZ: Checkout
+  U->>RZ: Pay
+  RZ-->>API: Signed webhook
+  API->>API: Verify signature
+  API-->>FE: Plan paid
+      </pre>
+      <div class="diagram" id="render-06"></div>
+    </section>
+
+    <section>
+      <h2>7. How connectors work</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('07','07-how-connectors-work.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('07','07-how-connectors-work.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="07">
+flowchart LR
+  User[Signed-in user] --> Drawer[Plugins]
+  Drawer --> OAuth[GitHub and Google OAuth]
+  Drawer --> Token[Notion Supabase Railway Vercel Razorpay Box Canva Finance]
+  OAuth --> API[API verifies then encrypts]
+  Token --> API
+  API --> DB[(connector_accounts)]
+      </pre>
+      <div class="diagram" id="render-07"></div>
+    </section>
+
+    <section>
+      <h2>8. Data model</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('08','08-data-model.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('08','08-data-model.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="08">
+erDiagram
+  profiles ||--o{ conversations : owns
+  profiles ||--o{ organization_memberships : joins
+  profiles ||--o{ connector_accounts : connects
+  organizations ||--o{ organization_memberships : has
+  conversations ||--o{ messages : contains
+  messages ||--o{ message_attachments : files
+      </pre>
+      <div class="diagram" id="render-08"></div>
+    </section>
+
+    <section>
+      <h2>9. Identity and access</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('09','09-identity-and-access.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('09','09-identity-and-access.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="09">
+flowchart LR
+  Email[Email OTP] --> Users[Supabase users]
+  Google[Google] --> Users
+  SSO[Company SSO] --> Users
+  Users --> JWT[JWT]
+  JWT --> Profile[profiles]
+  Profile --> Orgs[organizations]
+      </pre>
+      <div class="diagram" id="render-09"></div>
+    </section>
+
+    <section>
+      <h2>10. Go-live checklist</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('10','10-go-live-checklist.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('10','10-go-live-checklist.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="10">
+flowchart TD
+  A[Create Supabase project] --> B[Apply migrations 0001 to 0014]
+  B --> C[Set required env secrets]
+  C --> D[Deploy API plus frontend]
+  D --> E[Check /api/health/ready]
+  E --> F{Ready?}
+  F -->|No| C
+  F -->|Yes| G[Smoke test signup OTP chat file]
+  G --> H[Optional Google GitHub Razorpay SSO]
+  H --> I[Production live]
+      </pre>
+      <div class="diagram" id="render-10"></div>
+    </section>
+  </main>
+</body>
+</html>

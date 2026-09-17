@@ -1,0 +1,23 @@
+flowchart LR
+  subgraph login [Sign-in options]
+    Email[Email + password then OTP]
+    Google[Google OAuth]
+    SSO[Company SSO button]
+  end
+
+  subgraph supabaseAuth [Supabase Auth]
+    Users[auth.users]
+    JWT[Access and refresh JWT]
+  end
+
+  subgraph app [App]
+    Profile[profiles role user or admin]
+    Orgs[organizations and memberships]
+  end
+
+  Email --> Users
+  Google --> Users
+  SSO --> Users
+  Users --> JWT
+  JWT --> Profile
+  Profile --> Orgs

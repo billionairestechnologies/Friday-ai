@@ -1,0 +1,28 @@
+flowchart TB
+  Guest[Visitor] --> SignIn{Sign in}
+  SignIn --> Email[Email + OTP]
+  SignIn --> Google[Google]
+  SignIn --> SSO[Company SSO]
+  Email --> User[Signed-in user]
+  Google --> User
+  SSO --> User
+
+  User --> Chat[Chat with Friday]
+  User --> Files[Attach files]
+  User --> Tools[Toggle Search Think Canvas]
+  User --> Voice[Voice mode]
+  User --> Projects[Create Work or Developer project]
+  User --> Plugins[Connect GitHub Google Notion etc]
+  User --> Settings[Settings]
+  User --> Team[Team org invite budget]
+  User --> Pay[Pay Pro or Business via Razorpay]
+  User --> Data[Download or delete my data]
+  User --> Usage[See usage and estimated cost]
+
+  Settings --> Account[Account profile]
+  Settings --> Appearance[Appearance]
+  Settings --> VoiceSet[Voice picker]
+  Settings --> Billing[Billing]
+  Settings --> Data
+  Settings --> Team
+  Settings --> Usage

@@ -1,0 +1,56 @@
+flowchart TB
+  subgraph clients [Clients]
+    Browser[Web app - React Vite]
+  end
+
+  subgraph api [Friday API - Express TypeScript]
+    MW[Helmet CORS request ID rate limits]
+    AuthR["/api/auth"]
+    ChatR["/api/chat SSE"]
+    BillR["/api/billing"]
+    ConnR["/api/connectors"]
+    OrgR["/api/organizations"]
+    UseR["/api/usage /projects /voice /sandbox"]
+    Health["/api/health live+ready"]
+  end
+
+  subgraph data [Data plane]
+    SB[(Supabase Postgres + Auth)]
+    Store[Supabase Storage message-attachments]
+    Redis[(Redis optional)]
+  end
+
+  subgraph vendors [External vendors]
+    Models[OpenAI Anthropic Gemini OpenRouter Sarvam ScaleMax Ollama]
+    Pay[Razorpay]
+    Mail[Resend OTP email]
+    GH[GitHub]
+    G[Google]
+    Other[Notion Vercel Railway Box Canva]
+  end
+
+  Browser --> MW
+  MW --> AuthR
+  MW --> ChatR
+  MW --> BillR
+  MW --> ConnR
+  MW --> OrgR
+  MW --> UseR
+  MW --> Health
+  AuthR --> SB
+  AuthR --> Mail
+  AuthR --> G
+  ChatR --> SB
+  ChatR --> Store
+  ChatR --> Models
+  BillR --> Pay
+  BillR --> SB
+  ConnR --> GH
+  ConnR --> G
+  ConnR --> Other
+  ConnR --> SB
+  OrgR --> SB
+  UseR --> SB
+  Health --> SB
+  Health --> Redis
+  MW -.-> Redis

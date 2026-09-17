@@ -6,7 +6,7 @@
 **Head commit:** `6168a05` — *feat: complete Google sign-in and remaining connectors*  
 **Base:** `main`
 
-This document is the handoff: what shipped, how the system works, and exactly what to configure to go live.
+**Downloadable diagrams (PNG / SVG / PDF via HTML):** see [`docs/diagrams/`](./diagrams/README.md) and the boss pack [`docs/diagrams/BOSS_COPY.md`](./diagrams/BOSS_COPY.md).
 
 ---
 

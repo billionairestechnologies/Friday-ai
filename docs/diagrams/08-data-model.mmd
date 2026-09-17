@@ -1,0 +1,39 @@
+erDiagram
+  profiles ||--o{ conversations : owns
+  profiles ||--o{ organization_memberships : joins
+  profiles ||--o{ connector_accounts : connects
+  profiles ||--o{ usage_events : meters
+  organizations ||--o{ organization_memberships : has
+  organizations ||--o{ organization_invites : invites
+  conversations ||--o{ messages : contains
+  messages ||--o{ message_attachments : files
+  assistant_projects ||--o{ conversations : context
+
+  profiles {
+    uuid id
+    text role
+    text full_name
+  }
+  conversations {
+    uuid id
+    uuid user_id
+    text mode
+  }
+  messages {
+    uuid id
+    text role
+    text content
+  }
+  message_attachments {
+    uuid id
+    text storage_path
+  }
+  connector_accounts {
+    uuid id
+    text provider
+    text access_token_encrypted
+  }
+  usage_events {
+    text event_type
+    numeric estimated_cost_cents
+  }

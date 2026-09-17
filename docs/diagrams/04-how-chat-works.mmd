@@ -1,0 +1,23 @@
+sequenceDiagram
+  actor U as User
+  participant FE as Web app
+  participant API as Friday API
+  participant RL as Rate limiter
+  participant DB as Supabase
+  participant ST as File storage
+  participant M as AI model
+
+  U->>FE: Type message and attach files
+  FE->>API: POST /api/chat with JWT
+  API->>RL: Check per-user limit
+  alt Over limit
+    API-->>FE: 429 Too many requests
+  else Allowed
+    API->>DB: Save user message
+    API->>ST: Store attachments
+    API->>M: Stream the prompt
+    M-->>API: Tokens plus usage
+    API->>DB: Save reply and token cost
+    API-->>FE: Live SSE text Think cites
+    FE-->>U: Answer appears as it is written
+  end

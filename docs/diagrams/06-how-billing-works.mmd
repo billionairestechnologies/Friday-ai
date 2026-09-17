@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor U as User
+  participant FE as Settings Billing
+  participant API as /api/billing
+  participant RZ as Razorpay
+  participant DB as billing_orders
+
+  U->>FE: Choose Pro or Business
+  FE->>API: POST /billing/orders
+  API->>RZ: Create order
+  RZ-->>API: order_id
+  API->>DB: Save created order
+  API-->>FE: key and orderId
+  FE->>RZ: Open Checkout
+  U->>RZ: Pay
+  RZ-->>API: Webhook with signature
+  API->>API: Verify HMAC
+  API->>DB: Mark paid and update plan

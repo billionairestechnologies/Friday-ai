@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph oauth [OAuth connectors]
+    GH[GitHub]
+    GG[Google Calendar Gmail Drive]
+  end
+
+  subgraph token [Token connectors - verified then encrypted]
+    N[Notion]
+    S[Supabase]
+    R[Railway]
+    V[Vercel]
+    RZ[Razorpay keys]
+    B[Box]
+    C[Canva]
+    F[Finance]
+  end
+
+  User[Signed-in user] --> Drawer[Plugins drawer]
+  Drawer --> oauth
+  Drawer --> token
+  oauth --> API[Friday API encrypts secrets]
+  token --> API
+  API --> DB[(connector_accounts)]
+  GH --> Repos[Search repos]
+  GG --> GoogleAPIs[Calendar Gmail Drive]
+  N --> NotionAPI[Search pages]
+  V --> VercelAPI[List projects]

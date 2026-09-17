@@ -1,0 +1,10 @@
+flowchart TD
+  A[Create Supabase project] --> B[Apply migrations 0001 to 0014]
+  B --> C[Set required env secrets]
+  C --> D[Deploy API plus frontend]
+  D --> E[Check /api/health/ready]
+  E --> F{Ready?}
+  F -->|No| C
+  F -->|Yes| G[Smoke test signup OTP chat file]
+  G --> H[Optional: Google GitHub Razorpay SSO keys]
+  H --> I[Production live]
