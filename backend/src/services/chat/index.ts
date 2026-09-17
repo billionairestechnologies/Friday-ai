@@ -149,10 +149,27 @@ export async function streamMessage(
     onEvent({ t: "done" });
     return;
   }
+  const project = conversation.assistant_projects;
+  const projectContext: ChatMessage[] = project
+    ? [
+        {
+          role: "system",
+          content: [
+            `Project: ${project.name}`,
+            `Mode: ${project.mode}`,
+            project.repository_url ? `Repository: ${project.repository_url}` : null,
+            project.instructions ? `Project instructions:\n${project.instructions}` : null,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        },
+      ]
+    : [];
+
   const history = appendExtractedText(
     attachImages(
       withSystemPreamble(
-        trimHistoryToBudget(historyRows as ChatMessage[]),
+        trimHistoryToBudget([...projectContext, ...(historyRows as ChatMessage[])]),
         think,
         behavior,
         searchActuallyRan,

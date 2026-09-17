@@ -2,6 +2,7 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import type { ConversationMode } from "./types.js";
 import type { ChatImage } from "../providers/types.js";
+import { getOwnedProject } from "../projectService.js";
 
 export type MessageMetadata = {
   thinking?: string;
@@ -29,12 +30,20 @@ function pageSize(limit: number | undefined): number {
 export async function getOwnedConversation(userId: string, conversationId: string) {
   const { data, error } = await supabaseAdmin
     .from("conversations")
-    .select("*, providers(slug, display_name)")
+    .select("*, providers(slug, display_name), assistant_projects(name, mode, instructions, repository_url)")
     .eq("id", conversationId)
     .eq("user_id", userId)
     .single();
   if (error || !data) throw new HttpError(404, "Conversation not found");
-  return data as typeof data & { providers: { slug: string; display_name: string } | null };
+  return data as typeof data & {
+    providers: { slug: string; display_name: string } | null;
+    assistant_projects: {
+      name: string;
+      mode: "personal" | "work" | "developer";
+      instructions: string;
+      repository_url: string | null;
+    } | null;
+  };
 }
 
 export async function createConversation(
@@ -43,8 +52,10 @@ export async function createConversation(
   providerSlug?: string,
   modelId?: string,
   title?: string,
+  projectId?: string,
 ) {
   let providerRowId: string | null = null;
+  if (projectId) await getOwnedProject(userId, projectId);
 
   if (mode === "single") {
     if (!providerSlug || !modelId) throw new HttpError(400, "providerSlug and modelId are required for single mode");
@@ -67,6 +78,7 @@ export async function createConversation(
       model_id: mode === "single" ? modelId : null,
       mode,
       title: title || defaultTitle,
+      project_id: projectId ?? null,
     })
     .select()
     .single();

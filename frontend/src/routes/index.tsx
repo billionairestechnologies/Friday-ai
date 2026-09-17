@@ -135,7 +135,8 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       return { chatId: chat.id, conversationId: chat.conversationId };
     }
 
-    const body: { mode: ConversationMode; providerSlug?: string; modelId?: string } = { mode };
+    const body: { mode: ConversationMode; providerSlug?: string; modelId?: string; projectId?: string } = { mode };
+    if (s.activeProjectId) body.projectId = s.activeProjectId;
     if (mode === "single") {
       const decoded = decodeModelId(model);
       if (!decoded) throw new Error("Pick a model first");

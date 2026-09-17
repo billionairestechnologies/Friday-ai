@@ -118,7 +118,7 @@ export function SettingsModal() {
               {tab === "behavior" && <BehaviorPane />}
               {tab === "voice" && <VoicePane />}
               {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
-              {tab === "customize" && <SimpleNote title="Customize" body="Search, Think, and Canvas live in the composer. Personality stays direct and truthful." />}
+              {tab === "customize" && <ProjectsPane />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
               {tab === "data" && <DataPane />}
@@ -356,6 +356,140 @@ function VoicePane() {
         Picked here or in Voice Mode — this is who reads Friday's replies aloud.
       </p>
       <VoicePicker selectedId={voiceId} onSelect={(v) => setVoice(v.voiceId, v.name)} />
+    </div>
+  );
+}
+
+type AssistantProject = {
+  id: string;
+  name: string;
+  mode: "personal" | "work" | "developer";
+  instructions: string;
+  repository_url: string | null;
+};
+
+function ProjectsPane() {
+  const activeProjectId = useChat((s) => s.activeProjectId);
+  const setActiveProjectId = useChat((s) => s.setActiveProjectId);
+  const [projects, setProjects] = useState<AssistantProject[]>([]);
+  const [name, setName] = useState("");
+  const [mode, setMode] = useState<AssistantProject["mode"]>("work");
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refreshProjects() {
+    api
+      .get<{ projects: AssistantProject[] }>("/projects")
+      .then((res) => {
+        setProjects(res.projects);
+        setError(null);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load projects"));
+  }
+
+  useEffect(refreshProjects, []);
+
+  async function createProject() {
+    if (!name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ project: AssistantProject }>("/projects", {
+        name,
+        mode,
+        repositoryUrl,
+        instructions,
+      });
+      setProjects((current) => [res.project, ...current]);
+      setActiveProjectId(res.project.id);
+      setName("");
+      setRepositoryUrl("");
+      setInstructions("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create project");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="mb-1 text-lg font-semibold">Projects</h2>
+      <p className="mb-4 text-sm text-muted">
+        Give Friday persistent Work or Developer context for new conversations.
+      </p>
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      <div className="mb-5 flex flex-col gap-2 rounded-xl border border-border bg-background p-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Project name"
+          className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
+        />
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as AssistantProject["mode"])}
+          className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
+        >
+          <option value="work">Work project</option>
+          <option value="developer">Developer project</option>
+          <option value="personal">Personal project</option>
+        </select>
+        {mode === "developer" && (
+          <input
+            value={repositoryUrl}
+            onChange={(e) => setRepositoryUrl(e.target.value)}
+            placeholder="Repository URL"
+            className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
+          />
+        )}
+        <textarea
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder="Persistent instructions, files to remember, team rules, or repo notes"
+          rows={3}
+          className="resize-none rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none"
+        />
+        <button
+          type="button"
+          disabled={busy || !name.trim()}
+          onClick={() => void createProject()}
+          className="h-9 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {busy ? "Creating..." : "Create and use project"}
+        </button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => setActiveProjectId(null)}
+          className={cn(
+            "rounded-xl px-3 py-2 text-left text-sm",
+            activeProjectId === null ? "bg-chip text-foreground" : "text-muted hover:bg-chip/60",
+          )}
+        >
+          No project
+        </button>
+        {projects.map((project) => (
+          <button
+            key={project.id}
+            type="button"
+            onClick={() => setActiveProjectId(project.id)}
+            className={cn(
+              "rounded-xl px-3 py-2 text-left text-sm",
+              activeProjectId === project.id ? "bg-chip text-foreground" : "text-muted hover:bg-chip/60",
+            )}
+          >
+            <span className="block font-medium">{project.name}</span>
+            <span className="block text-xs capitalize text-subtle">
+              {project.mode}
+              {project.repository_url ? ` - ${project.repository_url}` : ""}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

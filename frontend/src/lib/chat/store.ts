@@ -72,6 +72,7 @@ type ChatState = {
   canvas: boolean;
   canvasOpen: boolean;
   settingsTab: string;
+  activeProjectId: string | null;
   appearance: "dark" | "light";
   /** Persona/behavior instruction from Settings → Behavior, sent as a system prompt with every message. */
   behavior: string;
@@ -97,6 +98,7 @@ type ChatState = {
   setCanvas: (v: boolean) => void;
   setCanvasOpen: (v: boolean) => void;
   setSettingsTab: (id: string) => void;
+  setActiveProjectId: (id: string | null) => void;
   setAppearance: (v: "dark" | "light") => void;
   setVoice: (id: string, name: string) => void;
   setVoiceIntroSeen: (v: boolean) => void;
@@ -135,6 +137,7 @@ type Persisted = Pick<
   | "canvas"
   | "appearance"
   | "behavior"
+  | "activeProjectId"
   | "sidebarOpen"
   | "voiceId"
   | "voiceName"
@@ -201,6 +204,7 @@ export const useChat = create<ChatState>()(
       canvas: false,
       canvasOpen: false,
       settingsTab: "account",
+      activeProjectId: null,
       appearance: "light",
       behavior: "",
       draft: "",
@@ -233,6 +237,7 @@ export const useChat = create<ChatState>()(
         })),
       setCanvasOpen: (canvasOpen) => set({ canvasOpen }),
       setSettingsTab: (settingsTab) => set({ settingsTab }),
+      setActiveProjectId: (activeProjectId) => set({ activeProjectId }),
       setAppearance: (appearance) => set({ appearance }),
       setVoice: (voiceId, voiceName) => set({ voiceId, voiceName }),
       setVoiceIntroSeen: (voiceIntroSeen) => set({ voiceIntroSeen }),
@@ -268,7 +273,7 @@ export const useChat = create<ChatState>()(
       syncOwner: (userId) =>
         set((s) => {
           if (userId === s.ownerUserId) return {};
-          return { ownerUserId: userId, chats: [], activeId: null, draft: "", attachments: [] };
+          return { ownerUserId: userId, chats: [], activeId: null, activeProjectId: null, draft: "", attachments: [] };
         }),
       beginTurn: (user) => {
         const { think, webSearch, canvas } = get();
@@ -479,6 +484,7 @@ export const useChat = create<ChatState>()(
         canvas: s.canvas,
         appearance: s.appearance,
         behavior: s.behavior,
+        activeProjectId: s.activeProjectId,
         sidebarOpen: s.sidebarOpen,
         voiceId: s.voiceId,
         voiceName: s.voiceName,
