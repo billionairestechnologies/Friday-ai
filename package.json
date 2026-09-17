@@ -6,6 +6,10 @@
   },
   "scripts": {
     "build": "npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend ci && npm --prefix backend run build",
+    "test": "npm --prefix backend test",
+    "typecheck": "npm --prefix frontend run typecheck && npm --prefix backend run typecheck",
+    "verify:migrations": "node scripts/verify-migrations.mjs",
+    "verify": "npm run verify:migrations && npm run typecheck && npm test && npm run build",
     "start": "node backend/dist/server.js"
   }
 }

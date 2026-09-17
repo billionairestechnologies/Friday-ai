@@ -1,6 +1,7 @@
 import type { Socket } from "node:net";
 import { assertEnvironmentConfigured, env } from "./config/env.js";
 import { beginShutdown } from "./services/lifecycle.js";
+import { logger } from "./utils/logger.js";
 
 assertEnvironmentConfigured();
 
@@ -9,7 +10,7 @@ const app = createApp();
 const sockets = new Set<Socket>();
 
 const server = app.listen(env.port, () => {
-  console.log(`Friday AI backend listening on http://localhost:${env.port}`);
+  logger.info("server_listening", { port: env.port });
 });
 
 server.on("connection", (socket) => {
@@ -23,10 +24,10 @@ async function shutdown(reason: string, exitCode = 0) {
   shutdownStarted = true;
   beginShutdown();
   process.exitCode = exitCode;
-  console.log(`Shutting down Friday AI backend (${reason})`);
+  logger.info("server_shutdown_started", { reason });
 
   const forceTimer = setTimeout(() => {
-    console.error("Graceful shutdown timed out; closing remaining connections");
+    logger.error("server_shutdown_timeout", { activeConnections: sockets.size });
     for (const socket of sockets) socket.destroy();
   }, 10_000);
 
@@ -38,10 +39,10 @@ async function shutdown(reason: string, exitCode = 0) {
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught exception:", error);
+  logger.error("uncaught_exception", { error: error.stack });
   void shutdown("uncaughtException", 1);
 });
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection:", reason);
+  logger.error("unhandled_rejection", { reason });
   void shutdown("unhandledRejection", 1);
 });

@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+.git
+.github
+.DS_Store
+npm-debug.log*
+frontend/tsconfig.tsbuildinfo
