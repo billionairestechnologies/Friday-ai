@@ -17,6 +17,8 @@ import {
 } from "../services/connectorService.js";
 import { isTokenConnector } from "../services/tokenConnectors.js";
 import { env } from "../config/env.js";
+import { isGithubLoginState, parseGithubLoginState } from "../services/githubAuth.js";
+import { finishGithubLoginRedirect } from "../controllers/authController.js";
 
 export const connectorsRouter = Router();
 const providerParam = z.enum([
@@ -72,6 +74,12 @@ connectorsRouter.get(
     const code = typeof req.query.code === "string" ? req.query.code : "";
     const state = typeof req.query.state === "string" ? req.query.state : "";
     if (!code || !state) throw new HttpError(400, "Missing GitHub OAuth code or state");
+
+    if (isGithubLoginState(state)) {
+      const { returnTo } = parseGithubLoginState(state);
+      res.redirect(await finishGithubLoginRedirect(code, returnTo));
+      return;
+    }
 
     const { userId, returnTo } = parseOAuthState(state);
     await completeGitHubOAuth(userId, code);

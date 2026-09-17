@@ -19,6 +19,7 @@ import {
   googleLoginConfigured,
   parseGoogleLoginState,
 } from "../services/googleAuth.js";
+import { buildGithubLoginUrl, completeGithubLogin, githubLoginConfigured } from "../services/githubAuth.js";
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
@@ -356,4 +357,38 @@ export async function googleCallback(req: Request, res: Response) {
 
 export async function googleSignIn(_req: Request, res: Response) {
   throw new HttpError(405, "Use GET /api/auth/google/start");
+}
+
+/** GitHub sign-in is started here but completed by connectorsRouter's /github/callback,
+ *  since a classic GitHub OAuth App only supports one registered callback URL — the one
+ *  already used for the repo-connector flow. That handler branches on state.purpose. */
+export async function startGithubLogin(req: Request, res: Response) {
+  const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
+  res.json({ url: buildGithubLoginUrl(returnTo), enabled: githubLoginConfigured() });
+}
+
+export async function finishGithubLoginRedirect(code: string, returnTo: string): Promise<string> {
+  const completed = await completeGithubLogin(code);
+  const { role, phone, birthday } = await getProfileExtras(completed.user.id);
+  const payload = Buffer.from(
+    JSON.stringify({
+      session: {
+        access_token: completed.session.access_token,
+        refresh_token: completed.session.refresh_token,
+      },
+      user: {
+        id: completed.user.id,
+        email: completed.user.email,
+        name: completed.name,
+        phone,
+        birthday,
+        role,
+      },
+    }),
+    "utf8",
+  ).toString("base64url");
+
+  const target = new URL(returnTo, env.publicAppUrl);
+  target.hash = `friday_session=${payload}`;
+  return target.toString();
 }

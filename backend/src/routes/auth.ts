@@ -12,11 +12,13 @@ import {
   requestPasswordReset,
   resendOtp,
   signup,
+  startGithubLogin,
   startGoogleLogin,
   updateProfile,
   verifyOtp,
 } from "../controllers/authController.js";
 import { googleLoginConfigured } from "../services/googleAuth.js";
+import { githubLoginConfigured } from "../services/githubAuth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { env } from "../config/env.js";
@@ -57,6 +59,7 @@ authRouter.patch("/profile", requireAuth, asyncHandler(updateProfile));
 authRouter.post("/google", asyncHandler(googleSignIn));
 authRouter.get("/google/start", credentialLimit, asyncHandler(startGoogleLogin));
 authRouter.get("/google/callback", asyncHandler(googleCallback));
+authRouter.get("/github/start", credentialLimit, asyncHandler(startGithubLogin));
 authRouter.get(
   "/sso",
   asyncHandler(async (_req, res) => {
@@ -65,6 +68,7 @@ authRouter.get(
       entryUrl: env.ssoEnabled ? env.ssoEntryUrl || null : null,
       providerLabel: env.ssoProviderLabel,
       google: googleLoginConfigured(),
+      github: githubLoginConfigured(),
     });
   }),
 );
