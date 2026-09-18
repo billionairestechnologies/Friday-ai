@@ -17,6 +17,7 @@ import {
   FolderCode,
   Check,
   ChevronDown,
+  ChevronRight,
   Lock,
   Zap,
   Users,
@@ -25,7 +26,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, getModel, useModels } from "@/lib/chat/models";
+import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, getModel, useModels, type ChatModel } from "@/lib/chat/models";
 import { planSatisfiesTier, usePlan } from "@/lib/usage/planStore";
 import { ProviderLogo } from "@/components/provider-logos";
 import { createLiveAnalyser, type LiveAnalyser } from "@/lib/audio/analyser";
@@ -35,7 +36,7 @@ import { api } from "@/lib/api";
 function ModelIcon({ id, providerSlug, className }: { id: string; providerSlug?: string; className?: string }) {
   if (id === AUTO_MODEL_ID) return <Zap className={className} aria-hidden />;
   if (id === TEAMUP_MODEL_ID) return <Users className={className} aria-hidden />;
-  return <ProviderLogo slug={providerSlug} className={className} />;
+  return <ProviderLogo slug={providerSlug} modelId={decodeModelId(id)?.modelId} className={className} />;
 }
 
 const Textarea = React.forwardRef<
@@ -529,6 +530,62 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const viewerPlan = usePlan((s) => s.plan);
     const isEnterprise = usePlan((s) => s.isEnterprise);
     const loadPlan = usePlan((s) => s.load);
+
+    // Ungrouped sentinels (Auto/Team Up) stay flat at the top; every real model is grouped by
+    // company so the menu opens as a short list of companies instead of one long scrolling list.
+    const ungroupedModels = React.useMemo(() => models.filter((m) => !m.providerSlug), [models]);
+    const modelsByProvider = React.useMemo(() => {
+      const groups = new Map<string, { slug: string; name: string; models: ChatModel[] }>();
+      for (const m of models) {
+        if (!m.providerSlug) continue;
+        let group = groups.get(m.providerSlug);
+        if (!group) {
+          group = { slug: m.providerSlug, name: m.providerName ?? m.providerSlug, models: [] };
+          groups.set(m.providerSlug, group);
+        }
+        group.models.push(m);
+      }
+      return Array.from(groups.values());
+    }, [models]);
+
+    function renderModelItem(m: ChatModel) {
+      const locked = !planSatisfiesTier(viewerPlan, isEnterprise, m.minTier);
+      return (
+        <DropdownMenu.Item
+          key={m.id}
+          onSelect={() => {
+            if (locked) {
+              void navigate({ to: "/upgrade" });
+              return;
+            }
+            onModelChange?.(m.id);
+          }}
+          className={cn(
+            "flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm outline-none data-[highlighted]:bg-chip",
+            locked ? "text-muted" : "text-foreground",
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
+            <ModelIcon id={m.id} providerSlug={m.providerSlug} className={cn("size-4 shrink-0", locked && "opacity-50")} />
+            <span className="min-w-0">
+              <span className="block font-medium">{m.label}</span>
+              {locked ? (
+                <span className="block text-xs text-muted">
+                  {m.minTier === "premium" ? "Premium" : "Pro"} — upgrade to unlock
+                </span>
+              ) : (
+                m.hint !== m.label && <span className="block text-xs text-muted">{m.hint}</span>
+              )}
+            </span>
+          </span>
+          {locked ? (
+            <Lock className="size-3.5 shrink-0 text-muted" />
+          ) : (
+            m.id === model && <Check className="size-4 text-foreground" />
+          )}
+        </DropdownMenu.Item>
+      );
+    }
 
     React.useEffect(() => {
       void loadPlan();
@@ -1073,46 +1130,34 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     <DropdownMenu.Content
                       align="end"
                       sideOffset={8}
-                      className="z-50 min-w-56 rounded-xl border border-border bg-elevated p-1 shadow-xl"
+                      className="z-50 max-h-[70vh] min-w-56 overflow-y-auto rounded-xl border border-border bg-elevated p-1 shadow-xl"
                     >
-                      {models.map((m) => {
-                        const locked = !planSatisfiesTier(viewerPlan, isEnterprise, m.minTier);
-                        return (
-                          <DropdownMenu.Item
-                            key={m.id}
-                            onSelect={() => {
-                              if (locked) {
-                                void navigate({ to: "/upgrade" });
-                                return;
-                              }
-                              onModelChange(m.id);
-                            }}
-                            className={cn(
-                              "flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm outline-none data-[highlighted]:bg-chip",
-                              locked ? "text-muted" : "text-foreground",
-                            )}
+                      {ungroupedModels.map(renderModelItem)}
+
+                      {ungroupedModels.length > 0 && modelsByProvider.length > 0 && (
+                        <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                      )}
+
+                      {modelsByProvider.map((group) => (
+                        <DropdownMenu.Sub key={group.slug}>
+                          <DropdownMenu.SubTrigger
+                            className="flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-foreground outline-none data-[highlighted]:bg-chip data-[state=open]:bg-chip"
                           >
-                            <span className="flex min-w-0 items-center gap-2.5">
-                              <ModelIcon id={m.id} providerSlug={m.providerSlug} className={cn("size-4 shrink-0", locked && "opacity-50")} />
-                              <span className="min-w-0">
-                                <span className="block font-medium">{m.label}</span>
-                                {locked ? (
-                                  <span className="block text-xs text-muted">
-                                    {m.minTier === "premium" ? "Premium" : "Pro"} — upgrade to unlock
-                                  </span>
-                                ) : (
-                                  m.hint !== m.label && <span className="block text-xs text-muted">{m.hint}</span>
-                                )}
-                              </span>
-                            </span>
-                            {locked ? (
-                              <Lock className="size-3.5 shrink-0 text-muted" />
-                            ) : (
-                              m.id === model && <Check className="size-4 text-foreground" />
-                            )}
-                          </DropdownMenu.Item>
-                        );
-                      })}
+                            <ProviderLogo slug={group.slug} className="size-4 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate font-medium">{group.name}</span>
+                            <ChevronRight className="size-3.5 shrink-0 opacity-60" />
+                          </DropdownMenu.SubTrigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.SubContent
+                              sideOffset={6}
+                              alignOffset={-4}
+                              className="z-50 max-h-[70vh] min-w-56 overflow-y-auto rounded-xl border border-border bg-elevated p-1 shadow-xl"
+                            >
+                              {group.models.map(renderModelItem)}
+                            </DropdownMenu.SubContent>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Sub>
+                      ))}
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>

@@ -10,6 +10,8 @@ export type ChatModel = {
   reasoning: boolean;
   /** Provider slug used to look up a real brand logo. Absent for the Auto/Team Up sentinels. */
   providerSlug?: string;
+  /** Human-readable company name, used to group models in the picker. Absent for the Auto/Team Up sentinels. */
+  providerName?: string;
   /** Auto/Team Up are always "free" here — the backend already filters which models THEY can
    *  actually use per-message by the viewer's real plan (see chat/index.ts's tier gate); this
    *  field only needs to gate a DIRECT single-model pick in the model picker's lock icon. */
@@ -57,6 +59,7 @@ function fromOption(m: ModelOption): ChatModel {
     hint: m.display_name,
     reasoning: false,
     providerSlug: m.providers.slug,
+    providerName: m.providers.display_name,
     minTier: m.min_tier,
   };
 }

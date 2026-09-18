@@ -62,7 +62,7 @@ const SarvamLogo = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-/** ScaleMax proxies Claude models, so the Anthropic mark is the accurate logo for what's actually answering. */
+/** ScaleMax's catalog is mostly Claude models, so that's the fallback mark for its provider slug. */
 type LogoComponent = (props: SVGProps<SVGSVGElement>) => ReturnType<typeof OpenAILogo>;
 
 export const PROVIDER_LOGOS: Record<string, LogoComponent> = {
@@ -76,8 +76,18 @@ export const PROVIDER_LOGOS: Record<string, LogoComponent> = {
   sarvam: SarvamLogo,
 };
 
-export function ProviderLogo({ slug, className }: { slug?: string; className?: string }) {
-  const Logo = slug ? PROVIDER_LOGOS[slug] : undefined;
+// ScaleMax proxies both Claude AND GPT models behind one provider slug (see scalemax.ts's own
+// IMAGE_MODEL_PATTERN for the matching precedent), so the slug alone can't tell us the real brand
+// for a given model — only its model id can, hence this id-pattern override.
+const SCALEMAX_OPENAI_MODEL_PATTERN = /^gpt-/i;
+
+function resolveProviderLogo(slug?: string, modelId?: string): LogoComponent | undefined {
+  if (slug === "scalemax" && modelId && SCALEMAX_OPENAI_MODEL_PATTERN.test(modelId)) return OpenAILogo;
+  return slug ? PROVIDER_LOGOS[slug] : undefined;
+}
+
+export function ProviderLogo({ slug, modelId, className }: { slug?: string; modelId?: string; className?: string }) {
+  const Logo = resolveProviderLogo(slug, modelId);
   if (!Logo) return null;
   return <Logo className={className} aria-hidden />;
 }
