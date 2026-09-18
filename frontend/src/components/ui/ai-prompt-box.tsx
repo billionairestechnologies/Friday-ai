@@ -17,13 +17,16 @@ import {
   FolderCode,
   Check,
   ChevronDown,
+  Lock,
   Zap,
   Users,
   AudioLines,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, getModel, useModels } from "@/lib/chat/models";
+import { planSatisfiesTier, usePlan } from "@/lib/usage/planStore";
 import { ProviderLogo } from "@/components/provider-logos";
 import { createLiveAnalyser, type LiveAnalyser } from "@/lib/audio/analyser";
 import { VoiceMode } from "@/components/voice-mode";
@@ -522,6 +525,14 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const cancelledRef = React.useRef(false);
     const analyserRef = React.useRef<LiveAnalyser | null>(null);
     const models = useModels((s) => s.models);
+    const navigate = useNavigate();
+    const viewerPlan = usePlan((s) => s.plan);
+    const isEnterprise = usePlan((s) => s.isEnterprise);
+    const loadPlan = usePlan((s) => s.load);
+
+    React.useEffect(() => {
+      void loadPlan();
+    }, [loadPlan]);
 
     React.useEffect(() => {
       if (!recordError) return;
@@ -1064,26 +1075,44 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       sideOffset={8}
                       className="z-50 min-w-56 rounded-xl border border-border bg-elevated p-1 shadow-xl"
                     >
-                      {models.map((m) => (
-                        <DropdownMenu.Item
-                          key={m.id}
-                          onSelect={() => onModelChange(m.id)}
-                          className="flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-foreground outline-none data-[highlighted]:bg-chip"
-                        >
-                          <span className="flex min-w-0 items-center gap-2.5">
-                            <ModelIcon id={m.id} providerSlug={m.providerSlug} className="size-4 shrink-0" />
-                            <span className="min-w-0">
-                              <span className="block font-medium">{m.label}</span>
-                              {m.hint !== m.label && (
-                                <span className="block text-xs text-muted">{m.hint}</span>
-                              )}
+                      {models.map((m) => {
+                        const locked = !planSatisfiesTier(viewerPlan, isEnterprise, m.minTier);
+                        return (
+                          <DropdownMenu.Item
+                            key={m.id}
+                            onSelect={() => {
+                              if (locked) {
+                                void navigate({ to: "/upgrade" });
+                                return;
+                              }
+                              onModelChange(m.id);
+                            }}
+                            className={cn(
+                              "flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm outline-none data-[highlighted]:bg-chip",
+                              locked ? "text-muted" : "text-foreground",
+                            )}
+                          >
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <ModelIcon id={m.id} providerSlug={m.providerSlug} className={cn("size-4 shrink-0", locked && "opacity-50")} />
+                              <span className="min-w-0">
+                                <span className="block font-medium">{m.label}</span>
+                                {locked ? (
+                                  <span className="block text-xs text-muted">
+                                    {m.minTier === "premium" ? "Premium" : "Pro"} — upgrade to unlock
+                                  </span>
+                                ) : (
+                                  m.hint !== m.label && <span className="block text-xs text-muted">{m.hint}</span>
+                                )}
+                              </span>
                             </span>
-                          </span>
-                          {m.id === model && (
-                            <Check className="size-4 text-foreground" />
-                          )}
-                        </DropdownMenu.Item>
-                      ))}
+                            {locked ? (
+                              <Lock className="size-3.5 shrink-0 text-muted" />
+                            ) : (
+                              m.id === model && <Check className="size-4 text-foreground" />
+                            )}
+                          </DropdownMenu.Item>
+                        );
+                      })}
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>

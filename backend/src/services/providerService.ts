@@ -166,7 +166,7 @@ export async function setModelMinTier(modelId: string, minTier: "free" | "pro" |
 export async function listModelsForUsers() {
   const { data, error } = await supabaseAdmin
     .from("provider_models")
-    .select("id, model_id, display_name, capabilities, providers(slug, display_name)")
+    .select("id, model_id, display_name, capabilities, min_tier, providers(slug, display_name)")
     .eq("is_enabled_for_users", true)
     .order("display_name");
   if (error) throw new HttpError(500, error.message);

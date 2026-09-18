@@ -10,6 +10,10 @@ export type ChatModel = {
   reasoning: boolean;
   /** Provider slug used to look up a real brand logo. Absent for the Auto/Team Up sentinels. */
   providerSlug?: string;
+  /** Auto/Team Up are always "free" here — the backend already filters which models THEY can
+   *  actually use per-message by the viewer's real plan (see chat/index.ts's tier gate); this
+   *  field only needs to gate a DIRECT single-model pick in the model picker's lock icon. */
+  minTier: "free" | "pro" | "premium";
 };
 
 export const AUTO_MODEL_ID = "mode:auto";
@@ -33,6 +37,7 @@ const SPECIAL_MODELS: ChatModel[] = [
     short: "Auto",
     hint: "Tries enabled models in order, falls back automatically",
     reasoning: false,
+    minTier: "free",
   },
   {
     id: TEAMUP_MODEL_ID,
@@ -40,6 +45,7 @@ const SPECIAL_MODELS: ChatModel[] = [
     short: "Team",
     hint: "Asks up to 3 models at once and shows every reply",
     reasoning: false,
+    minTier: "free",
   },
 ];
 
@@ -51,6 +57,7 @@ function fromOption(m: ModelOption): ChatModel {
     hint: m.display_name,
     reasoning: false,
     providerSlug: m.providers.slug,
+    minTier: m.min_tier,
   };
 }
 

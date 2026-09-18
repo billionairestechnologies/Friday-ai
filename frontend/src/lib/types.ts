@@ -18,6 +18,7 @@ export interface ModelOption {
   model_id: string;
   display_name: string;
   capabilities: { chat?: boolean; vision?: boolean; tts?: boolean; stt?: boolean };
+  min_tier: "free" | "pro" | "premium";
   providers: { slug: string; display_name: string };
 }
 

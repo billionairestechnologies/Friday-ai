@@ -68,6 +68,7 @@ function PlanCard({
   busy,
   disabled,
   features,
+  models,
 }: {
   name: string;
   highlighted?: boolean;
@@ -79,6 +80,9 @@ function PlanCard({
   busy: boolean;
   disabled: boolean;
   features: string[];
+  /** Model display names unlocked AT this tier specifically — sourced live from GET /models,
+   *  so an admin re-tiering a model in the provider panel shows up here without a code change. */
+  models?: string[];
 }) {
   return (
     <div
@@ -106,6 +110,18 @@ function PlanCard({
         {current ? "Current Plan" : busy ? "Starting…" : cta}
       </button>
       <FeatureList items={features} />
+      {models && models.length > 0 && (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">Models unlocked</p>
+          <div className="flex flex-wrap gap-1.5">
+            {models.map((m) => (
+              <span key={m} className="rounded-full bg-chip px-2 py-0.5 text-xs text-foreground">
+                {m}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -125,6 +141,24 @@ export function UpgradePage() {
   const [orgName, setOrgName] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [seats, setSeats] = useState(3);
+  const [modelsByTier, setModelsByTier] = useState<Record<"free" | "pro" | "premium", string[]>>({
+    free: [],
+    pro: [],
+    premium: [],
+  });
+
+  useEffect(() => {
+    // Public endpoint (no auth) — the plan cards should show the live model catalog even to a
+    // signed-out visitor, and it reflects whatever an admin just re-tiered without a code change.
+    api
+      .get<{ models: { display_name: string; min_tier: "free" | "pro" | "premium" }[] }>("/models")
+      .then((res) => {
+        const grouped: Record<"free" | "pro" | "premium", string[]> = { free: [], pro: [], premium: [] };
+        for (const m of res.models) grouped[m.min_tier].push(m.display_name);
+        setModelsByTier(grouped);
+      })
+      .catch(() => setModelsByTier({ free: [], pro: [], premium: [] }));
+  }, []);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -274,6 +308,7 @@ export function UpgradePage() {
               busy={false}
               disabled
               features={FREE_FEATURES}
+              models={modelsByTier.free}
             />
             <PlanCard
               name="Pro"
@@ -286,6 +321,7 @@ export function UpgradePage() {
               busy={busyPlan === "pro"}
               disabled={busyPlan !== null || !config?.keyId || !signedIn}
               features={PRO_FEATURES}
+              models={modelsByTier.pro}
             />
             <PlanCard
               name="Premium"
@@ -297,6 +333,7 @@ export function UpgradePage() {
               busy={busyPlan === "premium"}
               disabled={busyPlan !== null || !config?.keyId || !signedIn}
               features={PREMIUM_FEATURES}
+              models={modelsByTier.premium}
             />
           </div>
         ) : (

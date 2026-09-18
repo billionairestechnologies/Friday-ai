@@ -7,6 +7,7 @@ import {
   Building2,
   Check,
   CreditCard,
+  Lock,
   Palette,
   Shield,
   SlidersHorizontal,
@@ -18,6 +19,7 @@ import {
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useModels } from "@/lib/chat/models";
+import { planSatisfiesTier, usePlan } from "@/lib/usage/planStore";
 import { saveFile } from "@/lib/chat/download";
 import { useChat } from "@/lib/chat/store";
 import { VoicePicker } from "@/components/voice-picker";
@@ -300,11 +302,19 @@ const PERSONALITY_PRESETS = [
 ] as const;
 
 function BehaviorPane() {
+  const navigate = useNavigate();
   const model = useChat((s) => s.model);
   const setModel = useChat((s) => s.setModel);
   const models = useModels((s) => s.models);
   const behavior = useChat((s) => s.behavior);
   const setBehavior = useChat((s) => s.setBehavior);
+  const viewerPlan = usePlan((s) => s.plan);
+  const isEnterprise = usePlan((s) => s.isEnterprise);
+  const loadPlan = usePlan((s) => s.load);
+
+  useEffect(() => {
+    void loadPlan();
+  }, [loadPlan]);
 
   return (
     <div>
@@ -336,23 +346,34 @@ function BehaviorPane() {
 
       <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">Default model</p>
       <div className="flex flex-col gap-1">
-        {models.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setModel(m.id)}
-            className={cn(
-              "flex items-center justify-between rounded-xl px-3 py-2.5 text-left",
-              m.id === model ? "bg-chip" : "hover:bg-chip/60",
-            )}
-          >
-            <span>
-              <span className="block text-sm font-medium">{m.label}</span>
-              <span className="block text-xs text-muted">{m.hint}</span>
-            </span>
-            {m.id === model && <Check className="size-4" />}
-          </button>
-        ))}
+        {models.map((m) => {
+          const locked = !planSatisfiesTier(viewerPlan, isEnterprise, m.minTier);
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => {
+                if (locked) {
+                  void navigate({ to: "/upgrade" });
+                  return;
+                }
+                setModel(m.id);
+              }}
+              className={cn(
+                "flex items-center justify-between rounded-xl px-3 py-2.5 text-left",
+                locked ? "text-muted" : m.id === model ? "bg-chip" : "hover:bg-chip/60",
+              )}
+            >
+              <span>
+                <span className="block text-sm font-medium">{m.label}</span>
+                <span className="block text-xs text-muted">
+                  {locked ? `${m.minTier === "premium" ? "Premium" : "Pro"} — upgrade to unlock` : m.hint}
+                </span>
+              </span>
+              {locked ? <Lock className="size-4 text-muted" /> : m.id === model && <Check className="size-4" />}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
