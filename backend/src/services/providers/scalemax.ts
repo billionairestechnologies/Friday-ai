@@ -2,23 +2,48 @@ import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
 
-// ScaleMax (api.scalemax.pro) proxies Claude models behind an Anthropic-compatible
-// /messages API, so this adapter mirrors the Anthropic one but targets ScaleMax's base
-// URL and doesn't rely on a working GET /models (it exposes a fixed, known model set).
+// ScaleMax (api.scalemax.pro) proxies Claude AND GPT models (confirmed directly against the
+// real API 2026-09-18 — its catalog grew well past the Claude-only set this adapter used to
+// hardcode) behind one Anthropic-compatible /messages API, so chat/chatStream/healthCheck below
+// work unmodified for any model id in the catalog. GET /models IS real and live (the comment this
+// replaced claimed otherwise) — it just doesn't follow OpenAI's /v1/models shape, hence the
+// bespoke response type here instead of reusing openai.ts's.
 const BASE_URL = "https://api.scalemax.pro/token/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-const KNOWN_MODELS: ProviderModel[] = [
-  { modelId: "claude-opus-5", displayName: "Claude Opus 5", capabilities: { chat: true, vision: true } },
-  { modelId: "claude-sonnet-5", displayName: "Claude Sonnet 5", capabilities: { chat: true, vision: true } },
-  { modelId: "fable-5", displayName: "Claude Fable 5", capabilities: { chat: true, vision: true } },
-];
+// ScaleMax's catalog includes image-generation models (flux-*, gpt-image-*) alongside chat
+// models, on the same /models list. This app has no image-generation feature to route them to —
+// they'd otherwise show up in the chat model picker and fail on the first real message.
+const IMAGE_MODEL_PATTERN = /^(flux-|gpt-image-)/;
+
+type ScaleMaxModel = {
+  id: string;
+  display_name?: string;
+  capabilities?: Record<string, boolean>;
+};
 
 export const scalemaxAdapter: ProviderAdapter = {
   slug: "scalemax",
 
-  async listModels(_apiKey: string): Promise<ProviderModel[]> {
-    return KNOWN_MODELS;
+  async listModels(apiKey: string): Promise<ProviderModel[]> {
+    const res = await fetch(`${BASE_URL}/models`, {
+      headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION },
+    });
+    if (!res.ok) throw new Error(`ScaleMax listModels failed: ${res.status} ${await res.text()}`);
+    const body = (await res.json()) as { data: ScaleMaxModel[] };
+
+    return body.data
+      .filter((m) => !IMAGE_MODEL_PATTERN.test(m.id) && m.capabilities?.chat !== false)
+      .map((m) => ({
+        modelId: m.id,
+        displayName: m.display_name ?? m.id,
+        // ScaleMax's /models response doesn't report vision support explicitly — every model
+        // in its chat catalog is a frontier multimodal-class release (Claude Opus/Sonnet/Fable,
+        // GPT-5.x/6), so defaulting true here matches openai.ts's own generous precedent
+        // (`/gpt-4|gpt-5|omni|o[0-9]/`) rather than under-claiming and blocking image attachments
+        // on models that do support them.
+        capabilities: { chat: true, vision: true },
+      }));
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
@@ -48,18 +73,8 @@ export const scalemaxAdapter: ProviderAdapter = {
 
   async healthCheck(apiKey: string): Promise<HealthCheckResult> {
     try {
-      const res = await fetch(`${BASE_URL}/messages`, {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": ANTHROPIC_VERSION,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: KNOWN_MODELS[0].modelId,
-          max_tokens: 1,
-          messages: [{ role: "user", content: "ping" }],
-        }),
+      const res = await fetch(`${BASE_URL}/models`, {
+        headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION },
       });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
       return { ok: true };
