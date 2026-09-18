@@ -5,11 +5,18 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { ProviderModelRow, ProviderWithStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const USERNAME_LOGIN_DOMAIN = "fridayai.com";
+// There is exactly one admin account now (consolidated from two — see git history) at an
+// address Resend can actually deliver the login OTP to (its sandbox mode otherwise only
+// delivers to the account it was signed up with). Typing the bare username still works; typing
+// any other full email also works unchanged.
+const USERNAME_LOGIN_EMAILS: Record<string, string> = {
+  admin: "admin.billionairestechnologies@gmail.com",
+};
 
 function resolveLoginEmail(input: string): string {
   const trimmed = input.trim();
-  return trimmed.includes("@") ? trimmed : `${trimmed}@${USERNAME_LOGIN_DOMAIN}`;
+  if (trimmed.includes("@")) return trimmed;
+  return USERNAME_LOGIN_EMAILS[trimmed.toLowerCase()] ?? trimmed;
 }
 
 // /admin is intentionally not part of the regular sign-in flow and isn't linked from
