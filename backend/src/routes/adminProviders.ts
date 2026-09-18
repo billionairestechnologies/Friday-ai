@@ -23,3 +23,4 @@ adminProvidersRouter.post("/keys/check-all", asyncHandler(controller.checkAllKey
 adminProvidersRouter.post("/:slug/sync", asyncHandler(controller.syncModels));
 adminProvidersRouter.get("/:slug/models", asyncHandler(controller.listProviderModels));
 adminProvidersRouter.patch("/models/:modelId", asyncHandler(controller.setModelEnabled));
+adminProvidersRouter.patch("/models/:modelId/tier", asyncHandler(controller.setModelMinTier));

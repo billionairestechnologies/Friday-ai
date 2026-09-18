@@ -156,6 +156,12 @@ export async function setModelEnabled(modelId: string, enabled: boolean) {
   if (error) throw new HttpError(500, error.message);
 }
 
+/** Which plan tier a model is gated behind (see chat/index.ts's tier gate and canUseModelTier). */
+export async function setModelMinTier(modelId: string, minTier: "free" | "pro" | "premium") {
+  const { error } = await supabaseAdmin.from("provider_models").update({ min_tier: minTier }).eq("id", modelId);
+  if (error) throw new HttpError(500, error.message);
+}
+
 /** Models shown in the chat/auth-page model selector — only ones the admin has enabled. */
 export async function listModelsForUsers() {
   const { data, error } = await supabaseAdmin
@@ -173,6 +179,7 @@ export interface ChatCandidate {
   modelId: string;
   displayName: string;
   vision: boolean;
+  minTier: "free" | "pro" | "premium";
 }
 
 /** Looks up a single model's friendly display name (e.g. "Sarvam 105B") for reply labels. Falls back to the raw model id. */
@@ -197,6 +204,18 @@ export async function getModelVisionSupport(providerId: string, modelId: string)
   return (data?.capabilities as Record<string, boolean> | null)?.vision === true;
 }
 
+/** The plan tier (free/pro/premium) an admin has gated this model behind — used to keep a Free
+ *  user off flagship/reasoning models even in single mode, where they picked the model directly. */
+export async function getModelMinTier(providerId: string, modelId: string): Promise<"free" | "pro" | "premium"> {
+  const { data } = await supabaseAdmin
+    .from("provider_models")
+    .select("min_tier")
+    .eq("provider_id", providerId)
+    .eq("model_id", modelId)
+    .maybeSingle();
+  return (data?.min_tier as "free" | "pro" | "premium" | undefined) ?? "free";
+}
+
 /**
  * Enabled, chat-capable models whose provider currently has a working key —
  * the pool that Auto and Team Up modes pick from.
@@ -204,7 +223,7 @@ export async function getModelVisionSupport(providerId: string, modelId: string)
 export async function listChatCandidates(): Promise<ChatCandidate[]> {
   const { data: models, error } = await supabaseAdmin
     .from("provider_models")
-    .select("model_id, display_name, capabilities, provider_id, providers(slug, display_name)")
+    .select("model_id, display_name, capabilities, provider_id, min_tier, providers(slug, display_name)")
     .eq("is_enabled_for_users", true);
   if (error) throw new HttpError(500, error.message);
 
@@ -228,6 +247,7 @@ export async function listChatCandidates(): Promise<ChatCandidate[]> {
         modelId: m.model_id,
         displayName: m.display_name,
         vision,
+        minTier: (m.min_tier as "free" | "pro" | "premium" | null) ?? "free",
       };
     });
 }

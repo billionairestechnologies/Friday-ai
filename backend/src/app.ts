@@ -10,6 +10,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
 import { adminProvidersRouter } from "./routes/adminProviders.js";
+import { adminQuotaRouter } from "./routes/adminQuota.js";
 import { modelsRouter } from "./routes/models.js";
 import { chatRouter } from "./routes/chat.js";
 import { voiceRouter } from "./routes/voice.js";
@@ -65,6 +66,7 @@ export function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/admin/providers", adminProvidersRouter);
+  app.use("/api/admin/quota", adminQuotaRouter);
   app.use("/api/models", modelsRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/voice", voiceRouter);

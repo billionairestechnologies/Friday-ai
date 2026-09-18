@@ -69,4 +69,5 @@ export interface ProviderModelRow {
   display_name: string;
   capabilities: Record<string, boolean>;
   is_enabled_for_users: boolean;
+  min_tier: "free" | "pro" | "premium";
 }

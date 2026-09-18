@@ -62,3 +62,14 @@ export async function setModelEnabled(req: Request, res: Response) {
   });
   res.status(204).send();
 }
+
+const setMinTierSchema = z.object({ minTier: z.enum(["free", "pro", "premium"]) });
+
+export async function setModelMinTier(req: Request, res: Response) {
+  const { minTier } = setMinTierSchema.parse(req.body);
+  await providerService.setModelMinTier(req.params.modelId, minTier);
+  void recordAdminAuditLog(req.user!.id, "provider_model_tier_changed", "provider_model", req.params.modelId, {
+    minTier,
+  });
+  res.status(204).send();
+}

@@ -129,6 +129,7 @@ export async function streamMessage(req: Request, res: Response) {
       webSearch,
       canvas,
       attachments,
+      req.quotaReservation,
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong";

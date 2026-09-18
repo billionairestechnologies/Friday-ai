@@ -132,12 +132,32 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   const failed = eventType === "payment.failed";
   if (!paid && !failed) return;
 
-  await supabaseAdmin
+  const { data: order, error } = await supabaseAdmin
     .from("razorpay_orders")
     .update({
       status: paid ? "paid" : "failed",
       razorpay_payment_id: paymentId,
       updated_at: new Date().toISOString(),
     })
-    .eq("razorpay_order_id", orderId);
+    .eq("razorpay_order_id", orderId)
+    .select("user_id, plan")
+    .maybeSingle();
+  if (error) {
+    logger.warn("razorpay_order_update_failed", { orderId, error: error.message });
+    return;
+  }
+
+  // This is the ONLY place a payment actually grants anything — without it, paying just marks
+  // the order row "paid" with no effect on the user's actual limits. BILLING_PLANS' "business"
+  // id predates profiles.plan's ('free'|'pro'|'premium') enum and is this app's higher
+  // individual tier, not the org-level "business" plan on `organizations` — mapped accordingly.
+  if (paid && order?.user_id) {
+    const plan = order.plan === "business" ? "premium" : "pro";
+    const planRenewsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({ plan, plan_renews_at: planRenewsAt })
+      .eq("id", order.user_id);
+    if (profileError) logger.warn("razorpay_plan_grant_failed", { orderId, error: profileError.message });
+  }
 }

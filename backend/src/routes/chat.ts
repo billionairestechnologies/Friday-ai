@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { env } from "../config/env.js";
 import { concurrencyLimit, rateLimit } from "../middleware/rateLimit.js";
+import { quotaLimit } from "../middleware/quotaLimit.js";
 
 export const chatRouter = Router();
 
@@ -32,5 +33,6 @@ chatRouter.post(
   chatBurstLimit,
   chatDailyLimit,
   chatConcurrencyLimit,
+  quotaLimit,
   asyncHandler(controller.streamMessage),
 );

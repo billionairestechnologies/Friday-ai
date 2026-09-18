@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { useChat } from "@/lib/chat/store";
 import { currentDirection, currentLocale } from "@/lib/i18n";
+import { QuotaAlerts } from "@/components/quota-alerts";
 
 export function RootLayout() {
   const appearance = useChat((s) => s.appearance);
@@ -12,5 +13,10 @@ export function RootLayout() {
     document.documentElement.dir = currentDirection();
   }, [appearance]);
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <QuotaAlerts />
+    </>
+  );
 }

@@ -22,6 +22,15 @@ import { useChat } from "@/lib/chat/store";
 import { VoicePicker } from "@/components/voice-picker";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import {
+  formatResetAt,
+  formatTokens,
+  labelForEventType,
+  percentUsed,
+  type QuotaBreakdownEntry,
+  type QuotaResponse,
+  type QuotaStatus,
+} from "@/lib/usage/quota";
 
 const NAV = [
   {
@@ -598,70 +607,132 @@ function BillingPane() {
   );
 }
 
-type UsageSummary = {
-  periodStart: string;
-  totals: {
-    chatMessages: number;
-    searches: number;
-    voiceSeconds: number;
-    sandboxRuns: number;
-    attachmentUploads: number;
-    tokens: number;
-    estimatedCostCents: number;
-  };
-};
+const PLAN_LABEL: Record<QuotaStatus["plan"], string> = { free: "Free", pro: "Pro", premium: "Premium" };
+const DOT_COLORS = ["bg-search", "bg-think", "bg-canvas", "bg-muted"];
+
+function QuotaBar({
+  title,
+  bucket,
+  help,
+  breakdown,
+}: {
+  title: string;
+  bucket: { used: number; limit: number; resetAt: string };
+  help?: string;
+  breakdown?: QuotaBreakdownEntry[];
+}) {
+  const pct = percentUsed(bucket);
+  return (
+    <div className="rounded-2xl border border-border bg-background p-4">
+      <div className="mb-3 flex items-center gap-1.5">
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        {help && <span title={help} className="text-xs text-subtle">ⓘ</span>}
+      </div>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-2xl font-semibold text-foreground">
+          {pct}% <span className="text-sm font-normal text-muted">used</span>
+        </p>
+        <p className="text-right text-xs text-muted">
+          Resets <span className="font-medium text-foreground">{formatResetAt(bucket.resetAt)}</span>
+        </p>
+      </div>
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-chip">
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-300",
+            pct >= 100 ? "bg-danger" : pct >= 80 ? "bg-canvas" : "bg-search",
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        {formatTokens(bucket.used)} / {formatTokens(bucket.limit)} tokens
+      </p>
+      {breakdown && breakdown.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-3 border-t border-border pt-3">
+          {breakdown.map((entry, i) => (
+            <span key={entry.type} className="flex items-center gap-1.5 text-xs text-muted">
+              <span className={cn("size-1.5 rounded-full", DOT_COLORS[i % DOT_COLORS.length])} />
+              {labelForEventType(entry.type)} <span className="font-medium text-foreground">{entry.percent}%</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function UsagePane() {
   const { user } = useCurrentUserState();
-  const [summary, setSummary] = useState<UsageSummary | null>(null);
+  const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const signedIn = Boolean(user && !user.isDevFallback);
 
   useEffect(() => {
     if (!signedIn) return;
     api
-      .get<UsageSummary>("/usage/summary")
+      .get<QuotaResponse>("/usage/quota")
       .then((res) => {
-        setSummary(res);
+        setQuota(res);
         setError(null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load usage"));
   }, [signedIn]);
 
   if (!signedIn) {
-    return <SimpleNote title="Usage" body="Sign in to track monthly chat, search, voice, attachment, and sandbox usage." />;
+    return <SimpleNote title="Usage" body="Sign in to track your token limits and usage." />;
   }
-
-  const rows = summary
-    ? [
-        ["Chat messages", summary.totals.chatMessages],
-        ["Searches", summary.totals.searches],
-        ["Voice seconds", summary.totals.voiceSeconds],
-        ["Sandbox runs", summary.totals.sandboxRuns],
-        ["Attachments", summary.totals.attachmentUploads],
-        ["Tokens", summary.totals.tokens],
-      ]
-    : [];
 
   return (
     <div>
-      <h2 className="mb-1 text-lg font-semibold">Usage</h2>
-      <p className="mb-4 text-sm text-muted">
-        {summary
-          ? `Current period started ${new Date(summary.periodStart).toLocaleDateString()}. Est. cost $${(
-              summary.totals.estimatedCostCents / 100
-            ).toFixed(2)}.`
-          : "Loading current period usage..."}
-      </p>
-      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {rows.map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-border bg-background p-3">
-            <p className="text-xs text-muted">{label}</p>
-            <p className="mt-1 font-mono text-2xl font-semibold">{value}</p>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Usage</h2>
+        {quota && (
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-chip px-2.5 py-1 text-xs font-medium text-foreground">
+              {quota.status.isEnterprise ? "Enterprise" : PLAN_LABEL[quota.status.plan]} plan
+            </span>
+            {!quota.status.isEnterprise && quota.status.plan !== "premium" && (
+              <button
+                type="button"
+                onClick={() => useChat.getState().setSettingsTab("billing")}
+                className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
+              >
+                Upgrade
+              </button>
+            )}
           </div>
-        ))}
+        )}
       </div>
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      {!quota ? (
+        <p className="text-sm text-muted">Loading current usage…</p>
+      ) : (
+        <div className="space-y-3">
+          <QuotaBar title="Weekly Limit" bucket={quota.status.weekly} breakdown={quota.breakdown} />
+          {quota.status.rolling && (
+            <QuotaBar
+              title="5-Hour Limit"
+              bucket={quota.status.rolling}
+              help="A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once."
+            />
+          )}
+          {quota.status.monthly && <QuotaBar title="Monthly Limit" bucket={quota.status.monthly} />}
+          {quota.status.org && (
+            <QuotaBar
+              title={`Organization Pool (${quota.status.org.seatCount} seats)`}
+              bucket={quota.status.org}
+            />
+          )}
+          {quota.status.memberCap && (
+            <QuotaBar
+              title="Your Monthly Cap"
+              bucket={{ ...quota.status.memberCap, resetAt: quota.status.org?.resetAt ?? new Date().toISOString() }}
+              help="A personal sub-limit your org admin set within the shared pool above."
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

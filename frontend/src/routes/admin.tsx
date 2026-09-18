@@ -120,6 +120,7 @@ function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
 }
 
 function AdminPage({ onLogout }: { onLogout: () => void }) {
+  const [section, setSection] = useState<"providers" | "plans">("providers");
   const [providers, setProviders] = useState<ProviderWithStatus[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [models, setModels] = useState<Record<string, ProviderModelRow[]>>({});
@@ -213,20 +214,51 @@ function AdminPage({ onLogout }: { onLogout: () => void }) {
     refreshProviders();
   }
 
+  async function setModelTier(modelId: string, slug: string, minTier: string) {
+    await api.patch(`/admin/providers/models/${modelId}/tier`, { minTier });
+    loadModels(slug);
+  }
+
   return (
     <div className="min-h-dvh bg-background px-4 py-8 text-foreground md:px-8">
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <header className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Admin panel</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold">Admin panel</h1>
+            <div className="flex items-center rounded-full bg-chip p-0.5">
+              <button
+                type="button"
+                onClick={() => setSection("providers")}
+                className={cn(
+                  "h-7 rounded-full px-3 text-xs font-medium",
+                  section === "providers" ? "bg-background text-foreground" : "text-muted",
+                )}
+              >
+                Providers
+              </button>
+              <button
+                type="button"
+                onClick={() => setSection("plans")}
+                className={cn(
+                  "h-7 rounded-full px-3 text-xs font-medium",
+                  section === "plans" ? "bg-background text-foreground" : "text-muted",
+                )}
+              >
+                Plans & Usage
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={checkAll}
-              disabled={busy}
-              className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip disabled:opacity-60"
-            >
-              Check all keys
-            </button>
+            {section === "providers" && (
+              <button
+                type="button"
+                onClick={checkAll}
+                disabled={busy}
+                className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip disabled:opacity-60"
+              >
+                Check all keys
+              </button>
+            )}
             <a
               href="/"
               className="flex h-8 items-center rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
@@ -247,7 +279,9 @@ function AdminPage({ onLogout }: { onLogout: () => void }) {
           <div className="rounded-xl border border-border bg-elevated px-4 py-2.5 text-sm text-muted">{notice}</div>
         )}
 
-        <div className="flex flex-col gap-3">
+        {section === "plans" && <PlansPane />}
+
+        <div className={cn("flex flex-col gap-3", section !== "providers" && "hidden")}>
           {providers.map((p) => (
             <div key={p.id} className="overflow-hidden rounded-2xl border border-border bg-surface">
               <button
@@ -348,6 +382,15 @@ function AdminPage({ onLogout }: { onLogout: () => void }) {
                         />
                         {m.display_name}
                         <span className="text-xs text-subtle">{m.model_id}</span>
+                        <select
+                          value={m.min_tier}
+                          onChange={(e) => setModelTier(m.id, p.slug, e.target.value)}
+                          className="ml-auto h-7 rounded-full border border-border bg-background px-2 text-xs"
+                        >
+                          <option value="free">Free</option>
+                          <option value="pro">Pro</option>
+                          <option value="premium">Premium</option>
+                        </select>
                       </label>
                     ))}
                     {(models[p.slug] ?? []).length === 0 && (
@@ -358,6 +401,215 @@ function AdminPage({ onLogout }: { onLogout: () => void }) {
               )}
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type AdminUserRow = {
+  id: string;
+  fullName: string | null;
+  role: string;
+  plan: "free" | "pro" | "premium";
+  planRenewsAt: string | null;
+  customMonthlyCap: number | null;
+  organizationId: string | null;
+  organizationName: string | null;
+};
+
+type AdminOrganizationRow = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  seatCount: number;
+  pooledMonthlyTokens: number;
+  memberCount: number;
+};
+
+type Profitability = {
+  sinceDays: number;
+  revenuePaise: number;
+  costUsdCents: number;
+  costPaiseApprox: number;
+  profitPaiseApprox: number;
+  totalTokens: number;
+  completions: number;
+};
+
+function formatInr(paise: number): string {
+  return `₹${(paise / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * The admin panel's "master control": every user's plan/personal cap, every enterprise
+ * org's seats/pooled tokens, and a real-money profitability card (Razorpay revenue vs.
+ * estimated provider cost from token_ledger — see adminUserService.profitabilitySummary).
+ */
+function PlansPane() {
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [orgs, setOrgs] = useState<AdminOrganizationRow[]>([]);
+  const [profit, setProfit] = useState<Profitability | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function refresh() {
+    api.get<{ users: AdminUserRow[] }>("/admin/quota/users").then((res) => setUsers(res.users));
+    api.get<{ organizations: AdminOrganizationRow[] }>("/admin/quota/organizations").then((res) => setOrgs(res.organizations));
+    api.get<Profitability>("/admin/quota/profitability?sinceDays=30").then(setProfit);
+  }
+
+  useEffect(refresh, []);
+
+  async function withBusy(id: string, fn: () => Promise<void>) {
+    setBusyId(id);
+    setNotice(null);
+    try {
+      await fn();
+      refresh();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {notice && <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger">{notice}</div>}
+
+      {profit && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-2xl border border-border bg-surface p-3">
+            <p className="text-xs text-muted">Revenue (30d)</p>
+            <p className="mt-1 text-lg font-semibold">{formatInr(profit.revenuePaise)}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-3">
+            <p className="text-xs text-muted">Est. cost (30d)</p>
+            <p className="mt-1 text-lg font-semibold">{formatInr(profit.costPaiseApprox)}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-3">
+            <p className="text-xs text-muted">Profit (30d, approx.)</p>
+            <p className={cn("mt-1 text-lg font-semibold", profit.profitPaiseApprox < 0 && "text-danger")}>
+              {formatInr(profit.profitPaiseApprox)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-3">
+            <p className="text-xs text-muted">Completions (30d)</p>
+            <p className="mt-1 text-lg font-semibold">{profit.completions}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+        <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Users</h3>
+        <div className="flex flex-col divide-y divide-border">
+          {users.map((u) => (
+            <div key={u.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+              <span className="min-w-0 flex-1 truncate">{u.fullName ?? u.id}</span>
+              {u.organizationName && (
+                <span className="rounded-full bg-chip px-2 py-0.5 text-xs text-muted">{u.organizationName}</span>
+              )}
+              <select
+                value={u.plan}
+                disabled={busyId === u.id}
+                onChange={(e) =>
+                  void withBusy(u.id, () => api.patch(`/admin/quota/users/${u.id}/plan`, { plan: e.target.value }))
+                }
+                className="h-7 rounded-full border border-border bg-background px-2 text-xs"
+              >
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="premium">Premium</option>
+              </select>
+              <input
+                type="number"
+                placeholder="Custom cap"
+                defaultValue={u.customMonthlyCap ?? ""}
+                onBlur={(e) => {
+                  const value = e.target.value.trim();
+                  void withBusy(u.id, () =>
+                    api.patch(`/admin/quota/users/${u.id}/custom-cap`, {
+                      customMonthlyCap: value ? Number(value) : null,
+                    }),
+                  );
+                }}
+                className="h-7 w-28 rounded-full border border-border bg-background px-2 text-xs"
+              />
+              <button
+                type="button"
+                disabled={busyId === u.id}
+                onClick={() =>
+                  void withBusy(u.id, () => api.post(`/admin/quota/users/${u.id}/bonus-tokens`, { tokens: 1_000_000 }))
+                }
+                className="h-7 rounded-full border border-border px-2.5 text-xs hover:bg-chip"
+              >
+                +1M bonus
+              </button>
+              <button
+                type="button"
+                disabled={busyId === u.id}
+                onClick={() => void withBusy(u.id, () => api.post(`/admin/quota/users/${u.id}/reset-quota`))}
+                className="h-7 rounded-full border border-border px-2.5 text-xs hover:bg-chip"
+              >
+                Reset now
+              </button>
+            </div>
+          ))}
+          {users.length === 0 && <p className="px-4 py-3 text-sm text-subtle">No users yet.</p>}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+        <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Organizations</h3>
+        <div className="flex flex-col divide-y divide-border">
+          {orgs.map((org) => (
+            <div key={org.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+              <span className="min-w-0 flex-1 truncate">
+                {org.name} <span className="text-xs text-subtle">({org.memberCount} members)</span>
+              </span>
+              <select
+                value={org.plan}
+                disabled={busyId === org.id}
+                onChange={(e) =>
+                  void withBusy(org.id, () => api.patch(`/admin/quota/organizations/${org.id}/plan`, { plan: e.target.value }))
+                }
+                className="h-7 rounded-full border border-border bg-background px-2 text-xs"
+              >
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="business">Business</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+              <input
+                type="number"
+                defaultValue={org.seatCount}
+                title="Seats"
+                onBlur={(e) => {
+                  const seatCount = Number(e.target.value);
+                  if (seatCount) void withBusy(org.id, () => api.patch(`/admin/quota/organizations/${org.id}/seats`, { seatCount }));
+                }}
+                className="h-7 w-20 rounded-full border border-border bg-background px-2 text-xs"
+              />
+              <span className="text-xs text-muted">seats</span>
+              <input
+                type="number"
+                defaultValue={org.pooledMonthlyTokens}
+                title="Pooled monthly tokens"
+                onBlur={(e) => {
+                  const pooledMonthlyTokens = Number(e.target.value);
+                  if (pooledMonthlyTokens >= 0)
+                    void withBusy(org.id, () =>
+                      api.patch(`/admin/quota/organizations/${org.id}/pooled-tokens`, { pooledMonthlyTokens }),
+                    );
+                }}
+                className="h-7 w-32 rounded-full border border-border bg-background px-2 text-xs"
+              />
+              <span className="text-xs text-muted">pooled tokens/mo</span>
+            </div>
+          ))}
+          {orgs.length === 0 && <p className="px-4 py-3 text-sm text-subtle">No organizations yet.</p>}
         </div>
       </div>
     </div>
