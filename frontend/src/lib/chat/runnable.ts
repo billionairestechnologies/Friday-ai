@@ -1,6 +1,6 @@
 import { api } from "@/lib/api";
 
-export type RunLanguage = "python" | "javascript";
+export type RunLanguage = "python" | "javascript" | "typescript" | "r" | "java" | "bash";
 
 export type RunResult = {
   output: string;
@@ -23,6 +23,13 @@ const LANG_ALIASES: Record<string, RunLanguage> = {
   py: "python",
   javascript: "javascript",
   js: "javascript",
+  typescript: "typescript",
+  ts: "typescript",
+  r: "r",
+  java: "java",
+  bash: "bash",
+  sh: "bash",
+  shell: "bash",
 };
 
 export function normalizeRunLanguage(lang?: string): RunLanguage | null {

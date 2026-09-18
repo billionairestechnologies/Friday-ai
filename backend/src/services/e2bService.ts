@@ -4,7 +4,7 @@ import { env } from "../config/env.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { fixCode } from "./chat/codeFix.js";
 
-export type RunLanguage = "python" | "javascript";
+export type RunLanguage = "python" | "javascript" | "typescript" | "r" | "java" | "bash";
 
 export interface RunResult {
   output: string;

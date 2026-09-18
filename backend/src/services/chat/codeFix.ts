@@ -6,10 +6,9 @@ import type { RunLanguage } from "../e2bService.js";
 
 const FIX_SYSTEM_PROMPT =
   "You are fixing a script that just failed to run in a real sandbox. You will be given the " +
-  "original code and the exact error/traceback it produced. Reply with ONLY the corrected, " +
-  "complete, self-contained code in a single fenced code block (```python or ```javascript, " +
-  "matching the input language) — no explanation before or after, no partial diffs, the whole " +
-  "fixed file.";
+  "original code, its language, and the exact error/traceback it produced. Reply with ONLY the " +
+  "corrected, complete, self-contained code in a single fenced code block tagged with that same " +
+  "language — no explanation before or after, no partial diffs, the whole fixed file.";
 
 const FENCE = /```(?:\w+)?\n([\s\S]*?)```/;
 

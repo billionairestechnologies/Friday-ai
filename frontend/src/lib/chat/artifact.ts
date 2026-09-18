@@ -7,8 +7,21 @@ export type Artifact = {
 
 const FENCE = /```(\w+)?\n([\s\S]*?)```/g;
 // Languages Canvas can actually execute for real (in an isolated E2B VM), vs. just
-// display as static text — see runnable.ts and the sandbox controller/service on the backend.
-const RUNNABLE_LANGS = new Set(["python", "py", "javascript", "js"]);
+// display as static text — see runnable.ts and the sandbox controller/service on the backend,
+// and RunCodeLanguage in the E2B SDK for the full set it supports.
+const RUNNABLE_LANGS = new Set([
+  "python",
+  "py",
+  "javascript",
+  "js",
+  "typescript",
+  "ts",
+  "r",
+  "java",
+  "bash",
+  "sh",
+  "shell",
+]);
 
 // Some models (this got noticeably worse after a model switch) write a React component and
 // still fence it as ```javascript/```js instead of ```jsx — RUNNABLE_LANGS would then send a
@@ -32,7 +45,7 @@ export function extractArtifact(content: string): Artifact | null {
   const react = blocks.find((b) => {
     const lang = (b[1] ?? "").toLowerCase();
     if (["tsx", "jsx"].includes(lang)) return true;
-    return ["javascript", "js"].includes(lang) && looksLikeReactComponent(b[2] ?? "");
+    return ["javascript", "js", "typescript", "ts"].includes(lang) && looksLikeReactComponent(b[2] ?? "");
   });
   if (react?.[2]?.trim()) {
     return { kind: "react", body: react[2].trim(), lang: react[1] || "jsx", title: `${react[1] || "jsx"} canvas` };
@@ -41,8 +54,9 @@ export function extractArtifact(content: string): Artifact | null {
   if (runnable?.[2]?.trim()) {
     return { kind: "runnable", body: runnable[2].trim(), lang: runnable[1], title: `${runnable[1]} canvas` };
   }
-  const preferred = ["typescript", "css"];
-  const code = blocks.find((b) => preferred.includes((b[1] ?? "").toLowerCase()));
+  // CSS has nothing to execute — it only ever makes sense rendered inside an HTML/React
+  // artifact, never as its own runnable/preview kind — so it's the one language left here.
+  const code = blocks.find((b) => (b[1] ?? "").toLowerCase() === "css");
   if (code?.[2]?.trim()) {
     return {
       kind: "code",
@@ -79,10 +93,10 @@ export function extractStreamingCodeBody(content: string): { lang?: string; body
 
 // Languages extractArtifact treats as a build artifact with no length gate at all — the ones
 // that can legitimately still be an OPEN, not-yet-closed fence while streaming and already be
-// certain to end up in Canvas. typescript/css match extractArtifact's "preferred" code kind;
-// the rest match html/react/runnable. Deliberately excludes the generic "first block, any
-// language" fallback (gated on text.length > 120), which can't be predicted before it closes.
-const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx|python|py|javascript|js|typescript|css)$/i;
+// certain to end up in Canvas: html/react, every RUNNABLE_LANGS entry, and css (the one
+// remaining static "code" kind). Deliberately excludes the generic "first block, any language"
+// fallback (gated on text.length > 120), which can't be predicted before it closes.
+const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx|python|py|javascript|js|typescript|ts|r|java|bash|sh|shell|css)$/i;
 
 /**
  * Cuts whatever fenced code block extractArtifact() picked as the Canvas artifact out of a

@@ -4,7 +4,7 @@ import * as e2bService from "../services/e2bService.js";
 import { recordUsageEvent } from "../services/usageService.js";
 
 const runSchema = z.object({
-  language: z.enum(["python", "javascript"]),
+  language: z.enum(["python", "javascript", "typescript", "r", "java", "bash"]),
   code: z.string().min(1, "Code cannot be empty").max(50_000),
   // Defaults on: Canvas auto-runs code the moment it lands, and a failure should self-heal
   // rather than just hand the user a stack trace — see runWithAutoFix's own comment for the
