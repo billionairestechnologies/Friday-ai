@@ -104,7 +104,7 @@ export async function createOrganization(userId: string, name: string) {
   };
 }
 
-async function requireOrgRole(userId: string, organizationId: string, roles: OrganizationRole[]) {
+export async function requireOrgRole(userId: string, organizationId: string, roles: OrganizationRole[]) {
   const { data, error } = await supabaseAdmin
     .from("organization_memberships")
     .select("role")
@@ -226,19 +226,57 @@ export async function listOrganizationMembers(userId: string, organizationId: st
   await requireOrgRole(userId, organizationId, ["owner", "admin", "member"]);
   const { data, error } = await supabaseAdmin
     .from("organization_memberships")
-    .select("role, created_at, user_id, profiles(full_name)")
+    .select("role, created_at, user_id, profiles(full_name, custom_monthly_cap)")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: true });
   if (error) throw new HttpError(500, error.message);
 
   return (data ?? []).map((row) => {
-    const profile = row.profiles as { full_name: string | null } | { full_name: string | null }[] | null;
+    const profile = row.profiles as
+      | { full_name: string | null; custom_monthly_cap: number | null }
+      | { full_name: string | null; custom_monthly_cap: number | null }[]
+      | null;
     const resolved = Array.isArray(profile) ? profile[0] : profile;
     return {
       userId: row.user_id as string,
       role: row.role as OrganizationRole,
       fullName: resolved?.full_name ?? null,
+      customMonthlyCap: resolved?.custom_monthly_cap ?? null,
       joinedAt: row.created_at as string,
     };
+  });
+}
+
+/**
+ * Self-service equivalent of the platform admin panel's per-user cap control (see
+ * adminUserService.setUserCustomCap) — lets an ENTERPRISE org's own owner/admin cap a teammate's
+ * draw against the shared pool, without needing Friday's own admin to do it for them. Scoped to
+ * members of THIS org specifically, not a blanket "set anyone's cap" action.
+ */
+export async function setMemberCustomCap(
+  actingUserId: string,
+  organizationId: string,
+  targetUserId: string,
+  customMonthlyCap: number | null,
+): Promise<void> {
+  await requireOrgRole(actingUserId, organizationId, ["owner", "admin"]);
+  const { data: membership, error: membershipError } = await supabaseAdmin
+    .from("organization_memberships")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", targetUserId)
+    .maybeSingle();
+  if (membershipError) throw new HttpError(500, membershipError.message);
+  if (!membership) throw new HttpError(404, "That user isn't a member of this organization");
+
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update({ custom_monthly_cap: customMonthlyCap })
+    .eq("id", targetUserId);
+  if (error) throw new HttpError(500, error.message);
+
+  await recordAdminAuditLog(actingUserId, "organization.member_cap_set", "profile", targetUserId, {
+    organizationId,
+    customMonthlyCap,
   });
 }

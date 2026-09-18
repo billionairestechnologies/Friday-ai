@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
 import { ENTERPRISE_MIN_SEATS, ENTERPRISE_TOKENS_PER_SEAT } from "./quota/tierConfig.js";
+import { requireOrgRole } from "./organizationService.js";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -88,6 +89,10 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
 
   if (input.planId === "enterprise") {
     if (!input.organizationId) throw new HttpError(400, "organizationId is required for an Enterprise purchase");
+    // Without this, any authenticated user could pass an arbitrary organizationId and buy/
+    // upgrade seats on an org they don't own — the webhook grant trusts whatever org the order
+    // was created against, so authorization has to happen here, before the order even exists.
+    await requireOrgRole(userId, input.organizationId, ["owner", "admin"]);
     seats = Math.max(ENTERPRISE_PLAN.minSeats, Math.floor(input.seats ?? ENTERPRISE_PLAN.minSeats));
     const perSeatForCycle = amountForCycle(ENTERPRISE_PLAN.perSeatMonthlyAmountPaise, input.billingCycle);
     amountPaise = perSeatForCycle * seats;

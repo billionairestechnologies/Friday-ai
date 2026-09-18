@@ -8,6 +8,7 @@ import {
   acceptOrganizationInvite,
   listOrganizationMembers,
   listOrganizationsForUser,
+  setMemberCustomCap,
   updateOrganizationBudget,
 } from "../services/organizationService.js";
 import { env } from "../config/env.js";
@@ -94,5 +95,22 @@ organizationsRouter.post(
     res.status(201).json({
       invite: await inviteOrganizationMember(req.user!.id, organizationId, email, role),
     });
+  }),
+);
+
+const memberCapSchema = z.object({
+  customMonthlyCap: z.number().int().min(0).nullable(),
+});
+
+// Self-service equivalent of the platform admin panel's per-user cap control — an enterprise
+// org's own owner/admin, not just Friday's own admin, can cap a teammate's draw against the pool.
+organizationsRouter.patch(
+  "/:organizationId/members/:userId/cap",
+  asyncHandler(async (req, res) => {
+    const organizationId = z.string().uuid().parse(req.params.organizationId);
+    const userId = z.string().uuid().parse(req.params.userId);
+    const { customMonthlyCap } = memberCapSchema.parse(req.body);
+    await setMemberCustomCap(req.user!.id, organizationId, userId, customMonthlyCap);
+    res.status(204).send();
   }),
 );

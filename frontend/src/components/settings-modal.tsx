@@ -944,6 +944,11 @@ function TeamPane() {
   const [sso, setSso] = useState<{ enabled: boolean; entryUrl: string | null; providerLabel: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [members, setMembers] = useState<
+    { userId: string; role: string; fullName: string | null; customMonthlyCap: number | null; joinedAt: string }[]
+  >([]);
+  const [orgQuota, setOrgQuota] = useState<QuotaStatus | null>(null);
+  const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
 
   function refresh() {
     if (!signedIn) return;
@@ -961,15 +966,48 @@ function TeamPane() {
       .get<{ enabled: boolean; entryUrl: string | null; providerLabel: string }>("/organizations/sso")
       .then(setSso)
       .catch(() => setSso(null));
+    api
+      .get<QuotaResponse>("/usage/quota")
+      .then((res) => setOrgQuota(res.status.org ? res.status : null))
+      .catch(() => setOrgQuota(null));
   }
 
   useEffect(refresh, [signedIn]);
+
+  const selected = organizations.find((org) => org.id === selectedOrgId) ?? null;
+
+  useEffect(() => {
+    if (!selected) {
+      setMembers([]);
+      return;
+    }
+    api
+      .get<{ members: typeof members }>(`/organizations/${selected.id}/members`)
+      .then((res) => setMembers(res.members))
+      .catch(() => setMembers([]));
+  }, [selected?.id]);
 
   if (!signedIn) {
     return <SimpleNote title="Team" body="Sign in to create an organization, invite members, and set budgets." />;
   }
 
-  const selected = organizations.find((org) => org.id === selectedOrgId) ?? null;
+  const canManageMembers = selected?.role === "owner" || selected?.role === "admin";
+
+  async function saveMemberCap(userId: string) {
+    if (!selected) return;
+    const raw = capDrafts[userId]?.trim();
+    const customMonthlyCap = raw ? Number(raw) : null;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patch(`/organizations/${selected.id}/members/${userId}/cap`, { customMonthlyCap });
+      setMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, customMonthlyCap } : m)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't set that member's cap");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function createOrg() {
     if (!name.trim()) return;
@@ -1139,6 +1177,48 @@ function TeamPane() {
                 <p className="rounded-xl border border-border bg-elevated px-3 py-2 text-xs text-muted">
                   Invite token (share once): <span className="font-mono text-foreground">{inviteToken}</span>
                 </p>
+              )}
+
+              {orgQuota?.org && (
+                <QuotaBar title={`Pooled tokens (${orgQuota.org.seatCount} seats)`} bucket={orgQuota.org} />
+              )}
+
+              {members.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-border bg-background">
+                  <p className="border-b border-border px-3 py-2 text-xs font-medium tracking-wide text-muted uppercase">
+                    Members
+                  </p>
+                  <div className="flex flex-col divide-y divide-border">
+                    {members.map((m) => (
+                      <div key={m.userId} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                        <span className="min-w-0 flex-1 truncate">{m.fullName ?? m.userId}</span>
+                        <span className="rounded-full bg-chip px-2 py-0.5 text-xs text-muted">{m.role}</span>
+                        {canManageMembers && (
+                          <>
+                            <input
+                              type="number"
+                              placeholder="No cap"
+                              defaultValue={m.customMonthlyCap ?? ""}
+                              onChange={(e) => setCapDrafts((prev) => ({ ...prev, [m.userId]: e.target.value }))}
+                              className="h-7 w-28 rounded-full border border-border bg-elevated px-2 text-xs outline-none"
+                            />
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void saveMemberCap(m.userId)}
+                              className="h-7 rounded-full border border-border px-2.5 text-xs hover:bg-chip"
+                            >
+                              Set cap
+                            </button>
+                          </>
+                        )}
+                        {!canManageMembers && m.customMonthlyCap != null && (
+                          <span className="text-xs text-muted">Cap: {formatTokens(m.customMonthlyCap)} tokens/mo</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </>
           )}
