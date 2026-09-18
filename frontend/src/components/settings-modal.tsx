@@ -506,63 +506,102 @@ function ProjectsPane() {
   );
 }
 
+type BillingConfig = {
+  provider: "razorpay";
+  keyId: string | null;
+  currency: "INR";
+  annualDiscountPercent: number;
+  individual: { id: "pro" | "premium"; name: string; monthlyAmountPaise: number; annualAmountPaise: number; description: string }[];
+  enterprise: { id: "enterprise"; name: string; perSeatMonthlyAmountPaise: number; minSeats: number; description: string };
+};
+
+type CheckoutResponse = {
+  checkout: { key: string; orderId: string; amount: number; currency: string; name: string; description: string };
+};
+
+function formatRupees(paise: number): string {
+  return `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
+}
+
+async function loadRazorpayCheckout() {
+  const existing = (window as typeof window & { Razorpay?: unknown }).Razorpay;
+  if (existing) return true;
+  return new Promise<boolean>((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+}
+
+async function openCheckout(res: CheckoutResponse): Promise<string | null> {
+  const loaded = await loadRazorpayCheckout();
+  const Razorpay = (window as typeof window & {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }).Razorpay;
+  if (!loaded || !Razorpay) return `Order created: ${res.checkout.orderId}. Razorpay Checkout could not load in this browser.`;
+  new Razorpay({
+    key: res.checkout.key,
+    amount: res.checkout.amount,
+    currency: res.checkout.currency,
+    name: res.checkout.name,
+    description: res.checkout.description,
+    order_id: res.checkout.orderId,
+    theme: { color: "#111111" },
+  }).open();
+  return null;
+}
+
 function BillingPane() {
-  const [config, setConfig] = useState<{
-    provider: "razorpay";
-    keyId: string | null;
-    plans: { id: "pro" | "business"; name: string; amountPaise: number; currency: string; description: string }[];
-  } | null>(null);
+  const [config, setConfig] = useState<BillingConfig | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<QuotaStatus | null>(null);
+  const [tab, setTab] = useState<"individual" | "business">("individual");
+  const [annual, setAnnual] = useState(false);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [orgs, setOrgs] = useState<{ id: string; name: string; plan: string }[]>([]);
+  const [orgName, setOrgName] = useState("");
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [seats, setSeats] = useState(3);
 
   useEffect(() => {
-    api.get<NonNullable<typeof config>>("/billing/config").then(setConfig).catch(() => setConfig(null));
+    api.get<BillingConfig>("/billing/config").then(setConfig).catch(() => setConfig(null));
+    api.get<QuotaResponse>("/usage/quota").then((res) => setCurrentPlan(res.status)).catch(() => setCurrentPlan(null));
+    api
+      .get<{ organizations: { id: string; name: string; plan: string }[] }>("/organizations")
+      .then((res) => {
+        setOrgs(res.organizations);
+        if (res.organizations[0]) setSelectedOrgId(res.organizations[0].id);
+      })
+      .catch(() => setOrgs([]));
   }, []);
 
-  async function loadRazorpayCheckout() {
-    const existing = (window as typeof window & { Razorpay?: unknown }).Razorpay;
-    if (existing) return true;
-    return new Promise<boolean>((resolve) => {
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.head.appendChild(script);
-    });
+  async function createOrgInline() {
+    if (!orgName.trim()) return;
+    try {
+      const res = await api.post<{ organization: { id: string; name: string; plan: string } }>("/organizations", {
+        name: orgName,
+      });
+      setOrgs((prev) => [res.organization, ...prev]);
+      setSelectedOrgId(res.organization.id);
+      setOrgName("");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't create team");
+    }
   }
 
-  async function startCheckout(planId: "pro" | "business") {
+  async function buyIndividual(planId: "pro" | "premium") {
     setBusyPlan(planId);
     setNotice(null);
     try {
-      const res = await api.post<{
-        checkout: {
-          key: string;
-          orderId: string;
-          amount: number;
-          currency: string;
-          name: string;
-          description: string;
-        };
-      }>("/billing/orders", { planId });
-      const loaded = await loadRazorpayCheckout();
-      const Razorpay = (window as typeof window & {
-        Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-      }).Razorpay;
-      if (!loaded || !Razorpay) {
-        setNotice(`Order created: ${res.checkout.orderId}. Razorpay Checkout could not load in this browser.`);
-        return;
-      }
-      new Razorpay({
-        key: res.checkout.key,
-        amount: res.checkout.amount,
-        currency: res.checkout.currency,
-        name: res.checkout.name,
-        description: res.checkout.description,
-        order_id: res.checkout.orderId,
-        theme: { color: "#18181b" },
-      }).open();
+      const res = await api.post<CheckoutResponse>("/billing/orders", {
+        planId,
+        billingCycle: annual ? "annual" : "monthly",
+      });
+      const failMsg = await openCheckout(res);
+      if (failMsg) setNotice(failMsg);
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Couldn't start Razorpay checkout");
     } finally {
@@ -570,41 +609,187 @@ function BillingPane() {
     }
   }
 
+  async function buyEnterprise() {
+    if (!selectedOrgId) {
+      setNotice("Create or select a team first.");
+      return;
+    }
+    setBusyPlan("enterprise");
+    setNotice(null);
+    try {
+      const res = await api.post<CheckoutResponse>("/billing/orders", {
+        planId: "enterprise",
+        billingCycle: annual ? "annual" : "monthly",
+        seats,
+        organizationId: selectedOrgId,
+      });
+      const failMsg = await openCheckout(res);
+      if (failMsg) setNotice(failMsg);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't start Razorpay checkout");
+    } finally {
+      setBusyPlan(null);
+    }
+  }
+
+  const minSeats = config?.enterprise.minSeats ?? 3;
+
   return (
     <div>
       <h2 className="mb-1 text-lg font-semibold">Billing</h2>
       <p className="mb-4 text-sm text-muted">Payments are handled through Razorpay.</p>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center rounded-full bg-chip p-0.5">
+          <button
+            type="button"
+            onClick={() => setTab("individual")}
+            className={cn("h-8 rounded-full px-3 text-xs font-medium", tab === "individual" ? "bg-background text-foreground" : "text-muted")}
+          >
+            Individual
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("business")}
+            className={cn("h-8 rounded-full px-3 text-xs font-medium", tab === "business" ? "bg-background text-foreground" : "text-muted")}
+          >
+            Business
+          </button>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-muted">
+          Annual
+          <button
+            type="button"
+            role="switch"
+            aria-checked={annual}
+            onClick={() => setAnnual((v) => !v)}
+            className={cn("relative h-5 w-9 rounded-full transition-colors", annual ? "bg-primary" : "bg-chip")}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 left-0.5 size-4 rounded-full bg-elevated transition-transform",
+                annual && "translate-x-[18px]",
+              )}
+            />
+          </button>
+          <span className={cn("font-medium", annual && "text-foreground")}>
+            Save {config?.annualDiscountPercent ?? 10}%
+          </span>
+        </label>
+      </div>
+
       {notice && <p className="mb-3 rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted">{notice}</p>}
-      <div className="grid gap-3">
-        {(config?.plans ?? []).map((plan) => (
-          <div key={plan.id} className="rounded-xl border border-border bg-background p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+
+      {tab === "individual" ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="font-medium">Free</p>
+            <p className="mt-1 text-sm text-muted">250k tokens/week, lightweight models.</p>
+            <p className="mt-3 font-mono text-xl font-semibold">₹0</p>
+            <button
+              type="button"
+              disabled
+              className="mt-4 h-9 w-full rounded-full border border-border text-sm font-semibold text-muted disabled:opacity-70"
+            >
+              {!currentPlan || currentPlan.plan === "free" ? "Current plan" : "Included"}
+            </button>
+          </div>
+          {(config?.individual ?? []).map((plan) => {
+            const amount = annual ? plan.annualAmountPaise : plan.monthlyAmountPaise;
+            const isCurrent = currentPlan?.plan === plan.id && !currentPlan.isEnterprise;
+            return (
+              <div key={plan.id} className="rounded-2xl border border-border bg-background p-4">
                 <p className="font-medium">{plan.name}</p>
                 <p className="mt-1 text-sm text-muted">{plan.description}</p>
                 <p className="mt-3 font-mono text-xl font-semibold">
-                  ₹{(plan.amountPaise / 100).toLocaleString("en-IN")}
+                  {formatRupees(amount)}
+                  <span className="text-sm font-normal text-muted">/{annual ? "year" : "month"}</span>
                 </p>
+                <button
+                  type="button"
+                  disabled={isCurrent || busyPlan !== null || !config?.keyId}
+                  onClick={() => void buyIndividual(plan.id)}
+                  className="mt-4 h-9 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  {isCurrent ? "Current plan" : busyPlan === plan.id ? "Starting…" : "Upgrade"}
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={busyPlan !== null || !config?.keyId}
-                onClick={() => void startCheckout(plan.id)}
-                className="h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                {busyPlan === plan.id ? "Starting..." : "Pay"}
-              </button>
-            </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-border bg-background p-4">
+          <p className="font-medium">{config?.enterprise.name ?? "Friday Enterprise"}</p>
+          <p className="mt-1 text-sm text-muted">{config?.enterprise.description}</p>
+          <p className="mt-3 font-mono text-xl font-semibold">
+            {formatRupees(annual ? amountForCyclePreview(config?.enterprise.perSeatMonthlyAmountPaise ?? 0, true) : config?.enterprise.perSeatMonthlyAmountPaise ?? 0)}
+            <span className="text-sm font-normal text-muted">/seat/{annual ? "year" : "month"}</span>
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Team
+              {orgs.length > 0 ? (
+                <select
+                  value={selectedOrgId ?? ""}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  className="h-9 w-48 rounded-lg border border-border bg-elevated px-2.5 text-sm text-foreground"
+                >
+                  {orgs.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="flex gap-2">
+                  <input
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="Team name"
+                    className="h-9 w-40 rounded-lg border border-border bg-elevated px-2.5 text-sm text-foreground outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void createOrgInline()}
+                    className="h-9 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
+                  >
+                    Create
+                  </button>
+                </span>
+              )}
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Seats (min {minSeats})
+              <input
+                type="number"
+                min={minSeats}
+                value={seats}
+                onChange={(e) => setSeats(Math.max(minSeats, Number(e.target.value) || minSeats))}
+                className="h-9 w-24 rounded-lg border border-border bg-elevated px-2.5 text-sm text-foreground outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={busyPlan !== null || !config?.keyId || orgs.length === 0}
+              onClick={() => void buyEnterprise()}
+              className="h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {busyPlan === "enterprise" ? "Starting…" : `Pay ${formatRupees((annual ? amountForCyclePreview(config?.enterprise.perSeatMonthlyAmountPaise ?? 0, true) : config?.enterprise.perSeatMonthlyAmountPaise ?? 0) * seats)}`}
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
       {config && !config.keyId && (
-        <p className="mt-3 text-xs text-muted">
-          Razorpay keys are not configured on this environment yet.
-        </p>
+        <p className="mt-3 text-xs text-muted">Razorpay keys are not configured on this environment yet.</p>
       )}
     </div>
   );
+}
+
+function amountForCyclePreview(monthlyAmountPaise: number, annualDiscount: boolean): number {
+  return annualDiscount ? Math.round(monthlyAmountPaise * 12 * 0.9) : monthlyAmountPaise;
 }
 
 const PLAN_LABEL: Record<QuotaStatus["plan"], string> = { free: "Free", pro: "Pro", premium: "Premium" };

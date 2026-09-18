@@ -12,7 +12,9 @@ import {
 export const billingRouter = Router();
 
 const createOrderSchema = z.object({
-  planId: z.enum(["pro", "business"]),
+  planId: z.enum(["pro", "premium", "enterprise"]),
+  billingCycle: z.enum(["monthly", "annual"]).default("monthly"),
+  seats: z.number().int().min(1).max(10_000).optional(),
   organizationId: z.string().uuid().optional(),
 });
 
@@ -39,7 +41,7 @@ billingRouter.get(
 billingRouter.post(
   "/orders",
   asyncHandler(async (req, res) => {
-    const { planId, organizationId } = createOrderSchema.parse(req.body);
-    res.status(201).json(await createRazorpayOrder(req.user!.id, planId, organizationId));
+    const input = createOrderSchema.parse(req.body);
+    res.status(201).json(await createRazorpayOrder(req.user!.id, input));
   }),
 );

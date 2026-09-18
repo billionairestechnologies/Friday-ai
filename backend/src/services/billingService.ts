@@ -3,25 +3,49 @@ import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
+import { ENTERPRISE_MIN_SEATS, ENTERPRISE_TOKENS_PER_SEAT } from "./quota/tierConfig.js";
 
-export const BILLING_PLANS = [
+export type BillingCycle = "monthly" | "annual";
+
+// Individual plans — profiles.plan is exactly ('free' | 'pro' | 'premium'), so these ids match
+// that enum directly (no more of the old pro/business→pro/premium name mapping).
+export const INDIVIDUAL_PLANS = [
   {
     id: "pro",
     name: "Friday Pro",
-    amountPaise: 99900,
-    currency: "INR",
+    monthlyAmountPaise: 99_900, // ₹999
     description: "Higher personal limits for chat, search, voice, and Canvas.",
   },
   {
-    id: "business",
-    name: "Friday Business",
-    amountPaise: 299900,
-    currency: "INR",
-    description: "Team workspace foundation with admin budgets and audit logs.",
+    id: "premium",
+    name: "Friday Premium",
+    monthlyAmountPaise: 199_900, // ₹1,999
+    description: "Highest personal limits, plus reasoning/flagship models.",
   },
 ] as const;
 
-type PlanId = (typeof BILLING_PLANS)[number]["id"];
+// A one-time payment covering 12 months at 10% off the monthly rate, rounded to the nearest
+// rupee — matches the "annual toggle applies a 10% discount" ask. Not a subscription (one-time
+// orders were chosen over Razorpay Subscriptions) — an annual purchase is a single order for a
+// longer period, same as a monthly one is for 30 days.
+export function annualAmountPaise(monthlyAmountPaise: number): number {
+  return Math.round(monthlyAmountPaise * 12 * 0.9);
+}
+
+export function amountForCycle(monthlyAmountPaise: number, cycle: BillingCycle): number {
+  return cycle === "annual" ? annualAmountPaise(monthlyAmountPaise) : monthlyAmountPaise;
+}
+
+// Enterprise is per-seat, min 3 seats, org-pooled — not an individual profiles.plan value.
+export const ENTERPRISE_PLAN = {
+  id: "enterprise",
+  name: "Friday Enterprise",
+  perSeatMonthlyAmountPaise: 249_900, // ₹2,499/seat/mo
+  minSeats: ENTERPRISE_MIN_SEATS,
+  description: `Pooled org-wide tokens (${(ENTERPRISE_TOKENS_PER_SEAT / 1_000_000).toFixed(0)}M/seat/mo), no 5-hour lockout, every model.`,
+} as const;
+
+type OrderPlanId = "pro" | "premium" | "enterprise";
 
 function requireRazorpayConfigured() {
   if (!env.razorpayKeyId || !env.razorpayKeySecret) {
@@ -34,20 +58,48 @@ export function publicBillingConfig() {
     provider: "razorpay",
     keyId: env.razorpayKeyId || null,
     currency: "INR",
-    plans: BILLING_PLANS,
+    annualDiscountPercent: 10,
+    individual: INDIVIDUAL_PLANS.map((p) => ({
+      ...p,
+      annualAmountPaise: annualAmountPaise(p.monthlyAmountPaise),
+    })),
+    enterprise: ENTERPRISE_PLAN,
   };
 }
 
-export function getPlan(planId: string) {
-  const plan = BILLING_PLANS.find((item) => item.id === planId);
-  if (!plan) throw new HttpError(400, "Unknown billing plan");
-  return plan;
-}
+export type CreateOrderInput = {
+  planId: OrderPlanId;
+  billingCycle: BillingCycle;
+  /** Required (and >= ENTERPRISE_PLAN.minSeats) for planId "enterprise"; ignored otherwise. */
+  seats?: number;
+  /** The org this enterprise purchase applies to — the user must already own/admin it (created
+   *  via the existing self-serve /organizations flow) before checkout can start. */
+  organizationId?: string;
+};
 
-export async function createRazorpayOrder(userId: string, planId: PlanId, organizationId?: string | null) {
+export async function createRazorpayOrder(userId: string, input: CreateOrderInput) {
   requireRazorpayConfigured();
-  const plan = getPlan(planId);
   const receipt = `friday_${Date.now()}_${userId.slice(0, 8)}`;
+
+  let amountPaise: number;
+  let name: string;
+  let description: string;
+  let seats: number | null = null;
+
+  if (input.planId === "enterprise") {
+    if (!input.organizationId) throw new HttpError(400, "organizationId is required for an Enterprise purchase");
+    seats = Math.max(ENTERPRISE_PLAN.minSeats, Math.floor(input.seats ?? ENTERPRISE_PLAN.minSeats));
+    const perSeatForCycle = amountForCycle(ENTERPRISE_PLAN.perSeatMonthlyAmountPaise, input.billingCycle);
+    amountPaise = perSeatForCycle * seats;
+    name = ENTERPRISE_PLAN.name;
+    description = `${seats} seats, ${input.billingCycle}`;
+  } else {
+    const plan = INDIVIDUAL_PLANS.find((p) => p.id === input.planId);
+    if (!plan) throw new HttpError(400, "Unknown billing plan");
+    amountPaise = amountForCycle(plan.monthlyAmountPaise, input.billingCycle);
+    name = plan.name;
+    description = plan.description;
+  }
 
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
@@ -56,13 +108,13 @@ export async function createRazorpayOrder(userId: string, planId: PlanId, organi
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      amount: plan.amountPaise,
-      currency: plan.currency,
+      amount: amountPaise,
+      currency: "INR",
       receipt,
       notes: {
         user_id: userId,
-        plan: plan.id,
-        organization_id: organizationId ?? "",
+        plan: input.planId,
+        organization_id: input.organizationId ?? "",
       },
     }),
   });
@@ -76,12 +128,12 @@ export async function createRazorpayOrder(userId: string, planId: PlanId, organi
     .from("razorpay_orders")
     .insert({
       user_id: userId,
-      organization_id: organizationId ?? null,
-      plan: plan.id,
-      amount_paise: plan.amountPaise,
-      currency: plan.currency,
+      organization_id: input.organizationId ?? null,
+      plan: input.planId,
+      amount_paise: amountPaise,
+      currency: "INR",
       razorpay_order_id: body.id,
-      metadata: { receipt },
+      metadata: { receipt, billingCycle: input.billingCycle, seats },
     })
     .select()
     .single();
@@ -92,10 +144,10 @@ export async function createRazorpayOrder(userId: string, planId: PlanId, organi
     checkout: {
       key: env.razorpayKeyId,
       orderId: body.id,
-      amount: plan.amountPaise,
-      currency: plan.currency,
+      amount: amountPaise,
+      currency: "INR",
       name: "Friday AI",
-      description: plan.name,
+      description: `${name} — ${description}`,
     },
   };
 }
@@ -140,24 +192,42 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
       updated_at: new Date().toISOString(),
     })
     .eq("razorpay_order_id", orderId)
-    .select("user_id, plan")
+    .select("user_id, organization_id, plan, metadata")
     .maybeSingle();
   if (error) {
     logger.warn("razorpay_order_update_failed", { orderId, error: error.message });
     return;
   }
+  if (!paid || !order?.user_id) return;
 
   // This is the ONLY place a payment actually grants anything — without it, paying just marks
-  // the order row "paid" with no effect on the user's actual limits. BILLING_PLANS' "business"
-  // id predates profiles.plan's ('free'|'pro'|'premium') enum and is this app's higher
-  // individual tier, not the org-level "business" plan on `organizations` — mapped accordingly.
-  if (paid && order?.user_id) {
-    const plan = order.plan === "business" ? "premium" : "pro";
-    const planRenewsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  // the order row "paid" with no effect on the user's actual limits.
+  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number } | null) ?? {};
+  const renewsInDays = metadata.billingCycle === "annual" ? 365 : 30;
+  const renewsAt = new Date(Date.now() + renewsInDays * 24 * 60 * 60 * 1000).toISOString();
+
+  if (order.plan === "pro" || order.plan === "premium" || order.plan === "business") {
+    // "business" is a pre-migration legacy id (see 0016) — treated as premium going forward.
+    const plan = order.plan === "business" ? "premium" : order.plan;
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .update({ plan, plan_renews_at: planRenewsAt })
+      .update({ plan, plan_renews_at: renewsAt })
       .eq("id", order.user_id);
     if (profileError) logger.warn("razorpay_plan_grant_failed", { orderId, error: profileError.message });
+    return;
+  }
+
+  if (order.plan === "enterprise" && order.organization_id) {
+    const seats = Math.max(ENTERPRISE_PLAN.minSeats, metadata.seats ?? ENTERPRISE_PLAN.minSeats);
+    const { error: orgError } = await supabaseAdmin
+      .from("organizations")
+      .update({
+        plan: "enterprise",
+        seat_count: seats,
+        pooled_monthly_tokens: seats * ENTERPRISE_TOKENS_PER_SEAT,
+        billing_cycle_anchor: new Date().toISOString(),
+      })
+      .eq("id", order.organization_id);
+    if (orgError) logger.warn("razorpay_enterprise_grant_failed", { orderId, error: orgError.message });
   }
 }
