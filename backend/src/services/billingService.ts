@@ -157,12 +157,19 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
   };
 }
 
-/** The signed-in user's own order history — the Billing settings pane's "Invoices" list. */
+/**
+ * The signed-in user's own order history — the Billing settings pane's "Invoices" list. Only
+ * `paid` (and `failed`, so a declined payment isn't silently invisible) rows qualify as an
+ * actual invoice — a bare `created` row just means checkout was opened and abandoned (closed the
+ * Razorpay popup, never finished paying), which isn't a billing event and shouldn't clutter a
+ * list whose whole point is "what did I actually pay."
+ */
 export async function listMyOrders(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("razorpay_orders")
     .select("id, plan, amount_paise, currency, status, metadata, created_at")
     .eq("user_id", userId)
+    .in("status", ["paid", "failed"])
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) throw new HttpError(500, error.message);
