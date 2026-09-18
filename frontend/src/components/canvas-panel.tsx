@@ -11,7 +11,6 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
-import { Markdown } from "@/lib/chat/markdown";
 import { extractArtifact, extractStreamingCodeBody, type Artifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
@@ -41,7 +40,6 @@ export function CanvasPanel() {
 
 function filenameFor(kind: string, lang?: string) {
   if (kind === "html") return "canvas.html";
-  if (kind === "markdown") return "canvas.md";
   return `canvas.${extForLang(lang)}`;
 }
 
@@ -414,17 +412,6 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
             >
               {artifact.body}
             </motion.pre>
-          ) : artifact?.kind === "markdown" ? (
-            <motion.div
-              key="markdown"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="p-5"
-            >
-              <Markdown text={artifact.body} />
-            </motion.div>
           ) : (
             <motion.div
               key="empty"

@@ -1,5 +1,5 @@
 export type Artifact = {
-  kind: "html" | "markdown" | "code" | "react" | "runnable";
+  kind: "html" | "code" | "react" | "runnable";
   body: string;
   lang?: string;
   title: string;
@@ -10,6 +10,17 @@ const FENCE = /```(\w+)?\n([\s\S]*?)```/g;
 // display as static text — see runnable.ts and the sandbox controller/service on the backend.
 const RUNNABLE_LANGS = new Set(["python", "py", "javascript", "js"]);
 
+// Some models (this got noticeably worse after a model switch) write a React component and
+// still fence it as ```javascript/```js instead of ```jsx — RUNNABLE_LANGS would then send a
+// browser-only React component into the sandbox's plain Node/Python executor, where it can't
+// possibly run (no DOM, no React). Anything that's clearly React (JSX markup, or the hooks API)
+// gets treated as a react-preview artifact instead, regardless of which of those two tags it used.
+function looksLikeReactComponent(body: string): boolean {
+  const hasJsxTag = /<([A-Za-z][\w.]*)[^>]*>[\s\S]*<\/\1>/.test(body) || /<[A-Za-z][\w.]*[^>]*\/>/.test(body);
+  const hasReactApi = /\b(useState|useEffect|useRef|useMemo|useCallback|useContext|useReducer)\s*\(/.test(body);
+  return hasJsxTag || hasReactApi;
+}
+
 export function extractArtifact(content: string): Artifact | null {
   const text = content.trim();
   if (!text) return null;
@@ -18,9 +29,13 @@ export function extractArtifact(content: string): Artifact | null {
   if (html?.[2]?.trim()) {
     return { kind: "html", body: html[2].trim(), title: "Canvas", lang: "html" };
   }
-  const react = blocks.find((b) => ["tsx", "jsx"].includes((b[1] ?? "").toLowerCase()));
+  const react = blocks.find((b) => {
+    const lang = (b[1] ?? "").toLowerCase();
+    if (["tsx", "jsx"].includes(lang)) return true;
+    return ["javascript", "js"].includes(lang) && looksLikeReactComponent(b[2] ?? "");
+  });
   if (react?.[2]?.trim()) {
-    return { kind: "react", body: react[2].trim(), lang: react[1], title: `${react[1]} canvas` };
+    return { kind: "react", body: react[2].trim(), lang: react[1] || "jsx", title: `${react[1] || "jsx"} canvas` };
   }
   const runnable = blocks.find((b) => RUNNABLE_LANGS.has((b[1] ?? "").toLowerCase()));
   if (runnable?.[2]?.trim()) {
@@ -44,9 +59,9 @@ export function extractArtifact(content: string): Artifact | null {
       title: "Canvas",
     };
   }
-  if (text.length > 40) {
-    return { kind: "markdown", body: text, title: "Canvas" };
-  }
+  // A reply with no fenced code at all is a conversational answer, not a build artifact — it
+  // belongs in the chat bubble only. Canvas used to fall back to showing this same prose as
+  // "markdown", which just duplicated the chat answer verbatim in both panes.
   return null;
 }
 
@@ -62,24 +77,35 @@ export function extractStreamingCodeBody(content: string): { lang?: string; body
   return { lang: openFence[1], body: openFence[2] ?? "" };
 }
 
-const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx|python|py|javascript|js)$/i;
+// Languages extractArtifact treats as a build artifact with no length gate at all — the ones
+// that can legitimately still be an OPEN, not-yet-closed fence while streaming and already be
+// certain to end up in Canvas. typescript/css match extractArtifact's "preferred" code kind;
+// the rest match html/react/runnable. Deliberately excludes the generic "first block, any
+// language" fallback (gated on text.length > 120), which can't be predicted before it closes.
+const VISUAL_FENCE_LANGS = /^(?:html|jsx|tsx|python|py|javascript|js|typescript|css)$/i;
 
 /**
- * Cuts an auto-canvas fenced code block (html/jsx/tsx, plus the runnable langs python/js — see
- * RUNNABLE_LANGS above, everything maybeAutoOpenCanvas in routes/index.tsx opens Canvas for) out
- * of a message's text before it's shown in the chat bubble, so the same code doesn't appear
- * twice — once flooding the chat as a giant raw block, once properly rendered in Canvas.
- * Handles the still-streaming case too (an opened but not yet closed fence), not just a completed
- * one, so the code never appears in chat even momentarily while it's being generated. A no-op for
- * any message that doesn't contain one of these fences.
+ * Cuts whatever fenced code block extractArtifact() picked as the Canvas artifact out of a
+ * message's text before it's shown in the chat bubble, so the same code never appears twice —
+ * once flooding the chat as a giant raw block, once properly rendered in Canvas. Driven by
+ * extractArtifact itself (rather than a separate hardcoded language list) so every kind it can
+ * return — html/react/runnable, the preferred typescript/css block, and the generic first-block
+ * fallback — is covered here without the two functions being able to drift out of sync.
+ * Also handles the still-streaming case (an opened but not yet closed fence) for the languages
+ * that are guaranteed to become an artifact regardless of length. A no-op for a plain
+ * conversational reply with no code fence at all.
  */
 export function stripVisualArtifactForChat(content: string): string {
-  const closed = /```(html|jsx|tsx|python|py|javascript|js)\n[\s\S]*?```/i.exec(content);
-  if (closed && VISUAL_FENCE_LANGS.test(closed[1] ?? "")) {
-    const start = closed.index;
-    return (content.slice(0, start) + content.slice(start + closed[0].length)).trim();
+  const artifact = extractArtifact(content);
+  if (artifact) {
+    const blocks = [...content.matchAll(FENCE)];
+    const match = blocks.find((b) => b[2]?.trim() === artifact.body);
+    if (match) {
+      const start = match.index!;
+      return (content.slice(0, start) + content.slice(start + match[0].length)).trim();
+    }
   }
-  const open = /```(html|jsx|tsx|python|py|javascript|js)\b/i.exec(content);
-  if (open) return content.slice(0, open.index).trim();
+  const open = /```(\w+)?\b/.exec(content);
+  if (open && VISUAL_FENCE_LANGS.test(open[1] ?? "")) return content.slice(0, open.index).trim();
   return content;
 }
