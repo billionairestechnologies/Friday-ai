@@ -112,9 +112,15 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       .catch((err) => setSyncError(err instanceof Error ? err.message : "Couldn't load messages"));
   }, [activeId, isPending, user]);
 
-  async function ensureConversation(model: string): Promise<{ chatId: string; conversationId: string }> {
+  // `chatId` is always an already-existing local chat here — the caller runs `beginTurn()`
+  // (which appends the optimistic user+assistant messages) before this, specifically so that
+  // when a brand-new conversation is created and we navigate to /c/$id below, the resulting
+  // remount of Home (it's a genuinely different route component, see router.tsx) finds a
+  // non-empty message list and its "load messages from server" effect bails out instead of
+  // racing this function's setConversationId and clobbering the still-streaming reply.
+  async function ensureConversation(model: string, chatId: string): Promise<{ conversationId: string }> {
     const s = useChat.getState();
-    const chat = s.chats.find((c) => c.id === s.activeId);
+    const chat = s.chats.find((c) => c.id === chatId);
     const mode = modeForModel(model);
 
     if (chat?.conversationId) {
@@ -135,7 +141,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         await api.patch(`/chat/conversations/${chat.conversationId}`, body);
         useChat.getState().setConversationModel(chat.id, model);
       }
-      return { chatId: chat.id, conversationId: chat.conversationId };
+      return { conversationId: chat.conversationId };
     }
 
     const body: { mode: ConversationMode; providerSlug?: string; modelId?: string; projectId?: string } = { mode };
@@ -147,16 +153,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       body.modelId = decoded.modelId;
     }
     const res = await api.post<{ conversation: { id: string } }>("/chat/conversations", body);
+    useChat.getState().setConversationId(chatId, res.conversation.id);
+    useChat.getState().setConversationModel(chatId, model);
     void navigate({ to: "/c/$conversationId", params: { conversationId: res.conversation.id } });
-
-    if (chat) {
-      useChat.getState().setConversationId(chat.id, res.conversation.id);
-      useChat.getState().setConversationModel(chat.id, model);
-      return { chatId: chat.id, conversationId: res.conversation.id };
-    }
-    // No local chat yet — the caller appends the user message right after this,
-    // which creates one; tag it once that happens (see send()).
-    return { chatId: "", conversationId: res.conversation.id };
+    return { conversationId: res.conversation.id };
   }
 
   async function send(text: string, files?: File[]) {
@@ -189,24 +189,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     const model = s.model;
     s.clearDraft();
 
-    let conversationId: string;
-    try {
-      conversationId = (await ensureConversation(model)).conversationId;
-    } catch (err) {
-      const user: ChatMessage = {
-        id: uid(),
-        role: "user",
-        content: trimmed,
-        attachments: attachments.length ? attachments : undefined,
-        createdAt: Date.now(),
-      };
-      const { chatId } = useChat.getState().appendUserMessage(user);
-      useChat.getState().appendAssistantReplies(chatId, [
-        { content: err instanceof Error ? err.message : "Couldn't start the conversation", modelLabel: "Error" },
-      ]);
-      return;
-    }
-
     const user: ChatMessage = {
       id: uid(),
       role: "user",
@@ -215,9 +197,14 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       createdAt: Date.now(),
     };
 
+    // Append the optimistic user+assistant turn locally FIRST, before any network call or
+    // navigation — ensureConversation (for a brand-new chat) navigates to /c/$conversationId,
+    // which remounts Home on a different route component. If that remount's "load messages
+    // from server" effect ran while this chat's local message list was still empty, it would
+    // overwrite it with the server's (assistant-less) snapshot and orphan the live stream for
+    // good — see ensureConversation's comment. Doing this first means the effect always sees a
+    // non-empty list, regardless of how the remount race lands.
     const { chatId, assistantId } = useChat.getState().beginTurn(user);
-    useChat.getState().setConversationId(chatId, conversationId);
-    useChat.getState().setConversationModel(chatId, model);
     const initial =
       useChat.getState().chats.find((c) => c.id === chatId)?.messages.find((m) => m.id === assistantId)
         ?.status ?? "working";
@@ -228,6 +215,20 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     abortRef.current = ac;
     busyRef.current = true;
     setBusy(true);
+
+    let conversationId: string;
+    try {
+      conversationId = (await ensureConversation(model, chatId)).conversationId;
+    } catch (err) {
+      useChat.getState().commitTurn(chatId, assistantId, {
+        content: "",
+        error: err instanceof Error ? err.message : "Couldn't start the conversation",
+      });
+      clearLive();
+      busyRef.current = false;
+      setBusy(false);
+      return;
+    }
 
     const batch = createStreamBatcher((acc) => {
       applyLive(acc);
