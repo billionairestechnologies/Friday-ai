@@ -16,6 +16,8 @@
   --color-danger: #e07070;
   --color-chip: #2e3033;
   --color-chip-on: #3a3a40;
+  --color-hex-chip: var(--color-chip);
+  --color-notify: #3b82f6;
   --color-search: #1eaedb;
   --color-think: #8b5cf6;
   --color-canvas: #f97316;
@@ -39,21 +41,30 @@
 }
 
 html.light {
-  --color-background: #f4f4f5;
-  --color-foreground: #18181b;
-  --color-muted: #52525b;
-  --color-subtle: #71717a;
-  --color-surface: #ececee;
+  /* Cool off-white app chrome — see project's light-theme color spec.
+     Kept as flat, low-saturation grays/off-whites; no cream/yellow chrome. */
+  --color-background: #f9f8f7;
+  --color-foreground: #050505;
+  --color-muted: #8a8a8a;
+  --color-subtle: #b0b0b0;
+  --color-surface: #f4f3f2;
   --color-elevated: #ffffff;
   --color-composer: #ffffff;
-  --color-border: #d4d4d8;
-  --color-primary: #18181b;
-  --color-primary-foreground: #fafafa;
+  --color-border: #e8e6e4;
+  --color-primary: #111111;
+  --color-primary-foreground: #ffffff;
   --color-accent: #3f3f46;
-  --color-chip: #e4e4e7;
+  /* Sidebar hover / selected-pill / generic hover surfaces all key off this one token —
+     kept a neutral gray so none of that chrome turns cream/tan. */
+  --color-chip: #e6e4e3;
   --color-chip-on: #d4d4d8;
-  --shadow-panel: 0 24px 70px rgba(24, 24, 27, 0.12);
-  --shadow-soft: 0 14px 36px rgba(24, 24, 27, 0.08);
+  /* Only the literal inline-code/hex chip gets the warm tan — everything else above stays gray. */
+  --color-hex-chip: #f4e7dc;
+  --color-notify: #3b82f6;
+  --color-search: #2563eb;
+  --shadow-panel: 0 1px 2px rgba(5, 5, 5, 0.04);
+  --shadow-soft: 0 1px 2px rgba(5, 5, 5, 0.03);
+  --shadow-composer: 0 1px 2px rgba(5, 5, 5, 0.04);
 }
 
 @layer base {
@@ -95,7 +106,7 @@ html.light {
     border: 1px solid var(--hairline);
     background:
       linear-gradient(180deg, var(--surface-highlight), transparent 32%),
-      var(--color-background);
+      var(--color-surface);
     box-shadow: var(--shadow-panel);
   }
 
@@ -193,7 +204,8 @@ html.light {
 .md code {
   font-family: var(--font-mono);
   font-size: 0.85em;
-  background: var(--color-chip);
+  background: var(--color-hex-chip);
+  color: var(--color-foreground);
   border-radius: 6px;
   padding: 0.1em 0.35em;
 }
@@ -203,7 +215,7 @@ html.light {
   padding: 0.9em 1em;
   border-radius: 12px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-elevated);
   overflow-x: auto;
 }
 
@@ -225,6 +237,10 @@ html.light {
   border-collapse: collapse;
   font-size: 0.9em;
   margin: 0.8em 0;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .md th,
