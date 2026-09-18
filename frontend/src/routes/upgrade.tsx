@@ -160,9 +160,14 @@ export function UpgradePage() {
       .catch(() => setModelsByTier({ free: [], pro: [], premium: [] }));
   }, []);
 
+  // Public, same as /models above — prices must show for a signed-out visitor too, and mustn't
+  // ever depend on a maybe-stale session token the way the account-specific calls below do.
+  useEffect(() => {
+    api.get<BillingConfig>("/billing/config").then(setConfig).catch(() => setConfig(null));
+  }, []);
+
   useEffect(() => {
     if (!signedIn) return;
-    api.get<BillingConfig>("/billing/config").then(setConfig).catch(() => setConfig(null));
     api
       .get<QuotaResponse>("/usage/quota")
       .then((res) => setCurrentPlan(res.status))

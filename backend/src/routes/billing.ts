@@ -30,14 +30,19 @@ billingRouter.post(
   }),
 );
 
-billingRouter.use(requireAuth);
-
+// Public on purpose — pricing/plan metadata (see publicBillingConfig, same spirit as GET
+// /models) is exactly what a signed-out visitor deciding whether to sign up needs to see, and
+// gating it behind requireAuth meant the /upgrade page's prices silently disappeared (staying
+// stuck at their ₹0 default) for anyone whose session token happened to be stale or absent —
+// only the public /models call would succeed, making it look like just the models were missing.
 billingRouter.get(
   "/config",
   asyncHandler(async (_req, res) => {
     res.json(publicBillingConfig());
   }),
 );
+
+billingRouter.use(requireAuth);
 
 billingRouter.post(
   "/orders",
