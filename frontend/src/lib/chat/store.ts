@@ -12,7 +12,7 @@ function titleFrom(text: string) {
   return clean.length > TITLE_FROM ? `${clean.slice(0, TITLE_FROM)}…` : clean;
 }
 
-type DialogId = "settings" | "login" | "plugins" | "help" | "upgrade" | null;
+type DialogId = "settings" | "login" | "plugins" | "help" | null;
 
 export type TurnCommit = {
   content: string;

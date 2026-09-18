@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useNavigate } from "@tanstack/react-router";
 import {
   AudioLines,
   Bell,
@@ -506,290 +507,122 @@ function ProjectsPane() {
   );
 }
 
-type BillingConfig = {
-  provider: "razorpay";
-  keyId: string | null;
-  currency: "INR";
-  annualDiscountPercent: number;
-  individual: { id: "pro" | "premium"; name: string; monthlyAmountPaise: number; annualAmountPaise: number; description: string }[];
-  enterprise: { id: "enterprise"; name: string; perSeatMonthlyAmountPaise: number; minSeats: number; description: string };
+type OrderRow = {
+  id: string;
+  plan: string;
+  amountPaise: number;
+  currency: string;
+  status: string;
+  billingCycle: string;
+  createdAt: string;
 };
 
-type CheckoutResponse = {
-  checkout: { key: string; orderId: string; amount: number; currency: string; name: string; description: string };
+const PLAN_DISPLAY_NAME: Record<string, string> = {
+  free: "Free",
+  pro: "Friday Pro",
+  premium: "Friday Premium",
+  enterprise: "Friday Enterprise",
+  business: "Friday Premium",
 };
-
-function formatRupees(paise: number): string {
-  return `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
-}
-
-async function loadRazorpayCheckout() {
-  const existing = (window as typeof window & { Razorpay?: unknown }).Razorpay;
-  if (existing) return true;
-  return new Promise<boolean>((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
-}
-
-async function openCheckout(res: CheckoutResponse): Promise<string | null> {
-  const loaded = await loadRazorpayCheckout();
-  const Razorpay = (window as typeof window & {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }).Razorpay;
-  if (!loaded || !Razorpay) return `Order created: ${res.checkout.orderId}. Razorpay Checkout could not load in this browser.`;
-  new Razorpay({
-    key: res.checkout.key,
-    amount: res.checkout.amount,
-    currency: res.checkout.currency,
-    name: res.checkout.name,
-    description: res.checkout.description,
-    order_id: res.checkout.orderId,
-    theme: { color: "#111111" },
-  }).open();
-  return null;
-}
 
 function BillingPane() {
-  const [config, setConfig] = useState<BillingConfig | null>(null);
+  const navigate = useNavigate();
   const [currentPlan, setCurrentPlan] = useState<QuotaStatus | null>(null);
-  const [tab, setTab] = useState<"individual" | "business">("individual");
-  const [annual, setAnnual] = useState(false);
-  const [busyPlan, setBusyPlan] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [orgs, setOrgs] = useState<{ id: string; name: string; plan: string }[]>([]);
-  const [orgName, setOrgName] = useState("");
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [seats, setSeats] = useState(3);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<BillingConfig>("/billing/config").then(setConfig).catch(() => setConfig(null));
-    api.get<QuotaResponse>("/usage/quota").then((res) => setCurrentPlan(res.status)).catch(() => setCurrentPlan(null));
     api
-      .get<{ organizations: { id: string; name: string; plan: string }[] }>("/organizations")
-      .then((res) => {
-        setOrgs(res.organizations);
-        if (res.organizations[0]) setSelectedOrgId(res.organizations[0].id);
-      })
-      .catch(() => setOrgs([]));
+      .get<QuotaResponse>("/usage/quota")
+      .then((res) => setCurrentPlan(res.status))
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load your plan"));
+    api
+      .get<{ orders: OrderRow[] }>("/billing/orders")
+      .then((res) => setOrders(res.orders))
+      .catch(() => setOrders([]));
   }, []);
 
-  async function createOrgInline() {
-    if (!orgName.trim()) return;
-    try {
-      const res = await api.post<{ organization: { id: string; name: string; plan: string } }>("/organizations", {
-        name: orgName,
-      });
-      setOrgs((prev) => [res.organization, ...prev]);
-      setSelectedOrgId(res.organization.id);
-      setOrgName("");
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Couldn't create team");
-    }
-  }
-
-  async function buyIndividual(planId: "pro" | "premium") {
-    setBusyPlan(planId);
-    setNotice(null);
-    try {
-      const res = await api.post<CheckoutResponse>("/billing/orders", {
-        planId,
-        billingCycle: annual ? "annual" : "monthly",
-      });
-      const failMsg = await openCheckout(res);
-      if (failMsg) setNotice(failMsg);
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Couldn't start Razorpay checkout");
-    } finally {
-      setBusyPlan(null);
-    }
-  }
-
-  async function buyEnterprise() {
-    if (!selectedOrgId) {
-      setNotice("Create or select a team first.");
-      return;
-    }
-    setBusyPlan("enterprise");
-    setNotice(null);
-    try {
-      const res = await api.post<CheckoutResponse>("/billing/orders", {
-        planId: "enterprise",
-        billingCycle: annual ? "annual" : "monthly",
-        seats,
-        organizationId: selectedOrgId,
-      });
-      const failMsg = await openCheckout(res);
-      if (failMsg) setNotice(failMsg);
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Couldn't start Razorpay checkout");
-    } finally {
-      setBusyPlan(null);
-    }
-  }
-
-  const minSeats = config?.enterprise.minSeats ?? 3;
+  const planName = currentPlan
+    ? currentPlan.isEnterprise
+      ? "Friday Enterprise"
+      : PLAN_DISPLAY_NAME[currentPlan.plan]
+    : null;
+  const renewsAt = currentPlan?.isEnterprise ? currentPlan.org?.resetAt : currentPlan?.monthly?.resetAt;
 
   return (
     <div>
       <h2 className="mb-1 text-lg font-semibold">Billing</h2>
       <p className="mb-4 text-sm text-muted">Payments are handled through Razorpay.</p>
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center rounded-full bg-chip p-0.5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-background p-4">
+          <p className="text-xs text-muted">Current Plan</p>
+          <p className="mt-1 text-lg font-semibold">{planName ?? "Loading…"}</p>
+          <p className="mt-1 text-sm text-muted">
+            {currentPlan && currentPlan.plan === "free" && !currentPlan.isEnterprise
+              ? "Free plan — nothing to renew."
+              : renewsAt
+                ? `Renews ${formatResetAt(renewsAt)}`
+                : ""}
+          </p>
           <button
             type="button"
-            onClick={() => setTab("individual")}
-            className={cn("h-8 rounded-full px-3 text-xs font-medium", tab === "individual" ? "bg-background text-foreground" : "text-muted")}
+            onClick={() => {
+              useChat.getState().setDialog(null);
+              void navigate({ to: "/upgrade" });
+            }}
+            className="mt-4 h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
-            Individual
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("business")}
-            className={cn("h-8 rounded-full px-3 text-xs font-medium", tab === "business" ? "bg-background text-foreground" : "text-muted")}
-          >
-            Business
+            Manage subscription
           </button>
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted">
-          Annual
+        <div className="rounded-2xl border border-border bg-background p-4">
+          <p className="text-xs text-muted">Usage</p>
+          <p className="mt-1 text-lg font-semibold">See what you've used</p>
+          <p className="mt-1 text-sm text-muted">Weekly/5-hour limits, resets, and a feature breakdown.</p>
           <button
             type="button"
-            role="switch"
-            aria-checked={annual}
-            onClick={() => setAnnual((v) => !v)}
-            className={cn("relative h-5 w-9 rounded-full transition-colors", annual ? "bg-primary" : "bg-chip")}
+            onClick={() => useChat.getState().setSettingsTab("usage")}
+            className="mt-4 h-9 rounded-full border border-border px-4 text-sm font-semibold hover:bg-chip"
           >
-            <span
-              className={cn(
-                "absolute top-0.5 left-0.5 size-4 rounded-full bg-elevated transition-transform",
-                annual && "translate-x-[18px]",
-              )}
-            />
+            View Usage
           </button>
-          <span className={cn("font-medium", annual && "text-foreground")}>
-            Save {config?.annualDiscountPercent ?? 10}%
-          </span>
-        </label>
+        </div>
       </div>
 
-      {notice && <p className="mb-3 rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted">{notice}</p>}
-
-      {tab === "individual" ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-background p-4">
-            <p className="font-medium">Free</p>
-            <p className="mt-1 text-sm text-muted">250k tokens/week, lightweight models.</p>
-            <p className="mt-3 font-mono text-xl font-semibold">₹0</p>
-            <button
-              type="button"
-              disabled
-              className="mt-4 h-9 w-full rounded-full border border-border text-sm font-semibold text-muted disabled:opacity-70"
-            >
-              {!currentPlan || currentPlan.plan === "free" ? "Current plan" : "Included"}
-            </button>
+      <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-background">
+        <p className="border-b border-border px-4 py-3 text-sm font-semibold">Invoices</p>
+        {orders.length === 0 ? (
+          <div className="px-4 py-6 text-center">
+            <p className="text-sm font-medium">No invoices yet</p>
+            <p className="mt-1 text-xs text-muted">Your invoices will appear here after your first payment.</p>
           </div>
-          {(config?.individual ?? []).map((plan) => {
-            const amount = annual ? plan.annualAmountPaise : plan.monthlyAmountPaise;
-            const isCurrent = currentPlan?.plan === plan.id && !currentPlan.isEnterprise;
-            return (
-              <div key={plan.id} className="rounded-2xl border border-border bg-background p-4">
-                <p className="font-medium">{plan.name}</p>
-                <p className="mt-1 text-sm text-muted">{plan.description}</p>
-                <p className="mt-3 font-mono text-xl font-semibold">
-                  {formatRupees(amount)}
-                  <span className="text-sm font-normal text-muted">/{annual ? "year" : "month"}</span>
-                </p>
-                <button
-                  type="button"
-                  disabled={isCurrent || busyPlan !== null || !config?.keyId}
-                  onClick={() => void buyIndividual(plan.id)}
-                  className="mt-4 h-9 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  {isCurrent ? "Current plan" : busyPlan === plan.id ? "Starting…" : "Upgrade"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-border bg-background p-4">
-          <p className="font-medium">{config?.enterprise.name ?? "Friday Enterprise"}</p>
-          <p className="mt-1 text-sm text-muted">{config?.enterprise.description}</p>
-          <p className="mt-3 font-mono text-xl font-semibold">
-            {formatRupees(annual ? amountForCyclePreview(config?.enterprise.perSeatMonthlyAmountPaise ?? 0, true) : config?.enterprise.perSeatMonthlyAmountPaise ?? 0)}
-            <span className="text-sm font-normal text-muted">/seat/{annual ? "year" : "month"}</span>
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Team
-              {orgs.length > 0 ? (
-                <select
-                  value={selectedOrgId ?? ""}
-                  onChange={(e) => setSelectedOrgId(e.target.value)}
-                  className="h-9 w-48 rounded-lg border border-border bg-elevated px-2.5 text-sm text-foreground"
-                >
-                  {orgs.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className="flex gap-2">
-                  <input
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="Team name"
-                    className="h-9 w-40 rounded-lg border border-border bg-elevated px-2.5 text-sm text-foreground outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void createOrgInline()}
-                    className="h-9 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
-                  >
-                    Create
-                  </button>
+        ) : (
+          <div className="flex flex-col divide-y divide-border">
+            {orders.map((order) => (
+              <div key={order.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span>
+                  {PLAN_DISPLAY_NAME[order.plan] ?? order.plan}{" "}
+                  <span className="text-xs text-muted">({order.billingCycle})</span>
                 </span>
-              )}
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Seats (min {minSeats})
-              <input
-                type="number"
-                min={minSeats}
-                value={seats}
-                onChange={(e) => setSeats(Math.max(minSeats, Number(e.target.value) || minSeats))}
-                className="h-9 w-24 rounded-lg border border-border bg-elevated px-2.5 text-sm text-foreground outline-none"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={busyPlan !== null || !config?.keyId || orgs.length === 0}
-              onClick={() => void buyEnterprise()}
-              className="h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {busyPlan === "enterprise" ? "Starting…" : `Pay ${formatRupees((annual ? amountForCyclePreview(config?.enterprise.perSeatMonthlyAmountPaise ?? 0, true) : config?.enterprise.perSeatMonthlyAmountPaise ?? 0) * seats)}`}
-            </button>
+                <span className="text-xs text-muted">{new Date(order.createdAt).toLocaleDateString()}</span>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs font-medium",
+                    order.status === "paid" ? "bg-chip text-foreground" : "text-danger",
+                  )}
+                >
+                  {order.status}
+                </span>
+                <span className="font-mono text-sm">₹{(order.amountPaise / 100).toLocaleString("en-IN")}</span>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-
-      {config && !config.keyId && (
-        <p className="mt-3 text-xs text-muted">Razorpay keys are not configured on this environment yet.</p>
-      )}
+        )}
+      </div>
     </div>
   );
-}
-
-function amountForCyclePreview(monthlyAmountPaise: number, annualDiscount: boolean): number {
-  return annualDiscount ? Math.round(monthlyAmountPaise * 12 * 0.9) : monthlyAmountPaise;
 }
 
 const PLAN_LABEL: Record<QuotaStatus["plan"], string> = { free: "Free", pro: "Pro", premium: "Premium" };
@@ -848,6 +681,7 @@ function QuotaBar({
 }
 
 function UsagePane() {
+  const navigate = useNavigate();
   const { user } = useCurrentUserState();
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -880,7 +714,10 @@ function UsagePane() {
             {!quota.status.isEnterprise && quota.status.plan !== "premium" && (
               <button
                 type="button"
-                onClick={() => useChat.getState().setSettingsTab("billing")}
+                onClick={() => {
+                  useChat.getState().setDialog(null);
+                  void navigate({ to: "/upgrade" });
+                }}
                 className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
               >
                 Upgrade

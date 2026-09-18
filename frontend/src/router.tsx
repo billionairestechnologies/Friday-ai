@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
 import { AdminGate } from "@/routes/admin";
+import { UpgradePage } from "@/routes/upgrade";
 import { AppErrorComponent } from "@/lib/error-component";
 
 const rootRoute = createRootRoute({
@@ -52,7 +53,13 @@ const adminRoute = createRoute({
   component: AdminGate,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, conversationRoute, adminRoute]);
+const upgradeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/upgrade",
+  component: UpgradePage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, conversationRoute, adminRoute, upgradeRoute]);
 
 export const router = createRouter({ routeTree });
 

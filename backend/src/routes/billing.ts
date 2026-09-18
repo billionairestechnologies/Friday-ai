@@ -5,6 +5,7 @@ import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import {
   createRazorpayOrder,
   handleRazorpayWebhook,
+  listMyOrders,
   publicBillingConfig,
   verifyRazorpayWebhook,
 } from "../services/billingService.js";
@@ -43,5 +44,12 @@ billingRouter.post(
   asyncHandler(async (req, res) => {
     const input = createOrderSchema.parse(req.body);
     res.status(201).json(await createRazorpayOrder(req.user!.id, input));
+  }),
+);
+
+billingRouter.get(
+  "/orders",
+  asyncHandler(async (req, res) => {
+    res.json({ orders: await listMyOrders(req.user!.id) });
   }),
 );

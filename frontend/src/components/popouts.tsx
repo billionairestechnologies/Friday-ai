@@ -418,18 +418,6 @@ function HelpPopout() {
   );
 }
 
-function UpgradePopout() {
-  const dialog = useChat((s) => s.dialog);
-  const setDialog = useChat((s) => s.setDialog);
-  return (
-    <Shell open={dialog === "upgrade"} onClose={() => setDialog(null)} title="Upgrade plan">
-      <div className="rounded-xl border border-border bg-chip/40 p-4">
-        <p className="text-sm font-semibold">Friday</p>
-        <p className="mt-1 text-sm text-muted">This workspace already has model access. There’s nothing extra to buy here.</p>
-      </div>
-    </Shell>
-  );
-}
 
 export function HeaderActions() {
   const setDialog = useChat((s) => s.setDialog);
@@ -472,7 +460,6 @@ export function Popouts() {
       <SettingsModal />
       <PluginsDrawer />
       <HelpPopout />
-      <UpgradePopout />
     </>
   );
 }

@@ -157,6 +157,26 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
   };
 }
 
+/** The signed-in user's own order history — the Billing settings pane's "Invoices" list. */
+export async function listMyOrders(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("razorpay_orders")
+    .select("id, plan, amount_paise, currency, status, metadata, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new HttpError(500, error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    plan: row.plan as string,
+    amountPaise: row.amount_paise as number,
+    currency: row.currency as string,
+    status: row.status as string,
+    billingCycle: ((row.metadata as { billingCycle?: string } | null)?.billingCycle ?? "monthly") as string,
+    createdAt: row.created_at as string,
+  }));
+}
+
 export function verifyRazorpayWebhook(rawBody: Buffer, signature: string | undefined): boolean {
   if (!env.razorpayWebhookSecret || !signature) return false;
   const expected = createHmac("sha256", env.razorpayWebhookSecret).update(rawBody).digest("hex");

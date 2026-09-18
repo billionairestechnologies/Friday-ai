@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { formatResetAt, percentUsed, type QuotaResponse, type QuotaStatus } from "@/lib/usage/quota";
-import { useChat } from "@/lib/chat/store";
 
 type Toast = { id: string; message: string; danger: boolean };
 
@@ -49,6 +49,7 @@ function messageFor(label: string, threshold: number, status: QuotaStatus): stri
 }
 
 export function QuotaAlerts() {
+  const navigate = useNavigate();
   const { user } = useCurrentUserState();
   const signedIn = Boolean(user && !user.isDevFallback);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -129,10 +130,7 @@ export function QuotaAlerts() {
             {toast.danger && (
               <button
                 type="button"
-                onClick={() => {
-                  useChat.getState().setSettingsTab("usage");
-                  useChat.getState().setDialog("settings");
-                }}
+                onClick={() => void navigate({ to: "/upgrade" })}
                 className="ml-1 shrink-0 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
               >
                 Upgrade
