@@ -10,7 +10,7 @@ adminQuotaRouter.use(requireAuth, requireAdmin);
 adminQuotaRouter.use(
   rateLimit({
     name: "admin-quota-management",
-    limit: 120,
+    limit: 600,
     windowMs: 15 * 60_000,
   }),
 );

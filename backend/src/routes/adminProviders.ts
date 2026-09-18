@@ -7,10 +7,15 @@ import { rateLimit } from "../middleware/rateLimit.js";
 export const adminProvidersRouter = Router();
 
 adminProvidersRouter.use(requireAuth, requireAdmin);
+// A single bulk-management session (re-sync a provider, then enable + set a tier on ~20 newly
+// discovered models) fires several requests per model — the old limit of 60/15min was tripped
+// mid-session by exactly that workflow, leaving the Providers list permanently 429ing until the
+// window rolled over. Admin actions here are already gated behind requireAdmin, so this exists to
+// catch a runaway loop, not to throttle a legitimate admin doing real work.
 adminProvidersRouter.use(
   rateLimit({
     name: "admin-provider-management",
-    limit: 60,
+    limit: 600,
     windowMs: 15 * 60_000,
   }),
 );

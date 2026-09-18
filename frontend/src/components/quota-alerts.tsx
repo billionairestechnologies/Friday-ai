@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
@@ -15,27 +15,46 @@ const ROLLING_THRESHOLDS = [80, 100];
 const WEEKLY_THRESHOLDS = [50, 80, 90, 100];
 const POLL_MS = 60_000;
 
-function bucketKey(name: string, resetAt: string): string {
-  return `quota-alert:${name}:${resetAt}`;
+function armedKey(name: string, threshold: number): string {
+  return `quota-alert-armed:${name}:${threshold}`;
 }
 
-/** Fires a toast the first time a bucket crosses each threshold for its current period —
- *  deduped via sessionStorage so a re-render/remount can't re-fire the same threshold, but a
- *  new period (a changed resetAt) naturally gets a fresh set of thresholds to cross again. */
+/**
+ * Fires a toast the moment a bucket crosses UP through each threshold, then stays silent while
+ * it remains above — and re-arms once it drops back below, so it can fire again on the next
+ * climb. Deliberately NOT keyed by `resetAt`: the rolling 5-hour bucket's resetAt is recomputed
+ * as "now + 5h" on every single poll (it's not a fixed boundary the way weekly/monthly are), so
+ * using it in a dedupe key meant the key changed every poll and the same toast fired every
+ * minute forever — this arm/disarm model has no such moving target.
+ */
 function crossedThresholds(name: string, bucket: { used: number; limit: number; resetAt: string } | null, thresholds: number[]): number[] {
   if (!bucket) return [];
   const pct = percentUsed(bucket);
   const fired: number[] = [];
   for (const threshold of thresholds) {
-    if (pct < threshold) continue;
-    const key = bucketKey(`${name}:${threshold}`, bucket.resetAt);
+    const key = armedKey(name, threshold);
+    let alreadyArmed = false;
     try {
-      if (sessionStorage.getItem(key)) continue;
-      sessionStorage.setItem(key, "1");
+      alreadyArmed = sessionStorage.getItem(key) === "1";
     } catch {
-      // Private browsing / storage blocked — fall through and fire anyway rather than go silent.
+      // Private browsing / storage blocked — fall through and treat as never-armed.
     }
-    fired.push(threshold);
+    if (pct >= threshold) {
+      if (!alreadyArmed) {
+        fired.push(threshold);
+        try {
+          sessionStorage.setItem(key, "1");
+        } catch {
+          /* best-effort */
+        }
+      }
+    } else if (alreadyArmed) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        /* best-effort */
+      }
+    }
   }
   return fired;
 }
@@ -50,8 +69,13 @@ function messageFor(label: string, threshold: number, status: QuotaStatus): stri
 
 export function QuotaAlerts() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useCurrentUserState();
-  const signedIn = Boolean(user && !user.isDevFallback);
+  // The admin panel is Friday's own platform-management surface, not a regular user's chat
+  // session — a toast about the logged-in admin's personal token usage there is just noise on
+  // top of whatever they're actually doing (managing providers, other users' plans, etc).
+  const onAdminPanel = location.pathname.startsWith("/admin");
+  const signedIn = Boolean(user && !user.isDevFallback) && !onAdminPanel;
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
