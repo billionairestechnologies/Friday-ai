@@ -49,6 +49,16 @@ function guessComponentName(code: string): string | null {
 const REACT_HOOKS_PRELUDE =
   "const { useState, useEffect, useRef, useMemo, useCallback, useContext, useReducer, useLayoutEffect, Fragment, StrictMode, createContext, memo, forwardRef } = React;";
 
+// The two animation libraries model-generated "interactive demo" code (dice rolls, card flips,
+// drag interactions...) reaches for by far the most often, after bare React. Their import lines
+// get stripped like any other, so without loading the library and re-exposing its named exports
+// here too, that code hits "gsap is not defined" / "motion is not defined" at render time —
+// classified correctly as a react artifact now (see extractArtifact), but still failing to
+// actually run. gsap's own UMD build already sets a bare `window.gsap` global, matching a plain
+// `gsap.to(...)` call unmodified; framer-motion's does not (it's namespaced under `Motion`), so
+// that one needs the same destructuring treatment as the React hooks above.
+const MOTION_PRELUDE = "const { motion, AnimatePresence } = window.Motion ?? {};";
+
 export function buildReactPreviewHtml(source: string): string {
   const { code, exportedName } = stripModuleSyntax(source);
   const mountName = exportedName ?? guessComponentName(code) ?? "App";
@@ -62,12 +72,15 @@ export function buildReactPreviewHtml(source: string): string {
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"><\/script>
 <script src="https://cdn.tailwindcss.com"><\/script>
+<script src="https://unpkg.com/gsap@3/dist/gsap.min.js"><\/script>
+<script src="https://unpkg.com/framer-motion@11/dist/framer-motion.js"><\/script>
 <style>html,body{margin:0;min-height:100%;background:#fff}#root{min-height:100vh}</style>
 </head>
 <body>
 <div id="root"></div>
 <script id="user-code" type="text/babel" data-presets="react,typescript" data-type="module">
 ${REACT_HOOKS_PRELUDE}
+${MOTION_PRELUDE}
 ${code}
 
 try {
