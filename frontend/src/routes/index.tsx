@@ -318,7 +318,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
 
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_50%_0%,var(--surface-highlight),transparent_62%)]" />
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-1 px-3">
