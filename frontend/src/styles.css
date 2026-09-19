@@ -21,53 +21,62 @@
   --color-search: #1eaedb;
   --color-think: #8b5cf6;
   --color-canvas: #f97316;
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Outfit", "Google Sans Text", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 22px;
   --radius-2xl: 28px;
+  /* User chat bubble corner radius — distinct from the extra-large (28px) composer/dialog radius. */
+  --radius-bubble: 22px;
   --shadow-composer: 0 8px 30px rgba(0, 0, 0, 0.24);
+  --shadow-composer-focus: 0 8px 34px rgba(0, 0, 0, 0.3);
   --shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.34);
   --shadow-soft: 0 14px 40px rgba(0, 0, 0, 0.18);
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  /* M3 emphasized/standard easing — used for the composer focus halo, press-scale, and chip
+     transitions specifically; --ease-premium (above) is untouched for everything already using it. */
+  --ease-m3: cubic-bezier(0.2, 0, 0, 1);
   --motion-fast: 120ms;
   --motion-control: 190ms;
   --motion-panel: 300ms;
   --hairline: color-mix(in oklab, var(--color-border) 70%, transparent);
   --surface-highlight: color-mix(in oklab, var(--color-foreground) 7%, transparent);
   --focus-ring: color-mix(in oklab, var(--color-foreground) 72%, transparent);
+  --ambient-glow: radial-gradient(ellipse 70% 55% at 50% 42%, rgba(66, 133, 244, 0.16) 0%, rgba(20, 21, 22, 0) 72%);
 }
 
 html.light {
-  /* Cool off-white app chrome — see project's light-theme color spec.
-     Kept as flat, low-saturation grays/off-whites; no cream/yellow chrome. */
-  --color-background: #f9f8f7;
-  --color-foreground: #050505;
-  /* Darkened from #8a8a8a — that read as washed-out/light for icons and secondary text ("New
-     chat", header icons, composer toolbar). Subtle absorbs the old muted value so the two tiers
-     (secondary vs faintest) stay distinct, just both shifted darker for a more premium look. */
-  --color-muted: #47484a;
-  --color-subtle: #8a8a8a;
-  --color-surface: #f4f3f2;
+  /* Gemini / Material 3 surface tokens — exact values from the M3 token spec (surface,
+     surface-container, surface-container-high, on-surface, on-surface-variant,
+     outline-variant, primary, primary-container). Search/Think/Canvas accents were already
+     an exact match to the spec's $search-accent/$think-accent/$canvas-accent and are unchanged. */
+  --color-background: #ffffff;
+  --color-foreground: #1f1f1f;
+  --color-muted: #5f6368;
+  --color-subtle: #80868b;
+  --color-surface: #f0f4f9;
   --color-elevated: #ffffff;
   --color-composer: #ffffff;
-  --color-border: #e8e6e4;
-  --color-primary: #111111;
+  --color-border: #dadce0;
+  --color-primary: #1a73e8;
   --color-primary-foreground: #ffffff;
   --color-accent: #3f3f46;
-  /* Sidebar hover / selected-pill / generic hover surfaces all key off this one token —
-     kept a neutral gray so none of that chrome turns cream/tan. */
-  --color-chip: #e6e4e3;
-  --color-chip-on: #d4d4d8;
-  /* Only the literal inline-code/hex chip gets the warm tan — everything else above stays gray. */
+  /* surface-container-high — hover surfaces AND the user chat bubble (see message-thread.tsx). */
+  --color-chip: #e9eef6;
+  --color-chip-on: #dde6f3;
+  /* primary-container — selected nav pill, ambient glow, chip/avatar tint. */
+  --color-selected: #d3e3fd;
+  /* Only the literal inline-code/hex chip gets the warm tan — everything else above stays cool. */
   --color-hex-chip: #f4e7dc;
-  --color-notify: #3b82f6;
-  --color-search: #2563eb;
-  --shadow-panel: 0 1px 2px rgba(5, 5, 5, 0.04);
-  --shadow-soft: 0 1px 2px rgba(5, 5, 5, 0.03);
-  --shadow-composer: 0 1px 2px rgba(5, 5, 5, 0.04);
+  --color-notify: #1a73e8;
+  --color-search: #1eaedb;
+  --shadow-panel: 0 12px 40px rgba(60, 64, 67, 0.1), 0 2px 8px rgba(60, 64, 67, 0.08);
+  --shadow-soft: 0 4px 20px rgba(60, 64, 67, 0.06), 0 1px 3px rgba(60, 64, 67, 0.1);
+  --shadow-composer: 0 0 0 1px rgba(60, 64, 67, 0.06), 0 2px 6px rgba(60, 64, 67, 0.08), 0 12px 28px rgba(60, 64, 67, 0.08);
+  --shadow-composer-focus: 0 0 0 1px rgba(60, 64, 67, 0.1), 0 4px 10px rgba(60, 64, 67, 0.1), 0 16px 36px rgba(60, 64, 67, 0.12);
+  --ambient-glow: radial-gradient(ellipse 70% 55% at 50% 42%, #d3e3fd 0%, rgb(255 255 255 / 0) 72%);
 }
 
 @layer base {
@@ -137,6 +146,60 @@ html.light {
     transform: translateX(-100%);
     background: linear-gradient(90deg, transparent, var(--surface-highlight), transparent);
     animation: skeleton-shine 1.4s var(--ease-premium) infinite;
+  }
+
+  /* Ambient glow behind the empty-state viewport — absolutely positioned by the caller as the
+     first child of a `relative` container; never intercepts clicks, always behind content. */
+  .ambient-glow {
+    position: absolute;
+    inset: 0;
+    /* Negative, not 0 — a positioned element at z-index:0 still paints AFTER static in-flow
+       content in the same stacking context (CSS painting-order rules), so it rendered on TOP of
+       the heading text instead of behind it. Negative z-index paints before static content. */
+    z-index: -1;
+    pointer-events: none;
+    background: var(--ambient-glow);
+  }
+
+  .gemini-sparkle {
+    background: linear-gradient(135deg, #4285f4 0%, #9b72cb 52%, #d96570 100%);
+  }
+
+  .gemini-sparkle-text {
+    background: linear-gradient(135deg, #4285f4 0%, #9b72cb 52%, #d96570 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  /* Composer elevation + focus halo — M3 rest/focus shadow pair, transform+box-shadow only
+     (Wiz-safe motion — no layout properties). */
+  .m3-focus-halo {
+    transition:
+      box-shadow 220ms var(--ease-m3),
+      transform 220ms var(--ease-m3);
+  }
+
+  .m3-focus-halo:focus-within {
+    box-shadow: var(--shadow-composer-focus);
+    transform: translateY(-1px);
+  }
+
+  /* M3 press state: scale(0.96) rather than the site's default scale(0.98), per spec. */
+  .m3-lift {
+    transition: transform 150ms var(--ease-m3);
+  }
+
+  .m3-lift:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  /* Chip select/deselect — width/opacity only transitions, no layout measurement in JS. */
+  .m3-chip {
+    transition:
+      background-color 200ms var(--ease-m3),
+      border-color 200ms var(--ease-m3),
+      opacity 200ms var(--ease-m3);
   }
 }
 
@@ -211,12 +274,15 @@ html.light {
   padding: 0.1em 0.35em;
 }
 
+/* Code blocks render on a fixed dark canvas regardless of app theme (light or dark) — matches
+   the spec's $code-bg/$code-fg, and keeps code legible instead of the near-invisible
+   white-on-white block the light theme's --color-elevated used to produce. */
 .md pre {
   margin: 0.8em 0;
   padding: 0.9em 1em;
   border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #151515;
   overflow-x: auto;
 }
 
@@ -224,6 +290,7 @@ html.light {
   background: transparent;
   padding: 0;
   font-size: 0.8rem;
+  color: #e8eaed;
 }
 
 .md blockquote {
@@ -314,7 +381,7 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .think-dot {
-  animation: think-pulse 1.2s ease-in-out infinite;
+  animation: think-pulse 1.05s ease-in-out infinite;
 }
 
 .think-dot:nth-child(2) {
@@ -330,9 +397,36 @@ textarea::-webkit-scrollbar-thumb {
   80%,
   100% {
     opacity: 0.25;
+    transform: translateY(0);
   }
   40% {
     opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* M3 "rise" enter — fade-up 12px, transform+opacity only. Three stagger steps available
+   (0/80/150ms) for adjacent elements entering together (e.g. heading, composer, chips). */
+.rise {
+  animation: rise 560ms var(--ease-m3) both;
+}
+
+.rise-1 {
+  animation-delay: 80ms;
+}
+
+.rise-2 {
+  animation-delay: 150ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -391,11 +485,15 @@ textarea::-webkit-scrollbar-thumb {
   .enter-up,
   .msg-enter,
   .spin-slow,
+  .rise,
   .skeleton-shine::after {
     animation: none !important;
   }
 
-  .premium-control {
+  .premium-control,
+  .m3-focus-halo,
+  .m3-lift,
+  .m3-chip {
     transition: none !important;
   }
 }

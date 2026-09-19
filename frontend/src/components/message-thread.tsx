@@ -78,7 +78,7 @@ const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage 
                 <img
                   src={a.dataUrl}
                   alt={a.name}
-                  className="h-36 max-w-[240px] rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
+                  className="h-36 max-w-[240px] rounded-md object-cover outline outline-1 -outline-offset-1 outline-white/10"
                 />
                 <button
                   type="button"
@@ -105,7 +105,7 @@ const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage 
         </div>
       )}
       {message.content.trim() && (
-        <div className="max-w-[min(100%,36rem)] rounded-2xl border border-border bg-composer px-4 py-2.5 text-base leading-relaxed whitespace-pre-wrap text-foreground shadow-[var(--shadow-composer)]">
+        <div className="max-w-[min(100%,36rem)] rounded-[var(--radius-bubble)] bg-chip px-4 py-2.5 text-base leading-relaxed whitespace-pre-wrap text-foreground">
           {message.content}
         </div>
       )}

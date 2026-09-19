@@ -341,15 +341,16 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               className="flex flex-1 flex-col items-center justify-center px-4 pb-8"
             >
-              <div className="mb-8 flex flex-col items-center text-center">
+              <div className="relative mb-8 flex flex-col items-center text-center">
+                <div className="ambient-glow" aria-hidden />
                 {available ? (
-                  <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+                  <h1 className="relative text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl">
                     {heroLine.kind === "greeting" ? (
                       <>
                         <motion.span
-                          initial={{ opacity: 0, y: 14 }}
+                          initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                          transition={{ duration: 0.56, ease: [0.2, 0, 0, 1] }}
                           className="block text-muted"
                         >
                           {heroLine.greeting}
@@ -357,10 +358,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                         </motion.span>
                         {heroLine.name && (
                           <motion.span
-                            initial={{ opacity: 0, y: 18, scale: 0.94 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{ duration: 0.55, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-                            className="block bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.56, delay: 0.08, ease: [0.2, 0, 0, 1] }}
+                            className="block text-foreground"
                           >
                             {heroLine.name}
                           </motion.span>
@@ -368,10 +369,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                       </>
                     ) : (
                       <motion.span
-                        initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                        className="block bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.56, ease: [0.2, 0, 0, 1] }}
+                        className="block text-foreground"
                       >
                         {heroLine.text}
                       </motion.span>
@@ -401,9 +402,9 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                       <motion.button
                         key={p}
                         type="button"
-                        initial={{ opacity: 0, y: 8 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.08 + i * 0.05, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                        transition={{ delay: Math.min(i * 0.08, 0.15), duration: 0.56, ease: [0.2, 0, 0, 1] }}
                         onClick={() => usePrompt(p)}
                         className="premium-control rounded-xl border border-border bg-transparent px-3.5 py-3 text-left text-sm text-muted shadow-[var(--shadow-soft)] hover:bg-elevated hover:text-foreground"
                       >

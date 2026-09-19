@@ -365,8 +365,8 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           <div
             ref={ref}
             className={cn(
-              "rounded-3xl border border-border bg-composer p-2 shadow-[var(--shadow-composer)] transition-[border-color,box-shadow] duration-200",
-              isLoading && "border-red-500/70",
+              "m3-focus-halo rounded-2xl bg-composer p-2 shadow-[var(--shadow-composer)]",
+              isLoading && "border border-red-500/70",
               className,
             )}
             onDragOver={onDragOver}
@@ -904,7 +904,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   type="button"
                   onClick={() => setSearch(!showSearch)}
                   className={cn(
-                    "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 py-1 transition-all",
+                    "m3-chip flex h-8 shrink-0 items-center gap-1 rounded-full border-[1.5px] px-2 py-1",
                     showSearch
                       ? "border-search bg-search/15 text-search"
                       : "border-transparent bg-transparent text-muted hover:text-foreground",
@@ -952,7 +952,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   type="button"
                   onClick={() => setThink(!showThink)}
                   className={cn(
-                    "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 py-1 transition-all",
+                    "m3-chip flex h-8 shrink-0 items-center gap-1 rounded-full border-[1.5px] px-2 py-1",
                     showThink
                       ? "border-think bg-think/15 text-think"
                       : "border-transparent bg-transparent text-muted hover:text-foreground",
@@ -1000,7 +1000,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   type="button"
                   onClick={() => setCanvas(!showCanvas)}
                   className={cn(
-                    "flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 py-1 transition-all",
+                    "m3-chip flex h-8 shrink-0 items-center gap-1 rounded-full border-[1.5px] px-2 py-1",
                     showCanvas
                       ? "border-canvas bg-canvas/15 text-canvas"
                       : "border-transparent bg-transparent text-muted hover:text-foreground",
@@ -1135,7 +1135,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   variant="default"
                   size="icon"
                   className={cn(
-                    "h-8 w-8 rounded-full transition-all duration-200",
+                    "m3-lift h-8 w-8 rounded-full transition-all duration-200",
                     isRecording
                       ? "bg-transparent text-red-500 hover:bg-chip hover:text-red-400"
                       : hasContent || isLoading
