@@ -3,6 +3,8 @@ import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
 import { AdminGate } from "@/routes/admin";
 import { UpgradePage } from "@/routes/upgrade";
+import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
+import { TeamPage } from "@/routes/team";
 import { AppErrorComponent } from "@/lib/error-component";
 
 const rootRoute = createRootRoute({
@@ -59,7 +61,38 @@ const upgradeRoute = createRoute({
   component: UpgradePage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, conversationRoute, adminRoute, upgradeRoute]);
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects",
+  component: ProjectsPage,
+});
+
+function ProjectDetailRoute() {
+  const { projectId } = useParams({ strict: false }) as { projectId: string };
+  return <ProjectDetailPage projectId={projectId} />;
+}
+
+const projectDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$projectId",
+  component: ProjectDetailRoute,
+});
+
+const teamRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/team",
+  component: TeamPage,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  conversationRoute,
+  adminRoute,
+  upgradeRoute,
+  projectsRoute,
+  projectDetailRoute,
+  teamRoute,
+]);
 
 export const router = createRouter({ routeTree });
 

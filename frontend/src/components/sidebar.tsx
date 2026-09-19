@@ -1,9 +1,11 @@
-import { PanelLeft, Puzzle, Search, SquarePen, Trash2, X } from "lucide-react";
+import { useEffect } from "react";
+import { Building2, FolderKanban, PanelLeft, Puzzle, Search, SquarePen, Trash2, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
 import { api } from "@/lib/api";
 import { filteredChats, useChat } from "@/lib/chat/store";
+import { usePlan } from "@/lib/usage/planStore";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
@@ -17,8 +19,21 @@ export function Sidebar() {
   const selectChat = useChat((s) => s.selectChat);
   const deleteChatLocal = useChat((s) => s.deleteChat);
   const newChat = useChat((s) => s.newChat);
+  const setActiveProjectId = useChat((s) => s.setActiveProjectId);
   const setDialog = useChat((s) => s.setDialog);
-  const visible = filteredChats(chats, query);
+  const isEnterprise = usePlan((s) => s.isEnterprise);
+  const loadPlan = usePlan((s) => s.load);
+  // Project chats are project-scoped only (see hydrateFromServer/listConversations) — the main
+  // list only ever receives unscoped ones from the backend, but this also guards against any
+  // stale project-tagged chat left over in localStorage from before that filter existed.
+  const visible = filteredChats(
+    chats.filter((c) => !c.projectId),
+    query,
+  );
+
+  useEffect(() => {
+    void loadPlan();
+  }, [loadPlan]);
 
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
@@ -60,6 +75,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={() => {
+              setActiveProjectId(null);
               newChat();
               void navigate({ to: "/" });
               if (window.innerWidth < 768) setOpen(false);
@@ -121,6 +137,30 @@ export function Sidebar() {
           )}
         </nav>
         <div className="border-t border-border px-2 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              void navigate({ to: "/projects" });
+              if (window.innerWidth < 768) setOpen(false);
+            }}
+            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm text-muted transition-colors hover:bg-chip hover:text-foreground"
+          >
+            <FolderKanban className="size-4" />
+            Projects
+          </button>
+          {isEnterprise && (
+            <button
+              type="button"
+              onClick={() => {
+                void navigate({ to: "/team" });
+                if (window.innerWidth < 768) setOpen(false);
+              }}
+              className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm text-muted transition-colors hover:bg-chip hover:text-foreground"
+            >
+              <Building2 className="size-4" />
+              Team
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setDialog("plugins")}

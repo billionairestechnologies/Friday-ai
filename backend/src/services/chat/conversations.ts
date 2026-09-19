@@ -31,7 +31,9 @@ function pageSize(limit: number | undefined): number {
 export async function getOwnedConversation(userId: string, conversationId: string) {
   const { data, error } = await supabaseAdmin
     .from("conversations")
-    .select("*, providers(slug, display_name), assistant_projects(name, mode, instructions, repository_url)")
+    .select(
+      "*, providers(slug, display_name), assistant_projects(name, mode, description, instructions, repository_url)",
+    )
     .eq("id", conversationId)
     .eq("user_id", userId)
     .single();
@@ -41,6 +43,7 @@ export async function getOwnedConversation(userId: string, conversationId: strin
     assistant_projects: {
       name: string;
       mode: "personal" | "work" | "developer";
+      description: string;
       instructions: string;
       repository_url: string | null;
     } | null;
@@ -127,13 +130,19 @@ export async function updateConversationModel(
   return data;
 }
 
-export async function listConversations(userId: string, page: PageOptions = {}) {
+/**
+ * Projects are project-scoped only: a conversation created inside a project is left out of the
+ * general chat list and only shows up when browsing that project (projectId passed). With no
+ * projectId, this returns just the unscoped chats — the ones that belong to no project.
+ */
+export async function listConversations(userId: string, page: PageOptions = {}, projectId?: string) {
   let query = supabaseAdmin
     .from("conversations")
     .select("*, providers(slug, display_name)")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(pageSize(page.limit));
+  query = projectId ? query.eq("project_id", projectId) : query.is("project_id", null);
   if (page.before) query = query.lt("updated_at", page.before);
   const { data, error } = await query;
   if (error) throw new HttpError(500, error.message);

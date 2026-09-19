@@ -7,6 +7,10 @@ const pageSchema = z.object({
   before: z.string().datetime().optional(),
 });
 
+const listConversationsQuerySchema = pageSchema.extend({
+  projectId: z.string().uuid().optional(),
+});
+
 const createConversationSchema = z
   .object({
     mode: z.enum(["single", "auto", "teamup"]).optional().default("single"),
@@ -48,8 +52,8 @@ export async function updateConversation(req: Request, res: Response) {
 }
 
 export async function listConversations(req: Request, res: Response) {
-  const page = pageSchema.parse(req.query);
-  res.json({ conversations: await chatService.listConversations(req.user!.id, page) });
+  const { projectId, ...page } = listConversationsQuerySchema.parse(req.query);
+  res.json({ conversations: await chatService.listConversations(req.user!.id, page, projectId) });
 }
 
 export async function deleteAllConversations(req: Request, res: Response) {

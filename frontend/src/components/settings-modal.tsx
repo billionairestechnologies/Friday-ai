@@ -4,14 +4,12 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   AudioLines,
   Bell,
-  Building2,
   Check,
   CreditCard,
   Lock,
   Palette,
   Shield,
   SlidersHorizontal,
-  Sparkles,
   UserRound,
   X,
   Zap,
@@ -47,15 +45,10 @@ const NAV = [
     ],
   },
   {
-    group: "Friday",
-    items: [{ id: "customize", label: "Customize", icon: Sparkles }],
-  },
-  {
     group: "Payments",
     items: [
       { id: "billing", label: "Billing", icon: CreditCard },
       { id: "usage", label: "Usage", icon: Zap },
-      { id: "team", label: "Team", icon: Building2 },
     ],
   },
   {
@@ -132,10 +125,8 @@ export function SettingsModal() {
               {tab === "behavior" && <BehaviorPane />}
               {tab === "voice" && <VoicePane />}
               {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
-              {tab === "customize" && <ProjectsPane />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
-              {tab === "team" && <TeamPane />}
               {tab === "data" && <DataPane />}
             </div>
           </div>
@@ -394,140 +385,6 @@ function VoicePane() {
   );
 }
 
-type AssistantProject = {
-  id: string;
-  name: string;
-  mode: "personal" | "work" | "developer";
-  instructions: string;
-  repository_url: string | null;
-};
-
-function ProjectsPane() {
-  const activeProjectId = useChat((s) => s.activeProjectId);
-  const setActiveProjectId = useChat((s) => s.setActiveProjectId);
-  const [projects, setProjects] = useState<AssistantProject[]>([]);
-  const [name, setName] = useState("");
-  const [mode, setMode] = useState<AssistantProject["mode"]>("work");
-  const [repositoryUrl, setRepositoryUrl] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function refreshProjects() {
-    api
-      .get<{ projects: AssistantProject[] }>("/projects")
-      .then((res) => {
-        setProjects(res.projects);
-        setError(null);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load projects"));
-  }
-
-  useEffect(refreshProjects, []);
-
-  async function createProject() {
-    if (!name.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.post<{ project: AssistantProject }>("/projects", {
-        name,
-        mode,
-        repositoryUrl,
-        instructions,
-      });
-      setProjects((current) => [res.project, ...current]);
-      setActiveProjectId(res.project.id);
-      setName("");
-      setRepositoryUrl("");
-      setInstructions("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't create project");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div>
-      <h2 className="mb-1 text-lg font-semibold">Projects</h2>
-      <p className="mb-4 text-sm text-muted">
-        Give Friday persistent Work or Developer context for new conversations.
-      </p>
-      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-      <div className="mb-5 flex flex-col gap-2 rounded-xl border border-border bg-background p-3">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Project name"
-          className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
-        />
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as AssistantProject["mode"])}
-          className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
-        >
-          <option value="work">Work project</option>
-          <option value="developer">Developer project</option>
-          <option value="personal">Personal project</option>
-        </select>
-        {mode === "developer" && (
-          <input
-            value={repositoryUrl}
-            onChange={(e) => setRepositoryUrl(e.target.value)}
-            placeholder="Repository URL"
-            className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
-          />
-        )}
-        <textarea
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
-          placeholder="Persistent instructions, files to remember, team rules, or repo notes"
-          rows={3}
-          className="resize-none rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none"
-        />
-        <button
-          type="button"
-          disabled={busy || !name.trim()}
-          onClick={() => void createProject()}
-          className="h-9 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {busy ? "Creating..." : "Create and use project"}
-        </button>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <button
-          type="button"
-          onClick={() => setActiveProjectId(null)}
-          className={cn(
-            "rounded-xl px-3 py-2 text-left text-sm",
-            activeProjectId === null ? "bg-chip text-foreground" : "text-muted hover:bg-chip/60",
-          )}
-        >
-          No project
-        </button>
-        {projects.map((project) => (
-          <button
-            key={project.id}
-            type="button"
-            onClick={() => setActiveProjectId(project.id)}
-            className={cn(
-              "rounded-xl px-3 py-2 text-left text-sm",
-              activeProjectId === project.id ? "bg-chip text-foreground" : "text-muted hover:bg-chip/60",
-            )}
-          >
-            <span className="block font-medium">{project.name}</span>
-            <span className="block text-xs capitalize text-subtle">
-              {project.mode}
-              {project.repository_url ? ` - ${project.repository_url}` : ""}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 type OrderRow = {
   id: string;
   plan: string;
@@ -647,7 +504,7 @@ function BillingPane() {
 }
 
 const PLAN_LABEL: Record<QuotaStatus["plan"], string> = { free: "Free", pro: "Pro", premium: "Premium" };
-const DOT_COLORS = ["bg-search", "bg-think", "bg-canvas", "bg-muted"];
+const DOT_COLORS = ["bg-search", "bg-think", "bg-canvas", "bg-accent", "bg-muted"];
 
 function QuotaBar({
   title,
@@ -757,10 +614,13 @@ function UsagePane() {
             <QuotaBar
               title="5-Hour Limit"
               bucket={quota.status.rolling}
+              breakdown={quota.rollingBreakdown}
               help="A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once."
             />
           )}
-          {quota.status.monthly && <QuotaBar title="Monthly Limit" bucket={quota.status.monthly} />}
+          {quota.status.monthly && (
+            <QuotaBar title="Monthly Limit" bucket={quota.status.monthly} breakdown={quota.monthlyBreakdown} />
+          )}
           {quota.status.org && (
             <QuotaBar
               title={`Organization Pool (${quota.status.org.seatCount} seats)`}
@@ -773,312 +633,6 @@ function UsagePane() {
               bucket={{ ...quota.status.memberCap, resetAt: quota.status.org?.resetAt ?? new Date().toISOString() }}
               help="A personal sub-limit your org admin set within the shared pool above."
             />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TeamPane() {
-  const { user } = useCurrentUserState();
-  const signedIn = Boolean(user && !user.isDevFallback);
-  const [organizations, setOrganizations] = useState<
-    {
-      id: string;
-      name: string;
-      slug: string;
-      plan: string;
-      monthlyBudgetCents: number;
-      role: string;
-    }[]
-  >([]);
-  const [name, setName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteAcceptToken, setInviteAcceptToken] = useState("");
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [budget, setBudget] = useState("0");
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
-  const [sso, setSso] = useState<{ enabled: boolean; entryUrl: string | null; providerLabel: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [members, setMembers] = useState<
-    { userId: string; role: string; fullName: string | null; customMonthlyCap: number | null; joinedAt: string }[]
-  >([]);
-  const [orgQuota, setOrgQuota] = useState<QuotaStatus | null>(null);
-  const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
-
-  function refresh() {
-    if (!signedIn) return;
-    api
-      .get<{ organizations: typeof organizations }>("/organizations")
-      .then((res) => {
-        setOrganizations(res.organizations);
-        if (!selectedOrgId && res.organizations[0]) {
-          setSelectedOrgId(res.organizations[0].id);
-          setBudget(String(res.organizations[0].monthlyBudgetCents));
-        }
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load teams"));
-    api
-      .get<{ enabled: boolean; entryUrl: string | null; providerLabel: string }>("/organizations/sso")
-      .then(setSso)
-      .catch(() => setSso(null));
-    api
-      .get<QuotaResponse>("/usage/quota")
-      .then((res) => setOrgQuota(res.status.org ? res.status : null))
-      .catch(() => setOrgQuota(null));
-  }
-
-  useEffect(refresh, [signedIn]);
-
-  const selected = organizations.find((org) => org.id === selectedOrgId) ?? null;
-
-  useEffect(() => {
-    if (!selected) {
-      setMembers([]);
-      return;
-    }
-    api
-      .get<{ members: typeof members }>(`/organizations/${selected.id}/members`)
-      .then((res) => setMembers(res.members))
-      .catch(() => setMembers([]));
-  }, [selected?.id]);
-
-  if (!signedIn) {
-    return <SimpleNote title="Team" body="Sign in to create an organization, invite members, and set budgets." />;
-  }
-
-  const canManageMembers = selected?.role === "owner" || selected?.role === "admin";
-
-  async function saveMemberCap(userId: string) {
-    if (!selected) return;
-    const raw = capDrafts[userId]?.trim();
-    const customMonthlyCap = raw ? Number(raw) : null;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.patch(`/organizations/${selected.id}/members/${userId}/cap`, { customMonthlyCap });
-      setMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, customMonthlyCap } : m)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't set that member's cap");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function createOrg() {
-    if (!name.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.post<{ organization: (typeof organizations)[number] }>("/organizations", { name });
-      setOrganizations((current) => [res.organization, ...current]);
-      setSelectedOrgId(res.organization.id);
-      setBudget(String(res.organization.monthlyBudgetCents));
-      setName("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't create team");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveBudget() {
-    if (!selected) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.patch<{ organization: (typeof organizations)[number] }>(
-        `/organizations/${selected.id}/budget`,
-        { monthlyBudgetCents: Number(budget) || 0 },
-      );
-      setOrganizations((current) =>
-        current.map((org) => (org.id === res.organization.id ? { ...org, ...res.organization } : org)),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't update budget");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function inviteMember() {
-    if (!selected || !inviteEmail.trim()) return;
-    setBusy(true);
-    setError(null);
-    setInviteToken(null);
-    try {
-      const res = await api.post<{ invite: { inviteToken: string } }>(`/organizations/${selected.id}/invites`, {
-        email: inviteEmail,
-        role: "member",
-      });
-      setInviteToken(res.invite.inviteToken);
-      setInviteEmail("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't create invite");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function acceptInvite() {
-    if (!inviteAcceptToken.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.post("/organizations/invites/accept", { token: inviteAcceptToken.trim() });
-      setInviteAcceptToken("");
-      refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't accept invite");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div>
-      <h2 className="mb-1 text-lg font-semibold">Team</h2>
-      <p className="mb-4 text-sm text-muted">Create an organization, invite members, and set a monthly budget.</p>
-      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-      {sso?.enabled && sso.entryUrl && (
-        <p className="mb-3 rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted">
-          {sso.providerLabel} is enabled for this workspace. Members can enter through the sign-in SSO button.
-        </p>
-      )}
-      <div className="mb-5 flex flex-col gap-2 rounded-xl border border-border bg-background p-3">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Organization name"
-          className="h-9 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
-        />
-        <button
-          type="button"
-          disabled={busy || !name.trim()}
-          onClick={() => void createOrg()}
-          className="h-9 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {busy ? "Working..." : "Create organization"}
-        </button>
-        <div className="mt-1 flex gap-2">
-          <input
-            value={inviteAcceptToken}
-            onChange={(e) => setInviteAcceptToken(e.target.value)}
-            placeholder="Accept invite token"
-            className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-elevated px-3 text-sm outline-none"
-          />
-          <button
-            type="button"
-            disabled={busy || !inviteAcceptToken.trim()}
-            onClick={() => void acceptInvite()}
-            className="h-9 rounded-full border border-border px-3 text-sm disabled:opacity-50"
-          >
-            Join
-          </button>
-        </div>
-      </div>
-      {organizations.length > 0 && (
-        <div className="mb-4 flex flex-col gap-2">
-          <select
-            value={selectedOrgId ?? ""}
-            onChange={(e) => {
-              const next = organizations.find((org) => org.id === e.target.value);
-              setSelectedOrgId(e.target.value);
-              if (next) setBudget(String(next.monthlyBudgetCents));
-            }}
-            className="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none"
-          >
-            {organizations.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name} ({org.role})
-              </option>
-            ))}
-          </select>
-          {selected && (
-            <>
-              <div className="flex gap-2">
-                <input
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  inputMode="numeric"
-                  placeholder="Monthly budget (cents)"
-                  className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none"
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void saveBudget()}
-                  className="h-9 rounded-full border border-border px-3 text-sm disabled:opacity-50"
-                >
-                  Save budget
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="Invite email"
-                  className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none"
-                />
-                <button
-                  type="button"
-                  disabled={busy || !inviteEmail.trim()}
-                  onClick={() => void inviteMember()}
-                  className="h-9 rounded-full border border-border px-3 text-sm disabled:opacity-50"
-                >
-                  Invite
-                </button>
-              </div>
-              {inviteToken && (
-                <p className="rounded-xl border border-border bg-elevated px-3 py-2 text-xs text-muted">
-                  Invite token (share once): <span className="font-mono text-foreground">{inviteToken}</span>
-                </p>
-              )}
-
-              {orgQuota?.org && (
-                <QuotaBar title={`Pooled tokens (${orgQuota.org.seatCount} seats)`} bucket={orgQuota.org} />
-              )}
-
-              {members.length > 0 && (
-                <div className="overflow-hidden rounded-xl border border-border bg-background">
-                  <p className="border-b border-border px-3 py-2 text-xs font-medium tracking-wide text-muted uppercase">
-                    Members
-                  </p>
-                  <div className="flex flex-col divide-y divide-border">
-                    {members.map((m) => (
-                      <div key={m.userId} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-                        <span className="min-w-0 flex-1 truncate">{m.fullName ?? m.userId}</span>
-                        <span className="rounded-full bg-chip px-2 py-0.5 text-xs text-muted">{m.role}</span>
-                        {canManageMembers && (
-                          <>
-                            <input
-                              type="number"
-                              placeholder="No cap"
-                              defaultValue={m.customMonthlyCap ?? ""}
-                              onChange={(e) => setCapDrafts((prev) => ({ ...prev, [m.userId]: e.target.value }))}
-                              className="h-7 w-28 rounded-full border border-border bg-elevated px-2 text-xs outline-none"
-                            />
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void saveMemberCap(m.userId)}
-                              className="h-7 rounded-full border border-border px-2.5 text-xs hover:bg-chip"
-                            >
-                              Set cap
-                            </button>
-                          </>
-                        )}
-                        {!canManageMembers && m.customMonthlyCap != null && (
-                          <span className="text-xs text-muted">Cap: {formatTokens(m.customMonthlyCap)} tokens/mo</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
           )}
         </div>
       )}

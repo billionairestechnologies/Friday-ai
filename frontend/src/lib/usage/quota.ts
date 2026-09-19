@@ -15,6 +15,8 @@ export type QuotaBreakdownEntry = { type: string; quantity: number; percent: num
 export type QuotaResponse = {
   status: QuotaStatus;
   breakdown: QuotaBreakdownEntry[];
+  rollingBreakdown: QuotaBreakdownEntry[];
+  monthlyBreakdown: QuotaBreakdownEntry[];
 };
 
 export function percentUsed(bucket: { used: number; limit: number } | null): number {
@@ -26,7 +28,7 @@ const EVENT_LABELS: Record<string, string> = {
   chat_message: "Chat",
   web_search: "Search",
   voice_second: "Voice",
-  sandbox_run: "Canvas",
+  sandbox_run: "Build",
   attachment_upload: "Attachments",
 };
 

@@ -53,6 +53,9 @@ export type Chat = {
   conversationId?: string;
   /** Encoded model id (or Auto/Team Up sentinel) the conversation is currently wired to on the backend. */
   conversationModel?: string;
+  /** Set when this chat belongs to a Project — project chats are scoped-only: kept out of the
+   *  main sidebar list and only shown from inside that project's own view. */
+  projectId?: string;
 };
 
 export type ChatRequestMessage = {

@@ -19,6 +19,7 @@ export async function createProject(
   mode: ProjectMode,
   instructions = "",
   repositoryUrl: string | null = null,
+  description = "",
 ) {
   const { data, error } = await supabaseAdmin
     .from("assistant_projects")
@@ -28,6 +29,7 @@ export async function createProject(
       mode,
       instructions,
       repository_url: repositoryUrl,
+      description,
     })
     .select()
     .single();
@@ -44,4 +46,42 @@ export async function getOwnedProject(userId: string, projectId: string) {
     .single();
   if (error || !data) throw new HttpError(404, "Project not found");
   return data;
+}
+
+export type ProjectPatch = Partial<{
+  name: string;
+  mode: ProjectMode;
+  instructions: string;
+  repositoryUrl: string | null;
+  description: string;
+}>;
+
+export async function updateProject(userId: string, projectId: string, patch: ProjectPatch) {
+  await getOwnedProject(userId, projectId);
+  const { data, error } = await supabaseAdmin
+    .from("assistant_projects")
+    .update({
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.mode !== undefined ? { mode: patch.mode } : {}),
+      ...(patch.instructions !== undefined ? { instructions: patch.instructions } : {}),
+      ...(patch.repositoryUrl !== undefined ? { repository_url: patch.repositoryUrl } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId)
+    .select()
+    .single();
+  if (error || !data) throw new HttpError(500, error?.message ?? "Failed to update project");
+  return data;
+}
+
+/**
+ * Deleting a project doesn't delete its chats — conversations.project_id is ON DELETE SET NULL,
+ * so any chats that were scoped to this project fall back into the user's general chat list
+ * instead of being destroyed.
+ */
+export async function deleteProject(userId: string, projectId: string) {
+  await getOwnedProject(userId, projectId);
+  const { error } = await supabaseAdmin.from("assistant_projects").delete().eq("id", projectId);
+  if (error) throw new HttpError(500, error.message);
 }

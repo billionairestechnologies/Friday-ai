@@ -10,6 +10,15 @@ export type UsageEventType =
   | "attachment_upload"
   | "token_usage";
 
+/** The feature categories shown in the Usage settings breakdown, in display order. */
+export const BREAKDOWN_EVENT_TYPES: Exclude<UsageEventType, "token_usage">[] = [
+  "chat_message",
+  "web_search",
+  "voice_second",
+  "sandbox_run",
+  "attachment_upload",
+];
+
 export async function recordUsageEvent(
   userId: string,
   eventType: UsageEventType,

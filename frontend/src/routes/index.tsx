@@ -153,7 +153,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       body.modelId = decoded.modelId;
     }
     const res = await api.post<{ conversation: { id: string } }>("/chat/conversations", body);
-    useChat.getState().setConversationId(chatId, res.conversation.id);
+    useChat.getState().setConversationId(chatId, res.conversation.id, s.activeProjectId ?? undefined);
     useChat.getState().setConversationModel(chatId, model);
     void navigate({ to: "/c/$conversationId", params: { conversationId: res.conversation.id } });
     return { conversationId: res.conversation.id };

@@ -35,6 +35,7 @@ export type ServerConversation = {
   id: string;
   title: string;
   updated_at: string;
+  project_id?: string | null;
 };
 
 export type ServerMessage = {
@@ -119,11 +120,11 @@ type ChatState = {
   syncOwner: (userId: string | null) => void;
   beginTurn: (user: ChatMessage) => { chatId: string; assistantId: string };
   commitTurn: (chatId: string, assistantId: string, data: TurnCommit) => void;
-  setConversationId: (chatId: string, conversationId: string) => void;
+  setConversationId: (chatId: string, conversationId: string, projectId?: string) => void;
   setConversationModel: (chatId: string, model: string) => void;
   appendUserMessage: (user: ChatMessage) => { chatId: string };
   appendAssistantReplies: (chatId: string, replies: { content: string; modelLabel: string }[]) => void;
-  hydrateFromServer: (conversations: ServerConversation[]) => void;
+  hydrateFromServer: (conversations: ServerConversation[], projectId?: string) => void;
   loadMessagesInto: (chatId: string, messages: ServerMessage[]) => void;
 };
 
@@ -348,9 +349,9 @@ export const useChat = create<ChatState>()(
                 },
           ),
         })),
-      setConversationId: (chatId, conversationId) =>
+      setConversationId: (chatId, conversationId, projectId) =>
         set((s) => ({
-          chats: s.chats.map((c) => (c.id === chatId ? { ...c, conversationId } : c)),
+          chats: s.chats.map((c) => (c.id === chatId ? { ...c, conversationId, projectId } : c)),
         })),
       setConversationModel: (chatId, model) =>
         set((s) => ({
@@ -408,7 +409,7 @@ export const useChat = create<ChatState>()(
                 },
           ),
         })),
-      hydrateFromServer: (conversations) =>
+      hydrateFromServer: (conversations, projectId) =>
         set((s) => {
           const known = new Set(s.chats.map((c) => c.conversationId).filter(Boolean));
           const additions: Chat[] = conversations
@@ -420,6 +421,7 @@ export const useChat = create<ChatState>()(
               createdAt: new Date(sc.updated_at).getTime(),
               updatedAt: new Date(sc.updated_at).getTime(),
               messages: [],
+              projectId: projectId ?? sc.project_id ?? undefined,
             }));
           if (additions.length === 0) return {};
           const merged = [...s.chats, ...additions].sort((a, b) => b.updatedAt - a.updatedAt);

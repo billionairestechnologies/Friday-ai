@@ -180,6 +180,7 @@ export async function streamMessage(
             content: [
               `Project: ${project.name}`,
               `Mode: ${project.mode}`,
+              project.description ? `Description: ${project.description}` : null,
               project.repository_url ? `Repository: ${project.repository_url}` : null,
               project.instructions ? `Project instructions:\n${project.instructions}` : null,
             ]
