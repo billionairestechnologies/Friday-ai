@@ -319,7 +319,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-[320px] flex-1 shrink flex-col">
         <header className="flex h-14 shrink-0 items-center gap-1 px-3">
           <SidebarToggle />
           <span className="min-w-0 flex-1 truncate text-sm text-muted">{title}</span>

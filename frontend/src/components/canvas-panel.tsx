@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -21,17 +21,51 @@ import { useChat } from "@/lib/chat/store";
 export function CanvasPanel() {
   const open = useChat((s) => s.canvasOpen);
   const setOpen = useChat((s) => s.setCanvasOpen);
+  const [width, setWidth] = useState(512);
+  // Width changes for two different reasons that need opposite motion behavior: opening/closing
+  // should animate smoothly (the whole point of this fix — see the comment below), but live drag-
+  // resize needs to track the pointer with zero lag, not tween toward each intermediate value.
+  const [resizing, setResizing] = useState(false);
+
+  function startResize(e: PointerEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    setResizing(true);
+    const startX = e.clientX;
+    const startWidth = width;
+    const onMove = (event: globalThis.PointerEvent) => {
+      const next = Math.min(720, Math.max(384, startWidth - (event.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      setResizing(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ x: "100%", opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: "100%", opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="flex h-full min-w-0"
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{
+            // Coordinated layout motion: the panel's actual flex WIDTH now animates (instead of a
+            // fixed-width box merely sliding into view via `transform`), so the chat column next
+            // to it shrinks/grows in step with the same 300ms tween every frame, rather than
+            // snapping to its final width the instant Canvas mounts while Canvas itself was still
+            // just visually sliding in — that mismatch was the "canvas comes in, chat area
+            // glitches white" symptom (flex layout resize is instant; a transform-based slide
+            // isn't tracked by layout at all, so the two were never actually in sync).
+            width: { duration: resizing ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] },
+            opacity: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+          }}
+          className="flex h-full min-w-0 max-md:!w-full"
         >
-          <CanvasBody onClose={() => setOpen(false)} />
+          <CanvasBody onClose={() => setOpen(false)} onResizeStart={startResize} />
         </motion.div>
       )}
     </AnimatePresence>
@@ -200,8 +234,13 @@ function CanvasBuildSkeleton() {
   );
 }
 
-function CanvasBody({ onClose }: { onClose: () => void }) {
-  const [width, setWidth] = useState(512);
+function CanvasBody({
+  onClose,
+  onResizeStart,
+}: {
+  onClose: () => void;
+  onResizeStart: (e: PointerEvent<HTMLButtonElement>) => void;
+}) {
   const liveAll = useLiveStream();
   const activeId = useChat((s) => s.activeId);
   const live = liveAll && liveAll.chatId === activeId ? liveAll : null;
@@ -226,32 +265,17 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
   // markdown) only ever has one view.
   const [view, setView] = useState<"preview" | "code">("preview");
   const hasPreview = artifact?.kind === "html" || artifact?.kind === "react";
-  const style = { "--canvas-width": `${width}px` } as CSSProperties;
-
-  function startResize(e: PointerEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = width;
-    const onMove = (event: globalThis.PointerEvent) => {
-      const next = Math.min(720, Math.max(384, startWidth - (event.clientX - startX)));
-      setWidth(next);
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  }
 
   return (
-    <aside style={style} className="premium-panel relative flex h-full w-full min-w-0 flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-40 md:w-[min(100%,var(--canvas-width))]">
+    <aside className="premium-panel relative flex h-full w-full min-w-0 flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-40">
       <button
         type="button"
         aria-label="Resize canvas"
-        onPointerDown={startResize}
-        className="premium-control absolute top-0 bottom-0 left-0 hidden w-2 -translate-x-1 cursor-col-resize md:block"
-      />
+        onPointerDown={onResizeStart}
+        className="group premium-control absolute top-0 bottom-0 left-0 z-10 hidden w-2 -translate-x-1 cursor-col-resize md:flex md:items-center md:justify-center"
+      >
+        <span className="h-10 w-[3px] rounded-full bg-border transition-colors group-hover:bg-muted" />
+      </button>
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/80 px-3">
         <Globe className="size-3.5 text-muted" />
         <span className="min-w-0 flex-1 truncate text-xs text-muted">
