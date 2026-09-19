@@ -365,7 +365,7 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           <div
             ref={ref}
             className={cn(
-              "m3-focus-halo rounded-2xl bg-composer p-2 shadow-[var(--shadow-composer)]",
+              "m3-focus-halo rounded-2xl border border-border bg-composer p-2 shadow-[var(--shadow-composer)]",
               isLoading && "border border-red-500/70",
               className,
             )}

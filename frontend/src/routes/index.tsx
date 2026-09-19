@@ -339,10 +339,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-1 flex-col items-center justify-center px-4 pb-8"
+              className="relative z-0 flex flex-1 flex-col items-center justify-center px-4 pb-8"
             >
-              <div className="relative mb-8 flex flex-col items-center text-center">
-                <div className="ambient-glow" aria-hidden />
+              <div className="ambient-glow ambient-glow-breathe" aria-hidden />
+              <div className="relative z-10 mb-8 flex flex-col items-center text-center">
                 {available ? (
                   <h1 className="relative text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl">
                     {heroLine.kind === "greeting" ? (
@@ -389,7 +389,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                   </>
                 )}
               </div>
-              <div className="w-full max-w-2xl">
+              <div className="relative z-10 w-full max-w-2xl">
                 <Composer
                   onSend={(message, files) => void send(message, files)}
                   onStop={stop}
