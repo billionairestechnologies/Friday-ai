@@ -80,7 +80,7 @@ export function Sidebar() {
               void navigate({ to: "/" });
               if (window.innerWidth < 768) setOpen(false);
             }}
-            className="premium-control m3-lift flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-foreground hover:bg-chip"
+            className="premium-control flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-foreground hover:bg-chip"
           >
             <SquarePen className="size-4" />
             New chat
@@ -117,7 +117,7 @@ export function Sidebar() {
                     className={cn(
                       "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm",
                       c.id === activeId
-                        ? "bg-selected text-foreground"
+                        ? "bg-chip text-foreground"
                         : "text-muted hover:bg-chip/70 hover:text-foreground",
                     )}
                   >

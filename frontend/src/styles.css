@@ -2,95 +2,75 @@
 @import "tw-animate-css";
 
 @theme {
-  --color-background: #131314;
-  --color-foreground: #e8eaed;
-  --color-muted: #9aa0a6;
-  --color-subtle: #6f7377;
-  --color-surface: #1e1f20;
-  --color-elevated: #282a2c;
-  --color-composer: #1e1f20;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-primary: #e8eaed;
-  --color-primary-foreground: #131314;
-  --color-accent: #3c4043;
-  --color-danger: #f28b82;
-  --color-chip: #282a2c;
-  --color-chip-on: #303134;
-  /* Gemini/M3 "selected pill" tint — a light accent tint on light backgrounds reads as a real
-     selected state, but the same saturated blue on a near-black surface just looks washed out, so
-     dark mode gets a muted tonal-blue pill instead (see html.light for the literal #c2e7ff spec). */
-  --color-selected: #1a3a5c;
+  --color-background: #141516;
+  --color-foreground: #f3f4f6;
+  --color-muted: #9ca3af;
+  --color-subtle: #6b7280;
+  --color-surface: #1a1b1d;
+  --color-elevated: #1f2023;
+  --color-composer: #1f2023;
+  --color-border: #444444;
+  --color-primary: #f4f4f5;
+  --color-primary-foreground: #141516;
+  --color-accent: #d1d5db;
+  --color-danger: #e07070;
+  --color-chip: #2e3033;
+  --color-chip-on: #3a3a40;
   --color-hex-chip: var(--color-chip);
-  --color-notify: #8ab4f8;
-  --color-search: #8ab4f8;
+  --color-notify: #3b82f6;
+  --color-search: #1eaedb;
   --color-think: #8b5cf6;
   --color-canvas: #f97316;
-  --font-sans: "Google Sans Flex", "Inter", -apple-system, BlinkMacSystemFont, ui-sans-serif, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 22px;
   --radius-2xl: 28px;
-  --radius-3xl: 32px;
   --shadow-composer: 0 8px 30px rgba(0, 0, 0, 0.24);
   --shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.34);
   --shadow-soft: 0 14px 40px rgba(0, 0, 0, 0.18);
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
-  /* Material 3 "emphasized" easing — used for the newer M3-styled interactive states
-     (focus halo, hover lift, message reveal) alongside the pre-existing --ease-premium, which
-     stays as-is so nothing already using it changes behavior. */
-  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
-  --transition-smooth: 240ms var(--ease-emphasized);
   --motion-fast: 120ms;
   --motion-control: 190ms;
   --motion-panel: 300ms;
   --hairline: color-mix(in oklab, var(--color-border) 70%, transparent);
   --surface-highlight: color-mix(in oklab, var(--color-foreground) 7%, transparent);
   --focus-ring: color-mix(in oklab, var(--color-foreground) 72%, transparent);
-  --ambient-glow: radial-gradient(circle at 50% 20%, rgba(66, 133, 244, 0.16) 0%, rgba(19, 19, 20, 0) 70%);
-  --gemini-gradient: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%);
 }
 
 html.light {
-  /* Material 3 / Gemini surface tints — tonal grays-blue instead of flat white-on-white, and a
-     tuned charcoal instead of pure black text (avoids OLED contrast blowout). */
-  --color-background: #ffffff;
-  /* A touch darker than Google's literal #1f1f1f on-surface token — that value reads correctly
-     dark in Google's own apps because it's paired with their exact font-rendering pipeline, but
-     came across as washed-out gray here (flagged after shipping #1f1f1f). Still short of pure
-     black on purpose. */
-  --color-foreground: #141414;
-  --color-muted: #5f6368;
-  --color-subtle: #80868b;
-  --color-surface: #f0f4f9;
-  --color-elevated: #e9eef6;
+  /* Cool off-white app chrome — see project's light-theme color spec.
+     Kept as flat, low-saturation grays/off-whites; no cream/yellow chrome. */
+  --color-background: #f9f8f7;
+  --color-foreground: #050505;
+  --color-muted: #8a8a8a;
+  --color-subtle: #b0b0b0;
+  --color-surface: #f4f3f2;
+  --color-elevated: #ffffff;
   --color-composer: #ffffff;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-primary: #141414;
+  --color-border: #e8e6e4;
+  --color-primary: #111111;
   --color-primary-foreground: #ffffff;
   --color-accent: #3f3f46;
-  /* Sidebar hover / generic hover surfaces key off this one token. */
-  --color-chip: #e9eef6;
-  --color-chip-on: #dde6f3;
-  /* The Gemini "selected nav pill" tint — used for the active sidebar chat/nav item only, not
-     generic hover (that stays neutral gray above). */
-  --color-selected: #c2e7ff;
-  /* Only the literal inline-code/hex chip gets the warm tan — everything else above stays cool. */
+  /* Sidebar hover / selected-pill / generic hover surfaces all key off this one token —
+     kept a neutral gray so none of that chrome turns cream/tan. */
+  --color-chip: #e6e4e3;
+  --color-chip-on: #d4d4d8;
+  /* Only the literal inline-code/hex chip gets the warm tan — everything else above stays gray. */
   --color-hex-chip: #f4e7dc;
-  --color-notify: #4285f4;
-  --color-search: #4285f4;
-  --shadow-panel: 0 12px 40px rgba(60, 64, 67, 0.1), 0 2px 8px rgba(60, 64, 67, 0.08);
-  --shadow-soft: 0 4px 20px rgba(60, 64, 67, 0.06), 0 1px 3px rgba(60, 64, 67, 0.1);
-  --shadow-composer: 0 4px 20px rgba(60, 64, 67, 0.06), 0 1px 3px rgba(60, 64, 67, 0.1);
-  --ambient-glow: radial-gradient(circle at 50% 20%, rgba(211, 227, 253, 0.45) 0%, rgba(255, 255, 255, 0) 70%);
+  --color-notify: #3b82f6;
+  --color-search: #2563eb;
+  --shadow-panel: 0 1px 2px rgba(5, 5, 5, 0.04);
+  --shadow-soft: 0 1px 2px rgba(5, 5, 5, 0.03);
+  --shadow-composer: 0 1px 2px rgba(5, 5, 5, 0.04);
 }
 
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
   }
 
   html,
@@ -103,23 +83,12 @@ html.light {
 
   body {
     font-family: var(--font-sans);
-    font-weight: 400;
     letter-spacing: -0.011em;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-weight: 500;
   }
 
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
-    font-weight: 500;
   }
 
   ::selection {
@@ -166,61 +135,6 @@ html.light {
     background: linear-gradient(90deg, transparent, var(--surface-highlight), transparent);
     animation: skeleton-shine 1.4s var(--ease-premium) infinite;
   }
-
-  /* Ambient, out-of-focus radial glow meant to sit behind a main viewport/chat thread — absolutely
-     positioned by the caller (e.g. `<div class="ambient-glow" />` as the first child of a
-     `relative` container); never intercepts clicks and always renders behind content. */
-  .ambient-glow {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background: var(--ambient-glow);
-    filter: blur(48px);
-  }
-
-  .gemini-gradient {
-    background: var(--gemini-gradient);
-  }
-
-  .gemini-gradient-text {
-    background: var(--gemini-gradient);
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
-  }
-
-  /* Ambient blue focus halo for composer/input surfaces — pair with `focus-within` on the
-     container since these wrap a plain unstyled <textarea>/<input>, not a focusable element
-     itself. */
-  .m3-focus-halo {
-    transition:
-      border-color var(--transition-smooth),
-      box-shadow var(--transition-smooth);
-  }
-
-  .m3-focus-halo:focus-within {
-    border-color: rgba(66, 133, 244, 0.4);
-    box-shadow: 0 4px 24px rgba(66, 133, 244, 0.12);
-  }
-
-  /* Material 3 button physics: a light lift on hover, a slight compress on press. Opt-in
-     (applied per-button, not globally) since it isn't appropriate for drag handles or full-width
-     list rows that also use transition helpers like .premium-control. */
-  .m3-lift {
-    transition:
-      transform var(--transition-smooth),
-      background-color var(--transition-smooth),
-      box-shadow var(--transition-smooth);
-  }
-
-  .m3-lift:hover:not(:disabled) {
-    transform: translateY(-1px);
-  }
-
-  .m3-lift:active:not(:disabled) {
-    transform: scale(0.98);
-  }
 }
 
 @keyframes skeleton-shine {
@@ -252,7 +166,7 @@ html.light {
 .md h1,
 .md h2,
 .md h3 {
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin: 1.1em 0 0.4em;
 }
@@ -294,18 +208,12 @@ html.light {
   padding: 0.1em 0.35em;
 }
 
-/* Code blocks always render on a true dark canvas regardless of app theme (light or dark) — this
-   is a deliberate fixed palette, not theme-tokenized, matching how most modern chat UIs keep code
-   legible against either page background. Token-level syntax coloring (tags/attributes/strings/
-   comments) needs an actual tokenizer (e.g. shiki/rehype-highlight) wired into the markdown
-   renderer in lib/chat/markdown.tsx — not added here since that's a dependency/logic change, not
-   a styling one. The classes below are ready for that renderer to emit into once it exists. */
 .md pre {
   margin: 0.8em 0;
   padding: 0.9em 1em;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #151515;
+  border: 1px solid var(--color-border);
+  background: var(--color-elevated);
   overflow-x: auto;
 }
 
@@ -313,23 +221,6 @@ html.light {
   background: transparent;
   padding: 0;
   font-size: 0.8rem;
-  color: #e8eaed;
-}
-
-.md pre .token-tag {
-  color: #8ab4f8;
-}
-
-.md pre .token-attr {
-  color: #f9a8d4;
-}
-
-.md pre .token-string {
-  color: #b8e994;
-}
-
-.md pre .token-comment {
-  color: #9aa0a6;
 }
 
 .md blockquote {
@@ -369,17 +260,13 @@ html.light {
 }
 
 .msg-enter {
-  animation: geminiFluidReveal 0.24s var(--ease-emphasized) both;
+  animation: msg-enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes geminiFluidReveal {
+@keyframes msg-enter {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(6px);
   }
 }
 
@@ -474,7 +361,14 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .enter-up {
-  animation: geminiFluidReveal 0.45s var(--ease-emphasized) both;
+  animation: enter-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .spin-slow {

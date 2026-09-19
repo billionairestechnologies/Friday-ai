@@ -365,7 +365,7 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           <div
             ref={ref}
             className={cn(
-              "m3-focus-halo rounded-3xl border border-border bg-composer/90 p-2 shadow-[var(--shadow-composer)] backdrop-blur-xl transition-[border-color,box-shadow] duration-[240ms] ease-[var(--ease-emphasized)]",
+              "rounded-3xl border border-border bg-composer p-2 shadow-[var(--shadow-composer)] transition-[border-color,box-shadow] duration-200",
               isLoading && "border-red-500/70",
               className,
             )}
@@ -1135,7 +1135,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   variant="default"
                   size="icon"
                   className={cn(
-                    "m3-lift h-8 w-8 rounded-full transition-all duration-200",
+                    "h-8 w-8 rounded-full transition-all duration-200",
                     isRecording
                       ? "bg-transparent text-red-500 hover:bg-chip hover:text-red-400"
                       : hasContent || isLoading
