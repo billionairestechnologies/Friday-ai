@@ -56,14 +56,18 @@ html.light {
   /* Material 3 / Gemini surface tints — tonal grays-blue instead of flat white-on-white, and a
      tuned charcoal instead of pure black text (avoids OLED contrast blowout). */
   --color-background: #ffffff;
-  --color-foreground: #1f1f1f;
+  /* A touch darker than Google's literal #1f1f1f on-surface token — that value reads correctly
+     dark in Google's own apps because it's paired with their exact font-rendering pipeline, but
+     came across as washed-out gray here (flagged after shipping #1f1f1f). Still short of pure
+     black on purpose. */
+  --color-foreground: #141414;
   --color-muted: #5f6368;
   --color-subtle: #80868b;
   --color-surface: #f0f4f9;
   --color-elevated: #e9eef6;
   --color-composer: #ffffff;
   --color-border: rgba(0, 0, 0, 0.08);
-  --color-primary: #1f1f1f;
+  --color-primary: #141414;
   --color-primary-foreground: #ffffff;
   --color-accent: #3f3f46;
   /* Sidebar hover / generic hover surfaces key off this one token. */
