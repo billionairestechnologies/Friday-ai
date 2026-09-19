@@ -1,7 +1,8 @@
-import { memo, useRef, useState } from "react";
+import { memo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import { Check, Copy, Download } from "lucide-react";
 import { filenameForLang, saveFile } from "@/lib/chat/download";
 import { cn } from "@/lib/utils";
@@ -21,36 +22,60 @@ function IconAction({
   return (
     <button
       type="button"
-      className="inline-flex size-8 items-center justify-center rounded-[8px] text-muted opacity-80 transition-[opacity,background-color,color] duration-150 hover:bg-chip hover:text-foreground hover:opacity-100"
+      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-xs font-medium text-[#9aa0a6] transition-colors duration-150 hover:bg-white/10 hover:text-[#e3e3e3]"
       aria-label={ok ? doneLabel : label}
       onClick={async () => {
         await onPress();
         setOk(true);
-        window.setTimeout(() => setOk(false), 1400);
+        window.setTimeout(() => setOk(false), 2000);
       }}
     >
       {ok ? <Check className="size-3.5 text-emerald-400" /> : <Icon className="size-3.5" />}
+      {ok ? doneLabel : null}
     </button>
   );
 }
 
-function CodeActions({ text, lang }: { text: string; lang?: string }) {
+/** Flattens a react-markdown/hast-derived children tree (including rehype-highlight's nested
+ *  <span> tokens) back into the plain source text — needed for copy/download since the visible
+ *  tree is now a nest of syntax-highlighted spans, not a single string. */
+function nodeText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (typeof node === "object" && "props" in node) {
+    return nodeText((node as { props?: { children?: ReactNode } }).props?.children);
+  }
+  return "";
+}
+
+/** Gemini-style code block "black box": dark card, header bar with the language tag + copy/
+ *  download actions, syntax-highlighted body (via rehype-highlight; token colors are mapped onto
+ *  its hljs-* classes in styles.css). Self-contained — the `pre` override below is its only
+ *  caller, passing it the already-highlighted <code> element as `children`. */
+function CodeBlock({ lang, text, children }: { lang?: string; text: string; children: ReactNode }) {
   return (
-    <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-elevated p-0.5">
-      <IconAction
-        label="Copy code"
-        doneLabel="Copied"
-        icon={Copy}
-        onPress={async () => {
-          await navigator.clipboard.writeText(text);
-        }}
-      />
-      <IconAction
-        label="Download code"
-        doneLabel="Downloaded"
-        icon={Download}
-        onPress={() => void saveFile(filenameForLang(lang), text)}
-      />
+    <div className="code-block my-3 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#131314] shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+      <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-[#1e1f20] px-[18px] py-2.5">
+        <span className="font-mono text-xs lowercase text-[#9aa0a6]">{lang || "text"}</span>
+        <div className="flex items-center gap-1.5">
+          <IconAction
+            label="Copy code"
+            doneLabel="Copied!"
+            icon={Copy}
+            onPress={async () => {
+              await navigator.clipboard.writeText(text);
+            }}
+          />
+          <IconAction
+            label="Download code"
+            doneLabel="Downloaded"
+            icon={Download}
+            onPress={() => void saveFile(filenameForLang(lang), text)}
+          />
+        </div>
+      </div>
+      <pre className="overflow-x-auto px-5 py-4">{children}</pre>
     </div>
   );
 }
@@ -61,33 +86,32 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
     <div className="md">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
         components={{
           a: ({ href, children }) => (
             <a href={href} target="_blank" rel="noreferrer">
               {children}
             </a>
           ),
-          pre: ({ children }) => (
-            <pre className="relative min-h-[2.5rem] pr-24">{children}</pre>
-          ),
-          code: ({ className, children, ...props }) => {
-            const value = String(children).replace(/\n$/, "");
-            const isBlock = Boolean(className) || value.includes("\n");
-            if (!isBlock) {
-              return (
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              );
-            }
-            const lang = /language-([a-z0-9+#-]+)/i.exec(className ?? "")?.[1];
+          pre: ({ children }) => {
+            const codeEl = Array.isArray(children) ? children[0] : children;
+            const codeProps =
+              codeEl && typeof codeEl === "object" && "props" in codeEl
+                ? (codeEl.props as { className?: string; children?: ReactNode })
+                : undefined;
+            const lang = /language-([a-z0-9+#-]+)/i.exec(codeProps?.className ?? "")?.[1];
+            const value = nodeText(codeProps?.children).replace(/\n$/, "");
             return (
-              <code className={cn("block", className)} {...props}>
-                <CodeActions text={value} lang={lang} />
+              <CodeBlock lang={lang} text={value}>
                 {children}
-              </code>
+              </CodeBlock>
             );
           },
+          code: ({ className, children, node: _node, ...props }) => (
+            <code className={className} {...props}>
+              {children}
+            </code>
+          ),
           table: ({ children }) => (
             <div className="my-3 min-h-[3rem] overflow-x-auto">
               <table>{children}</table>

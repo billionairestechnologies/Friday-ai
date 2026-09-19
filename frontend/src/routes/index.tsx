@@ -406,7 +406,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: Math.min(i * 0.08, 0.15), duration: 0.56, ease: [0.2, 0, 0, 1] }}
                         onClick={() => usePrompt(p)}
-                        className="premium-control rounded-xl border border-border bg-transparent px-3.5 py-3 text-left text-sm text-muted shadow-[var(--shadow-soft)] hover:bg-elevated hover:text-foreground"
+                        className="premium-control rounded-xl border border-border bg-elevated px-3.5 py-3 text-left text-sm text-muted shadow-[var(--shadow-soft)] hover:bg-chip hover:text-foreground"
                       >
                         {p}
                       </motion.button>

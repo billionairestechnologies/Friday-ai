@@ -21,8 +21,8 @@
   --color-search: #1eaedb;
   --color-think: #8b5cf6;
   --color-canvas: #f97316;
-  --font-sans: "Outfit", "Google Sans Text", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, Menlo, monospace;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -83,6 +83,7 @@ html.light {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   html,
@@ -95,12 +96,30 @@ html.light {
 
   body {
     font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.5;
     letter-spacing: -0.011em;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 500;
+    letter-spacing: -0.025em;
   }
 
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+
+  button,
+  [role="button"] {
+    font-weight: 500;
+    letter-spacing: -0.006em;
   }
 
   ::selection {
@@ -154,11 +173,11 @@ html.light {
      empty-state look more closely than a flat inset gradient. */
   .ambient-glow {
     position: absolute;
-    top: 12%;
+    top: 8%;
     left: 50%;
     transform: translateX(-50%);
     width: min(850px, 90vw);
-    height: 480px;
+    height: 380px;
     /* Negative, not 0 — a positioned element at z-index:0 still paints AFTER static in-flow
        content in the same stacking context (CSS painting-order rules), so it rendered on TOP of
        the heading text instead of behind it. Negative z-index paints before static content. */
@@ -304,20 +323,73 @@ html.light {
 /* Code blocks render on a fixed dark canvas regardless of app theme (light or dark) — matches
    the spec's $code-bg/$code-fg, and keeps code legible instead of the near-invisible
    white-on-white block the light theme's --color-elevated used to produce. */
+/* The outer chrome (dark card, header bar, radius, shadow) is the CodeBlock component's own
+   Tailwind classes in lib/chat/markdown.tsx — this just resets the plain <pre> underneath it so
+   nothing here double-applies a second background/border/margin on top of that card. */
 .md pre {
-  margin: 0.8em 0;
-  padding: 0.9em 1em;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #151515;
-  overflow-x: auto;
+  margin: 0;
+  background: transparent;
 }
 
 .md pre code {
   background: transparent;
   padding: 0;
-  font-size: 0.8rem;
-  color: #e8eaed;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #e3e3e3;
+}
+
+/* Syntax token colors for rehype-highlight's hljs-* classes. */
+.md pre code .hljs-tag,
+.md pre code .hljs-name {
+  color: #8ab4f8;
+}
+
+.md pre code .hljs-attr,
+.md pre code .hljs-attribute {
+  color: #f9a8d4;
+}
+
+.md pre code .hljs-string,
+.md pre code .hljs-regexp {
+  color: #b8e994;
+}
+
+.md pre code .hljs-comment,
+.md pre code .hljs-quote {
+  color: #9aa0a6;
+  font-style: italic;
+}
+
+.md pre code .hljs-keyword,
+.md pre code .hljs-selector-tag,
+.md pre code .hljs-built_in {
+  color: #c58af9;
+}
+
+.md pre code .hljs-title,
+.md pre code .hljs-title.function_,
+.md pre code .hljs-title.class_ {
+  color: #8ab4f8;
+}
+
+.md pre code .hljs-number,
+.md pre code .hljs-literal {
+  color: #f9ab00;
+}
+
+.md pre code .hljs-variable,
+.md pre code .hljs-params {
+  color: #e3e3e3;
+}
+
+.md pre code .hljs-deletion {
+  color: #f28b82;
+}
+
+.md pre code .hljs-addition {
+  color: #b8e994;
 }
 
 .md blockquote {
