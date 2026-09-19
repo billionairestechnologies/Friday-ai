@@ -360,7 +360,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                             initial={{ opacity: 0, y: 18, scale: 0.94 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             transition={{ duration: 0.55, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-                            className="block bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent"
+                            className="block bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent"
                           >
                             {heroLine.name}
                           </motion.span>
@@ -371,7 +371,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                         initial={{ opacity: 0, y: 16, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                        className="block bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent"
+                        className="block bg-gradient-to-r from-foreground to-foreground/90 bg-clip-text text-transparent"
                       >
                         {heroLine.text}
                       </motion.span>

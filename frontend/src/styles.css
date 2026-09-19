@@ -45,8 +45,11 @@ html.light {
      Kept as flat, low-saturation grays/off-whites; no cream/yellow chrome. */
   --color-background: #f9f8f7;
   --color-foreground: #050505;
-  --color-muted: #8a8a8a;
-  --color-subtle: #b0b0b0;
+  /* Darkened from #8a8a8a — that read as washed-out/light for icons and secondary text ("New
+     chat", header icons, composer toolbar). Subtle absorbs the old muted value so the two tiers
+     (secondary vs faintest) stay distinct, just both shifted darker for a more premium look. */
+  --color-muted: #47484a;
+  --color-subtle: #8a8a8a;
   --color-surface: #f4f3f2;
   --color-elevated: #ffffff;
   --color-composer: #ffffff;
