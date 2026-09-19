@@ -318,6 +318,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
 
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background">
+      <div className="ambient-glow" aria-hidden />
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-1 px-3">
