@@ -320,7 +320,12 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
           <PanelRightClose className="size-4" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/* overflow-hidden, not -auto: every view below (LiveCode's <pre>, RunnablePane's <pre>,
+          the html/react iframe) manages its own internal scrolling and, for LiveCode while
+          streaming, its own scroll-to-bottom effect. A second scrollable region here doesn't
+          track that auto-scroll, so it silently grows past the visible viewport as code streams
+          in — reads as a blank white gap appearing below the code, growing while it's written. */}
+      <div className="min-h-0 flex-1 overflow-hidden">
         <AnimatePresence mode="popLayout" initial={false}>
           {building && streamingCode ? (
             <motion.div
@@ -408,7 +413,7 @@ function CanvasBody({ onClose }: { onClose: () => void }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap"
+              className="h-full overflow-auto p-4 font-mono text-xs leading-relaxed text-muted whitespace-pre-wrap"
             >
               {artifact.body}
             </motion.pre>
