@@ -2,20 +2,24 @@
 @import "tw-animate-css";
 
 @theme {
-  --color-background: #141516;
-  --color-foreground: #f3f4f6;
-  --color-muted: #9ca3af;
-  --color-subtle: #6b7280;
-  --color-surface: #1a1b1d;
-  --color-elevated: #1f2023;
-  --color-composer: #1f2023;
+  /* Official Gemini Web dark surface tokens. */
+  --color-background: #131314;
+  --color-foreground: #e3e3e3;
+  --color-muted: #c4c7c5;
+  --color-subtle: #9aa0a6;
+  --color-surface: #1e1f20;
+  --color-elevated: #282a2c;
+  --color-composer: #1e1f20;
   --color-border: #444444;
-  --color-primary: #f4f4f5;
-  --color-primary-foreground: #141516;
+  --color-primary: #a8c7fa;
+  --color-primary-foreground: #131314;
   --color-accent: #d1d5db;
   --color-danger: #e07070;
-  --color-chip: #2e3033;
-  --color-chip-on: #3a3a40;
+  --color-chip: #1e1f20;
+  --color-chip-on: #282a2c;
+  /* Defined per the latest token spec, not applied to any element yet (no sparkle mark is used
+     anywhere in this app today) — available for a caller that wants it deliberately. */
+  --gradient-sparkle: linear-gradient(90deg, #4285f4, #9b72cb, #d96570);
   --color-hex-chip: var(--color-chip);
   --color-notify: #3b82f6;
   --color-search: #1eaedb;
@@ -54,13 +58,13 @@ html.light {
      an exact match to the spec's $search-accent/$think-accent/$canvas-accent and are unchanged. */
   --color-background: #ffffff;
   --color-foreground: #1f1f1f;
-  --color-muted: #5f6368;
+  --color-muted: #444746;
   --color-subtle: #80868b;
   --color-surface: #f0f4f9;
   --color-elevated: #ffffff;
   --color-composer: #ffffff;
   --color-border: rgba(0, 0, 0, 0.08);
-  --color-primary: #1a73e8;
+  --color-primary: #0b57d0;
   --color-primary-foreground: #ffffff;
   --color-accent: #3f3f46;
   /* surface-container-high — hover surfaces AND the user chat bubble (see message-thread.tsx). */
@@ -70,7 +74,7 @@ html.light {
   --color-selected: #c2e7ff;
   /* Only the literal inline-code/hex chip gets the warm tan — everything else above stays cool. */
   --color-hex-chip: #f4e7dc;
-  --color-notify: #1a73e8;
+  --color-notify: #0b57d0;
   --color-search: #1eaedb;
   --shadow-panel: 0 12px 40px rgba(60, 64, 67, 0.1), 0 2px 8px rgba(60, 64, 67, 0.08);
   --shadow-soft: 0 4px 20px rgba(60, 64, 67, 0.06), 0 1px 3px rgba(60, 64, 67, 0.1);
