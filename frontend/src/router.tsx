@@ -5,6 +5,9 @@ import { AdminGate } from "@/routes/admin";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
 import { TeamPage } from "@/routes/team";
+import { LibraryPage } from "@/routes/library";
+import { AutomationsPage } from "@/routes/automations";
+import { MobileAuthBridge } from "@/routes/mobile-auth-bridge";
 import { AppErrorComponent } from "@/lib/error-component";
 
 const rootRoute = createRootRoute({
@@ -84,6 +87,24 @@ const teamRoute = createRoute({
   component: TeamPage,
 });
 
+const mobileAuthBridgeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mobile-auth-bridge",
+  component: MobileAuthBridge,
+});
+
+const libraryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/library",
+  component: LibraryPage,
+});
+
+const automationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/automations",
+  component: AutomationsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   conversationRoute,
@@ -92,6 +113,9 @@ const routeTree = rootRoute.addChildren([
   projectsRoute,
   projectDetailRoute,
   teamRoute,
+  mobileAuthBridgeRoute,
+  libraryRoute,
+  automationsRoute,
 ]);
 
 export const router = createRouter({ routeTree });

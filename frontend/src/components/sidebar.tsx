@@ -1,12 +1,43 @@
-import { useEffect } from "react";
-import { Building2, FolderKanban, PanelLeft, Puzzle, Search, SquarePen, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Building2,
+  ChevronDown,
+  FolderKanban,
+  LibraryBig,
+  MessageSquare,
+  PanelLeft,
+  Plus,
+  Puzzle,
+  Search,
+  Trash2,
+  Workflow,
+  X,
+} from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
 import { api } from "@/lib/api";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { filteredChats, useChat } from "@/lib/chat/store";
 import { usePlan } from "@/lib/usage/planStore";
+import type { AssistantProject } from "@/routes/projects";
 import { cn } from "@/lib/utils";
+
+/** Top-level nav rows above Projects/Chats — Chat is the only one with a real destination today;
+ *  Library/Automations are placeholder pages (see routes/library.tsx, routes/automations.tsx)
+ *  until those features actually exist, per explicit product decision. */
+function NavRow({ icon: Icon, label, onClick }: { icon: typeof MessageSquare; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-medium text-foreground hover:bg-chip"
+    >
+      <Icon className="size-4 text-muted" />
+      {label}
+    </button>
+  );
+}
 
 export function Sidebar() {
   const navigate = useNavigate();
@@ -23,6 +54,13 @@ export function Sidebar() {
   const setDialog = useChat((s) => s.setDialog);
   const isEnterprise = usePlan((s) => s.isEnterprise);
   const loadPlan = usePlan((s) => s.load);
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  const [projects, setProjects] = useState<AssistantProject[]>([]);
+
   // Project chats are project-scoped only (see hydrateFromServer/listConversations) — the main
   // list only ever receives unscoped ones from the backend, but this also guards against any
   // stale project-tagged chat left over in localStorage from before that filter existed.
@@ -34,6 +72,14 @@ export function Sidebar() {
   useEffect(() => {
     void loadPlan();
   }, [loadPlan]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ projects: AssistantProject[] }>("/projects")
+      .then((res) => setProjects(res.projects))
+      .catch(() => {});
+  }, [signedIn]);
 
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
@@ -61,93 +107,171 @@ export function Sidebar() {
           <div className="flex items-center gap-2 px-1 text-foreground">
             <BrandWordmark className="text-base" />
           </div>
-          <button
-            type="button"
-            className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground md:hidden"
-            aria-label="Close sidebar"
-            onClick={() => setOpen(false)}
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label={searchOpen ? "Close search" : "Search chats"}
+              onClick={() => setSearchOpen((v) => !v)}
+              className={cn(
+                "flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground",
+                searchOpen && "bg-chip text-foreground",
+              )}
+            >
+              <Search className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground md:hidden"
+              aria-label="Close sidebar"
+              onClick={() => setOpen(false)}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="px-3">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveProjectId(null);
-              newChat();
-              void navigate({ to: "/" });
-              if (window.innerWidth < 768) setOpen(false);
-            }}
-            className="premium-control m3-lift flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-foreground hover:bg-chip"
-          >
-            <SquarePen className="size-4" />
-            New chat
-          </button>
-          <label className="mt-2 flex h-10 items-center gap-2 rounded-xl border border-border bg-composer px-2.5 text-muted">
-            <Search className="size-4 shrink-0" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search"
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle"
+        {searchOpen && (
+          <div className="px-3 pb-2">
+            <label className="flex h-10 items-center gap-2 rounded-xl border border-border bg-composer px-2.5 text-muted">
+              <Search className="size-4 shrink-0" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search chats"
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle"
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="scroll-thin flex-1 overflow-y-auto px-2 pb-4">
+          {/* Top-level nav: Chat is a real destination (new chat); Library/Automations are
+              placeholder pages until those are real features — see NavRow's note above. */}
+          <div className="flex flex-col gap-0.5 px-1 pt-1">
+            <NavRow
+              icon={MessageSquare}
+              label="Chat"
+              onClick={() => {
+                setActiveProjectId(null);
+                newChat();
+                void navigate({ to: "/" });
+                if (window.innerWidth < 768) setOpen(false);
+              }}
             />
-          </label>
-        </div>
+            <NavRow
+              icon={LibraryBig}
+              label="Library"
+              onClick={() => {
+                void navigate({ to: "/library" });
+                if (window.innerWidth < 768) setOpen(false);
+              }}
+            />
+            <NavRow
+              icon={Workflow}
+              label="Automations"
+              onClick={() => {
+                void navigate({ to: "/automations" });
+                if (window.innerWidth < 768) setOpen(false);
+              }}
+            />
+          </div>
 
-        <nav className="scroll-thin mt-3 flex-1 overflow-y-auto px-2 pb-4">
-          {visible.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-subtle">
-              {chats.length === 0 ? "No chats yet" : "No matches"}
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-0.5">
-              {visible.map((c) => (
-                <li key={c.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      selectChat(c.id);
-                      if (c.conversationId) {
-                        void navigate({ to: "/c/$conversationId", params: { conversationId: c.conversationId } });
-                      }
-                      if (window.innerWidth < 768) setOpen(false);
-                    }}
-                    className={cn(
-                      "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm",
-                      c.id === activeId
-                        ? "bg-selected text-foreground"
-                        : "text-muted hover:bg-chip/70 hover:text-foreground",
-                    )}
-                  >
-                    <span className="truncate">{c.title}</span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Delete chat"
-                    onClick={() => handleDelete(c.id)}
-                    className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-subtle opacity-100 transition-opacity duration-150 hover:bg-elevated hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </nav>
+          {/* Projects — a real, collapsible section listing actual projects inline (not just a
+              link out to /projects), matching the requested reference layout. */}
+          <div className="mt-4">
+            <div className="flex h-8 items-center gap-1 px-1.5">
+              <button
+                type="button"
+                onClick={() => setProjectsOpen((v) => !v)}
+                className="flex flex-1 items-center gap-1.5 rounded-lg text-xs font-medium text-subtle hover:text-foreground"
+              >
+                <ChevronDown className={cn("size-3.5 transition-transform", !projectsOpen && "-rotate-90")} />
+                Projects
+              </button>
+              <button
+                type="button"
+                aria-label="New project"
+                onClick={() => {
+                  void navigate({ to: "/projects" });
+                  if (window.innerWidth < 768) setOpen(false);
+                }}
+                className="flex size-6 items-center justify-center rounded-md text-subtle hover:bg-chip hover:text-foreground"
+              >
+                <Plus className="size-3.5" />
+              </button>
+            </div>
+            {projectsOpen && (
+              <ul className="flex flex-col gap-0.5 px-1">
+                {projects.length === 0 ? (
+                  <li className="px-2.5 py-1.5 text-xs text-subtle">No projects yet</li>
+                ) : (
+                  projects.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigate({ to: "/projects/$projectId", params: { projectId: p.id } });
+                          if (window.innerWidth < 768) setOpen(false);
+                        }}
+                        className="premium-control flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-muted hover:bg-chip/70 hover:text-foreground"
+                      >
+                        <FolderKanban className="size-3.5 shrink-0" />
+                        <span className="truncate">{p.name}</span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
+
+          {/* Chats */}
+          <div className="mt-4">
+            <p className="px-2.5 py-1 text-xs font-medium text-subtle">Chats</p>
+            <nav>
+              {visible.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-subtle">
+                  {chats.length === 0 ? "No chats yet" : "No matches"}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-0.5">
+                  {visible.map((c) => (
+                    <li key={c.id} className="group relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          selectChat(c.id);
+                          if (c.conversationId) {
+                            void navigate({ to: "/c/$conversationId", params: { conversationId: c.conversationId } });
+                          }
+                          if (window.innerWidth < 768) setOpen(false);
+                        }}
+                        className={cn(
+                          "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm",
+                          c.id === activeId
+                            ? "bg-selected text-foreground"
+                            : "text-muted hover:bg-chip/70 hover:text-foreground",
+                        )}
+                      >
+                        <span className="truncate">{c.title}</span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Delete chat"
+                        onClick={() => handleDelete(c.id)}
+                        className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-subtle opacity-100 transition-opacity duration-150 hover:bg-elevated hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </nav>
+          </div>
+        </div>
         <div className="border-t border-border px-2 pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              void navigate({ to: "/projects" });
-              if (window.innerWidth < 768) setOpen(false);
-            }}
-            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm text-muted transition-colors hover:bg-chip hover:text-foreground"
-          >
-            <FolderKanban className="size-4" />
-            Projects
-          </button>
           {isEnterprise && (
             <button
               type="button"
