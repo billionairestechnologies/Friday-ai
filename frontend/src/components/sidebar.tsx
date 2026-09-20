@@ -31,7 +31,7 @@ function NavRow({ icon: Icon, label, onClick }: { icon: typeof MessageSquare; la
     <button
       type="button"
       onClick={onClick}
-      className="premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-medium text-foreground hover:bg-chip"
+      className="premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-semibold text-foreground hover:bg-chip-on"
     >
       <Icon className="size-4 text-muted" />
       {label}
@@ -99,13 +99,17 @@ export function Sidebar() {
       />
       <aside
         className={cn(
-          "premium-panel fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:static md:z-0 md:w-64 md:shrink-0",
+          // Matches the main panel's own background exactly (was --color-surface, a pale
+          // blue-gray distinctly different from the white main content — that mismatch was
+          // the "sidebar color doesn't match" complaint). A single hairline border-right is
+          // now the only seam between sidebar and dashboard, same as Gemini's own layout.
+          "bg-background fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:static md:z-0 md:w-64 md:shrink-0",
           open ? "translate-x-0" : "-translate-x-full md:hidden",
         )}
       >
         <div className="flex h-14 items-center justify-between px-3">
           <div className="flex items-center gap-2 px-1 text-foreground">
-            <BrandWordmark className="text-base" />
+            <BrandWordmark className="text-xl" />
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -184,7 +188,7 @@ export function Sidebar() {
               <button
                 type="button"
                 onClick={() => setProjectsOpen((v) => !v)}
-                className="flex flex-1 items-center gap-1.5 rounded-lg text-xs font-medium text-subtle hover:text-foreground"
+                className="flex h-7 flex-1 items-center gap-1.5 rounded-lg px-1 text-xs font-semibold text-subtle hover:bg-chip-on hover:text-foreground"
               >
                 <ChevronDown className={cn("size-3.5 transition-transform", !projectsOpen && "-rotate-90")} />
                 Projects
@@ -196,7 +200,7 @@ export function Sidebar() {
                   void navigate({ to: "/projects" });
                   if (window.innerWidth < 768) setOpen(false);
                 }}
-                className="flex size-6 items-center justify-center rounded-md text-subtle hover:bg-chip hover:text-foreground"
+                className="flex size-6 items-center justify-center rounded-md text-subtle hover:bg-chip-on hover:text-foreground"
               >
                 <Plus className="size-3.5" />
               </button>
@@ -214,7 +218,7 @@ export function Sidebar() {
                           void navigate({ to: "/projects/$projectId", params: { projectId: p.id } });
                           if (window.innerWidth < 768) setOpen(false);
                         }}
-                        className="premium-control flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-muted hover:bg-chip/70 hover:text-foreground"
+                        className="premium-control flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm font-medium text-muted hover:bg-chip-on hover:text-foreground"
                       >
                         <FolderKanban className="size-3.5 shrink-0" />
                         <span className="truncate">{p.name}</span>
@@ -248,10 +252,10 @@ export function Sidebar() {
                           if (window.innerWidth < 768) setOpen(false);
                         }}
                         className={cn(
-                          "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm",
+                          "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm font-medium",
                           c.id === activeId
                             ? "bg-selected text-foreground"
-                            : "text-muted hover:bg-chip/70 hover:text-foreground",
+                            : "text-muted hover:bg-chip-on hover:text-foreground",
                         )}
                       >
                         <span className="truncate">{c.title}</span>
@@ -279,7 +283,7 @@ export function Sidebar() {
                 void navigate({ to: "/team" });
                 if (window.innerWidth < 768) setOpen(false);
               }}
-              className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm text-muted transition-colors hover:bg-chip hover:text-foreground"
+              className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted transition-colors hover:bg-chip-on hover:text-foreground"
             >
               <Building2 className="size-4" />
               Team
@@ -288,7 +292,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={() => setDialog("plugins")}
-            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm text-muted transition-colors hover:bg-chip hover:text-foreground"
+            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted transition-colors hover:bg-chip-on hover:text-foreground"
           >
             <Puzzle className="size-4" />
             Plugins
