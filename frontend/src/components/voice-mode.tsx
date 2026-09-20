@@ -165,6 +165,15 @@ export function VoiceMode({
             const combined = (finalTranscriptRef.current + " " + interim).trim();
             latestCaptionRef.current = combined;
             setCaption(combined);
+            // The silence-based auto-submit timer below only ever restarted from the raw mic-level
+            // analyser (liveA.getLevel() > 0.08) — completely independent of whether speech
+            // recognition itself heard anything. On a quiet mic/low gain/aggressive echo
+            // cancellation, that level can simply never cross the threshold even while
+            // recognition is transcribing fine, so lastSpeechAtRef stayed 0 forever and
+            // auto-submit could never fire — reported live as "said hello, waited, still
+            // listening". A new result (interim or final) is unambiguous proof speech just
+            // happened, so it resets the same timer directly.
+            if (combined) lastSpeechAtRef.current = Date.now();
           };
           recognition.onerror = () => {
             /* keep listening — a transient no-speech/network blip shouldn't end the session */
