@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Mic, MicOff, X } from "lucide-react";
 import { createLiveAnalyser, type LiveAnalyser } from "@/lib/audio/analyser";
 import { hueForVoice, speak, type VoiceOption } from "@/lib/chat/voices";
-import { useLiveStream } from "@/lib/chat/live-stream";
+import { peekLive, useLiveStream } from "@/lib/chat/live-stream";
 import { useChat } from "@/lib/chat/store";
 import { VoiceCarousel } from "@/components/voice-carousel";
 import { ParticleSphere } from "@/components/particle-sphere";
@@ -326,6 +326,17 @@ export function VoiceMode({
       awaitingReplyRef.current = true;
       setPhase("responding");
       onSubmit(finalText);
+      // onSubmit ultimately calls the store's send(), which can call startLive() synchronously
+      // (or on the very next microtask, before this component's `[live]`-keyed effect below gets
+      // a chance to run) — that effect only fires on a *change* to `live`, so a stream that's
+      // already live by the time we get here is a transition it will never see, permanently
+      // missing this turn (reported live as "listening but no output": no reply, no error, no
+      // network call at all). Checking the singleton directly right here closes that race.
+      const alreadyLive = peekLive();
+      if (alreadyLive) {
+        awaitingReplyRef.current = false;
+        watchingAssistantIdRef.current = alreadyLive.assistantId;
+      }
     }
 
     if (text) {
