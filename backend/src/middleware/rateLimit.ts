@@ -194,6 +194,14 @@ export function rateLimit(options: RateLimitOptions): RequestHandler {
   };
 }
 
+// Belt-and-suspenders against a slot outliving the request that acquired it: behind Railway's
+// proxy, a client that disconnects (e.g. a mobile OkHttp read-timeout) doesn't reliably fire
+// Express's res 'close' event promptly, since the proxy-to-origin connection can outlive the
+// client-to-proxy one — leaving a real in-flight handler (and its slot) alive well past when the
+// client gave up, blocking every other device signed into the same account. This forces a release
+// no later than watchdogMs regardless of what the res event listeners do.
+const CONCURRENCY_WATCHDOG_MS = 10 * 60_000;
+
 export function concurrencyLimit(name: string, limit: number): RequestHandler {
   const memory = new ConcurrencyLimiter(limit);
   const redisLimiter = redisConfigured() ? new RedisConcurrencyLimiter(limit) : null;
@@ -225,12 +233,14 @@ export function concurrencyLimit(name: string, limit: number): RequestHandler {
       const release = () => {
         if (released) return;
         released = true;
+        clearTimeout(watchdog);
         if (redisLimiter) {
           void redisLimiter.release(key).catch(() => memory.release(key));
         } else {
           memory.release(key);
         }
       };
+      const watchdog = setTimeout(release, CONCURRENCY_WATCHDOG_MS);
       res.once("finish", release);
       res.once("close", release);
       next();

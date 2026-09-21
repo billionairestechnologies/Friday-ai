@@ -67,7 +67,7 @@ export const env = {
     voicePer15Minutes: positiveInteger(process.env.VOICE_RATE_LIMIT_MAX, 30),
     voiceConcurrency: positiveInteger(process.env.VOICE_CONCURRENCY_MAX, 2),
     sandboxPer10Minutes: positiveInteger(process.env.SANDBOX_RATE_LIMIT_MAX, 5),
-    sandboxConcurrency: positiveInteger(process.env.SANDBOX_CONCURRENCY_MAX, 1),
+    sandboxConcurrency: positiveInteger(process.env.SANDBOX_CONCURRENCY_MAX, 2),
   },
 };
 
