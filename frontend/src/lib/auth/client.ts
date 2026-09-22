@@ -43,6 +43,11 @@ type AuthState = {
 
 function consumeHashSession(): StoredAuth | null {
   if (typeof window === "undefined") return null;
+  // mobile-auth-bridge.tsx needs this exact hash intact so it can relay it on as a deep link to
+  // the native app — if bootstrap() consumed and stripped it first (it runs at module load, well
+  // before that page's own effect), the browser tab would silently log itself in instead and the
+  // native app would be left stuck on "Finishing sign-in" forever with nothing to redirect on.
+  if (window.location.pathname === "/mobile-auth-bridge") return null;
   const packed = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("friday_session");
   if (!packed) return null;
   try {
