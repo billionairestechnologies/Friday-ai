@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
 
 /**
- * Landing point for the Android app's Google/GitHub OAuth Custom Tab (see AuthRepository.
- * startOAuth in the Android project — googleStart/githubStart pass returnTo=/mobile-auth-bridge).
- * The backend's OAuth callback redirects here with `#friday_session=<payload>` exactly like it
- * does for the web app's own login (see src/lib/auth/client.ts's consumeHashSession) — this page
- * just re-emits that same hash as a `fridayai://auth-callback` deep link so Android's
- * intent-filter can hand it back to the app instead of leaving the session stranded in a browser
- * tab the user has to manually close.
+ * Landing point for both Android apps' Google/GitHub OAuth Custom Tab handoff. The backend's
+ * OAuth callback redirects here with `#friday_session=<payload>` exactly like it does for the web
+ * app's own login (see src/lib/auth/client.ts's consumeHashSession) — this page just re-emits
+ * that same hash as a deep link so Android's intent-filter can hand it back to the right app
+ * instead of leaving the session stranded in a browser tab the user has to manually close.
  *
- * The automatic `window.location.href` redirect is attempted, but Chrome (Custom Tabs included)
- * silently drops a top-level navigation to a non-http(s) scheme when it isn't tied to a real user
- * gesture — and arriving here is itself the tail of a server-side OAuth redirect chain, so there's
- * no gesture to attach to. That left this page stuck forever on "Finishing sign-in…" with no way
- * out. The visible "Open Friday app" link below is a real anchor the user taps themselves, which
- * Chrome always honors, so it's the reliable path — the auto-redirect is just a best-effort head
- * start for cases where the browser allows it.
+ * Two different apps land here, and each needs its own scheme:
+ * - The repo-integrated `com.friday.app` (AuthApi.kt) passes `?app=main`, handled via
+ *   `com.friday.app://auth-callback`.
+ * - The older, separate `ai.friday.app` project passes no `app` param, so it falls back to the
+ *   legacy `fridayai://auth-callback` it has always used.
+ * These must NOT collide on one scheme: with two apps registered for the same custom scheme,
+ * Android can't tell them apart and shows an "Open with" chooser instead of a clean handoff —
+ * easy to miss, which read live as Google/GitHub sign-in just "not working".
+ *
+ * The automatic `window.location.href` redirect is attempted, but a scripted top-level navigation
+ * to a non-http(s) scheme isn't always honored by the browser depending on gesture/redirect-chain
+ * history, so the visible "Open Friday app" link below is the reliable fallback — a real anchor
+ * tap always works.
  */
 export function MobileAuthBridge() {
   const [deepLink, setDeepLink] = useState<string | null>(null);
@@ -23,7 +27,9 @@ export function MobileAuthBridge() {
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash.includes("friday_session=")) return;
-    const link = `fridayai://auth-callback${hash}`;
+    const app = new URLSearchParams(window.location.search).get("app");
+    const scheme = app === "main" ? "com.friday.app" : "fridayai";
+    const link = `${scheme}://auth-callback${hash}`;
     setDeepLink(link);
     window.location.href = link;
   }, []);

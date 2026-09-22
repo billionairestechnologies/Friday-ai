@@ -178,12 +178,15 @@ object AuthApi {
         }.getOrElse { false }
     }
 
+    // `app=main` tells mobile-auth-bridge.tsx to hand the session back via this app's own
+    // com.friday.app://auth-callback scheme rather than the older ai.friday.app project's
+    // fridayai://auth-callback — see the AndroidManifest.xml comment on why they can't share one.
     suspend fun googleStartUrl(): String? = withContext(Dispatchers.IO) {
-        runCatching { get(ApiClient.plain, "auth/google/start?returnTo=/mobile-auth-bridge").optString("url").ifBlank { null } }.getOrNull()
+        runCatching { get(ApiClient.plain, "auth/google/start?returnTo=/mobile-auth-bridge?app=main").optString("url").ifBlank { null } }.getOrNull()
     }
 
     suspend fun githubStartUrl(): String? = withContext(Dispatchers.IO) {
-        runCatching { get(ApiClient.plain, "auth/github/start?returnTo=/mobile-auth-bridge").optString("url").ifBlank { null } }.getOrNull()
+        runCatching { get(ApiClient.plain, "auth/github/start?returnTo=/mobile-auth-bridge?app=main").optString("url").ifBlank { null } }.getOrNull()
     }
 
     /** Synchronous by design — called from OkHttp's Authenticator thread, never from a coroutine. */

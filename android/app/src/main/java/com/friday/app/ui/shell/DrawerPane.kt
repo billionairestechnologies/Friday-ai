@@ -103,27 +103,31 @@ fun DrawerPane(
             ) {
                 Text((user?.name?.take(1) ?: "G").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = FridayText)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(user?.name ?: "Guest", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = FridayText)
-                Icon(Icons.Default.ExpandMore, null, tint = FridayMuted, modifier = Modifier.size(20.dp))
-            }
-            if (user != null) {
-                val free = plan.isNullOrBlank() || plan.equals("free", ignoreCase = true)
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(if (free) FridaySurface else FridaySoftBlue)
-                        .padding(horizontal = 9.dp, vertical = 3.dp),
-                ) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        plan?.replaceFirstChar { it.uppercase() } ?: "Free",
+                        user?.name ?: "Guest",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = FridayText,
-                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Icon(Icons.Default.ExpandMore, null, tint = FridayMuted, modifier = Modifier.size(20.dp))
+                }
+                // A plain small-caps label, not a filled pill — reads as a status line under the
+                // name rather than a second tappable button sitting next to it.
+                if (user != null) {
+                    val free = plan.isNullOrBlank() || plan.equals("free", ignoreCase = true)
+                    Text(
+                        (plan?.replaceFirstChar { it.uppercase() } ?: "Free") + " plan",
+                        color = if (free) FridayMuted else FridaySoftBlue,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
                 }
             }
-            Spacer(Modifier.weight(1f))
             Box(
                 Modifier
                     .size(36.dp)
