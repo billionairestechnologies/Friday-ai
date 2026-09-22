@@ -143,9 +143,13 @@ private fun UserBubble(text: String) {
 @Composable
 private fun AssistantBlock(msg: ChatMessage) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // Bare pill right after send, before any status/step/content has arrived.
-        val nothingHasArrivedYet = msg.isStreaming && msg.status == null && msg.sources.isEmpty() &&
-            msg.content.isEmpty() && msg.thinkingLabel == null && msg.thinkingSteps.isEmpty() && msg.reasoning.isEmpty()
+        // Bare pill for as long as there's no actual reply text yet. Gating this on msg.status
+        // used to hide it the instant the backend's generic "thinking" status frame landed (it
+        // sends one on every reply, mode or no mode — see trailModeActive below) even though the
+        // model hadn't started streaming text yet, leaving a blank 1-2s gap between the pill
+        // disappearing and the reply showing up. Content arriving is the only thing that should
+        // replace this pill.
+        val nothingHasArrivedYet = msg.isStreaming && msg.content.isEmpty()
         // The backend emits a generic "thinking" status frame on every reply, mode or no mode —
         // without gating on the composer's actual modes, a plain "hii" got the full multi-step
         // Thought Trail card same as a real Think/Search turn. Now the card only shows when
@@ -159,10 +163,13 @@ private fun AssistantBlock(msg: ChatMessage) {
             AgentsRow(msg)
         } else if (trailModeActive) {
             ThoughtCard(msg)
-        } else if (nothingHasArrivedYet) {
+        }
+        // Cross-fades the pill out as the first bit of content fades in, instead of the pill
+        // vanishing and the text popping in on separate frames.
+        AnimatedVisibility(visible = !trailModeActive && msg.agents.isEmpty() && nothingHasArrivedYet, enter = fadeIn(tween(180)), exit = fadeOut(tween(180))) {
             ThinkingPill()
         }
-        if (msg.content.isNotEmpty()) {
+        AnimatedVisibility(visible = msg.content.isNotEmpty(), enter = fadeIn(tween(220)), exit = fadeOut(tween(0))) {
             MarkdownBody(msg.content)
         }
         if (msg.content.isNotEmpty() && !msg.isStreaming) {
