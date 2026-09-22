@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { FolderCode, X } from "lucide-react";
+import { LayoutDashboard, X } from "lucide-react";
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
@@ -437,7 +437,7 @@ export function HeaderActions() {
           canvasOpen ? "bg-canvas/15 text-canvas" : "text-muted hover:bg-chip hover:text-foreground"
         }`}
       >
-        <FolderCode className="size-4" />
+        <LayoutDashboard className="size-4" />
         Canvas
       </button>
     </div>
