@@ -214,6 +214,7 @@ fun FridayApp(
     ) {
         when (page) {
             "library" -> StubPage("Library", "Your files and images will live here.") { page = "chat" }
+            "projects" -> StubPage("Projects", "Project-scoped chats and files will live here.") { page = "chat" }
             "automations" -> StubPage("Automations", "Scheduled prompts are coming soon.") { page = "chat" }
             "settings" -> com.friday.app.ui.settings.SettingsScreen(
                 vm = vm,

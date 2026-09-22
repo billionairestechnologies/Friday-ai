@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -122,7 +123,10 @@ fun DrawerPane(
                     val free = plan.isNullOrBlank() || plan.equals("free", ignoreCase = true)
                     Text(
                         (plan?.replaceFirstChar { it.uppercase() } ?: "Free") + " plan",
-                        color = if (free) FridayMuted else FridaySoftBlue,
+                        // FridaySoftBlue is a pale pastel meant for fills/backgrounds, not text —
+                        // used as a text color it read as barely legible light gray. FridaySearch
+                        // is the same blue family but dark enough to actually read as text.
+                        color = if (free) FridayMuted else FridaySearch,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
@@ -143,7 +147,8 @@ fun DrawerPane(
         Column(Modifier.padding(horizontal = 12.dp)) {
             PlainRow(Icons.Default.Edit, "New chat", onNewChat)
             PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
-            PlainRow(Icons.Default.Folder, "Projects") { onNavigate("library") }
+            PlainRow(Icons.AutoMirrored.Filled.LibraryBooks, "Library") { onNavigate("library") }
+            PlainRow(Icons.Default.Folder, "Projects") { onNavigate("projects") }
         }
 
         Spacer(Modifier.height(16.dp))
