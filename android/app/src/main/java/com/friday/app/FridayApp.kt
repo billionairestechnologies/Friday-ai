@@ -295,8 +295,8 @@ fun FridayApp(
     if (ui.sheet == Sheet.Model || ui.sheet == Sheet.Attach) {
         CompactAnchoredPopup(
             onDismiss = vm::closeSheet,
-            alignStart = ui.sheet == Sheet.Attach,
-            widthFraction = if (ui.sheet == Sheet.Attach) 0.72f else 0.9f,
+            anchor = if (ui.sheet == Sheet.Attach) Alignment.BottomStart else Alignment.BottomEnd,
+            widthFraction = if (ui.sheet == Sheet.Attach) 0.72f else 0.66f,
         ) {
             when (ui.sheet) {
                 Sheet.Model -> ModelSheet(
@@ -335,7 +335,7 @@ fun FridayApp(
 @Composable
 private fun CompactAnchoredPopup(
     onDismiss: () -> Unit,
-    alignStart: Boolean = false,
+    anchor: Alignment = Alignment.BottomCenter,
     widthFraction: Float = 0.9f,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -351,8 +351,14 @@ private fun CompactAnchoredPopup(
     ) {
         Column(
             Modifier
-                .align(if (alignStart) Alignment.BottomStart else Alignment.BottomCenter)
-                .then(if (alignStart) Modifier.padding(start = 16.dp) else Modifier)
+                .align(anchor)
+                .then(
+                    when (anchor) {
+                        Alignment.BottomStart -> Modifier.padding(start = 16.dp)
+                        Alignment.BottomEnd -> Modifier.padding(end = 16.dp)
+                        else -> Modifier
+                    },
+                )
                 .fillMaxWidth(widthFraction)
                 .navigationBarsPadding()
                 .padding(bottom = 116.dp)
@@ -546,7 +552,9 @@ private fun ChatShell(
                     onDraft = vm::setDraft,
                     modes = ui.modes,
                     onToggleMode = vm::toggleMode,
-                    modelLabel = ui.remoteModels.firstOrNull { it.modelId == ui.selectedModelId }?.displayName ?: ui.model.label,
+                    modelLabel = com.friday.app.ui.shell.shortModelName(
+                        ui.remoteModels.firstOrNull { it.modelId == ui.selectedModelId }?.displayName ?: ui.model.label,
+                    ),
                     modelId = ui.selectedModelId,
                     isGenerating = ui.isGenerating,
                     onSend = { vm.send() },

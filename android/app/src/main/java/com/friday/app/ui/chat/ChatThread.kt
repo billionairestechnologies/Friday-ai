@@ -46,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,8 +82,28 @@ import kotlinx.coroutines.delay
 @Composable
 fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier) {
     val list = rememberLazyListState()
-    LaunchedEffect(messages.lastOrNull()?.content, messages.size) {
+    // Whether the last item is the (or nearly the) last one visible — used to gate auto-scroll
+    // during streaming so it doesn't fight a user who scrolled up to read earlier messages. Every
+    // streamed token used to re-run animateScrollToItem unconditionally, yanking the list back to
+    // the bottom out from under a manual scroll (reported live as a "glitch" that "comes back to
+    // top" — really back to bottom — on its own).
+    val isNearBottom by remember {
+        derivedStateOf {
+            val info = list.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
+            val totalCount = info.totalItemsCount
+            last.index >= totalCount - 1 && (last.offset + last.size) <= info.viewportEndOffset + 200
+        }
+    }
+    // A brand-new message (sent or received) always scrolls to it regardless of prior position —
+    // matches every chat app's "jump to the thing that just happened" behavior.
+    LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) list.animateScrollToItem(messages.lastIndex)
+    }
+    // Continued streaming into the same message only keeps auto-scrolling while the user is
+    // already at the bottom; once they've scrolled away, it leaves them alone.
+    LaunchedEffect(messages.lastOrNull()?.content) {
+        if (messages.isNotEmpty() && isNearBottom) list.animateScrollToItem(messages.lastIndex)
     }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -119,22 +140,19 @@ private fun AssistantBlock(msg: ChatMessage) {
         // Bare pill right after send, before any status/step/content has arrived.
         val nothingHasArrivedYet = msg.isStreaming && msg.status == null && msg.sources.isEmpty() &&
             msg.content.isEmpty() && msg.thinkingLabel == null && msg.thinkingSteps.isEmpty() && msg.reasoning.isEmpty()
-        val hasTrail = msg.thinkingLabel != null || msg.thinkingSteps.isNotEmpty() ||
-            msg.status != null || msg.sources.isNotEmpty() || msg.reasoning.isNotEmpty()
         // The backend emits a generic "thinking" status frame on every reply, mode or no mode —
         // without gating on the composer's actual modes, a plain "hii" got the full multi-step
         // Thought Trail card same as a real Think/Search turn. Now the card only shows when
-        // Think/Search/Canvas was actually toggled on; a plain reply goes straight from the brief
-        // loading pill to the one-line answer.
+        // Think/Search/Canvas was actually toggled on for THIS message; a plain reply goes
+        // straight from the brief loading pill to the one-line answer. And since the mode is
+        // already known at send time (it's a composer toggle, not something the backend tells us
+        // later), the card shows immediately with the right "Thinking"/"Searching" header from the
+        // very first frame instead of waiting for a status event to arrive first.
         val trailModeActive = Mode.Think in msg.modesUsed || Mode.Search in msg.modesUsed || Mode.Canvas in msg.modesUsed
-        if (nothingHasArrivedYet || (hasTrail && !trailModeActive && msg.content.isEmpty())) {
-            // Plain reply still waiting on its first token — keep the brief generic pill instead
-            // of nothing, but never the full trail card.
-            ThinkingPill()
-        } else if (hasTrail && trailModeActive) {
-            // One unified Thought Trail card for both the mock/guest demo and the real backend —
-            // same header, same "Understanding the question" step, same rotating reasoning line.
+        if (trailModeActive) {
             ThoughtCard(msg)
+        } else if (nothingHasArrivedYet) {
+            ThinkingPill()
         }
         if (msg.content.isNotEmpty()) {
             MarkdownBody(msg.content)
@@ -196,7 +214,11 @@ private fun ThoughtCard(msg: ChatMessage) {
     val artifact = remember(msg.content) { detectArtifact(msg.content) }
     val writingCode = msg.isStreaming && artifact != null && !artifact.complete
     val finished = !msg.isStreaming
-    val searching = msg.status == "searching" || msg.thinkingLabel?.contains("Searching", ignoreCase = true) == true
+    // Before the backend's first status frame arrives, fall back to the composer's own Search
+    // toggle so the header reads "Searching" from the very first frame instead of a generic
+    // "Thinking" that then jumps to "Searching" a moment later.
+    val searching = msg.status == "searching" || msg.thinkingLabel?.contains("Searching", ignoreCase = true) == true ||
+        (Mode.Search in msg.modesUsed && msg.status == null)
     val hasSources = msg.sources.isNotEmpty()
 
     val activePhrases = when {

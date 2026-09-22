@@ -76,24 +76,24 @@ fun ModelSheet(
     onPickRemote: (String) -> Unit,
     onPickLocal: (ModelId) -> Unit,
 ) {
-    Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp).heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+    Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp).heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
         if (remoteModels.isNotEmpty()) {
             remoteModels.forEach { m ->
                 val isSelected = m.modelId == selectedModelId
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .clickable { onPickRemote(m.modelId) }
                         .background(if (isSelected) FridaySurface else androidx.compose.ui.graphics.Color.Transparent)
-                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     ModelBrandIcon(m.modelId, m.displayName)
                     Column(Modifier.weight(1f)) {
-                        Text(m.displayName, color = FridayText, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text(m.minTier.replaceFirstChar { it.uppercase() } + " tier", color = FridayMuted, fontSize = 13.5.sp)
+                        Text(shortModelName(m.displayName), color = FridayText, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(m.minTier.replaceFirstChar { it.uppercase() } + " tier", color = FridayMuted, fontSize = 12.5.sp)
                     }
                     if (isSelected) Icon(Icons.Default.Check, null, tint = FridayText, modifier = Modifier.size(20.dp))
                 }
