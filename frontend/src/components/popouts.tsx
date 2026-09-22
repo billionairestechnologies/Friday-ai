@@ -433,12 +433,11 @@ export function HeaderActions() {
         aria-label={canvasOpen ? "Close canvas" : "Open canvas"}
         aria-pressed={canvasOpen}
         onClick={() => setCanvasOpen(!canvasOpen)}
-        className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors duration-150 ${
+        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-150 ${
           canvasOpen ? "bg-canvas/15 text-canvas" : "text-muted hover:bg-chip hover:text-foreground"
         }`}
       >
         <LayoutDashboard className="size-4" />
-        Canvas
       </button>
     </div>
   );
