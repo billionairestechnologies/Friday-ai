@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RocketLaunch
@@ -52,17 +53,23 @@ private fun modelIcon(id: ModelId): ImageVector = when (id) {
 
 @Composable
 private fun ModelBrandIcon(modelId: String, displayName: String) {
-    val brand = brandOf(modelId, displayName)
     Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-        if (brand.logo != null) {
-            Icon(
-                painter = painterResource(brand.logo),
-                contentDescription = null,
-                tint = androidx.compose.ui.graphics.Color.Unspecified,
-                modifier = Modifier.size(22.dp),
-            )
-        } else {
-            Icon(Icons.Default.AutoAwesome, null, tint = FridayText, modifier = Modifier.size(22.dp))
+        when (modelId) {
+            com.friday.app.data.AUTO_MODEL_ID -> Icon(Icons.Default.Bolt, null, tint = FridayText, modifier = Modifier.size(22.dp))
+            com.friday.app.data.TEAMUP_MODEL_ID -> Icon(Icons.Default.Groups, null, tint = FridayText, modifier = Modifier.size(22.dp))
+            else -> {
+                val brand = brandOf(modelId, displayName)
+                if (brand.logo != null) {
+                    Icon(
+                        painter = painterResource(brand.logo),
+                        contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color.Unspecified,
+                        modifier = Modifier.size(22.dp),
+                    )
+                } else {
+                    Icon(Icons.Default.AutoAwesome, null, tint = FridayText, modifier = Modifier.size(22.dp))
+                }
+            }
         }
     }
 }
@@ -93,7 +100,12 @@ fun ModelSheet(
                     ModelBrandIcon(m.modelId, m.displayName)
                     Column(Modifier.weight(1f)) {
                         Text(shortModelName(m.displayName), color = FridayText, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(m.minTier.replaceFirstChar { it.uppercase() } + " tier", color = FridayMuted, fontSize = 12.5.sp)
+                        val subtitle = when (m.modelId) {
+                            com.friday.app.data.AUTO_MODEL_ID -> "Tries enabled models in order, falls back automatically"
+                            com.friday.app.data.TEAMUP_MODEL_ID -> "Asks up to 3 models at once and shows every reply"
+                            else -> m.minTier.replaceFirstChar { it.uppercase() } + " tier"
+                        }
+                        Text(subtitle, color = FridayMuted, fontSize = 12.5.sp)
                     }
                     if (isSelected) Icon(Icons.Default.Check, null, tint = FridayText, modifier = Modifier.size(20.dp))
                 }

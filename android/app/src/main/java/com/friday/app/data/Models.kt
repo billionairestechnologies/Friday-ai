@@ -2,6 +2,20 @@ package com.friday.app.data
 
 enum class Mode { Search, Think, Canvas }
 
+/** Sentinel remote-model ids for the two non-single conversation modes — mirrors the web app's
+ *  AUTO_MODEL_ID/TEAMUP_MODEL_ID (exactly (frontend/src/lib/chat/models.ts), so both surfaces
+ *  agree on what these mean when they show up as a "modelId". */
+const val AUTO_MODEL_ID = "mode:auto"
+const val TEAMUP_MODEL_ID = "mode:teamup"
+
+/** One model's progress within a Team Up turn — mirrors the backend's {"t":"agent",...} frame. */
+data class AgentStatus(
+    val slug: String,
+    val model: String,
+    val state: String, // "start" | "done" | "error"
+    val error: String? = null,
+)
+
 enum class ModelId(val label: String, val hint: String) {
     Auto("Auto", "Picks the best model for the task"),
     Flash("Friday Flash", "Fast everyday answers"),
@@ -51,6 +65,9 @@ data class ChatMessage(
      *  its full Thought Trail card when Think/Search/Canvas was actually toggled on; a plain reply
      *  (no mode) goes straight from the brief loading pill to the answer, one line, no trail. */
     val modesUsed: Set<Mode> = emptySet(),
+    /** Populated only for a Team Up turn, from {"t":"agent",...} frames — one entry per model
+     *  consulted, upserted by (slug, model) as its state changes. */
+    val agents: List<AgentStatus> = emptyList(),
 )
 
 enum class Role { User, Assistant }
@@ -79,6 +96,8 @@ sealed class ChatEvent {
     data class Reasoning(val text: String) : ChatEvent()
     data class Token(val text: String) : ChatEvent()
     data class CanvasUpdate(val html: String) : ChatEvent()
+    /** One model's progress within a Team Up turn, from {"t":"agent",...} frames. */
+    data class Agent(val status: AgentStatus) : ChatEvent()
     data object Done : ChatEvent()
 }
 

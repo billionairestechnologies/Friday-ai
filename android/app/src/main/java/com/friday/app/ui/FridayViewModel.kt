@@ -8,6 +8,8 @@ import android.os.Vibrator
 import android.util.Base64
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.friday.app.data.AUTO_MODEL_ID
+import com.friday.app.data.TEAMUP_MODEL_ID
 import com.friday.app.data.ChatMessage
 import com.friday.app.data.ChatRepository
 import com.friday.app.data.ChatThread
@@ -96,8 +98,15 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val models = ModelsApi.list()
             if (models.isNotEmpty()) {
+                // Auto/Team Up aren't real /api/models entries (the backend picks/consults models
+                // itself for those) — prepended as sentinel picks, matching the web app's own
+                // AUTO_MODEL_ID/TEAMUP_MODEL_ID entries (lib/chat/models.ts's SPECIAL_MODELS).
+                val special = listOf(
+                    RemoteModel(AUTO_MODEL_ID, "Auto", "free", ""),
+                    RemoteModel(TEAMUP_MODEL_ID, "Team Up", "free", ""),
+                )
                 val default = models.firstOrNull { it.modelId == "claude-sonnet-5" } ?: models.first()
-                _state.update { it.copy(remoteModels = models, selectedModelId = default.modelId) }
+                _state.update { it.copy(remoteModels = special + models, selectedModelId = default.modelId) }
             }
         }
         viewModelScope.launch {
@@ -529,8 +538,14 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         job = viewModelScope.launch {
             try {
                 val eventFlow = if (tokenStore.hasSession()) {
-                    val selected = _state.value.remoteModels.firstOrNull { it.modelId == _state.value.selectedModelId }
-                    val remoteId = ChatApi.createConversation(selected?.modelId, selected?.providerSlug)
+                    val selectedId = _state.value.selectedModelId
+                    val conversationMode = when (selectedId) {
+                        AUTO_MODEL_ID -> "auto"
+                        TEAMUP_MODEL_ID -> "teamup"
+                        else -> "single"
+                    }
+                    val selected = _state.value.remoteModels.firstOrNull { it.modelId == selectedId }
+                    val remoteId = ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode)
                     if (remoteId != null) {
                         val oldId = chatId!!
                         if (remoteId != oldId) {
@@ -574,6 +589,11 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         is ChatEvent.CanvasUpdate -> patchMessage(chatId!!, asstId) {
                             it.copy(canvasHtml = event.html)
+                        }
+                        is ChatEvent.Agent -> patchMessage(chatId!!, asstId) { msg ->
+                            val i = msg.agents.indexOfFirst { it.slug == event.status.slug && it.model == event.status.model }
+                            val nextAgents = if (i == -1) msg.agents + event.status else msg.agents.toMutableList().apply { set(i, event.status) }
+                            msg.copy(agents = nextAgents)
                         }
                         ChatEvent.Done -> patchMessage(chatId!!, asstId) {
                             it.copy(isStreaming = false)

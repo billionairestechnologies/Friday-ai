@@ -20,6 +20,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -59,7 +62,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -71,8 +77,10 @@ import com.friday.app.data.Role
 import com.friday.app.data.Source
 import com.friday.app.ui.canvas.detectArtifact
 import com.friday.app.ui.theme.BubbleCorner
+import com.friday.app.ui.theme.FridayBg
 import com.friday.app.ui.theme.FridayMuted
 import com.friday.app.ui.theme.FridaySearch
+import com.friday.app.ui.theme.FridayStop
 import com.friday.app.ui.theme.FridaySuccess
 import com.friday.app.ui.theme.FridaySurface
 import com.friday.app.ui.theme.FridayText
@@ -149,7 +157,9 @@ private fun AssistantBlock(msg: ChatMessage) {
         // later), the card shows immediately with the right "Thinking"/"Searching" header from the
         // very first frame instead of waiting for a status event to arrive first.
         val trailModeActive = Mode.Think in msg.modesUsed || Mode.Search in msg.modesUsed || Mode.Canvas in msg.modesUsed
-        if (trailModeActive) {
+        if (msg.agents.isNotEmpty()) {
+            AgentsRow(msg.agents, finished = !msg.isStreaming)
+        } else if (trailModeActive) {
             ThoughtCard(msg)
         } else if (nothingHasArrivedYet) {
             ThinkingPill()
@@ -157,6 +167,38 @@ private fun AssistantBlock(msg: ChatMessage) {
         if (msg.content.isNotEmpty()) {
             MarkdownBody(msg.content)
         }
+        if (msg.content.isNotEmpty() && !msg.isStreaming) {
+            MessageActions(msg.content)
+        }
+    }
+}
+
+@Composable
+private fun MessageActions(text: String) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1200)
+            copied = false
+        }
+    }
+    Box(
+        Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .clickable {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+            if (copied) "Copied" else "Copy response",
+            tint = FridayMuted,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 
@@ -197,6 +239,67 @@ private fun ThreeDotBounce(color: Color) {
                     .clip(CircleShape)
                     .background(color),
             )
+        }
+    }
+}
+
+/**
+ * Team Up's multi-model consult card — one circular chip per model contacted (spinner while
+ * running, its own brand mark once done, an X on error), matching the web app's
+ * chain-of-thought-live.tsx "Consulting the team" step.
+ */
+@Composable
+private fun AgentsRow(agents: List<com.friday.app.data.AgentStatus>, finished: Boolean) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(FridaySurface)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (finished) {
+                Icon(Icons.Default.Check, null, tint = FridaySuccess, modifier = Modifier.size(15.dp))
+            } else {
+                CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(13.dp))
+            }
+            val label = if (finished) "Team of ${agents.size} consulted" else "Consulting the team"
+            if (finished) {
+                Text(label, color = FridayThink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+            } else {
+                ShimmerText(label, FridayThink)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            agents.forEach { agent ->
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(FridayBg)
+                        .border(1.dp, FridayMuted.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when (agent.state) {
+                        "start" -> CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(14.dp))
+                        "error" -> Icon(Icons.Default.Close, "Failed", tint = FridayStop, modifier = Modifier.size(14.dp))
+                        else -> {
+                            val brand = com.friday.app.ui.shell.brandOf(agent.model, agent.model)
+                            if (brand.logo != null) {
+                                Icon(
+                                    painter = painterResource(brand.logo),
+                                    contentDescription = null,
+                                    tint = Color.Unspecified,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            } else {
+                                Icon(Icons.Default.Check, null, tint = FridaySuccess, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

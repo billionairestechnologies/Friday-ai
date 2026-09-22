@@ -47,8 +47,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Stop
@@ -255,16 +257,22 @@ fun ComposerBar(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp),
                         ) {
-                            val brand = brandOf(modelId.orEmpty(), modelLabel)
-                            if (brand.logo != null) {
-                                Icon(
-                                    painter = painterResource(brand.logo),
-                                    contentDescription = null,
-                                    tint = Color.Unspecified,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            } else {
-                                Icon(Icons.Outlined.AutoAwesome, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+                            when (modelId) {
+                                com.friday.app.data.AUTO_MODEL_ID -> Icon(Icons.Default.Bolt, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+                                com.friday.app.data.TEAMUP_MODEL_ID -> Icon(Icons.Default.Groups, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+                                else -> {
+                                    val brand = brandOf(modelId.orEmpty(), modelLabel)
+                                    if (brand.logo != null) {
+                                        Icon(
+                                            painter = painterResource(brand.logo),
+                                            contentDescription = null,
+                                            tint = Color.Unspecified,
+                                            modifier = Modifier.size(14.dp),
+                                        )
+                                    } else {
+                                        Icon(Icons.Outlined.AutoAwesome, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+                                    }
+                                }
                             }
                             Text(
                                 modelLabel,

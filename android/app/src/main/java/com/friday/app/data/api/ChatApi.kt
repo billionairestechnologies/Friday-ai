@@ -1,5 +1,6 @@
 package com.friday.app.data.api
 
+import com.friday.app.data.AgentStatus
 import com.friday.app.data.ChatEvent
 import com.friday.app.data.Mode
 import com.friday.app.data.PendingAttachment
@@ -21,13 +22,17 @@ import java.io.IOException
 object ChatApi {
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
-    /** POST /api/chat/conversations — a real conversation id is required before streaming into it. */
-    suspend fun createConversation(modelId: String? = null, providerSlug: String? = null): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+    /** POST /api/chat/conversations — a real conversation id is required before streaming into it.
+     *  [mode] "single" needs [modelId]/[providerSlug]; "auto"/"teamup" need neither — the backend
+     *  picks/consults models itself for those. */
+    suspend fun createConversation(modelId: String? = null, providerSlug: String? = null, mode: String = "single"): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
         runCatching {
             val body = JSONObject().apply {
-                put("mode", "single")
-                if (!modelId.isNullOrBlank()) put("modelId", modelId)
-                if (!providerSlug.isNullOrBlank()) put("providerSlug", providerSlug)
+                put("mode", mode)
+                if (mode == "single") {
+                    if (!modelId.isNullOrBlank()) put("modelId", modelId)
+                    if (!providerSlug.isNullOrBlank()) put("providerSlug", providerSlug)
+                }
             }
             val request = Request.Builder()
                 .url(ApiClient.BASE_URL + "chat/conversations")
@@ -113,6 +118,16 @@ object ChatApi {
                                     text += "\n\n" + json.optString("c", "Something went wrong.")
                                     emit(ChatEvent.Token(text))
                                 }
+                                "agent" -> emit(
+                                    ChatEvent.Agent(
+                                        AgentStatus(
+                                            slug = json.optString("slug"),
+                                            model = json.optString("model"),
+                                            state = json.optString("state"),
+                                            error = json.optString("error").ifBlank { null },
+                                        ),
+                                    ),
+                                )
                                 "done" -> done = true
                             }
                         }
