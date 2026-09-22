@@ -25,17 +25,73 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, getModel, useModels } from "@/lib/chat/models";
+import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, getModel, useModels, type ChatModel } from "@/lib/chat/models";
 import { planSatisfiesTier, usePlan } from "@/lib/usage/planStore";
-import { ProviderLogo } from "@/components/provider-logos";
+import { ProviderLogo, resolveVendorSlug, vendorLabel } from "@/components/provider-logos";
 import { createLiveAnalyser, type LiveAnalyser } from "@/lib/audio/analyser";
 import { VoiceMode } from "@/components/voice-mode";
 import { api } from "@/lib/api";
 
-function ModelIcon({ id, providerSlug, className }: { id: string; providerSlug?: string; className?: string }) {
+function ModelIcon({ id, label, providerSlug, className }: { id: string; label?: string; providerSlug?: string; className?: string }) {
   if (id === AUTO_MODEL_ID) return <Zap className={className} aria-hidden />;
   if (id === TEAMUP_MODEL_ID) return <Users className={className} aria-hidden />;
-  return <ProviderLogo slug={providerSlug} className={className} />;
+  return <ProviderLogo slug={providerSlug} modelText={`${id} ${label ?? ""}`} className={className} />;
+}
+
+/** Groups the picker by real vendor (Anthropic/OpenAI/NVIDIA/...) rather than a flat list — a
+ *  provider slug like "scalemax" or "openrouter" covers several underlying vendors at once, so
+ *  grouping uses the same text-resolved vendor as the icon (see resolveVendorSlug). */
+function groupModelsByVendor(models: ChatModel[]): { vendor: string; label: string; models: ChatModel[] }[] {
+  const order: string[] = [];
+  const groups = new Map<string, ChatModel[]>();
+  for (const m of models) {
+    const vendor = resolveVendorSlug(m.providerSlug, `${m.id} ${m.label}`) ?? "other";
+    if (!groups.has(vendor)) {
+      groups.set(vendor, []);
+      order.push(vendor);
+    }
+    groups.get(vendor)!.push(m);
+  }
+  return order.map((vendor) => ({ vendor, label: vendorLabel(vendor), models: groups.get(vendor)! }));
+}
+
+function ModelMenuItem({
+  model: m,
+  selected,
+  locked,
+  onSelect,
+  onLocked,
+}: {
+  model: ChatModel;
+  selected: boolean;
+  locked: boolean;
+  onSelect: () => void;
+  onLocked: () => void;
+}) {
+  return (
+    <DropdownMenu.Item
+      onSelect={() => (locked ? onLocked() : onSelect())}
+      className={cn(
+        "flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm outline-none data-[highlighted]:bg-chip",
+        locked ? "text-muted" : "text-foreground",
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <ModelIcon id={m.id} label={m.label} providerSlug={m.providerSlug} className={cn("size-4 shrink-0", locked && "opacity-50")} />
+        <span className="min-w-0">
+          <span className="block font-medium">{m.label}</span>
+          {locked ? (
+            <span className="block text-xs text-muted">
+              {m.minTier === "premium" ? "Premium" : "Pro"} — upgrade to unlock
+            </span>
+          ) : (
+            m.hint !== m.label && <span className="block text-xs text-muted">{m.hint}</span>
+          )}
+        </span>
+      </span>
+      {locked ? <Lock className="size-3.5 shrink-0 text-muted" /> : selected && <Check className="size-4 text-foreground" />}
+    </DropdownMenu.Item>
+  );
 }
 
 const Textarea = React.forwardRef<
@@ -529,6 +585,14 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const viewerPlan = usePlan((s) => s.plan);
     const isEnterprise = usePlan((s) => s.isEnterprise);
     const loadPlan = usePlan((s) => s.load);
+    // Auto/Team Up aren't tied to a vendor, so they stay as standalone top items; everything else
+    // groups under its real vendor (see groupModelsByVendor) as a click-to-expand section.
+    const specialModels = React.useMemo(() => models.filter((m) => m.id === AUTO_MODEL_ID || m.id === TEAMUP_MODEL_ID), [models]);
+    const vendorGroups = React.useMemo(
+      () => groupModelsByVendor(models.filter((m) => m.id !== AUTO_MODEL_ID && m.id !== TEAMUP_MODEL_ID)),
+      [models],
+    );
+    const [expandedVendors, setExpandedVendors] = React.useState<Set<string>>(() => new Set());
 
     React.useEffect(() => {
       void loadPlan();
@@ -993,54 +1057,6 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     )}
                   </AnimatePresence>
                 </button>
-
-                <CustomDivider />
-
-                <button
-                  type="button"
-                  onClick={() => setCanvas(!showCanvas)}
-                  className={cn(
-                    "m3-chip flex h-8 shrink-0 items-center gap-1 rounded-full border-[1.5px] px-2 py-1",
-                    showCanvas
-                      ? "border-canvas bg-canvas/15 text-canvas"
-                      : "border-transparent bg-transparent text-muted hover:text-foreground",
-                  )}
-                >
-                  <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                    <motion.div
-                      animate={{
-                        rotate: showCanvas ? 360 : 0,
-                        scale: showCanvas ? 1.1 : 1,
-                      }}
-                      whileHover={{
-                        rotate: showCanvas ? 360 : 15,
-                        scale: 1.1,
-                        transition: { type: "spring", stiffness: 300, damping: 10 },
-                      }}
-                      transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                    >
-                      <FolderCode
-                        className={cn(
-                          "h-4 w-4",
-                          showCanvas ? "text-canvas" : "text-inherit",
-                        )}
-                      />
-                    </motion.div>
-                  </div>
-                  <AnimatePresence>
-                    {showCanvas && (
-                      <motion.span
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: "auto", opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex-shrink-0 overflow-hidden text-xs whitespace-nowrap text-canvas"
-                      >
-                        Canvas
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </button>
               </div>
             </div>
 
@@ -1064,7 +1080,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       type="button"
                       className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-xs font-medium whitespace-nowrap text-muted transition-colors hover:bg-chip hover:text-foreground"
                     >
-                      <ModelIcon id={currentModel.id} providerSlug={currentModel.providerSlug} className="size-3.5 shrink-0" />
+                      <ModelIcon id={currentModel.id} label={currentModel.label} providerSlug={currentModel.providerSlug} className="size-3.5 shrink-0" />
                       <span>{currentModel.short}</span>
                       <ChevronDown className="size-3 shrink-0 opacity-70" />
                     </button>
@@ -1073,44 +1089,60 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     <DropdownMenu.Content
                       align="end"
                       sideOffset={8}
-                      className="z-50 min-w-56 rounded-xl border border-border bg-elevated p-1 shadow-xl"
+                      className="z-50 max-h-[70vh] min-w-64 overflow-y-auto rounded-xl border border-border bg-elevated p-1 shadow-xl"
                     >
-                      {models.map((m) => {
-                        const locked = !planSatisfiesTier(viewerPlan, isEnterprise, m.minTier);
+                      {specialModels.map((m) => (
+                        <ModelMenuItem
+                          key={m.id}
+                          model={m}
+                          selected={m.id === model}
+                          locked={!planSatisfiesTier(viewerPlan, isEnterprise, m.minTier)}
+                          onSelect={() => onModelChange(m.id)}
+                          onLocked={() => void navigate({ to: "/upgrade" })}
+                        />
+                      ))}
+                      {specialModels.length > 0 && vendorGroups.length > 0 && (
+                        <div className="my-1 h-px bg-border" />
+                      )}
+                      {vendorGroups.map(({ vendor, label, models: groupModels }) => {
+                        const hasSelected = groupModels.some((m) => m.id === model);
+                        const expanded = expandedVendors.has(vendor) || hasSelected;
                         return (
-                          <DropdownMenu.Item
-                            key={m.id}
-                            onSelect={() => {
-                              if (locked) {
-                                void navigate({ to: "/upgrade" });
-                                return;
-                              }
-                              onModelChange(m.id);
-                            }}
-                            className={cn(
-                              "flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm outline-none data-[highlighted]:bg-chip",
-                              locked ? "text-muted" : "text-foreground",
+                          <div key={vendor}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setExpandedVendors((prev) => {
+                                  const next = new Set(prev);
+                                  if (expanded) next.delete(vendor);
+                                  else next.add(vendor);
+                                  return next;
+                                });
+                              }}
+                              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-foreground outline-none hover:bg-chip"
+                            >
+                              <ModelIcon id={groupModels[0]!.id} label={groupModels[0]!.label} providerSlug={groupModels[0]!.providerSlug} className="size-4 shrink-0" />
+                              <span className="min-w-0 flex-1 text-left">{label}</span>
+                              <span className="text-xs text-muted">{groupModels.length}</span>
+                              <ChevronDown className={cn("size-3.5 shrink-0 text-muted transition-transform", expanded && "rotate-180")} />
+                            </button>
+                            {expanded && (
+                              <div className="ml-2 border-l border-border pl-2">
+                                {groupModels.map((m) => (
+                                  <ModelMenuItem
+                                    key={m.id}
+                                    model={m}
+                                    selected={m.id === model}
+                                    locked={!planSatisfiesTier(viewerPlan, isEnterprise, m.minTier)}
+                                    onSelect={() => onModelChange(m.id)}
+                                    onLocked={() => void navigate({ to: "/upgrade" })}
+                                  />
+                                ))}
+                              </div>
                             )}
-                          >
-                            <span className="flex min-w-0 items-center gap-2.5">
-                              <ModelIcon id={m.id} providerSlug={m.providerSlug} className={cn("size-4 shrink-0", locked && "opacity-50")} />
-                              <span className="min-w-0">
-                                <span className="block font-medium">{m.label}</span>
-                                {locked ? (
-                                  <span className="block text-xs text-muted">
-                                    {m.minTier === "premium" ? "Premium" : "Pro"} — upgrade to unlock
-                                  </span>
-                                ) : (
-                                  m.hint !== m.label && <span className="block text-xs text-muted">{m.hint}</span>
-                                )}
-                              </span>
-                            </span>
-                            {locked ? (
-                              <Lock className="size-3.5 shrink-0 text-muted" />
-                            ) : (
-                              m.id === model && <Check className="size-4 text-foreground" />
-                            )}
-                          </DropdownMenu.Item>
+                          </div>
                         );
                       })}
                     </DropdownMenu.Content>

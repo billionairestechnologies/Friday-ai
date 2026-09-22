@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { LogIn, Settings, UserRound, X } from "lucide-react";
+import { FolderCode, X } from "lucide-react";
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
@@ -419,35 +419,26 @@ function HelpPopout() {
 }
 
 
+// Settings/account already live in the sidebar's ProfileDock (bottom of the sidebar) — these
+// two buttons were a redundant second entry point. Replaced with a direct Canvas opener now that
+// the composer's own Canvas toggle is gone, so there's still a manual way to bring the panel up
+// (auto-open on a detected artifact still works independently of this).
 export function HeaderActions() {
-  const setDialog = useChat((s) => s.setDialog);
-  const { user } = useCurrentUserState();
-  const signedIn = Boolean(user && !user.isDevFallback);
+  const canvasOpen = useChat((s) => s.canvasOpen);
+  const setCanvasOpen = useChat((s) => s.setCanvasOpen);
   return (
     <div className="flex items-center gap-0.5">
       <button
         type="button"
-        aria-label="Settings"
-        onClick={() => setDialog("settings")}
-        className="flex size-9 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-chip hover:text-foreground"
+        aria-label={canvasOpen ? "Close canvas" : "Open canvas"}
+        aria-pressed={canvasOpen}
+        onClick={() => setCanvasOpen(!canvasOpen)}
+        className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors duration-150 ${
+          canvasOpen ? "bg-canvas/15 text-canvas" : "text-muted hover:bg-chip hover:text-foreground"
+        }`}
       >
-        <Settings className="size-4" />
-      </button>
-      <button
-        type="button"
-        aria-label={signedIn ? "Account" : "Sign in"}
-        onClick={() => setDialog("login")}
-        className="flex size-9 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-chip hover:text-foreground"
-      >
-        {signedIn ? (
-          user?.profileImageUrl ? (
-            <img src={user.profileImageUrl} alt="" className="size-6 rounded-full object-cover" />
-          ) : (
-            <UserRound className="size-4" />
-          )
-        ) : (
-          <LogIn className="size-4" />
-        )}
+        <FolderCode className="size-4" />
+        Canvas
       </button>
     </div>
   );

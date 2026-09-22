@@ -50,6 +50,21 @@ const ElevenLabsLogo = (props: SVGProps<SVGSVGElement>) => (
   <Icon {...props} path="M4.6035 0v24h4.9317V0zm9.8613 0v24h4.9317V0z" />
 );
 
+const NvidiaLogo = (props: SVGProps<SVGSVGElement>) => (
+  <Icon
+    {...props}
+    path="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"
+  />
+);
+
+/** Z.ai (formerly Zhipu AI) — hosts the GLM models. */
+const ZaiLogo = (props: SVGProps<SVGSVGElement>) => (
+  <Icon
+    {...props}
+    path="M12.606 1.806l-1.677 2.388c-0.258 0.374-0.697 0.606-1.161 0.606h-9.162V1.794C0.594 1.806 12.606 1.806 12.606 1.806zM24 1.806L9.6 22.206 0 22.206 14.4 1.806zM11.394 22.206l1.69-2.4c0.258-0.374 0.697-0.606 1.161-0.606h9.149v3.006H11.394z"
+  />
+);
+
 /** No public brand-icon asset exists for Sarvam AI — a plain monogram instead of faking an official mark. */
 const SarvamLogo = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 -2 344 344" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -62,22 +77,78 @@ const SarvamLogo = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-/** ScaleMax proxies Claude models, so the Anthropic mark is the accurate logo for what's actually answering. */
 type LogoComponent = (props: SVGProps<SVGSVGElement>) => ReturnType<typeof OpenAILogo>;
 
 export const PROVIDER_LOGOS: Record<string, LogoComponent> = {
   openai: OpenAILogo,
   anthropic: AnthropicLogo,
+  // Last-resort fallback only — ScaleMax proxies BOTH Claude and GPT-branded codenames under one
+  // provider slug (see resolveVendorSlug below, which is what actually picks the right mark for
+  // ScaleMax-routed models by reading the model's own name instead of trusting this slug).
   scalemax: AnthropicLogo,
   gemini: GeminiLogo,
   openrouter: OpenRouterLogo,
   ollama: OllamaLogo,
   elevenlabs: ElevenLabsLogo,
   sarvam: SarvamLogo,
+  nvidia: NvidiaLogo,
+  glm: ZaiLogo,
 };
 
-export function ProviderLogo({ slug, className }: { slug?: string; className?: string }) {
-  const Logo = slug ? PROVIDER_LOGOS[slug] : undefined;
+/**
+ * ScaleMax (and OpenRouter) proxy several underlying vendors under one provider slug each, so the
+ * slug alone doesn't say who actually answered — "gpt-5.5" and "claude-sonnet-5" both come back
+ * with providerSlug "scalemax", and blindly showing the Anthropic mark for both (the old behavior)
+ * mislabeled every GPT-branded model as Claude. This reads the model's own id/label text first,
+ * matching real vendor keywords, and only falls back to the raw provider slug when nothing matches.
+ */
+export function resolveVendorSlug(providerSlug?: string, modelText?: string): string | undefined {
+  const key = (modelText ?? "").toLowerCase();
+  if (key.includes("claude") || key.includes("fable") || key.includes("sonnet") || key.includes("opus")) return "anthropic";
+  if (key.includes("gpt")) return "openai";
+  if (key.includes("nemotron") || key.includes("nvidia")) return "nvidia";
+  if (key.includes("glm") || key.includes("z-ai") || key.includes("z.ai")) return "glm";
+  if (key.includes("sarvam")) return "sarvam";
+  if (key.includes("gemini")) return "gemini";
+  return providerSlug;
+}
+
+export function ProviderLogo({
+  slug,
+  modelText,
+  className,
+}: {
+  slug?: string;
+  /** The model's own id/label — used to disambiguate a shared provider slug (see resolveVendorSlug). */
+  modelText?: string;
+  className?: string;
+}) {
+  const resolved = resolveVendorSlug(slug, modelText);
+  const Logo = resolved ? PROVIDER_LOGOS[resolved] : undefined;
   if (!Logo) return null;
   return <Logo className={className} aria-hidden />;
+}
+
+/** Human-facing vendor name for a resolved slug — used to group the model picker by company. */
+export function vendorLabel(slug: string): string {
+  switch (slug) {
+    case "anthropic":
+      return "Anthropic";
+    case "openai":
+      return "OpenAI";
+    case "nvidia":
+      return "NVIDIA";
+    case "glm":
+      return "Z.ai";
+    case "sarvam":
+      return "Sarvam AI";
+    case "gemini":
+      return "Google";
+    case "openrouter":
+      return "OpenRouter";
+    case "scalemax":
+      return "ScaleMax";
+    default:
+      return slug.charAt(0).toUpperCase() + slug.slice(1);
+  }
 }
