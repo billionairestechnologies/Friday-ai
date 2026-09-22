@@ -509,7 +509,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         }
         val userMsg = ChatMessage(id = "u-${System.currentTimeMillis()}", role = Role.User, content = text, attachments = attachments)
         val asstId = "a-${System.currentTimeMillis()}"
-        val asst = ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true)
+        val asst = ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true, modesUsed = modes)
         val titleSeed = text.ifBlank { attachments.firstOrNull()?.name.orEmpty() }
         patchChat(chatId) { it.copy(messages = it.messages + userMsg + asst, title = if (it.messages.isEmpty()) titleFrom(titleSeed) else it.title, updatedAt = System.currentTimeMillis()) }
         _state.update { it.copy(draft = "", isGenerating = true, pendingAttachments = emptyList()) }

@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.friday.app.data.ChatMessage
+import com.friday.app.data.Mode
 import com.friday.app.data.Role
 import com.friday.app.data.Source
 import com.friday.app.ui.canvas.detectArtifact
@@ -120,9 +121,17 @@ private fun AssistantBlock(msg: ChatMessage) {
             msg.content.isEmpty() && msg.thinkingLabel == null && msg.thinkingSteps.isEmpty() && msg.reasoning.isEmpty()
         val hasTrail = msg.thinkingLabel != null || msg.thinkingSteps.isNotEmpty() ||
             msg.status != null || msg.sources.isNotEmpty() || msg.reasoning.isNotEmpty()
-        if (nothingHasArrivedYet) {
+        // The backend emits a generic "thinking" status frame on every reply, mode or no mode —
+        // without gating on the composer's actual modes, a plain "hii" got the full multi-step
+        // Thought Trail card same as a real Think/Search turn. Now the card only shows when
+        // Think/Search/Canvas was actually toggled on; a plain reply goes straight from the brief
+        // loading pill to the one-line answer.
+        val trailModeActive = Mode.Think in msg.modesUsed || Mode.Search in msg.modesUsed || Mode.Canvas in msg.modesUsed
+        if (nothingHasArrivedYet || (hasTrail && !trailModeActive && msg.content.isEmpty())) {
+            // Plain reply still waiting on its first token — keep the brief generic pill instead
+            // of nothing, but never the full trail card.
             ThinkingPill()
-        } else if (hasTrail) {
+        } else if (hasTrail && trailModeActive) {
             // One unified Thought Trail card for both the mock/guest demo and the real backend —
             // same header, same "Understanding the question" step, same rotating reasoning line.
             ThoughtCard(msg)

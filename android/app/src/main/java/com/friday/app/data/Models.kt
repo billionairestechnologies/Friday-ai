@@ -47,6 +47,10 @@ data class ChatMessage(
     val canvasHtml: String? = null,
     val isStreaming: Boolean = false,
     val attachments: List<PendingAttachment> = emptyList(),
+    /** Modes active on the composer when this message was sent — an assistant message only shows
+     *  its full Thought Trail card when Think/Search/Canvas was actually toggled on; a plain reply
+     *  (no mode) goes straight from the brief loading pill to the answer, one line, no trail. */
+    val modesUsed: Set<Mode> = emptySet(),
 )
 
 enum class Role { User, Assistant }
