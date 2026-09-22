@@ -20,7 +20,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,7 +76,6 @@ import com.friday.app.data.Role
 import com.friday.app.data.Source
 import com.friday.app.ui.canvas.detectArtifact
 import com.friday.app.ui.theme.BubbleCorner
-import com.friday.app.ui.theme.FridayBg
 import com.friday.app.ui.theme.FridayMuted
 import com.friday.app.ui.theme.FridaySearch
 import com.friday.app.ui.theme.FridayStop
@@ -158,7 +156,7 @@ private fun AssistantBlock(msg: ChatMessage) {
         // very first frame instead of waiting for a status event to arrive first.
         val trailModeActive = Mode.Think in msg.modesUsed || Mode.Search in msg.modesUsed || Mode.Canvas in msg.modesUsed
         if (msg.agents.isNotEmpty()) {
-            AgentsRow(msg.agents, finished = !msg.isStreaming)
+            AgentsRow(msg)
         } else if (trailModeActive) {
             ThoughtCard(msg)
         } else if (nothingHasArrivedYet) {
@@ -244,19 +242,28 @@ private fun ThreeDotBounce(color: Color) {
 }
 
 /**
- * Team Up's multi-model consult card — one circular chip per model contacted (spinner while
- * running, its own brand mark once done, an X on error), matching the web app's
- * chain-of-thought-live.tsx "Consulting the team" step.
+ * Team Up's multi-model consult card — matches the web app's chain-of-thought-live.tsx exactly:
+ * a collapsible header ("Consulting the team" / "Team of N consulted"), an "Understanding the
+ * question" step, one named row per model consulted (its own brand mark + spinner/check/error),
+ * and a "Synthesizing the final answer" step once every model has replied.
  */
 @Composable
-private fun AgentsRow(agents: List<com.friday.app.data.AgentStatus>, finished: Boolean) {
+private fun AgentsRow(msg: ChatMessage) {
+    val agents = msg.agents
+    val finished = !msg.isStreaming
+    val synthesizing = msg.status == "synthesizing"
+    val headerLabel = if (finished) "Team of ${agents.size} consulted" else "Consulting the team"
+    var userExpanded by remember(msg.id) { mutableStateOf<Boolean?>(null) }
+    val expanded = userExpanded ?: true
+    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron-agents")
+
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(FridaySurface)
+            .clickable { userExpanded = !expanded }
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (finished) {
@@ -264,42 +271,68 @@ private fun AgentsRow(agents: List<com.friday.app.data.AgentStatus>, finished: B
             } else {
                 CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(13.dp))
             }
-            val label = if (finished) "Team of ${agents.size} consulted" else "Consulting the team"
-            if (finished) {
-                Text(label, color = FridayThink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
-            } else {
-                ShimmerText(label, FridayThink)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            agents.forEach { agent ->
-                Box(
-                    Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(FridayBg)
-                        .border(1.dp, FridayMuted.copy(alpha = 0.2f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    when (agent.state) {
-                        "start" -> CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(14.dp))
-                        "error" -> Icon(Icons.Default.Close, "Failed", tint = FridayStop, modifier = Modifier.size(14.dp))
-                        else -> {
-                            val brand = com.friday.app.ui.shell.brandOf(agent.model, agent.model)
-                            if (brand.logo != null) {
-                                Icon(
-                                    painter = painterResource(brand.logo),
-                                    contentDescription = null,
-                                    tint = Color.Unspecified,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            } else {
-                                Icon(Icons.Default.Check, null, tint = FridaySuccess, modifier = Modifier.size(14.dp))
-                            }
-                        }
-                    }
+            Box(Modifier.weight(1f)) {
+                if (finished) {
+                    Text(headerLabel, color = FridayThink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+                } else {
+                    ShimmerText(headerLabel, FridayThink)
                 }
             }
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                null,
+                tint = FridayMuted,
+                modifier = Modifier.size(18.dp).rotate(chevronRotation),
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(tween(300)) + fadeIn(tween(300)),
+            exit = shrinkVertically(tween(300)) + fadeOut(tween(300)),
+        ) {
+            Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                TrailStep("Understanding the question", caption = "Read the prompt and any attachments")
+                agents.forEach { agent -> AgentStepRow(agent) }
+                if (agents.size > 1) {
+                    val synthesized = finished || msg.content.isNotEmpty()
+                    TrailStep(
+                        title = if (synthesizing || !synthesized) "Synthesizing the final answer" else "Synthesized the final answer",
+                        muted = !synthesizing && !synthesized,
+                        spinning = synthesizing,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentStepRow(agent: com.friday.app.data.AgentStatus) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            when (agent.state) {
+                "start" -> CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(12.dp))
+                "error" -> Icon(Icons.Default.Close, "Failed", tint = FridayStop, modifier = Modifier.size(13.dp))
+                else -> Icon(Icons.Default.Check, null, tint = FridaySuccess, modifier = Modifier.size(13.dp))
+            }
+            val brand = com.friday.app.ui.shell.brandOf(agent.model, agent.model)
+            if (brand.logo != null) {
+                Icon(
+                    painter = painterResource(brand.logo),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            Text(
+                agent.model,
+                color = if (agent.state == "error") FridayStop else FridayText,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        if (agent.state == "error") {
+            Text(agent.error ?: "Failed to respond", color = FridayMuted, fontSize = 12.sp)
         }
     }
 }
