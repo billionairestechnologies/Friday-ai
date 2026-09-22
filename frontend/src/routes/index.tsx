@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { applyLive, clearLive, markLiveCanvasOn, peekLive, startLive } from "@/lib/chat/live-stream";
+import { beginStream, endStream, isStreamActive, stopStream } from "@/lib/chat/active-streams";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/chat/models";
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
 import { streamMessage } from "@/lib/chat/stream";
@@ -61,9 +62,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     Boolean(s.chats.find((c) => c.id === s.activeId)?.messages.some((m) => m.streaming)),
   );
   const activeId = useChat((s) => s.activeId);
-  const abortRef = useRef<AbortController | null>(null);
-  const busyRef = useRef(false);
-  const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
@@ -81,10 +79,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       })
       .catch((err) => setSyncError(err instanceof Error ? err.message : "Couldn't sync conversations"));
   }, [loadModels, isPending, user]);
-
-  useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
 
   useEffect(() => {
     if (window.innerWidth < 768) useChat.getState().setSidebarOpen(false);
@@ -173,9 +167,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       }
     }
     if (!trimmed && attachments.length === 0) return;
-    if (!available || busyRef.current) {
-      // A stuck busyRef (an earlier request that never cleared it) used to make every send
-      // after it — voice included — silently do nothing forever. Surface it instead.
+    // Only blocks re-sending into the SAME chat that's already streaming — a global busy flag
+    // here used to refuse sending into any OTHER chat too (and a stuck one made every send
+    // forever after do nothing silently), which is exactly what broke multitasking across chats.
+    if (!available || isStreamActive(s.activeId)) {
       setSendError(available ? "Still working on the last message — try again in a moment." : "No models available right now.");
       window.setTimeout(() => setSendError(null), 4000);
       return;
@@ -209,12 +204,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       useChat.getState().chats.find((c) => c.id === chatId)?.messages.find((m) => m.id === assistantId)
         ?.status ?? "working";
     startLive(chatId, assistantId, initial, s.canvas);
-
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    busyRef.current = true;
-    setBusy(true);
+    const ac = beginStream(chatId);
 
     let conversationId: string;
     try {
@@ -224,14 +214,13 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         content: "",
         error: err instanceof Error ? err.message : "Couldn't start the conversation",
       });
-      clearLive();
-      busyRef.current = false;
-      setBusy(false);
+      clearLive(chatId);
+      endStream(chatId, ac);
       return;
     }
 
     const batch = createStreamBatcher((acc) => {
-      applyLive(acc);
+      applyLive(chatId, acc);
     });
 
     // Auto-canvas: open the panel the moment the reply is actually producing a visual artifact
@@ -247,7 +236,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       if (artifact && (artifact.kind === "html" || artifact.kind === "react" || artifact.kind === "runnable")) {
         autoCanvasOpened = true;
         useChat.getState().setCanvasOpen(true);
-        markLiveCanvasOn();
+        markLiveCanvasOn(chatId);
       }
     }
 
@@ -278,7 +267,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       }, ac.signal);
     } catch (err) {
       if ((err as { name?: string }).name !== "AbortError") {
-        applyLive({
+        applyLive(chatId, {
           text: "",
           think: "",
           cites: [],
@@ -288,7 +277,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       }
     } finally {
       batch.flush();
-      const live = peekLive();
+      const live = peekLive(chatId);
       useChat.getState().commitTurn(chatId, assistantId, {
         content: live?.text ?? "",
         thinking: live?.think,
@@ -302,14 +291,13 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         usedSearch: Boolean(live?.cites?.length),
         usedCanvas: live?.canvasOn,
       });
-      clearLive();
-      busyRef.current = false;
-      setBusy(false);
+      clearLive(chatId);
+      endStream(chatId, ac);
     }
   }
 
   function stop() {
-    abortRef.current?.abort();
+    if (activeId) stopStream(activeId);
   }
 
   function usePrompt(text: string) {
@@ -393,7 +381,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                 <Composer
                   onSend={(message, files) => void send(message, files)}
                   onStop={stop}
-                  streaming={busy}
+                  streaming={streaming}
                   disabled={!available}
                 />
                 {available && (
@@ -431,7 +419,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
-                    streaming={busy || streaming}
+                    streaming={streaming}
                     disabled={!available}
                   />
                   <p className="pt-2 pb-1 text-center text-xs text-subtle">

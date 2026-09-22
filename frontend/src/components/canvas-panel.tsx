@@ -241,15 +241,22 @@ function CanvasBody({
   onClose: () => void;
   onResizeStart: (e: PointerEvent<HTMLButtonElement>) => void;
 }) {
-  const liveAll = useLiveStream();
   const activeId = useChat((s) => s.activeId);
-  const live = liveAll && liveAll.chatId === activeId ? liveAll : null;
+  const live = useLiveStream(activeId);
+  // The latest message that actually BUILT something, not just the latest assistant message —
+  // a plain follow-up reply after the canvas turn (e.g. "continue", or any non-canvas answer)
+  // used to become the new "last assistant message," and since it has no artifact to extract,
+  // the panel would go blank even though the earlier build is still sitting right there in the
+  // transcript. Reported live as "code done but canvas output not coming." Canvas is expected to
+  // keep showing the last real build regardless of what's said after it, same as the reference
+  // product, until a message with a new artifact replaces it.
   const stored = useChat((s) => {
     const chat = s.chats.find((c) => c.id === s.activeId);
     const list = chat?.messages ?? [];
     for (let i = list.length - 1; i >= 0; i--) {
       const m = list[i]!;
-      if (m.role === "assistant") return m.content;
+      if (m.role !== "assistant") continue;
+      if (extractArtifact(m.content)) return m.content;
     }
     return "";
   });

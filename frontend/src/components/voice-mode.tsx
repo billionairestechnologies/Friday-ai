@@ -44,7 +44,8 @@ export function VoiceMode({
   const voiceIntroSeen = useChat((s) => s.voiceIntroSeen);
   const setVoice = useChat((s) => s.setVoice);
   const setVoiceIntroSeen = useChat((s) => s.setVoiceIntroSeen);
-  const live = useLiveStream();
+  const activeId = useChat((s) => s.activeId);
+  const live = useLiveStream(activeId);
 
   const [phase, setPhase] = useState<Phase>("listening");
   const [analyser, setAnalyser] = useState<LiveAnalyser | null>(null);
@@ -341,7 +342,7 @@ export function VoiceMode({
       // already live by the time we get here is a transition it will never see, permanently
       // missing this turn (reported live as "listening but no output": no reply, no error, no
       // network call at all). Checking the singleton directly right here closes that race.
-      const alreadyLive = peekLive();
+      const alreadyLive = peekLive(useChat.getState().activeId ?? "");
       if (alreadyLive) {
         awaitingReplyRef.current = false;
         watchingAssistantIdRef.current = alreadyLive.assistantId;

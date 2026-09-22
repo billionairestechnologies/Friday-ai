@@ -16,24 +16,34 @@ export type LiveSnapshot = {
 
 type Draft = LiveSnapshot;
 
-let draft: Draft | null = null;
-let snapshot: LiveSnapshot | null = null;
+// Keyed by chatId instead of a single global slot — a single `draft`/`snapshot` pair meant only
+// ONE chat could ever be "live" at a time: starting a turn in a second chat silently clobbered
+// whichever chat was already streaming, orphaning its live updates (the underlying request kept
+// running server-side, but nothing showed it — and see active-streams.ts for the matching abort
+// bug this was paired with). Every chat now gets its own slot, so switching chats or opening a
+// new one mid-reply no longer disturbs whatever else is in flight.
+const drafts = new Map<string, Draft>();
+const snapshots = new Map<string, LiveSnapshot | null>();
 const listeners = new Set<() => void>();
 
-function emit() {
-  snapshot = draft
-    ? {
-        chatId: draft.chatId,
-        assistantId: draft.assistantId,
-        text: draft.text,
-        think: draft.think,
-        status: draft.status,
-        cites: draft.cites.slice(),
-        agents: draft.agents.slice(),
-        error: draft.error,
-        canvasOn: draft.canvasOn,
-      }
-    : null;
+function emit(chatId: string) {
+  const draft = drafts.get(chatId);
+  snapshots.set(
+    chatId,
+    draft
+      ? {
+          chatId: draft.chatId,
+          assistantId: draft.assistantId,
+          text: draft.text,
+          think: draft.think,
+          status: draft.status,
+          cites: draft.cites.slice(),
+          agents: draft.agents.slice(),
+          error: draft.error,
+          canvasOn: draft.canvasOn,
+        }
+      : null,
+  );
   listeners.forEach((l) => l());
 }
 
@@ -43,7 +53,7 @@ export function startLive(
   status: AssistantStatus,
   canvasOn = false,
 ) {
-  draft = {
+  drafts.set(chatId, {
     chatId,
     assistantId,
     text: "",
@@ -52,8 +62,8 @@ export function startLive(
     cites: [],
     agents: [],
     canvasOn,
-  };
-  emit();
+  });
+  emit(chatId);
 }
 
 /**
@@ -62,13 +72,15 @@ export function startLive(
  * so without this, a message that earns Canvas later (an html/react/runnable artifact appearing)
  * never gets usedCanvas set, and the chain-of-thought panel's canvas step log never shows for it.
  */
-export function markLiveCanvasOn() {
+export function markLiveCanvasOn(chatId: string) {
+  const draft = drafts.get(chatId);
   if (!draft || draft.canvasOn) return;
   draft.canvasOn = true;
-  emit();
+  emit(chatId);
 }
 
-export function applyLive(acc: StreamAcc) {
+export function applyLive(chatId: string, acc: StreamAcc) {
+  const draft = drafts.get(chatId);
   if (!draft) return;
   if (acc.text) draft.text += acc.text;
   if (acc.think) draft.think += acc.think;
@@ -86,20 +98,20 @@ export function applyLive(acc: StreamAcc) {
     }
   }
   if (acc.error) draft.error = acc.error;
-  emit();
+  emit(chatId);
 }
 
-export function peekLive() {
-  return draft;
+export function peekLive(chatId: string) {
+  return drafts.get(chatId) ?? null;
 }
 
-export function clearLive() {
-  draft = null;
-  emit();
+export function clearLive(chatId: string) {
+  drafts.delete(chatId);
+  emit(chatId);
 }
 
-export function isLive() {
-  return draft !== null;
+export function isLive(chatId: string) {
+  return drafts.has(chatId);
 }
 
 function subscribe(cb: () => void) {
@@ -109,16 +121,18 @@ function subscribe(cb: () => void) {
   };
 }
 
-function getSnapshot() {
-  return snapshot;
-}
-
 function getServerSnapshot() {
   return null;
 }
 
-export function useLiveStream() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+/** Live snapshot for one specific chat — pass the chat actually being viewed/acted on (usually
+ *  the active chat), not a global "whatever's live" value, now that several can be live at once. */
+export function useLiveStream(chatId: string | null | undefined) {
+  return useSyncExternalStore(
+    subscribe,
+    () => (chatId ? snapshots.get(chatId) ?? null : null),
+    getServerSnapshot,
+  );
 }
 
 export function overlayLive(

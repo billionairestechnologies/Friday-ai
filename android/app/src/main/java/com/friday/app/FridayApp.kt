@@ -393,6 +393,10 @@ private fun ChatShell(
     }
     val chat = ui.chats.find { it.id == ui.currentId }
     val empty = chat == null || chat.messages.isEmpty()
+    // Per-chat, not a single app-wide flag — a chat streaming in the background (another chat
+    // open, or one the user switched away from) must not disable the composer for whatever chat
+    // is actually being viewed right now. See FridayViewModel.send()'s per-chat streamJobs map.
+    val isGenerating = chat?.messages?.any { it.isStreaming } == true
     // Auto-open: no dedicated backend artifact event exists (verified live), so this is a client-side
     // fence scan over the latest assistant message — see ArtifactDetect.kt. Falls back to the mock
     // ChatRepository's separate canvasHtml field (used only as a resiliency path if remote conversation
@@ -556,7 +560,7 @@ private fun ChatShell(
                         ui.remoteModels.firstOrNull { it.modelId == ui.selectedModelId }?.displayName ?: ui.model.label,
                     ),
                     modelId = ui.selectedModelId,
-                    isGenerating = ui.isGenerating,
+                    isGenerating = isGenerating,
                     onSend = { vm.send() },
                     onStop = vm::stop,
                     onAttach = { vm.openSheet(Sheet.Attach) },
@@ -584,7 +588,7 @@ private fun ChatShell(
     ) {
         CanvasPanel(
             artifact = latestArtifact,
-            generating = ui.isGenerating && latestArtifact == null,
+            generating = isGenerating && latestArtifact == null,
             onClose = {
                 if (Mode.Canvas in ui.modes) vm.toggleMode(Mode.Canvas)
                 if (latestArtifactMsg != null) autoClosedMessageId = latestArtifactMsg.id
@@ -600,7 +604,7 @@ private fun ChatShell(
         com.friday.app.ui.voice.VoiceModeScreen(
             voiceId = ui.voiceId,
             replyText = lastAssistant?.content.orEmpty(),
-            isReplying = ui.isGenerating,
+            isReplying = isGenerating,
             onSubmitTranscript = { text -> vm.send(text) },
             onClose = { voiceModeOpen = false },
             modifier = Modifier.fillMaxSize().statusBarsPadding(),

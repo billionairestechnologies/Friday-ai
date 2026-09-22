@@ -22,8 +22,7 @@ export function MessageThread() {
     return chat?.messages ?? EMPTY;
   });
   const activeId = useChat((s) => s.activeId);
-  const liveAll = useLiveStream();
-  const live = liveAll && liveAll.chatId === activeId ? liveAll : null;
+  const live = useLiveStream(activeId);
   const messages = useMemo(() => overlayLive(stored, live), [stored, live]);
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);

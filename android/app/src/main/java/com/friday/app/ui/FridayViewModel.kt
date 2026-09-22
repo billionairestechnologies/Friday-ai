@@ -56,7 +56,6 @@ data class FridayUiState(
     val model: ModelId = ModelId.Auto,
     val remoteModels: List<RemoteModel> = emptyList(),
     val selectedModelId: String? = null,
-    val isGenerating: Boolean = false,
     val drawerOpen: Boolean = false,
     val sheet: Sheet = Sheet.None,
     val pluginsTab: String = "connectors",
@@ -86,7 +85,12 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     private val vibrator = app.getSystemService(Vibrator::class.java)
     private val _state = MutableStateFlow(FridayUiState())
     val state: StateFlow<FridayUiState> = _state.asStateFlow()
-    private var streamJob: Job? = null
+    // Per-chat, not a single shared slot — one Job used to cover the whole app, so sending in a
+    // second chat cancelled whatever the first chat was still streaming, and a single isGenerating
+    // flag blocked sending into ANY chat while ANY other chat was generating. Reported live as
+    // chats "getting stuck" when switching screens or opening a new chat mid-reply. Each chat now
+    // owns its own job and can run fully independently of every other chat.
+    private val streamJobs = mutableMapOf<String, Job>()
 
     init {
         viewModelScope.launch {
@@ -393,7 +397,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun logout() {
-        stop()
+        // Every chat is about to be cleared below, not just the one being viewed — stop() alone
+        // only stops the current chat's job.
+        streamJobs.values.forEach { it.cancel() }
+        streamJobs.clear()
         val hadSession = tokenStore.hasSession()
         tokenStore.clear()
         SupabaseRealtime.disconnect()
@@ -494,7 +501,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     fun send(override: String? = null) {
         val text = (override ?: _state.value.draft).trim()
         val attachments = _state.value.pendingAttachments
-        if ((text.isEmpty() && attachments.isEmpty()) || _state.value.isGenerating) return
+        if (text.isEmpty() && attachments.isEmpty()) return
+        // Only blocks re-sending into the SAME chat that's already streaming, not every chat.
+        val activeChatId = _state.value.currentId
+        if (activeChatId != null && streamJobs[activeChatId]?.isActive == true) return
         if (!tokenStore.hasSession()) {
             _state.update { it.copy(authRequired = true) }
             return
@@ -512,10 +522,11 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         val asst = ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true, modesUsed = modes)
         val titleSeed = text.ifBlank { attachments.firstOrNull()?.name.orEmpty() }
         patchChat(chatId) { it.copy(messages = it.messages + userMsg + asst, title = if (it.messages.isEmpty()) titleFrom(titleSeed) else it.title, updatedAt = System.currentTimeMillis()) }
-        _state.update { it.copy(draft = "", isGenerating = true, pendingAttachments = emptyList()) }
+        _state.update { it.copy(draft = "", pendingAttachments = emptyList()) }
 
-        streamJob?.cancel()
-        streamJob = viewModelScope.launch {
+        val startChatId = chatId!!
+        lateinit var job: Job
+        job = viewModelScope.launch {
             try {
                 val eventFlow = if (tokenStore.hasSession()) {
                     val selected = _state.value.remoteModels.firstOrNull { it.modelId == _state.value.selectedModelId }
@@ -531,6 +542,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                                     chats = s.chats.map { if (it.id == oldId) it.copy(id = remoteId) else it },
                                 )
                             }
+                            // Follow the id swap so stop()/the "already streaming" guard, both keyed
+                            // on the current chat id, still find this job afterward.
+                            streamJobs.remove(oldId)
+                            streamJobs[remoteId] = job
                             chatId = remoteId
                         }
                         ChatApi.streamMessage(remoteId, text, modes, attachments)
@@ -566,10 +581,11 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
             } finally {
-                _state.update { it.copy(isGenerating = false) }
                 patchMessage(chatId!!, asstId) { it.copy(isStreaming = false) }
+                streamJobs.remove(chatId)
             }
         }
+        streamJobs[startChatId] = job
     }
 
     /** Uploads a recorded voice message for transcription, then writes the recognized text into
@@ -582,13 +598,13 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Stops the currently displayed chat's turn only — never affects any other chat's own
+     *  in-flight generation. */
     fun stop() {
-        streamJob?.cancel()
-        streamJob = null
-        val id = _state.value.currentId
+        val id = _state.value.currentId ?: return
+        streamJobs.remove(id)?.cancel()
         _state.update { s ->
             s.copy(
-                isGenerating = false,
                 chats = s.chats.map { chat ->
                     if (chat.id != id) chat
                     else chat.copy(messages = chat.messages.map { m -> m.copy(isStreaming = false) })
