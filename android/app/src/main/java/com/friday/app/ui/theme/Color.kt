@@ -1,0 +1,26 @@
+package com.friday.app.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val FridayBg = Color(0xFFFFFFFF)
+val FridaySidebar = Color(0xFFF0F4F9)
+val FridaySurface = Color(0xFFF4F4F5)
+val FridayText = Color(0xFF1F1F1F)
+val FridayMuted = Color(0xFF5F6368)
+val FridayGlow = Color(0xFFD3E3FD)
+val FridaySearch = Color(0xFF2563EB)
+val FridayThink = Color(0xFF7C3AED)
+val FridayCanvas = Color(0xFFEA580C)
+val FridaySoftBlue = Color(0xFFC2E7FF)
+val FridayCodeBg = Color(0xFF151515)
+val FridayCodeFg = Color(0xFFE8EAED)
+val FridayCodeTag = Color(0xFF8AB4F8)
+val FridayCodeAttr = Color(0xFFF9A8D4)
+val FridayCodeString = Color(0xFFB8E994)
+val FridayCodeComment = Color(0xFF9AA0A6)
+val FridayStop = Color(0xFF1A73E8)
+val FridaySuccess = Color(0xFF16A34A)
+val FridayError = Color(0xFFDC2626)
+val FridayChip = Color(0xFFE9EEF6)
+val FridayHairline = Color(0x141F1F1F)
+val FridayScrim = Color(0x51202124)

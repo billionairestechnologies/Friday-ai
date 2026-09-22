@@ -1,0 +1,35 @@
+#!/bin/sh
+# Gradle start-up. Android Studio also generates this on first sync.
+##############################################################################
+
+app_path=$0
+while [ -h "$app_path" ]; do
+    ls=$(ls -ld "$app_path")
+    link=${ls#*' -> '}
+    case $link in
+      /*) app_path=$link ;;
+      *)  app_path=$(dirname "$app_path")/$link ;;
+    esac
+done
+
+APP_HOME=$(cd "$(dirname "$app_path")" && pwd) || exit
+APP_BASE_NAME=$(basename "$0")
+
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+
+if [ -n "$JAVA_HOME" ]; then
+    JAVACMD="$JAVA_HOME/bin/java"
+else
+    JAVACMD="java"
+fi
+
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
+ORIG_ARGS="$@"
+eval set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS
+
+exec "$JAVACMD" "$@" \
+  -Dorg.gradle.appname="$APP_BASE_NAME" \
+  -classpath "$CLASSPATH" \
+  org.gradle.wrapper.GradleWrapperMain \
+  $ORIG_ARGS

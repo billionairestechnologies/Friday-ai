@@ -8,28 +8,45 @@ import { useEffect, useState } from "react";
  * just re-emits that same hash as a `fridayai://auth-callback` deep link so Android's
  * intent-filter can hand it back to the app instead of leaving the session stranded in a browser
  * tab the user has to manually close.
+ *
+ * The automatic `window.location.href` redirect is attempted, but Chrome (Custom Tabs included)
+ * silently drops a top-level navigation to a non-http(s) scheme when it isn't tied to a real user
+ * gesture — and arriving here is itself the tail of a server-side OAuth redirect chain, so there's
+ * no gesture to attach to. That left this page stuck forever on "Finishing sign-in…" with no way
+ * out. The visible "Open Friday app" link below is a real anchor the user taps themselves, which
+ * Chrome always honors, so it's the reliable path — the auto-redirect is just a best-effort head
+ * start for cases where the browser allows it.
  */
 export function MobileAuthBridge() {
-  const [handedOff, setHandedOff] = useState(false);
+  const [deepLink, setDeepLink] = useState<string | null>(null);
 
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash.includes("friday_session=")) return;
-    window.location.href = `fridayai://auth-callback${hash}`;
-    setHandedOff(true);
+    const link = `fridayai://auth-callback${hash}`;
+    setDeepLink(link);
+    window.location.href = link;
   }, []);
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-6 text-center text-foreground">
-      <div>
+      <div className="flex flex-col items-center">
         <h1 className="text-xl font-semibold">
-          {handedOff ? "Signed in — you can close this tab" : "Finishing sign-in…"}
+          {deepLink ? "Signed in" : "Finishing sign-in…"}
         </h1>
         <p className="mt-2 text-sm text-muted">
-          {handedOff
-            ? "Return to the Friday app."
-            : "If this doesn't redirect automatically, return to the Friday app and try again."}
+          {deepLink
+            ? "Tap below if the Friday app didn't open automatically."
+            : "This will only take a moment."}
         </p>
+        {deepLink && (
+          <a
+            href={deepLink}
+            className="mt-6 rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background"
+          >
+            Open Friday app
+          </a>
+        )}
       </div>
     </main>
   );

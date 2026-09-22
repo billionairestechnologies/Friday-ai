@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, API_BASE_URL, setAccessToken, setUnauthorizedHandler } from "@/lib/api";
 import { useChat } from "@/lib/chat/store";
+import { setRealtimeAuth, startRealtimeSync, stopRealtimeSync } from "@/lib/chat/realtime";
 import type { AuthUser, Session } from "@/lib/types";
 
 const STORAGE_KEY = "friday-ai-session";
@@ -87,6 +88,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await api.get<{ user: AuthUser }>("/auth/me");
       set({ user: res.user, isPending: false });
       useChat.getState().syncOwner(res.user.id);
+      startRealtimeSync(res.user.id, stored.session.access_token);
       const invite = new URLSearchParams(window.location.search).get("invite");
       if (invite) {
         try {
@@ -116,6 +118,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     persist(res.session, res.user);
     set({ user: res.user, isPending: false });
     useChat.getState().syncOwner(res.user.id);
+    startRealtimeSync(res.user.id, res.session.access_token);
   },
 
   resendOtp: async (email) => {
@@ -156,6 +159,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     setAccessToken(null);
     set({ user: null });
     useChat.getState().syncOwner(null);
+    stopRealtimeSync();
   },
 
   refresh: async () => {
@@ -173,11 +177,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       const body = (await res.json()) as { user: AuthUser; session: Session };
       persist(body.session, body.user);
       set({ user: body.user });
+      setRealtimeAuth(body.session.access_token);
       return true;
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       setAccessToken(null);
       set({ user: null });
+      stopRealtimeSync();
       return false;
     }
   },

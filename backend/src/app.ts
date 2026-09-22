@@ -21,6 +21,7 @@ import { projectsRouter } from "./routes/projects.js";
 import { billingRouter } from "./routes/billing.js";
 import { connectorsRouter } from "./routes/connectors.js";
 import { organizationsRouter } from "./routes/organizations.js";
+import { appRouter } from "./routes/app.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -76,6 +77,7 @@ export function createApp() {
   app.use("/api/billing", billingRouter);
   app.use("/api/connectors", connectorsRouter);
   app.use("/api/organizations", organizationsRouter);
+  app.use("/api/app", appRouter);
 
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist));

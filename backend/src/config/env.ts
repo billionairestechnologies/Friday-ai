@@ -58,6 +58,17 @@ export const env = {
   razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? "",
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+  // In-app update check (GET /api/app/version) — Railway already provisions these per-platform,
+  // they just had no route reading them until now.
+  latestVersionAndroid: process.env.FRIDAY_LATEST_VERSION_ANDROID ?? "",
+  downloadAndroid: process.env.FRIDAY_DOWNLOAD_ANDROID ?? "",
+  latestNotesAndroid: process.env.FRIDAY_LATEST_NOTES_ANDROID ?? "",
+  latestVersionMac: process.env.FRIDAY_LATEST_VERSION_MAC ?? "",
+  downloadMac: process.env.FRIDAY_DOWNLOAD_MAC ?? "",
+  latestNotesMac: process.env.FRIDAY_LATEST_NOTES_MAC ?? "",
+  latestVersionWindows: process.env.FRIDAY_LATEST_VERSION_WINDOWS ?? "",
+  downloadWindows: process.env.FRIDAY_DOWNLOAD_WINDOWS ?? "",
+  latestNotesWindows: process.env.FRIDAY_LATEST_NOTES_WINDOWS ?? "",
   rateLimits: {
     authPer15Minutes: positiveInteger(process.env.AUTH_RATE_LIMIT_MAX, 10),
     otpPer10Minutes: positiveInteger(process.env.OTP_RATE_LIMIT_MAX, 5),

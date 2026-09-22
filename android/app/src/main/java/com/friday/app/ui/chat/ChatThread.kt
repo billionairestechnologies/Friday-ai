@@ -1,0 +1,442 @@
+package com.friday.app.ui.chat
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.friday.app.data.ChatMessage
+import com.friday.app.data.Role
+import com.friday.app.data.Source
+import com.friday.app.ui.canvas.detectArtifact
+import com.friday.app.ui.theme.BubbleCorner
+import com.friday.app.ui.theme.FridayMuted
+import com.friday.app.ui.theme.FridaySearch
+import com.friday.app.ui.theme.FridaySuccess
+import com.friday.app.ui.theme.FridaySurface
+import com.friday.app.ui.theme.FridayText
+import com.friday.app.ui.theme.FridayThink
+import kotlinx.coroutines.delay
+
+@Composable
+fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier) {
+    val list = rememberLazyListState()
+    LaunchedEffect(messages.lastOrNull()?.content, messages.size) {
+        if (messages.isNotEmpty()) list.animateScrollToItem(messages.lastIndex)
+    }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        state = list,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        items(messages, key = { it.id }) { msg ->
+            if (msg.role == Role.User) UserBubble(msg.content) else AssistantBlock(msg)
+        }
+    }
+}
+
+@Composable
+private fun UserBubble(text: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Text(
+            text,
+            color = FridayText,
+            fontSize = 15.5.sp,
+            lineHeight = 22.sp,
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .clip(RoundedCornerShape(BubbleCorner))
+                .background(FridaySurface)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+    }
+}
+
+@Composable
+private fun AssistantBlock(msg: ChatMessage) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Bare pill right after send, before any status/step/content has arrived.
+        val nothingHasArrivedYet = msg.isStreaming && msg.status == null && msg.sources.isEmpty() &&
+            msg.content.isEmpty() && msg.thinkingLabel == null && msg.thinkingSteps.isEmpty() && msg.reasoning.isEmpty()
+        val hasTrail = msg.thinkingLabel != null || msg.thinkingSteps.isNotEmpty() ||
+            msg.status != null || msg.sources.isNotEmpty() || msg.reasoning.isNotEmpty()
+        if (nothingHasArrivedYet) {
+            ThinkingPill()
+        } else if (hasTrail) {
+            // One unified Thought Trail card for both the mock/guest demo and the real backend —
+            // same header, same "Understanding the question" step, same rotating reasoning line.
+            ThoughtCard(msg)
+        }
+        if (msg.content.isNotEmpty()) {
+            MarkdownBody(msg.content)
+        }
+    }
+}
+
+/** Shown the instant a message starts streaming, before any status/reasoning/content has arrived. */
+@Composable
+private fun ThinkingPill() {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(FridaySurface)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ThreeDotBounce(FridayThink)
+        RotatingLabel(ThinkingLines.plain, FridayThink, active = true, shimmer = false)
+    }
+}
+
+/** Three-dot typing/bounce indicator — sits to the left of the rotating label in the thinking pill. */
+@Composable
+private fun ThreeDotBounce(color: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        repeat(3) { i ->
+            val t = rememberInfiniteTransition(label = "bounce$i")
+            val y by t.animateFloat(
+                0f, -5f,
+                infiniteRepeatable(
+                    tween(420, delayMillis = i * 120, easing = FastOutSlowInEasing),
+                    RepeatMode.Reverse,
+                ),
+                label = "y$i",
+            )
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .offset(y = y.dp)
+                    .clip(CircleShape)
+                    .background(color),
+            )
+        }
+    }
+}
+
+/**
+ * Unified Thought Trail card — used for both the mock/guest demo and the real backend, styled to
+ * mirror the web app: a purple phase header ("Searching"/"Thinking"/"Writing"), an "Understanding
+ * the question" step, any further steps (dimmed once superseded, black once finished), a "Found N
+ * sources" step with links, and a live active-step line with a rotating pill underneath. Search
+ * results collapse to "Searched N sources" once done; plain thinking stays expanded to show the
+ * full trail, matching the web app's behavior.
+ */
+@Composable
+private fun ThoughtCard(msg: ChatMessage) {
+    val artifact = remember(msg.content) { detectArtifact(msg.content) }
+    val writingCode = msg.isStreaming && artifact != null && !artifact.complete
+    val finished = !msg.isStreaming
+    val searching = msg.status == "searching" || msg.thinkingLabel?.contains("Searching", ignoreCase = true) == true
+    val hasSources = msg.sources.isNotEmpty()
+
+    val activePhrases = when {
+        writingCode -> ThinkingLines.activeCanvas
+        searching -> ThinkingLines.activeSearch
+        else -> ThinkingLines.activeThink
+    }
+    val pillPhrases = when {
+        writingCode -> ThinkingLines.pillCanvas
+        searching -> ThinkingLines.pillSearch
+        else -> ThinkingLines.pillThink
+    }
+
+    val headerLabel = when {
+        finished && hasSources -> "Searched ${msg.sources.size} source${if (msg.sources.size == 1) "" else "s"}"
+        finished -> "Thought"
+        writingCode -> "Writing"
+        searching -> "Searching"
+        else -> "Thinking"
+    }
+    // Search results collapse by default once done; plain thinking stays open, like the web app.
+    var userExpanded by remember(msg.id) { mutableStateOf<Boolean?>(null) }
+    val expanded = userExpanded ?: (!finished || !hasSources)
+    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(FridaySurface)
+            .clickable { userExpanded = !expanded }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (finished) {
+                Icon(Icons.Default.Check, null, tint = FridaySuccess, modifier = Modifier.size(15.dp))
+            } else {
+                CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(13.dp))
+            }
+            Box(Modifier.weight(1f)) {
+                if (finished) {
+                    Text(headerLabel, color = FridayThink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+                } else {
+                    ShimmerText(headerLabel, FridayThink)
+                }
+            }
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                null,
+                tint = FridayMuted,
+                modifier = Modifier.size(18.dp).rotate(chevronRotation),
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(tween(300)) + fadeIn(tween(300)),
+            exit = shrinkVertically(tween(300)) + fadeOut(tween(300)),
+        ) {
+            Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TrailStep("Understanding the question", caption = "Read the prompt and any attachments")
+
+                // Mock/guest demo steps beyond the first ("Understanding the question" is steps[0]).
+                val extraSteps = msg.thinkingSteps.drop(1)
+                extraSteps.forEachIndexed { i, step ->
+                    val isLast = i == extraSteps.lastIndex
+                    TrailStep(
+                        title = step,
+                        muted = !finished && !isLast,
+                        spinning = !finished && isLast && msg.reasoning.isBlank(),
+                    )
+                }
+
+                if (msg.reasoning.isNotBlank()) {
+                    TrailStep(title = "Reasoned through it") {
+                        Text(msg.reasoning, color = FridayMuted, fontSize = 12.5.sp, lineHeight = 18.sp)
+                    }
+                }
+
+                if (hasSources) {
+                    TrailStep("Found ${msg.sources.size} source${if (msg.sources.size == 1) "" else "s"}") {
+                        SourceLinksRow(msg.sources)
+                    }
+                }
+
+                if (!finished) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(12.dp))
+                            RotatingLabel(activePhrases, FridayText, active = true)
+                        }
+                        ThinkingPillChip(pillPhrases)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One row of the expanded reasoning trail: an optional bold title, a muted caption, and/or custom content. */
+@Composable
+private fun TrailStep(
+    title: String?,
+    caption: String? = null,
+    muted: Boolean = false,
+    spinning: Boolean = false,
+    content: (@Composable () -> Unit)? = null,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (title != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (spinning) CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(12.dp))
+                Text(
+                    title,
+                    color = if (muted) FridayMuted else FridayText,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+        if (caption != null) Text(caption, color = FridayMuted, fontSize = 12.sp)
+        content?.invoke()
+    }
+}
+
+/** Small rounded pill with a bouncing-dot trio and an italic rotating phrase, sitting under the active step. */
+@Composable
+private fun ThinkingPillChip(phrases: List<String>) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(FridayMuted.copy(alpha = 0.10f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ThreeDotBounce(FridayMuted)
+        RotatingLabel(phrases, FridayMuted, active = true, fontSize = 12.sp, italic = true)
+    }
+}
+
+/** Rotating text label — cross-fades between phrases every ~2.6s while [active]; shimmers while streaming. */
+@Composable
+private fun RotatingLabel(
+    phrases: List<String>,
+    color: Color,
+    active: Boolean,
+    shimmer: Boolean = false,
+    fontSize: androidx.compose.ui.unit.TextUnit = 13.5.sp,
+    italic: Boolean = false,
+) {
+    var index by remember(phrases) { mutableIntStateOf(0) }
+    LaunchedEffect(active, phrases) {
+        if (!active) return@LaunchedEffect
+        while (true) {
+            delay(2600)
+            index = (index + 1) % phrases.size
+        }
+    }
+    AnimatedContent(
+        targetState = phrases.getOrElse(index) { phrases.first() },
+        transitionSpec = {
+            (fadeIn(tween(220)) + slideInVertically(tween(220)) { h -> h / 3 }) togetherWith
+                (fadeOut(tween(180)) + slideOutVertically(tween(180)) { h -> -h / 3 })
+        },
+        label = "thinking-label",
+    ) { text ->
+        if (shimmer) {
+            ShimmerText(text, color)
+        } else {
+            Text(
+                text,
+                color = color,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Medium,
+                fontStyle = if (italic) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
+            )
+        }
+    }
+}
+
+/** Animated gradient sweep across the label text to signal active streaming, ~1.8s loop. */
+@Composable
+private fun ShimmerText(text: String, baseColor: Color) {
+    val t = rememberInfiniteTransition(label = "shimmer-text")
+    val shift by t.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
+        label = "shift",
+    )
+    val brush = Brush.linearGradient(
+        colors = listOf(baseColor.copy(alpha = 0.45f), baseColor, baseColor.copy(alpha = 0.45f)),
+        start = Offset(shift * 500f - 250f, 0f),
+        end = Offset(shift * 500f + 250f, 0f),
+    )
+    Text(text, style = TextStyle(brush = brush, fontSize = 13.5.sp, fontWeight = FontWeight.Medium))
+}
+
+/** Wrapped row of clickable, underlined source links — each opens in the browser. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SourceLinksRow(sources: List<Source>) {
+    val ctx = LocalContext.current
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.Start)) {
+        sources.forEach { s ->
+            Text(
+                s.title.ifBlank { s.url },
+                color = FridaySearch,
+                fontSize = 12.5.sp,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable {
+                    runCatching {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(s.url)))
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+fun MarkdownBody(text: String) {
+    val parts = splitMarkdown(text)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        parts.forEach { part ->
+            when (part) {
+                is Md.Code -> CodeBlock(part.lang, part.body)
+                is Md.Text -> Text(part.value, color = FridayText, fontSize = 15.5.sp, lineHeight = 24.sp)
+            }
+        }
+    }
+}
+
+sealed class Md {
+    data class Text(val value: String) : Md()
+    data class Code(val lang: String, val body: String) : Md()
+}
+
+fun splitMarkdown(src: String): List<Md> {
+    val out = mutableListOf<Md>()
+    val regex = Regex("```([a-zA-Z0-9_+-]*)\\n([\\s\\S]*?)```")
+    var last = 0
+    for (m in regex.findAll(src)) {
+        if (m.range.first > last) out += Md.Text(src.substring(last, m.range.first).trim())
+        out += Md.Code(m.groupValues[1].ifBlank { "code" }, m.groupValues[2].trimEnd())
+        last = m.range.last + 1
+    }
+    if (last < src.length) {
+        val rest = src.substring(last).trim()
+        if (rest.isNotEmpty()) out += Md.Text(rest)
+    }
+    return out.ifEmpty { listOf(Md.Text(src)) }
+}
