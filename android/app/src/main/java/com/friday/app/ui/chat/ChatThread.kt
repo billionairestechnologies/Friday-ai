@@ -211,15 +211,11 @@ private fun MessageActions(text: String) {
 @Composable
 private fun ThinkingPill() {
     Row(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(FridaySurface)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ThreeDotBounce(FridayThink)
-        RotatingLabel(ThinkingLines.plain, FridayThink, active = true, shimmer = false)
+        RotatingLabel(ThinkingLines.plain, FridayText, active = true, shimmer = false)
     }
 }
 
@@ -390,10 +386,8 @@ private fun ThoughtCard(msg: ChatMessage) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(FridaySurface)
             .clickable { userExpanded = !expanded }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(vertical = 4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (finished) {
@@ -403,9 +397,9 @@ private fun ThoughtCard(msg: ChatMessage) {
             }
             Box(Modifier.weight(1f)) {
                 if (finished) {
-                    Text(headerLabel, color = FridayThink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+                    Text(headerLabel, color = FridayText, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
                 } else {
-                    ShimmerText(headerLabel, FridayThink)
+                    ShimmerText(headerLabel, FridayText)
                 }
             }
             Icon(
