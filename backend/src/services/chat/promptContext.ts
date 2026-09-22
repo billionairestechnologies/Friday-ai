@@ -38,6 +38,17 @@ const EXECUTION_HONESTY_SYSTEM_PROMPT =
   "For python/javascript code in Canvas specifically, tell the user to click the Run button in " +
   "the Canvas panel to execute it themselves and see the real output — do not invent output.";
 
+// Both clients render real markdown (react-markdown+remark-gfm on web, a bold/list/code-fence
+// parser on Android) but a plain instruction-less prompt often comes back as an unbroken wall of
+// text even for multi-part answers, which reads as disorganized regardless of how good the
+// content is. This nudges every reply toward the same structure a human would use.
+const FORMAT_SYSTEM_PROMPT =
+  "Structure your replies for readability: use short paragraphs, and when a reply covers multiple " +
+  "points, steps, or items, use a bulleted or numbered markdown list (\"- \" or \"1. \") instead of " +
+  "run-on prose. Bold (**like this**) section titles or key terms with markdown, not by writing " +
+  "them in caps or repeating them. Only add structure where it actually helps — a short " +
+  "conversational reply doesn't need headers or bullets forced onto it.";
+
 // "Think" has no per-provider API today, so it's implemented as a universal system-prompt nudge
 // that works the same across every adapter rather than a provider-specific reasoning param.
 const THINK_SYSTEM_PROMPT =
@@ -123,6 +134,7 @@ export function withSystemPreamble(
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
     { role: "system", content: HONESTY_SYSTEM_PROMPT },
     { role: "system", content: EXECUTION_HONESTY_SYSTEM_PROMPT },
+    { role: "system", content: FORMAT_SYSTEM_PROMPT },
   ];
   if (webSearch) preamble.push(searchResultsToSystemMessage(searchResults));
   if (behavior.trim()) preamble.push({ role: "system", content: behavior.trim() });

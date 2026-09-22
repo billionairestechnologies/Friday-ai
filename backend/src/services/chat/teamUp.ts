@@ -13,7 +13,8 @@ const SYNTHESIS_SYSTEM_PROMPT =
   "You are given the original request and several draft answers from different AI models. Write ONE final " +
   "answer that combines their strongest parts, resolves any disagreements between them, and corrects anything " +
   "wrong or weak in any draft. Answer as if you were asked directly — don't mention the drafts, the other " +
-  "models, or that this is a synthesis.";
+  "models, or that this is a synthesis. Structure the final answer for readability: short paragraphs, a " +
+  "bulleted/numbered markdown list for multi-part answers, and markdown bold for section titles or key terms.";
 
 /** Mixture-of-agents: merges Team Up's parallel drafts into a single best final answer. */
 function buildSynthesisMessages(

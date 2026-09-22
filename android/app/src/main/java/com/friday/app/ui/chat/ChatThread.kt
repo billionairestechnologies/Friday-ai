@@ -65,9 +65,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.friday.app.data.ChatMessage
@@ -582,10 +585,101 @@ fun MarkdownBody(text: String) {
         parts.forEach { part ->
             when (part) {
                 is Md.Code -> CodeBlock(part.lang, part.body)
-                is Md.Text -> Text(part.value, color = FridayText, fontSize = 15.5.sp, lineHeight = 24.sp)
+                is Md.Text -> MarkdownText(part.value)
             }
         }
     }
+}
+
+/** Renders a plain-text block's lines as paragraphs and bulleted/numbered lists, with inline
+ *  **bold** — previously this just dumped the raw string into one Text, so a model's structured
+ *  reply ("**Summary**\n- point one\n- point two") showed up as literal asterisks and dashes
+ *  instead of actual formatting. Headings (`# `..`###### `) render as a bold paragraph — replies
+ *  are nudged toward bold section titles over headers (see FORMAT_SYSTEM_PROMPT on the backend),
+ *  but a model that uses `#` anyway should still render sensibly rather than showing the dashes. */
+@Composable
+private fun MarkdownText(text: String) {
+    val lines = remember(text) { parseMarkdownLines(text) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        lines.forEach { line ->
+            when (line) {
+                is MdLine.Bullet -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            line.ordinal?.let { "$it." } ?: "•",
+                            color = FridayText,
+                            fontSize = 15.5.sp,
+                            lineHeight = 24.sp,
+                        )
+                        Text(
+                            annotatedFromBold(line.text),
+                            color = FridayText,
+                            fontSize = 15.5.sp,
+                            lineHeight = 24.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                is MdLine.Para -> Text(annotatedFromBold(line.text), color = FridayText, fontSize = 15.5.sp, lineHeight = 24.sp)
+            }
+        }
+    }
+}
+
+private sealed class MdLine {
+    data class Para(val text: String) : MdLine()
+    data class Bullet(val text: String, val ordinal: String? = null) : MdLine()
+}
+
+private val headingLineRegex = Regex("^#{1,6}\\s+(.*)$")
+private val bulletLineRegex = Regex("^[-*•]\\s+(.*)$")
+private val numberedLineRegex = Regex("^(\\d+)[.)]\\s+(.*)$")
+private val boldRegex = Regex("\\*\\*(.+?)\\*\\*")
+
+private fun parseMarkdownLines(text: String): List<MdLine> {
+    val out = mutableListOf<MdLine>()
+    val para = StringBuilder()
+    fun flushPara() {
+        if (para.isNotBlank()) out += MdLine.Para(para.toString().trim())
+        para.clear()
+    }
+    for (raw in text.split("\n")) {
+        val line = raw.trim()
+        val heading = headingLineRegex.find(line)
+        val bullet = bulletLineRegex.find(line)
+        val numbered = numberedLineRegex.find(line)
+        when {
+            line.isEmpty() -> flushPara()
+            heading != null -> {
+                flushPara()
+                out += MdLine.Para("**${heading.groupValues[1]}**")
+            }
+            bullet != null -> {
+                flushPara()
+                out += MdLine.Bullet(bullet.groupValues[1])
+            }
+            numbered != null -> {
+                flushPara()
+                out += MdLine.Bullet(numbered.groupValues[2], ordinal = numbered.groupValues[1])
+            }
+            else -> {
+                if (para.isNotEmpty()) para.append(" ")
+                para.append(line)
+            }
+        }
+    }
+    flushPara()
+    return out.ifEmpty { listOf(MdLine.Para(text)) }
+}
+
+private fun annotatedFromBold(text: String): AnnotatedString = buildAnnotatedString {
+    var last = 0
+    for (m in boldRegex.findAll(text)) {
+        if (m.range.first > last) append(text.substring(last, m.range.first))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(m.groupValues[1]) }
+        last = m.range.last + 1
+    }
+    if (last < text.length) append(text.substring(last))
 }
 
 sealed class Md {

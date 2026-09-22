@@ -24,7 +24,16 @@ const INTENT_SYSTEM_PROMPT =
   "conceptual, or purely conversational message is NO.";
 
 /** True if the model judges this message needs live info. Never throws — a failed probe just
- *  means no auto-search this turn, not a broken send. */
+ *  means no auto-search this turn, not a broken send.
+ *
+ *  This runs before the real reply on every message that doesn't already have Search toggled on,
+ *  so it must never be the thing making replies feel slow. Some provider adapters (ScaleMax in
+ *  particular) have no fetch timeout of their own, and rankCandidatesForMessage can pick any
+ *  enabled provider as the probe — without a bound here, one slow/hanging provider silently adds
+ *  its full hang time to every single message's latency, not just its own. Confirmed live
+ *  (2026-09-22) as the dominant cause of "every model feels slow to reply." */
+const INTENT_PROBE_TIMEOUT_MS = 2000;
+
 export async function detectNeedsLiveSearch(content: string): Promise<boolean> {
   try {
     const candidates = rankCandidatesForMessage(await listChatCandidates(), content);
@@ -37,7 +46,10 @@ export async function detectNeedsLiveSearch(content: string): Promise<boolean> {
       { role: "system", content: INTENT_SYSTEM_PROMPT },
       { role: "user", content },
     ];
-    const raw = await adapter.chat(apiKey, candidate.modelId, probe);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("intent probe timed out")), INTENT_PROBE_TIMEOUT_MS),
+    );
+    const raw = await Promise.race([adapter.chat(apiKey, candidate.modelId, probe), timeout]);
     return /^\s*yes/i.test(raw);
   } catch {
     return false;
