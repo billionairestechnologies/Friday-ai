@@ -48,7 +48,7 @@ struct SettingsScreen: View {
                 VStack(alignment: .leading, spacing: 18) {
                     SectionLabel("Account")
                     SettingsCard {
-                        SettingsRow(icon: "person.crop.circle", label: vm.user?.name ?? "Guest", value: vm.user?.email ?? "Not logged in") {
+                        SettingsRow(icon: "person.crop.circle", label: vm.user?.name ?? "Guest", subtitle: vm.user?.email ?? "Not logged in") {
                             if vm.user != nil { go(.profile) } else { vm.page = "chat"; vm.startAuth(signup: false) }
                         }
                     }
@@ -163,6 +163,7 @@ private struct SettingsRow: View {
     let icon: String
     let label: String
     var value: String? = nil
+    var subtitle: String? = nil
     var tint: Color = FridayColor.text
     var showChevron: Bool = true
     var trailingCheck: Bool = false
@@ -172,7 +173,14 @@ private struct SettingsRow: View {
         Button { action?() } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon).font(.system(size: 17)).frame(width: 22).foregroundColor(tint)
-                Text(label).font(.system(size: 15)).foregroundColor(tint).lineLimit(1)
+                if let subtitle {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label).font(.system(size: 15, weight: .medium)).foregroundColor(tint).lineLimit(1)
+                        Text(subtitle).font(.system(size: 13)).foregroundColor(FridayColor.muted).lineLimit(1).truncationMode(.middle)
+                    }
+                } else {
+                    Text(label).font(.system(size: 15)).foregroundColor(tint).lineLimit(1)
+                }
                 Spacer(minLength: 8)
                 if let value { Text(value).font(.system(size: 13.5)).foregroundColor(FridayColor.muted).lineLimit(1) }
                 if trailingCheck {

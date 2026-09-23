@@ -85,11 +85,10 @@ struct ModelLogo: View {
         if let b = Self.brand(for: key), let entry = Self.data[b] {
             ZStack {
                 ForEach(0..<entry.1.count, id: \.self) { i in
-                    SVGPathShape(d: entry.1[i], viewport: 24).fill(Color(hex: entry.0))
+                    SVGPathShape(d: entry.1[i], viewport: 24).fill(dim ? FridayColor.muted : FridayColor.text)
                 }
             }
             .frame(width: size, height: size)
-            .saturation(dim ? 0 : 1)
         } else {
             Image(systemName: "sparkles").font(.system(size: size * 0.9)).foregroundColor(FridayColor.muted)
         }

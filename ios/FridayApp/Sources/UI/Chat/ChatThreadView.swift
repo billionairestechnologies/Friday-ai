@@ -71,17 +71,29 @@ private struct MessageRow: View {
                 }
 
                 if !message.content.isEmpty && !message.isStreaming {
-                    Button {
-                        UIPasteboard.general.string = message.content
-                        copied = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
-                    } label: {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 13))
-                            .foregroundColor(FridayColor.muted)
-                            .frame(width: 32, height: 32)
-                            .background(FridayColor.surface)
-                            .clipShape(Circle())
+                    HStack(spacing: 4) {
+                        Button {
+                            UIPasteboard.general.string = message.content
+                            copied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
+                        } label: {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 13))
+                                .foregroundColor(FridayColor.muted)
+                                .frame(width: 32, height: 32)
+                                .background(FridayColor.surface)
+                                .clipShape(Circle())
+                        }
+                        Button {
+                            ShareSheet.saveText(message.content, filename: "friday-reply.md")
+                        } label: {
+                            Image(systemName: "arrow.down.to.line")
+                                .font(.system(size: 13))
+                                .foregroundColor(FridayColor.muted)
+                                .frame(width: 32, height: 32)
+                                .background(FridayColor.surface)
+                                .clipShape(Circle())
+                        }
                     }
                 }
             }

@@ -52,13 +52,22 @@ fun CodeBlock(lang: String, body: String) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(lang.ifBlank { "code" }, color = FridayCodeComment, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Text(
-                "Copy",
-                color = FridayCodeTag,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable { copy(ctx, body) },
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    "Download",
+                    color = FridayCodeTag,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable { shareTextFile(ctx, "friday-code.${extensionFor(lang)}", body) },
+                )
+                Text(
+                    "Copy",
+                    color = FridayCodeTag,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable { copy(ctx, body) },
+                )
+            }
         }
         Text(
             highlight(body, lang),
@@ -70,6 +79,79 @@ fun CodeBlock(lang: String, body: String) {
                 .padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
         )
     }
+}
+
+private fun extensionFor(lang: String): String = when (lang.lowercase()) {
+    "python", "py" -> "py"
+    "javascript", "js" -> "js"
+    "typescript", "ts" -> "ts"
+    "tsx" -> "tsx"
+    "jsx" -> "jsx"
+    "html" -> "html"
+    "css" -> "css"
+    "json" -> "json"
+    "kotlin", "kt" -> "kt"
+    "java" -> "java"
+    "swift" -> "swift"
+    "bash", "sh", "shell" -> "sh"
+    "sql" -> "sql"
+    "xml" -> "xml"
+    "yaml", "yml" -> "yml"
+    "markdown", "md" -> "md"
+    "c" -> "c"
+    "cpp", "c++" -> "cpp"
+    "go" -> "go"
+    "rust", "rs" -> "rs"
+    "r" -> "r"
+    else -> "txt"
+}
+
+/** Writes [text] to a cache file and opens the OS share sheet so the user can save it anywhere. */
+internal fun shareTextFile(ctx: Context, name: String, text: String, mime: String = "text/plain") {
+    val uri = runCatching {
+        val dir = java.io.File(ctx.cacheDir, "downloads").apply { mkdirs() }
+        val file = java.io.File(dir, name)
+        file.writeText(text)
+        androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+    }.getOrNull()
+    if (uri == null) {
+        Toast.makeText(ctx, "Couldn't save file", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = mime
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching { ctx.startActivity(android.content.Intent.createChooser(intent, "Save file").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        .onFailure { Toast.makeText(ctx, "Couldn't open share sheet", Toast.LENGTH_SHORT).show() }
+}
+
+/** Saves a generated image: http(s) URLs go through the system DownloadManager into Downloads;
+ *  inline data: URLs are decoded and handed to the share sheet. */
+internal fun downloadImage(ctx: Context, url: String) {
+    runCatching {
+        if (url.startsWith("data:")) {
+            val bytes = android.util.Base64.decode(url.substringAfter("base64,"), android.util.Base64.DEFAULT)
+            val dir = java.io.File(ctx.cacheDir, "downloads").apply { mkdirs() }
+            val file = java.io.File(dir, "friday-image.png").apply { writeBytes(bytes) }
+            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            ctx.startActivity(android.content.Intent.createChooser(intent, "Save image").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        } else {
+            val ext = url.substringBefore('?').substringAfterLast('.', "png").takeIf { it.length in 2..4 } ?: "png"
+            val request = android.app.DownloadManager.Request(android.net.Uri.parse(url))
+                .setTitle("Friday image")
+                .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "friday-image-${System.currentTimeMillis()}.$ext")
+            (ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager).enqueue(request)
+            Toast.makeText(ctx, "Downloading image…", Toast.LENGTH_SHORT).show()
+        }
+    }.onFailure { Toast.makeText(ctx, "Couldn't download image", Toast.LENGTH_SHORT).show() }
 }
 
 private fun copy(ctx: Context, text: String) {

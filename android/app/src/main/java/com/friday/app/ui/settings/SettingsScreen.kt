@@ -199,7 +199,7 @@ private fun SettingsHome(
                 SettingsRow(
                     icon = Icons.Default.PersonOutline,
                     label = user?.name ?: "Guest",
-                    value = user?.email ?: "Not logged in",
+                    subtitle = user?.email ?: "Not logged in",
                     onClick = { if (user != null) onOpen(SettingsSub.Profile) else onLogin() },
                 )
             }
@@ -800,6 +800,7 @@ private fun SettingsRow(
     tint: Color = FridayText,
     showChevron: Boolean = true,
     trailingIcon: ImageVector? = null,
+    subtitle: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -811,9 +812,16 @@ private fun SettingsRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-        Text(label, color = tint, fontSize = 15.sp, fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f))
+        if (subtitle != null) {
+            Column(Modifier.weight(1f)) {
+                Text(label, color = tint, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(subtitle, color = FridayMuted, fontSize = 13.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+        } else {
+            Text(label, color = tint, fontSize = 15.sp, fontWeight = FontWeight.Normal, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        }
         if (value != null) {
-            Text(value, color = FridayMuted, fontSize = 13.5.sp)
+            Text(value, color = FridayMuted, fontSize = 13.5.sp, maxLines = 1)
         }
         if (trailingIcon != null) {
             Icon(trailingIcon, null, tint = FridaySearch, modifier = Modifier.size(18.dp))

@@ -65,7 +65,7 @@ private fun ModelBrandIcon(modelId: String, displayName: String) {
                     Icon(
                         painter = painterResource(brand.logo),
                         contentDescription = null,
-                        tint = androidx.compose.ui.graphics.Color.Unspecified,
+                        tint = FridayText,
                         modifier = Modifier.size(22.dp),
                     )
                 } else {

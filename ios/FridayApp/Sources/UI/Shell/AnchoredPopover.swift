@@ -12,6 +12,7 @@ struct AnchoredPopover<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     @State private var appeared = false
+    @State private var contentHeight: CGFloat = 420
 
     var body: some View {
         GeometryReader { geo in
@@ -25,10 +26,11 @@ struct AnchoredPopover<Content: View>: View {
                     VStack(alignment: .leading, spacing: 0) {
                         content()
                     }
+                    .background(GeometryReader { g in Color.clear.preference(key: PopoverHeightKey.self, value: g.size.height) })
                 }
+                .onPreferenceChange(PopoverHeightKey.self) { contentHeight = $0 }
                 .frame(width: geo.size.width * widthFraction)
-                .frame(maxHeight: min(geo.size.height * 0.5, 420), alignment: .top)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: min(contentHeight, min(geo.size.height * 0.6, 420)))
                 .background(FridayColor.bg)
                 .cornerRadius(FridayRadius.sheet)
                 .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 8)
@@ -55,7 +57,7 @@ struct PopoverRow: View {
     let subtitle: String?
     var selected: Bool = false
     var circularIcon: Bool = false
-    var iconColor: Color = FridayColor.canvas
+    var iconColor: Color = FridayColor.text
     /// Model is above the user's plan tier — shown dimmed with a lock, tapping routes to upgrade
     /// instead of selecting it (mirrors backend's planSatisfiesTier gate in tokenQuotaService.ts).
     var locked: Bool = false
@@ -107,4 +109,9 @@ struct PopoverRow: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+private struct PopoverHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

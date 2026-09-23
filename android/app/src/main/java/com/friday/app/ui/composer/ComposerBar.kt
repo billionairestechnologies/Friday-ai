@@ -268,7 +268,7 @@ fun ComposerBar(
                                         Icon(
                                             painter = painterResource(brand.logo),
                                             contentDescription = null,
-                                            tint = Color.Unspecified,
+                                            tint = FridayText,
                                             modifier = Modifier.size(14.dp),
                                         )
                                     } else {

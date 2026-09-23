@@ -126,7 +126,7 @@ private struct ChatShell: View {
                 }
 
                 if vm.sheet == .model {
-                    AnchoredPopover(anchor: .bottomTrailing, widthFraction: 0.72, onDismiss: { vm.sheet = .none }) {
+                    AnchoredPopover(anchor: .bottomTrailing, widthFraction: 0.66, onDismiss: { vm.sheet = .none }) {
                         modelPopoverContent
                     }
                     .transition(.identity)

@@ -412,7 +412,7 @@ private fun AgentStepRow(agent: com.friday.app.data.AgentStatus) {
                 Icon(
                     painter = painterResource(brand.logo),
                     contentDescription = null,
-                    tint = Color.Unspecified,
+                    tint = FridayText,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -711,6 +711,21 @@ private fun GeneratedImage(url: String, alt: String) {
             modifier = Modifier.fillMaxWidth().alpha(alpha),
             onState = { state -> loaded = state is AsyncImagePainter.State.Success },
         )
+        if (loaded) {
+            val ctx = LocalContext.current
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable { downloadImage(ctx, url) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Download, "Download image", tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 

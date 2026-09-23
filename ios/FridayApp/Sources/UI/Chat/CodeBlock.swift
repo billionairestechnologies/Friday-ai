@@ -16,6 +16,14 @@ struct CodeBlock: View {
                     .foregroundColor(FridayColor.codeComment)
                 Spacer()
                 Button {
+                    ShareSheet.saveText(code, filename: "friday-code.\(ShareSheet.fileExtension(for: language))")
+                } label: {
+                    Text("Download")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(FridayColor.codeTag)
+                }
+                .padding(.trailing, 12)
+                Button {
                     UIPasteboard.general.string = code
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
@@ -97,5 +105,66 @@ struct CodeBlock: View {
         flush()
         if inString { out = out + Text(stringBuf).foregroundColor(FridayColor.codeString) }
         return out
+    }
+}
+
+
+enum ShareSheet {
+    static func present(_ items: [Any]) {
+        DispatchQueue.main.async {
+            guard var top = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first?.keyWindow?.rootViewController else { return }
+            while let presented = top.presentedViewController { top = presented }
+            let av = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            av.popoverPresentationController?.sourceView = top.view
+            av.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            top.present(av, animated: true)
+        }
+    }
+
+    static func saveText(_ text: String, filename: String) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            present([url])
+        } catch {
+            NSLog("Couldn't write \(filename): \(error)")
+        }
+    }
+
+    static func saveData(_ data: Data, filename: String) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        do {
+            try data.write(to: url)
+            present([url])
+        } catch {
+            NSLog("Couldn't write \(filename): \(error)")
+        }
+    }
+
+    static func fileExtension(for language: String) -> String {
+        switch language.lowercased() {
+        case "python", "py": return "py"
+        case "javascript", "js": return "js"
+        case "typescript", "ts": return "ts"
+        case "tsx": return "tsx"
+        case "jsx": return "jsx"
+        case "html": return "html"
+        case "css": return "css"
+        case "json": return "json"
+        case "kotlin", "kt": return "kt"
+        case "java": return "java"
+        case "swift": return "swift"
+        case "bash", "sh", "shell": return "sh"
+        case "sql": return "sql"
+        case "xml": return "xml"
+        case "yaml", "yml": return "yml"
+        case "markdown", "md": return "md"
+        case "c": return "c"
+        case "cpp", "c++": return "cpp"
+        case "go": return "go"
+        case "rust", "rs": return "rs"
+        case "r": return "r"
+        default: return "txt"
+        }
     }
 }
