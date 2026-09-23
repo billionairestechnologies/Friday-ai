@@ -1076,7 +1076,16 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               </PromptInputAction>
 
               {currentModel && onModelChange && (
-                <DropdownMenu.Root>
+                <DropdownMenu.Root
+                  onOpenChange={(open) => {
+                    // Start each open with only the selected model's vendor expanded, so a group can
+                    // always be collapsed again (a selected group used to be pinned open).
+                    if (open) {
+                      const selectedVendor = vendorGroups.find((g) => g.models.some((m) => m.id === model))?.vendor;
+                      setExpandedVendors(new Set(selectedVendor ? [selectedVendor] : []));
+                    }
+                  }}
+                >
                   <DropdownMenu.Trigger asChild>
                     <button
                       type="button"
@@ -1091,7 +1100,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     <DropdownMenu.Content
                       align="end"
                       sideOffset={8}
-                      className="z-50 max-h-[70vh] min-w-64 overflow-y-auto rounded-xl border border-border bg-elevated p-1 shadow-xl"
+                      collisionPadding={16}
+                      avoidCollisions
+                      className="z-50 max-h-[min(60vh,var(--radix-dropdown-menu-content-available-height))] w-60 overflow-y-auto overscroll-contain rounded-xl border border-border bg-elevated p-1 shadow-xl"
                     >
                       {specialModels.map((m) => (
                         <ModelMenuItem
@@ -1107,8 +1118,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                         <div className="my-1 h-px bg-border" />
                       )}
                       {vendorGroups.map(({ vendor, label, models: groupModels }) => {
-                        const hasSelected = groupModels.some((m) => m.id === model);
-                        const expanded = expandedVendors.has(vendor) || hasSelected;
+                        const expanded = expandedVendors.has(vendor);
                         return (
                           <div key={vendor}>
                             <button
