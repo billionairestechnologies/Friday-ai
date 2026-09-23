@@ -276,6 +276,7 @@ fun ComposerBar(
                                     }
                                 }
                             }
+AnimatedVisibility(modes.size < 2, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
                             Text(
                                 modelLabel,
                                 color = FridayText,
@@ -285,6 +286,7 @@ fun ComposerBar(
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.widthIn(max = 96.dp),
                             )
+}
                             Icon(Icons.Default.KeyboardArrowDown, null, tint = FridayMuted, modifier = Modifier.size(16.dp))
                         }
                     }

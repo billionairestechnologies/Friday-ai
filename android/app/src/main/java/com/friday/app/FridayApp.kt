@@ -466,19 +466,17 @@ private fun ChatShell(
             ) {
                 Icon(Icons.Default.Menu, "Open menu", tint = FridayText)
             }
-            if (ui.user != null && com.friday.app.ui.settings.isFreePlan(ui.plan)) {
+            if (ui.user == null || com.friday.app.ui.settings.isFreePlan(ui.plan)) {
                 Spacer(Modifier.width(6.dp))
-                Row(
+                Box(
                     Modifier
                         .clip(RoundedCornerShape(50))
-                        .background(FridayGlow)
-                        .clickable(onClick = onOpenPlans)
-                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        .background(FridayText)
+                        .clickable(onClick = if (ui.user == null) onOpenAuth else onOpenPlans)
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Outlined.WorkspacePremium, null, tint = FridayStop, modifier = Modifier.size(15.dp))
-                    Text("Upgrade", color = FridayStop, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (ui.user == null) "Log in" else "Upgrade", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -567,6 +565,7 @@ private fun ChatShell(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
+                    .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
                     .alpha(compA)
                     .scale(if (play) 0.96f + 0.04f * compA else 1f),

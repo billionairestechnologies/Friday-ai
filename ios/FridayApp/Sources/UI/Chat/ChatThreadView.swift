@@ -17,6 +17,9 @@ struct ChatThreadView: View {
             .onChange(of: messages.count) { _ in
                 scrollToBottom(proxy)
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                scrollToBottom(proxy)
+            }
             .onChange(of: messages.last?.content) { _ in
                 // Only auto-follow token streaming if the user hasn't scrolled away —
                 // ScrollViewReader has no scroll-position introspection, so we
