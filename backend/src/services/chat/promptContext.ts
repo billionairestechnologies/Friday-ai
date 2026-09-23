@@ -5,8 +5,18 @@ import type { WebSearchResult } from "../webSearch.js";
 // history and answer a short new message — "hii", "thanks", "ok" — as if it were a continuation
 // of the last question instead of what it actually is. This keeps every provider focused on the
 // message that was actually just sent.
+// The first version of this ("earlier messages are context, not the question") overcorrected:
+// models read a user's ANSWER to their own follow-up question ("build me a React site" → "what's
+// the name?" → "Stockbricks, an investors company") as an unrelated new topic and replied "what
+// can I do for you?" — exactly the "it forgets the chat" complaint. So this now leads with using
+// the conversation, and keeps the greeting/topic-change carve-out narrow.
 const FOCUS_SYSTEM_PROMPT =
-  "Always respond to the user's latest message specifically. Earlier messages in this conversation are context, not the question — if the latest message is a greeting, a short reaction, or changes topic, respond to that directly instead of continuing to elaborate on an earlier topic.";
+  "You have the full conversation so far — use it, the way a person remembers what was just said. " +
+  "Read the user's latest message in light of the earlier turns: if it answers a question you asked, supplies details you requested, " +
+  "or refers back to something earlier (\"it\", \"that\", a name, a follow-up edit), continue that same task with those details " +
+  "instead of asking what they want or starting over. Never ask for information the user already gave earlier in this conversation. " +
+  "Only when the latest message is clearly a standalone greeting, a thank-you, or an explicit change of topic should you respond to it on its own " +
+  "rather than continuing to elaborate on the earlier topic.";
 
 // Confirmed live in production (2026-09-16): a user attached a screenshot and typed just "see"
 // on an existing long conversation about an unrelated topic (arbitrage). Web search fired on the

@@ -46,6 +46,26 @@ object ChatApi {
         }.getOrNull()
     }
 
+    /** PATCH /api/chat/conversations/:id — switches an EXISTING conversation to a different
+     *  model/mode so the next reply comes from it, without starting a new conversation (which
+     *  would throw away the whole history the backend sends the model as context). */
+    suspend fun updateConversation(conversationId: String, modelId: String? = null, providerSlug: String? = null, mode: String = "single"): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        runCatching {
+            val body = JSONObject().apply {
+                put("mode", mode)
+                if (mode == "single") {
+                    if (!modelId.isNullOrBlank()) put("modelId", modelId)
+                    if (!providerSlug.isNullOrBlank()) put("providerSlug", providerSlug)
+                }
+            }
+            val request = Request.Builder()
+                .url(ApiClient.BASE_URL + "chat/conversations/" + conversationId)
+                .patch(body.toString().toRequestBody(JSON))
+                .build()
+            ApiClient.authed.newCall(request).execute().use { resp -> resp.isSuccessful }
+        }.getOrDefault(false)
+    }
+
     /** POST /api/chat/conversations/:id/messages/stream — text/event-stream, "t"-discriminated JSON frames.
      * [attachments] (max 4, enforced server-side) ride inline in this same request body as base64 data
      * URLs — the backend has no separate upload endpoint for chat attachments. */
