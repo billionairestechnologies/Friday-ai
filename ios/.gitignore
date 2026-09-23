@@ -1,0 +1,5 @@
+FridayApp.xcodeproj/
+build/
+DerivedData/
+*.xcuserstate
+.DS_Store

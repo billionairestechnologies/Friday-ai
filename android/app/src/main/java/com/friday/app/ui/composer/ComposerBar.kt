@@ -248,7 +248,9 @@ fun ComposerBar(
                         ModeChip(Icons.Outlined.Settings, "Think", Mode.Think, FridayThink, modes, onToggleMode)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconBtn(Icons.Outlined.GraphicEq, "Voice", FridayMuted, onVoice)
+                        AnimatedVisibility(!hasText && modes.isEmpty(), enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
+                            IconBtn(Icons.Outlined.GraphicEq, "Voice", FridayMuted, onVoice)
+                        }
                         Row(
                             Modifier
                                 .clip(RoundedCornerShape(20.dp))

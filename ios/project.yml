@@ -1,0 +1,40 @@
+name: FridayApp
+options:
+  bundleIdPrefix: com.friday.app.ios
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  FridayApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: FridayApp/Sources
+    resources:
+      - path: FridayApp/Resources
+    info:
+      path: FridayApp/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Friday
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSMicrophoneUsageDescription: "Friday needs microphone access for voice mode and voice messages."
+        NSCameraUsageDescription: "Friday needs camera access to attach photos to your chat."
+        NSPhotoLibraryUsageDescription: "Friday needs photo library access to attach images to your chat."
+        CFBundleURLTypes:
+          - CFBundleURLName: com.friday.app.ios.auth
+            CFBundleURLSchemes:
+              - com.friday.app.ios
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.friday.app.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_PREVIEWS: YES

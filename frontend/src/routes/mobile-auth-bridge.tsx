@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
  * that same hash as a deep link so Android's intent-filter can hand it back to the right app
  * instead of leaving the session stranded in a browser tab the user has to manually close.
  *
- * Two different apps land here, and each needs its own scheme:
+ * Three different apps land here, and each needs its own scheme (`?app=ios` is the native iOS
+ * app, handled via `com.friday.app.ios://auth-callback`):
  * - The repo-integrated `com.friday.app` (AuthApi.kt) passes `?app=main`, handled via
  *   `com.friday.app://auth-callback`.
  * - The older, separate `ai.friday.app` project passes no `app` param, so it falls back to the
@@ -28,7 +29,7 @@ export function MobileAuthBridge() {
     const hash = window.location.hash;
     if (!hash.includes("friday_session=")) return;
     const app = new URLSearchParams(window.location.search).get("app");
-    const scheme = app === "main" ? "com.friday.app" : "fridayai";
+    const scheme = app === "main" ? "com.friday.app" : app === "ios" ? "com.friday.app.ios" : "fridayai";
     const link = `${scheme}://auth-callback${hash}`;
     setDeepLink(link);
     window.location.href = link;
