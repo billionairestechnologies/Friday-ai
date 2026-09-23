@@ -8,6 +8,7 @@ struct FridayAppApp: App {
         WindowGroup {
             RootShell()
                 .environmentObject(vm)
+                .preferredColorScheme(.light)
                 .task { await vm.bootstrap() }
                 .onOpenURL { url in
                     // OAuth callback: com.friday.app.ios://auth-callback#friday_session=<b64url json>
