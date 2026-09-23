@@ -30,12 +30,34 @@ interface ImagesResponse {
   data: { url?: string; b64_json?: string }[];
 }
 
+// Confirmed live in production (2026-09-23): this fetch had no timeout at all, and a request got
+// stuck — no error, no response, the client's "Creating your image" indicator frozen at its
+// simulated ceiling forever. The SSE connection itself stays alive throughout (chatController.ts
+// sends a `: ping` heartbeat every 15s independent of this), so it wasn't a dropped connection —
+// the actual ScaleMax call itself just never resolved. This bounds it so a stuck call fails fast
+// and the caller (tryGenerateOrEditImage in chat/index.ts) can fall through to a normal chat
+// reply instead of hanging the whole turn indefinitely.
+const IMAGE_REQUEST_TIMEOUT_MS = 55_000;
+
 async function callImagesEndpoint(path: string, apiKey: string, body: Record<string, unknown>): Promise<string> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), IMAGE_REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`ScaleMax images ${path} timed out after ${IMAGE_REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(`ScaleMax images ${path} failed: ${res.status} ${errText}`);
