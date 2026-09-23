@@ -259,6 +259,7 @@ export async function streamMessage(
       }
     }
     if (imageIntent) {
+      onEvent({ t: "status", s: "generating_image" });
       const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment, correctionSourceUrl);
       if (generated) {
         const caption = imageIntent.kind === "edit" ? "Here's the edited image:" : "Here you go:";

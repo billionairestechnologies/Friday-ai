@@ -80,6 +80,31 @@ function CodeBlock({ lang, text, children }: { lang?: string; text: string; chil
   );
 }
 
+/** Fades a markdown image in once it's actually loaded instead of popping in abruptly the
+ *  instant `src` resolves — same fade timing as the streamed-text chunks above, for a generated
+ *  image (the one place a markdown `![]()` reliably appears in this app today) landing right
+ *  after the "Creating your image" indicator disappears. A subtle pulse placeholder fills the
+ *  gap while the browser fetches it. */
+function FadeInImage({ src, alt }: { src?: string; alt?: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <span className="relative my-2 block overflow-hidden rounded-2xl">
+      {!loaded && (
+        <span className="absolute inset-0 block animate-pulse rounded-2xl bg-white/5" aria-hidden />
+      )}
+      <motion.img
+        src={src}
+        alt={alt ?? ""}
+        onLoad={() => setLoaded(true)}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: loaded ? 1 : 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="block max-w-full rounded-2xl"
+      />
+    </span>
+  );
+}
+
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
   if (!text) return null;
   return (
@@ -117,6 +142,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
               <table>{children}</table>
             </div>
           ),
+          img: ({ src, alt }) => <FadeInImage src={typeof src === "string" ? src : undefined} alt={alt} />,
         }}
       >
         {text}

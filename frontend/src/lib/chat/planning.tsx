@@ -20,7 +20,13 @@ function hostOf(url: string) {
 }
 
 export function shouldShowPlan(message: ChatMessage) {
-  return Boolean(message.usedThink || message.usedSearch || message.usedCanvas || message.agents?.length);
+  return Boolean(
+    message.usedThink ||
+      message.usedSearch ||
+      message.usedCanvas ||
+      message.agents?.length ||
+      message.status === "generating_image",
+  );
 }
 
 export function planTitle(message: ChatMessage) {

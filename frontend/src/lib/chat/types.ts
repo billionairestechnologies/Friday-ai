@@ -14,7 +14,14 @@ export type Citation = {
   title?: string;
 };
 
-export type AssistantStatus = "working" | "searching" | "thinking" | "synthesizing" | "writing" | null;
+export type AssistantStatus =
+  | "working"
+  | "searching"
+  | "thinking"
+  | "synthesizing"
+  | "writing"
+  | "generating_image"
+  | null;
 
 export type AgentStatus = {
   slug: string;
@@ -65,7 +72,7 @@ export type ChatRequestMessage = {
 };
 
 export type StreamEvent =
-  | { t: "status"; s: "thinking" | "searching" | "synthesizing" | "writing" }
+  | { t: "status"; s: "thinking" | "searching" | "synthesizing" | "writing" | "generating_image" }
   | { t: "agent"; slug: string; model: string; state: "start" | "done" | "error"; error?: string }
   | { t: "think"; c: string }
   | { t: "text"; c: string }

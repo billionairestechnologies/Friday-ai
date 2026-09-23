@@ -178,3 +178,32 @@ export function useElapsedSeconds(active: boolean): number {
 
   return seconds;
 }
+
+/**
+ * A simulated completion percentage for image generation — there is no real progress signal
+ * from the image API (it's one blocking call that either returns a finished image or fails), so
+ * this fakes a decelerating climb the same way most "AI is generating..." UIs do (Gemini's own
+ * included): fast at first, slowing as it approaches the ceiling, and never actually reaching
+ * 100 until the real result arrives and the caller stops rendering this state. Resets to 0 each
+ * time `active` goes from false to true.
+ */
+export function useSimulatedProgress(active: boolean, ceiling = 92): number {
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    setPct(0);
+    const id = window.setInterval(() => {
+      setPct((prev) => {
+        if (prev >= ceiling) return prev;
+        const remaining = ceiling - prev;
+        // Decelerating step: big jumps early, tiny creeps near the ceiling.
+        const step = Math.max(0.5, remaining * 0.08);
+        return Math.min(ceiling, prev + step);
+      });
+    }, 220);
+    return () => window.clearInterval(id);
+  }, [active, ceiling]);
+
+  return Math.round(pct);
+}

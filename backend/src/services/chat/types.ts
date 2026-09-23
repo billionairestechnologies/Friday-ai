@@ -1,5 +1,5 @@
 export type StreamEvent =
-  | { t: "status"; s: "thinking" | "searching" | "synthesizing" }
+  | { t: "status"; s: "thinking" | "searching" | "synthesizing" | "generating_image" }
   | { t: "agent"; slug: string; model: string; state: "start" | "done" | "error"; error?: string }
   | { t: "text"; c: string }
   | { t: "think"; c: string }

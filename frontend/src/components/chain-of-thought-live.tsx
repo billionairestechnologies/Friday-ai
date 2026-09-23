@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/chain-of-thought";
 import { ProviderLogo } from "@/components/provider-logos";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { useElapsedSeconds, useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
+import { useElapsedSeconds, useRotatingThinkingLine, useSimulatedProgress } from "@/lib/chat/thinking-lines";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/chat/types";
 
@@ -57,6 +57,12 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
   const canvasWriteLine = useRotatingThinkingLine(canvasWriteActive, user?.birthday, "canvas");
   const elapsedSeconds = useElapsedSeconds(canvasOn && streaming);
 
+  // Image generation runs as one blocking server call with no real progress signal — see
+  // useSimulatedProgress's own comment for why the percentage is faked (same approach the
+  // reference product's own "Creating your image" loader uses).
+  const generatingImage = streaming && status === "generating_image";
+  const imageProgress = useSimulatedProgress(generatingImage);
+
   const live = streaming && !failed;
   const label = failed
     ? "Stopped"
@@ -83,6 +89,20 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
             : canvasOn
               ? "Plan"
               : "Done";
+
+  // Small, flat "Creating your image" indicator — intentionally tiny and unboxed (not a big
+  // loading card) with a simulated completion percentage, per the reference product's own
+  // compact "Creating your image" shimmer. Disappears the instant the real image event lands —
+  // there's nothing left to show once `content` (the final markdown image) arrives.
+  if (generatingImage) {
+    return (
+      <div className="flex items-center gap-2 py-1 text-sm font-medium text-foreground">
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-sky-400" />
+        <span className="live-label">Creating your image</span>
+        <span className="tabular-nums text-subtle">{imageProgress}%</span>
+      </div>
+    );
+  }
 
   // Flat, unboxed step log for the canvas-only path — no bordered card, no collapsible header,
   // matching the reference product's plain running list instead of an accordion box. Nothing to
