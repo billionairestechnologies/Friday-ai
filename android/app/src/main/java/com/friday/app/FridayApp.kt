@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -522,10 +523,35 @@ private fun ChatShell(
 
         Column(Modifier.weight(1f).fillMaxWidth()) {
             var dragTotal by remember { mutableStateOf(0f) }
+            val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+            val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+            val hideKeyboardOnPull = remember {
+                object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                    override fun onPreScroll(
+                        available: androidx.compose.ui.geometry.Offset,
+                        source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+                    ): androidx.compose.ui.geometry.Offset {
+                        if (available.y > 8f) {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
+                        }
+                        return androidx.compose.ui.geometry.Offset.Zero
+                    }
+                }
+            }
             Box(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .nestedScroll(hideKeyboardOnPull)
+                    .pointerInput(Unit) {
+                        androidx.compose.foundation.gestures.detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 10f) {
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                            }
+                        }
+                    }
                     .pointerInput(canvasOn) {
                         detectHorizontalDragGestures(
                             onDragStart = { dragTotal = 0f },

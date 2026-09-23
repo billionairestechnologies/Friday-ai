@@ -75,6 +75,10 @@ private struct ChatShell: View {
                         DragGesture(minimumDistance: 25)
                             .onEnded { value in
                                 let dx = value.translation.width, dy = value.translation.height
+                                if dy > 40 && abs(dy) > abs(dx) * 1.5 {
+                                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                    return
+                                }
                                 guard abs(dx) > abs(dy) * 1.5 else { return }
                                 if dx < -60 && !vm.canvasOpen {
                                     withAnimation(.easeInOut(duration: 0.3)) { vm.canvasOpen = true }

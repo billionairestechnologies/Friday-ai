@@ -14,6 +14,7 @@ struct ChatThreadView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: messages.count) { _ in
                 scrollToBottom(proxy)
             }
