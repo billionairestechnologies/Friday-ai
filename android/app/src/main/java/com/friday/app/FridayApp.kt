@@ -309,7 +309,25 @@ fun FridayApp(
                 Sheet.Attach -> AttachSheet(
                     onCamera = { launchCamera() },
                     onPhotos = { photoPickerLauncher.launch("image/*") },
-                    onFiles = { filePickerLauncher.launch(arrayOf("image/*", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                    // Widened alongside the backend's plain-text/code attachment support
+                    // (.py/.xml/.json/.csv/.md/etc — see plainTextDocs.ts): "text/*" is a real
+                    // SAF wildcard (Android's document picker honors it same as an exact mime),
+                    // application/json and application/xml are common cases browsers/OSes report
+                    // outside the text/* prefix. Without this the picker itself hid these files
+                    // before the backend fix could ever matter.
+                    onFiles = {
+                        filePickerLauncher.launch(
+                            arrayOf(
+                                "image/*",
+                                "application/pdf",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                "text/*",
+                                "application/json",
+                                "application/xml",
+                            ),
+                        )
+                    },
                     onPlugins = { vm.openSheet(Sheet.Plugins) },
                 )
                 else -> {}

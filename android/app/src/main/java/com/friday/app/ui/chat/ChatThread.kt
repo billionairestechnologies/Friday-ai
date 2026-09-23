@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -56,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -73,6 +75,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.request.ImageRequest
 import com.friday.app.data.ChatMessage
 import com.friday.app.data.Mode
 import com.friday.app.data.Role
@@ -167,10 +172,14 @@ private fun AssistantBlock(msg: ChatMessage) {
         } else if (trailModeActive) {
             ThoughtCard(msg)
         }
+        val generatingImage = msg.status == "generating_image" && nothingHasArrivedYet
         // Cross-fades the pill out as the first bit of content fades in, instead of the pill
         // vanishing and the text popping in on separate frames.
-        AnimatedVisibility(visible = !trailModeActive && msg.agents.isEmpty() && nothingHasArrivedYet, enter = fadeIn(tween(180)), exit = fadeOut(tween(180))) {
+        AnimatedVisibility(visible = !trailModeActive && msg.agents.isEmpty() && nothingHasArrivedYet && !generatingImage, enter = fadeIn(tween(180)), exit = fadeOut(tween(180))) {
             ThinkingPill()
+        }
+        AnimatedVisibility(visible = generatingImage, enter = fadeIn(tween(180)), exit = fadeOut(tween(180))) {
+            GeneratingImagePill()
         }
         AnimatedVisibility(visible = msg.content.isNotEmpty(), enter = fadeIn(tween(220)), exit = fadeOut(tween(0))) {
             MarkdownBody(msg.content)
@@ -220,6 +229,38 @@ private fun ThinkingPill() {
         ThreeDotBounce(FridayThink)
         RotatingLabel(ThinkingLines.plain, FridayText, active = true, shimmer = false)
     }
+}
+
+/** Small, flat "Creating your image" indicator with a simulated completion percentage — matches
+ *  web's chain-of-thought-live.tsx generatingImage branch. Image generation is one blocking
+ *  server call with no real progress to report, so this fakes a decelerating climb the same way
+ *  (and the same way most "AI is generating..." UIs, including the reference product, do). */
+@Composable
+private fun GeneratingImagePill() {
+    val pct = rememberSimulatedProgress(ceiling = 92)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(14.dp))
+        Text("Creating your image", color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        Text("$pct%", color = FridayMuted, fontSize = 15.sp)
+    }
+}
+
+/** Fakes a decelerating climb toward (but never reaching) `ceiling` while composed, resetting to
+ *  0 on each recomposition of the caller (a fresh generation) — see GeneratingImagePill. */
+@Composable
+private fun rememberSimulatedProgress(ceiling: Int): Int {
+    var pct by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) {
+        while (pct < ceiling) {
+            delay(220)
+            val remaining = ceiling - pct
+            pct = (pct + maxOf(0.5f, remaining * 0.08f)).coerceAtMost(ceiling.toFloat())
+        }
+    }
+    return pct.toInt()
 }
 
 /** Three-dot typing/bounce indicator — sits to the left of the rotating label in the thinking pill. */
@@ -586,8 +627,45 @@ fun MarkdownBody(text: String) {
             when (part) {
                 is Md.Code -> CodeBlock(part.lang, part.body)
                 is Md.Text -> MarkdownText(part.value)
+                is Md.Image -> GeneratedImage(part.url, part.alt)
             }
         }
+    }
+}
+
+/** Fades a generated image in once it's actually loaded, with a pulsing placeholder while it
+ *  fetches — matches web's FadeInImage (lib/chat/markdown.tsx) instead of the image just popping
+ *  in the instant Coil resolves it. */
+@Composable
+private fun GeneratedImage(url: String, alt: String) {
+    var loaded by remember(url) { mutableStateOf(false) }
+    val alpha by animateFloatAsState(if (loaded) 1f else 0f, animationSpec = tween(400), label = "imageFadeIn")
+    val pulse = rememberInfiniteTransition(label = "imagePulse")
+    val pulseAlpha by pulse.animateFloat(
+        initialValue = 0.06f,
+        targetValue = 0.14f,
+        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+        label = "imagePulseAlpha",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp)),
+    ) {
+        if (!loaded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .background(FridayText.copy(alpha = pulseAlpha)),
+            )
+        }
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current).data(url).crossfade(false).build(),
+            contentDescription = alt,
+            modifier = Modifier.fillMaxWidth().alpha(alpha),
+            onState = { state -> loaded = state is AsyncImagePainter.State.Success },
+        )
     }
 }
 
@@ -685,15 +763,28 @@ private fun annotatedFromBold(text: String): AnnotatedString = buildAnnotatedStr
 sealed class Md {
     data class Text(val value: String) : Md()
     data class Code(val lang: String, val body: String) : Md()
+    data class Image(val alt: String, val url: String) : Md()
 }
+
+// Was matched (and split off) by nothing at all — a generated image's `![prompt](url)` reply
+// (see the backend's ScaleMax image-generation feature) fell straight through to MarkdownText's
+// plain-paragraph path and rendered as literal `![prompt](https://...)` text, since there was no
+// image concept anywhere in this parser and no image-loading library (Coil) in the project.
+private val imageLineRegex = Regex("!\\[([^\\]]*)\\]\\((https?://[^)\\s]+)\\)")
 
 fun splitMarkdown(src: String): List<Md> {
     val out = mutableListOf<Md>()
-    val regex = Regex("```([a-zA-Z0-9_+-]*)\\n([\\s\\S]*?)```")
+    // Alternation, so a fenced code block and a markdown image are both recognized as their own
+    // top-level block in document order, same as web's react-markdown treats both as block-level.
+    val regex = Regex("```([a-zA-Z0-9_+-]*)\\n([\\s\\S]*?)```|" + imageLineRegex.pattern)
     var last = 0
     for (m in regex.findAll(src)) {
         if (m.range.first > last) out += Md.Text(src.substring(last, m.range.first).trim())
-        out += Md.Code(m.groupValues[1].ifBlank { "code" }, m.groupValues[2].trimEnd())
+        if (m.groupValues[1].isNotEmpty() || m.value.startsWith("```")) {
+            out += Md.Code(m.groupValues[1].ifBlank { "code" }, m.groupValues[2].trimEnd())
+        } else {
+            out += Md.Image(m.groupValues[3], m.groupValues[4])
+        }
         last = m.range.last + 1
     }
     if (last < src.length) {
