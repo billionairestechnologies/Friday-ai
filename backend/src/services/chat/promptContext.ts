@@ -59,8 +59,52 @@ const THINK_SYSTEM_PROMPT =
 // answered conversationally. The client's Canvas panel then had nothing to show but that plain
 // text. This is what actually makes the toggle do something: it must produce a single fenced code
 // block that the client's extractArtifact() can find and render live in the sandboxed iframe.
+// Confirmed live in production (2026-09-23): a user built an HTML page, then asked for a
+// follow-up tweak ("make the background blue"). The model replied with ONLY a bare ```css
+// snippet of the changed rules — like a code reviewer's diff, not a new artifact. The panel has
+// no way to render or run standalone CSS (it isn't a page), so the user saw a dead "css canvas"
+// with raw text and no preview, then typed "run it" hoping that would trigger something — it
+// can't, there's no button for a CSS-only fragment, and the model correctly (but unhelpfully)
+// explained it can't execute code from chat. The fix has two parts: this prompt now explicitly
+// forbids replying with just the changed piece, and index.ts's canvas branch re-injects the last
+// full html/react artifact as its own system message before every canvas-mode turn (see
+// findLastCanvasArtifact() below) so the model always has the complete file in front of it to
+// edit against, not just whatever its own previous reply happened to contain.
 const CANVAS_SYSTEM_PROMPT =
-  "Canvas mode is ON: the user is looking at a live preview panel that renders your reply, not just this chat, so a conversational answer is not useful right now — they want a working result. Respond with ONE fenced code block containing complete, self-contained, runnable code: use ```html for a full standalone HTML page (inline <style>/<script>, no external files) for UI/visual/design requests, ```jsx for a single React component (a default-exported function component using only React and its own hooks — no imports beyond react), or ```python for a script the user can run themselves with one click via Canvas's own Run button (backed by a real sandbox) — use that for anything computational (data processing, algorithms, math) rather than a UI. You will NOT see that output yourself; it displays directly to the user in Canvas. A single short sentence before the code fence is fine, but do not explain what you would build instead of building it, do not claim you already ran it or describe output you haven't seen, and do not split the result across multiple code blocks.";
+  "Canvas mode is ON: the user is looking at a live preview panel that renders your reply, not just this chat, so a conversational answer is not useful right now — they want a working result. Respond with ONE fenced code block containing complete, self-contained, runnable code: use ```html for a full standalone HTML page (inline <style>/<script>, no external files) for UI/visual/design requests, ```jsx for a single React component (a default-exported function component using only React and its own hooks — no imports beyond react), or ```python for a script the user can run themselves with one click via Canvas's own Run button (backed by a real sandbox) — use that for anything computational (data processing, algorithms, math) rather than a UI. " +
+  "CRITICAL for follow-up edits to something you already built: ALWAYS reproduce the ENTIRE file with the change applied — never reply with just the changed CSS rules, a diff, or a fragment on its own. A bare ```css or partial snippet cannot be previewed or run at all and leaves the user with nothing — if the artifact is an HTML page, your reply must be a full ```html block (the complete page, inline styles included) even if the user's request was small (\"make it blue\", \"change the font\"). If a full current version of the artifact is provided to you in a system message below, start from that exact file and return the whole thing, modified. " +
+  "You will NOT see that output yourself; it displays directly to the user in Canvas. A single short sentence before the code fence is fine, but do not explain what you would build instead of building it, do not claim you already ran it or describe output you haven't seen, and do not split the result across multiple code blocks.";
+
+// Scans assistant history for the most recent complete html/react Canvas artifact (most-recent
+// first) so it can be handed back to the model verbatim before a follow-up edit — see
+// CANVAS_SYSTEM_PROMPT's comment above for why this exists. Deliberately ignores non-artifact
+// fences (a python snippet, an unrelated code example elsewhere in the conversation) by requiring
+// the fence's language tag to be exactly html/jsx/tsx, matching the client's own extractArtifact()
+// classification (frontend/src/lib/chat/artifact.ts) closely enough for this purpose.
+const ARTIFACT_FENCE = /```(html|jsx|tsx)\r?\n([\s\S]*?)```/i;
+
+export function findLastCanvasArtifact(history: ChatMessage[]): { lang: string; code: string } | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const message = history[i]!;
+    if (message.role !== "assistant") continue;
+    const match = ARTIFACT_FENCE.exec(message.content);
+    if (match) return { lang: match[1]!.toLowerCase(), code: match[2]!.trim() };
+  }
+  return null;
+}
+
+function canvasArtifactSystemMessage(artifact: { lang: string; code: string }): ChatMessage {
+  return {
+    role: "system",
+    content:
+      `Here is the complete, current Canvas artifact (${artifact.lang}) exactly as last built. If the user is asking for a change to it, start from this exact file and return the ENTIRE updated file (per the Canvas instructions above) — do not return only the changed lines.\n\n` +
+      "```" +
+      artifact.lang +
+      "\n" +
+      artifact.code +
+      "\n```",
+  };
+}
 
 export function searchResultsToSystemMessage(results: WebSearchResult[]): ChatMessage {
   if (results.length === 0) {
@@ -143,7 +187,11 @@ export function withSystemPreamble(
   // reason: the most recent instruction is the most salient one. A fresh attachment with a short
   // caption needs to win over everything else (an old topic, irrelevant search results), which is
   // exactly the case that failed in production — see ATTACHMENT_FOCUS_SYSTEM_PROMPT's comment.
-  if (canvas) preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
+  if (canvas) {
+    preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
+    const lastArtifact = findLastCanvasArtifact(history);
+    if (lastArtifact) preamble.push(canvasArtifactSystemMessage(lastArtifact));
+  }
   if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT });
   return preamble.length ? [...preamble, ...history] : history;
 }
