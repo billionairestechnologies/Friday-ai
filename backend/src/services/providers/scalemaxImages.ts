@@ -10,15 +10,21 @@ import { safeErrorMessage } from "./types.js";
 //     URL)"), so a user's attachment dataUrl can be sent as-is, no upload/hosting step needed.
 const BASE_URL = "https://api.scalemax.pro/token/v1";
 
-// grok-imagine-image is the model this integration was verified end-to-end against (both
-// generate and edit, live). Other catalog models (gpt-image-*, flux-2-*) likely work identically
-// since they're the same endpoint/shape, but haven't been confirmed — keep this the default
-// until one of those is verified too.
-export const DEFAULT_IMAGE_MODEL = "grok-imagine-image";
+// gpt-image-2 (the real OpenAI image model, proxied — its own generation metadata reports
+// "Azure OpenAI ImageGen" as the software agent, confirmed live) is the default: verified
+// side-by-side against grok-imagine-image with the identical prompt ("a MacBook laptop open on a
+// wooden table") — grok returned a completely unrelated lighthouse/coastline photo, gpt-image-2
+// nailed it first try. grok-imagine-image is kept available as a fallback option, not the
+// default, given that real prompt-adherence gap.
+export const DEFAULT_IMAGE_MODEL = "gpt-image-2";
 
 export type ImageQuality = "low" | "medium" | "high";
-// Grok Imagine's size values are aspect ratios, not pixel dimensions.
-export type ImageSize = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "3:2" | "2:3" | "auto";
+// Size FORMAT depends on the model family — gpt-image-* wants pixel dimensions
+// (1024x1024/1536x864/864x1536, confirmed live), Grok Imagine wants aspect ratios (1:1/16:9/...).
+// Kept as a permissive string rather than a strict union so callers can pass whichever shape
+// matches their chosen model; DEFAULT_IMAGE_SIZE below matches DEFAULT_IMAGE_MODEL.
+export type ImageSize = string;
+export const DEFAULT_IMAGE_SIZE: ImageSize = "1024x1024";
 
 interface ImagesResponse {
   data: { url?: string; b64_json?: string }[];
@@ -50,7 +56,7 @@ export async function generateImage(
   return callImagesEndpoint("/images/generations", apiKey, {
     model: options.model ?? DEFAULT_IMAGE_MODEL,
     prompt,
-    size: options.size ?? "1:1",
+    size: options.size ?? DEFAULT_IMAGE_SIZE,
     quality: options.quality ?? "medium",
     n: 1,
   });
@@ -72,7 +78,7 @@ export async function editImage(
     model: options.model ?? DEFAULT_IMAGE_MODEL,
     prompt,
     ...(source.dataUrl ? { image: source.dataUrl } : { image_url: source.url }),
-    size: options.size ?? "1:1",
+    size: options.size ?? DEFAULT_IMAGE_SIZE,
     quality: options.quality ?? "medium",
     n: 1,
   });
