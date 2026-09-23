@@ -56,16 +56,22 @@ export async function generateImage(
   });
 }
 
+/**
+ * `source` is either the attachment's own base64 data URL (the normal edit-a-photo-you-attached
+ * case, sent as the `image` field) or a previously-generated image's hosted URL (used when
+ * continuing/correcting a generation that came back wrong — see imageIntent.ts's
+ * findImageCorrection() — sent as `image_url`, both confirmed working live against the real API).
+ */
 export async function editImage(
   apiKey: string,
   prompt: string,
-  sourceImageDataUrl: string,
+  source: { dataUrl?: string; url?: string },
   options: { model?: string; size?: ImageSize; quality?: ImageQuality } = {},
 ): Promise<string> {
   return callImagesEndpoint("/images/edits", apiKey, {
     model: options.model ?? DEFAULT_IMAGE_MODEL,
     prompt,
-    image: sourceImageDataUrl,
+    ...(source.dataUrl ? { image: source.dataUrl } : { image_url: source.url }),
     size: options.size ?? "1:1",
     quality: options.quality ?? "medium",
     n: 1,

@@ -38,6 +38,27 @@ const EXECUTION_HONESTY_SYSTEM_PROMPT =
   "For python/javascript code in Canvas specifically, tell the user to click the Run button in " +
   "the Canvas panel to execute it themselves and see the real output — do not invent output.";
 
+// Confirmed live in production (2026-09-23): a user asked for an image, got a real generated
+// image back (handled entirely server-side, BEFORE any chat model is ever called — see
+// tryGenerateOrEditImage() in chat/index.ts), then sent a short follow-up correction ("I told you
+// macbook on table") that didn't re-trigger that server-side path. The chat model that then
+// answered normally had no actual image to offer, but replied with a markdown image link anyway
+// — a fabricated/memorized URL pointing to a real but completely unrelated stock photo, which
+// react-markdown rendered as if it were a real result. This is the image-generation equivalent of
+// EXECUTION_HONESTY_SYSTEM_PROMPT above: the model has no image-generation tool of its own at
+// all (that capability is a separate server-side step this prompt is never present for), so it
+// must never emit `![...](url)` markdown unless a real image URL was explicitly handed to it in
+// this conversation already for this exact purpose.
+const IMAGE_HONESTY_SYSTEM_PROMPT =
+  "You cannot generate, edit, or fetch images yourself — there is no image-generation tool wired " +
+  "to you. Never write markdown image syntax (`![...](...)`) with a URL you invented, guessed, or " +
+  "recalled from training data — that is a fabricated link, not a real image, and presenting it as " +
+  "one is a serious mistake. If the user asks you to create/edit an image and no real image URL " +
+  "already appears earlier in this exact conversation for that request, tell them plainly you " +
+  "can't produce one from this message and ask them to phrase it as an explicit image request " +
+  "(e.g. \"generate an image of...\") so the real image tool can pick it up — do not soften this " +
+  "into pretending to have made something.";
+
 // Both clients render real markdown (react-markdown+remark-gfm on web, a bold/list/code-fence
 // parser on Android) but a plain instruction-less prompt often comes back as an unbroken wall of
 // text even for multi-part answers, which reads as disorganized regardless of how good the
@@ -178,6 +199,7 @@ export function withSystemPreamble(
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
     { role: "system", content: HONESTY_SYSTEM_PROMPT },
     { role: "system", content: EXECUTION_HONESTY_SYSTEM_PROMPT },
+    { role: "system", content: IMAGE_HONESTY_SYSTEM_PROMPT },
     { role: "system", content: FORMAT_SYSTEM_PROMPT },
   ];
   if (webSearch) preamble.push(searchResultsToSystemMessage(searchResults));

@@ -19,7 +19,7 @@ import {
   type TokenUsage,
 } from "../tokenUsage.js";
 import { detectNeedsLiveSearch } from "./liveSearchIntent.js";
-import { detectImageIntent, type ImageIntent } from "./imageIntent.js";
+import { detectImageIntent, findImageCorrection, isShortEnoughForCorrection, type ImageIntent } from "./imageIntent.js";
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
@@ -100,13 +100,18 @@ async function extractDocumentText(attachments: ChatImage[]): Promise<string | n
  * any failure (no working ScaleMax key, API error, edit requested with no source image) so the
  * caller can fall through to the normal chat path instead of hard-failing the turn.
  */
-async function tryGenerateOrEditImage(intent: ImageIntent, sourceAttachment?: ChatImage): Promise<string | null> {
+async function tryGenerateOrEditImage(
+  intent: ImageIntent,
+  sourceAttachment?: ChatImage,
+  correctionSourceUrl?: string | null,
+): Promise<string | null> {
   if (!intent) return null;
   try {
     const apiKey = await getWorkingKeyForProvider("scalemax");
     if (intent.kind === "edit") {
-      if (!sourceAttachment) return null;
-      return await editImage(apiKey, intent.prompt, sourceAttachment.dataUrl);
+      if (sourceAttachment) return await editImage(apiKey, intent.prompt, { dataUrl: sourceAttachment.dataUrl });
+      if (correctionSourceUrl) return await editImage(apiKey, intent.prompt, { url: correctionSourceUrl });
+      return null;
     }
     return await generateImage(apiKey, intent.prompt);
   } catch (err) {
@@ -240,9 +245,21 @@ export async function streamMessage(
     // respond in text (e.g. explain it couldn't generate the image) rather than the user getting
     // nothing.
     const currentImageAttachment = attachments.find((a) => a.mime.startsWith("image/"));
-    const imageIntent = detectImageIntent(content, Boolean(currentImageAttachment));
+    let imageIntent = detectImageIntent(content, Boolean(currentImageAttachment));
+    let correctionSourceUrl: string | null = null;
+    // No explicit generate/edit wording matched — but if the very last reply was itself a real
+    // generated image and this message is short (a correction, not a new unrelated request), redo
+    // it as an edit of that image using the new wording. See findImageCorrection()'s comment for
+    // why this exists and why the length cap keeps it from firing on unrelated follow-ups.
+    if (!imageIntent && isShortEnoughForCorrection(content)) {
+      const correction = findImageCorrection(historyWithImages);
+      if (correction) {
+        imageIntent = { kind: "edit", prompt: `${correction.priorPrompt}. Correction: ${content}` };
+        correctionSourceUrl = correction.imageUrl;
+      }
+    }
     if (imageIntent) {
-      const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment);
+      const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment, correctionSourceUrl);
       if (generated) {
         const caption = imageIntent.kind === "edit" ? "Here's the edited image:" : "Here you go:";
         const markdown = `${caption}\n\n![${content.slice(0, 120)}](${generated})`;

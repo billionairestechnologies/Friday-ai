@@ -34,3 +34,53 @@ export function detectImageIntent(message: string, hasImageAttachment: boolean):
 
   return null;
 }
+
+// Exactly matches the caption index.ts prepends to a real generated/edited image's reply — used
+// to recognize "the last assistant turn was a real generated image" without needing a separate DB
+// column, by reading the same conversation history already fetched for the prompt.
+const GENERATED_IMAGE_REPLY = /^(Here you go:|Here's the edited image:)/;
+
+/**
+ * Confirmed live in production (2026-09-23): a user got a wrong generated image back (asked for
+ * "macbook on table", got an unrelated stock photo — a real prompt-adherence issue with the image
+ * model, not a code bug), then sent a short correction ("I told you macbook on table") that
+ * doesn't contain any generate/edit verb, so detectImageIntent() above returns null for it. With
+ * IMAGE_HONESTY_SYSTEM_PROMPT now blocking the chat model from fabricating a fake replacement
+ * image, that correction would otherwise just get a text-only "I can't tell this is about the
+ * image" reply — technically honest, but not what the user needs, which is another attempt.
+ *
+ * This catches that specific case — SHORT-message-immediately-after-a-generated-image — and
+ * retries as an edit of the previous (wrong) image using the new wording as the correction. The
+ * length cap keeps this from firing on an unrelated new request that just happens to follow an
+ * image reply (a real topic change is very unlikely to be this short) — false negatives here just
+ * fall through to a normal chat reply (safe); a false positive would spend money on an unwanted
+ * regeneration, which the length gate is specifically there to keep rare.
+ */
+const CORRECTION_MAX_CHARS = 80;
+
+export function findImageCorrection(history: { role: string; content: string }[]): { priorPrompt: string; imageUrl: string } | null {
+  let lastAssistantIdx = -1;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i]!.role === "assistant") {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
+  if (lastAssistantIdx === -1) return null;
+  const lastReply = history[lastAssistantIdx]!.content.trim();
+  if (!GENERATED_IMAGE_REPLY.test(lastReply)) return null;
+
+  const urlMatch = /!\[[^\]]*\]\((https?:\/\/[^)]+)\)/.exec(lastReply);
+  if (!urlMatch) return null;
+
+  for (let j = lastAssistantIdx - 1; j >= 0; j--) {
+    if (history[j]!.role === "user") {
+      return { priorPrompt: history[j]!.content, imageUrl: urlMatch[1]! };
+    }
+  }
+  return null;
+}
+
+export function isShortEnoughForCorrection(message: string): boolean {
+  return message.trim().length > 0 && message.trim().length <= CORRECTION_MAX_CHARS;
+}
