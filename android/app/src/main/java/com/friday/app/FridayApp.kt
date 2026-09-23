@@ -17,6 +17,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -545,7 +546,7 @@ private fun ChatShell(
                     .fillMaxWidth()
                     .nestedScroll(hideKeyboardOnPull)
                     .pointerInput(Unit) {
-                        androidx.compose.foundation.gestures.detectVerticalDragGestures { _, dragAmount ->
+                        detectVerticalDragGestures { _, dragAmount ->
                             if (dragAmount > 10f) {
                                 keyboardController?.hide()
                                 focusManager.clearFocus()
