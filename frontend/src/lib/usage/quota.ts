@@ -30,6 +30,7 @@ const EVENT_LABELS: Record<string, string> = {
   voice_second: "Voice",
   sandbox_run: "Build",
   attachment_upload: "Attachments",
+  image_generation: "Image generation",
 };
 
 export function labelForEventType(type: string): string {

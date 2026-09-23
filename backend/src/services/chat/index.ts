@@ -19,6 +19,8 @@ import {
   type TokenUsage,
 } from "../tokenUsage.js";
 import { detectNeedsLiveSearch } from "./liveSearchIntent.js";
+import { detectImageIntent, type ImageIntent } from "./imageIntent.js";
+import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import {
@@ -82,6 +84,26 @@ async function extractDocumentText(attachments: ChatImage[]): Promise<string | n
     .map((text, i) => (text ? (allResults.length > 1 ? `[Attachment ${i + 1}]\n${text}` : text) : null))
     .filter((t): t is string => t !== null);
   return extracted.length > 0 ? extracted.join("\n\n") : null;
+}
+
+/**
+ * Best-effort image generate/edit via ScaleMax — returns the resulting image URL, or null on
+ * any failure (no working ScaleMax key, API error, edit requested with no source image) so the
+ * caller can fall through to the normal chat path instead of hard-failing the turn.
+ */
+async function tryGenerateOrEditImage(intent: ImageIntent, sourceAttachment?: ChatImage): Promise<string | null> {
+  if (!intent) return null;
+  try {
+    const apiKey = await getWorkingKeyForProvider("scalemax");
+    if (intent.kind === "edit") {
+      if (!sourceAttachment) return null;
+      return await editImage(apiKey, intent.prompt, sourceAttachment.dataUrl);
+    }
+    return await generateImage(apiKey, intent.prompt);
+  } catch (err) {
+    console.error("[chat] image generation failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /**
@@ -200,6 +222,34 @@ export async function streamMessage(
       onEvent({ t: "done" });
       return;
     }
+
+    // Image generation/editing — a separate capability from the text chat models above, routed
+    // to ScaleMax's Images API (verified live 2026-09-23; see scalemaxImages.ts). Checked up
+    // front, before any mode branching, same as the document gate above: this replaces the whole
+    // turn rather than feeding into a chat model. Best-effort — on any failure this falls through
+    // to the normal chat path below instead of hard-erroring the turn, so the model can at least
+    // respond in text (e.g. explain it couldn't generate the image) rather than the user getting
+    // nothing.
+    const currentImageAttachment = attachments.find((a) => a.mime.startsWith("image/"));
+    const imageIntent = detectImageIntent(content, Boolean(currentImageAttachment));
+    if (imageIntent) {
+      const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment);
+      if (generated) {
+        const caption = imageIntent.kind === "edit" ? "Here's the edited image:" : "Here you go:";
+        const markdown = `${caption}\n\n![${content.slice(0, 120)}](${generated})`;
+        onEvent({ t: "text", c: markdown });
+        void recordUsageEvent(userId, "image_generation", 1, { kind: imageIntent.kind });
+        await insertAssistantMessage(conversationId, markdown, "ScaleMax Images", {
+          usedCanvas: false,
+          usedSearch: false,
+          usedThink: false,
+        });
+        await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+        onEvent({ t: "done" });
+        return;
+      }
+    }
+
     const project = conversation.assistant_projects;
     const projectContext: ChatMessage[] = project
       ? [

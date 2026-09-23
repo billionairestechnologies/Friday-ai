@@ -8,6 +8,7 @@ export type UsageEventType =
   | "voice_second"
   | "sandbox_run"
   | "attachment_upload"
+  | "image_generation"
   | "token_usage";
 
 /** The feature categories shown in the Usage settings breakdown, in display order. */
@@ -17,6 +18,7 @@ export const BREAKDOWN_EVENT_TYPES: Exclude<UsageEventType, "token_usage">[] = [
   "voice_second",
   "sandbox_run",
   "attachment_upload",
+  "image_generation",
 ];
 
 export async function recordUsageEvent(
