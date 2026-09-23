@@ -93,7 +93,9 @@ struct ComposerBar: View {
                         Image(systemName: modelIcon)
                             .font(.system(size: 13))
                             .foregroundColor(modelIconColor)
-                        Text(modelLabel).font(.system(size: 13, weight: .medium)).lineLimit(1).frame(maxWidth: 96, alignment: .leading).fixedSize(horizontal: true, vertical: false)
+                        if vm.modes.count < 2 {
+                            Text(modelLabel).font(.system(size: 13, weight: .medium)).lineLimit(1).frame(maxWidth: 96, alignment: .leading).fixedSize(horizontal: true, vertical: false)
+                        }
                         Image(systemName: "chevron.down").font(.system(size: 12))
                     }
                     .foregroundColor(FridayColor.text)
@@ -103,6 +105,7 @@ struct ComposerBar: View {
                 }
                 .fixedSize()
                 .layoutPriority(1)
+                .animation(.easeInOut(duration: 0.25), value: vm.modes.count)
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
