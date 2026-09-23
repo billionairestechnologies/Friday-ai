@@ -154,3 +154,16 @@ export function toOpenAiStyleMessages(messages: ChatMessage[]) {
     return { role: m.role, content: parts };
   });
 }
+
+/** Ollama's /api/chat wants a sibling `images: string[]` field per message holding PLAIN base64
+ *  payloads (no `data:mime;base64,` prefix, no image_url/content-block wrapper) — a different
+ *  shape from every other adapter here. Previously `images` was silently forwarded unconverted
+ *  (an array of {mime, dataUrl,...} objects), which a real Ollama server ignores/rejects, so a
+ *  vision-capable local model (e.g. llava) never actually received the picture. */
+export function toOllamaStyleMessages(messages: ChatMessage[]) {
+  return messages.map((m) => {
+    const images = (m.images ?? []).filter((img) => img.mime.startsWith("image/"));
+    if (images.length === 0) return { role: m.role, content: m.content };
+    return { role: m.role, content: m.content, images: images.map((img) => base64PayloadOf(img.dataUrl)) };
+  });
+}

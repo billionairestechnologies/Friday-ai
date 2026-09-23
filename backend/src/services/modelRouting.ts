@@ -54,13 +54,31 @@ function score(candidate: ChatCandidate, tags: ModelTag[]): number {
  * Reorders Auto-mode candidates so the model best suited to THIS message (based on lightweight
  * text heuristics — code, reasoning, Indic-script, long input) is tried first, instead of a fixed
  * order. Falls through the rest exactly as before if the top pick fails, so reliability doesn't regress.
+ *
+ * When the message has an image attachment that needs real vision (i.e. wasn't already covered by
+ * OCR/text extraction), non-vision candidates are dropped entirely rather than just deprioritized —
+ * a non-vision model silently answering without ever seeing the image is worse than trying fewer,
+ * correct candidates. Mirrors the explicit gate single-mode already has (chat/index.ts), which Auto
+ * mode was missing.
  */
-export function rankCandidatesForMessage(candidates: ChatCandidate[], message: string): ChatCandidate[] {
+export function rankCandidatesForMessage(
+  candidates: ChatCandidate[],
+  message: string,
+  requiresVision = false,
+): ChatCandidate[] {
   const tags = detectTags(message);
-  return [...candidates].sort((a, b) => score(b, tags) - score(a, tags));
+  const pool = requiresVision ? candidates.filter((c) => c.vision) : candidates;
+  return [...pool].sort((a, b) => score(b, tags) - score(a, tags));
 }
 
-/** Picks the highest general-capability model from a pool — used as the Team Up synthesizer. */
-export function pickStrongest(candidates: ChatCandidate[]): ChatCandidate {
-  return [...candidates].sort((a, b) => profileFor(b).power - profileFor(a).power)[0]!;
+/**
+ * Picks the highest general-capability model from a pool — used as the Team Up synthesizer.
+ * When `requiresVision` is set, only vision-capable candidates are eligible (the synthesizer
+ * gets the raw image re-attached alongside the proposers' text drafts — see teamUp.ts — so it
+ * needs to actually be able to see it, not just read what the proposers said about it).
+ */
+export function pickStrongest(candidates: ChatCandidate[], requiresVision = false): ChatCandidate {
+  const pool = requiresVision ? candidates.filter((c) => c.vision) : candidates;
+  const ranked = pool.length > 0 ? pool : candidates;
+  return [...ranked].sort((a, b) => profileFor(b).power - profileFor(a).power)[0]!;
 }

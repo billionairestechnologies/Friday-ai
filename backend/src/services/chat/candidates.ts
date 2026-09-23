@@ -46,11 +46,19 @@ export async function callCandidate(candidate: ChatCandidate, history: ChatMessa
   return withTimeout(adapter.chat(apiKey, candidate.modelId, history), CANDIDATE_TIMEOUT_MS, candidate.slug);
 }
 
-/** Picks distinct providers so Team Up compares different vendors rather than two models from one. */
-export function pickDistinctProviders(candidates: ChatCandidate[], limit: number): ChatCandidate[] {
+/**
+ * Picks distinct providers so Team Up compares different vendors rather than two models from one.
+ *
+ * When `requiresVision` is set (the turn has an image that needs real vision, not just OCR text),
+ * only vision-capable candidates are eligible — otherwise Team Up could silently fan an image out
+ * to proposers that can't see it at all, producing blind drafts with no error shown (mirrors the
+ * gate single/auto mode apply; see modelRouting.ts).
+ */
+export function pickDistinctProviders(candidates: ChatCandidate[], limit: number, requiresVision = false): ChatCandidate[] {
+  const pool = requiresVision ? candidates.filter((c) => c.vision) : candidates;
   const seen = new Set<string>();
   const picked: ChatCandidate[] = [];
-  for (const c of candidates) {
+  for (const c of pool) {
     if (seen.has(c.slug)) continue;
     seen.add(c.slug);
     picked.push(c);

@@ -153,13 +153,15 @@ export function withSystemPreamble(
 const MAX_ATTACHMENTS = 4;
 
 /**
- * Attaches image data to the most recent message in `history` (always the user's just-sent
- * message — see sendMessage/streamMessage). Previously the "Canvas" bug's sibling: the composer
- * already let a user attach an image and showed a thumbnail for it, but the attachment was never
- * sent to the backend at all, so the model silently answered with no image and no error. Images
- * aren't persisted to the messages table (no column for them yet), so they're only usable for the
- * turn they were attached to, not for later turns referencing "that image" — a real limitation,
- * not the bug being fixed here.
+ * Attaches the CURRENT turn's image data to the most recent message in `history` (always the
+ * user's just-sent message — see sendMessage/streamMessage). Previously the "Canvas" bug's
+ * sibling: the composer already let a user attach an image and showed a thumbnail for it, but the
+ * attachment was never sent to the backend at all, so the model silently answered with no image
+ * and no error.
+ *
+ * Earlier turns' images are re-hydrated separately, upstream in index.ts's history query (joins
+ * message_attachments, which insertUserMessage/storeAttachments already persists) — so "that
+ * image I sent earlier" does now work on a later turn, not just the turn it was attached to.
  */
 export function attachImages(history: ChatMessage[], images: ChatImage[]): ChatMessage[] {
   if (images.length === 0 || history.length === 0) return history;

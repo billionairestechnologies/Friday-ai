@@ -30,6 +30,7 @@ import {
 } from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
+import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import {
@@ -123,12 +124,39 @@ export async function streamMessage(
       });
     }
 
+    // Joins message_attachments so an earlier turn's image is still visible to the model on a
+    // later turn (e.g. "what's in that image I sent earlier") — previously this only selected
+    // role/content, so message_attachments (populated by insertUserMessage below, and already
+    // used to redisplay thumbnails in listMessages) was written but never read back into the
+    // prompt, meaning an attachment only ever worked on the exact turn it was sent with.
     const { data: historyRows, error: historyError } = await supabaseAdmin
       .from("messages")
-      .select("role, content")
+      .select("role, content, message_attachments(mime, data_url, storage_bucket, storage_path)")
       .eq("conversation_id", conversationId)
       .order("created_at");
     if (historyError) throw new HttpError(500, historyError.message);
+
+    const historyWithImages: ChatMessage[] = await Promise.all(
+      (historyRows ?? []).map(async (row) => {
+        const attachmentRows = (row as { message_attachments?: Array<Record<string, unknown>> | null }).message_attachments;
+        const imageRows = (attachmentRows ?? []).filter((a) => String(a.mime ?? "").startsWith("image/"));
+        if (imageRows.length === 0) {
+          return { role: row.role, content: row.content } as ChatMessage;
+        }
+        const images: ChatImage[] = await Promise.all(
+          imageRows.map(async (a) => ({
+            mime: String(a.mime),
+            dataUrl: await resolveAttachmentDataUrl({
+              data_url: (a.data_url as string | null) ?? null,
+              storage_bucket: (a.storage_bucket as string | null) ?? null,
+              storage_path: (a.storage_path as string | null) ?? null,
+              mime: String(a.mime),
+            }),
+          })),
+        );
+        return { role: row.role, content: row.content, images: images.filter((img) => img.dataUrl) } as ChatMessage;
+      }),
+    );
 
     // Confirmed live in production: Search blindly ran on the literal message text regardless of
     // whether that text was an actual query — a screenshot attached with the caption "see" searched
@@ -193,7 +221,7 @@ export async function streamMessage(
     const history = appendExtractedText(
       attachImages(
         withSystemPreamble(
-          trimHistoryToBudget([...projectContext, ...(historyRows as ChatMessage[])]),
+          trimHistoryToBudget([...projectContext, ...historyWithImages]),
           think,
           behavior,
           searchActuallyRan,
@@ -207,9 +235,12 @@ export async function streamMessage(
     );
 
     if (mode === "teamup") {
+      const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
       await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal, {
         think,
         canvas,
+        images: attachments,
+        requiresVision: hasImageAttachment && !extractedDocText,
       });
       return;
     }
@@ -257,7 +288,17 @@ export async function streamMessage(
         },
       ];
     } else {
-      candidates = rankCandidatesForMessage(await listChatCandidates(), content);
+      // Same vision gate single-mode applies, ported to Auto so it can't silently pick a
+      // non-vision model that would just ignore the image (see modelRouting.ts).
+      const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
+      const requiresVision = hasImageAttachment && !extractedDocText;
+      const pool = await listChatCandidates();
+      candidates = rankCandidatesForMessage(pool, content, requiresVision);
+      if (candidates.length === 0 && requiresVision && pool.length > 0) {
+        onEvent({ t: "err", c: "None of your enabled models can see images — enable a vision-capable model or remove the attachment." });
+        onEvent({ t: "done" });
+        return;
+      }
       if (candidates.length === 0) throw new HttpError(503, "No chat models are enabled yet");
     }
 

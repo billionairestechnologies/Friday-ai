@@ -1,5 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
-import type { ChatMessage } from "../providers/types.js";
+import type { ChatImage, ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, listChatCandidates, type ChatCandidate } from "../providerService.js";
 import { pickStrongest } from "../modelRouting.js";
 import type { WebSearchResult } from "../webSearch.js";
@@ -21,15 +21,17 @@ function buildSynthesisMessages(
   originalMessage: string,
   drafts: { candidate: ChatCandidate; text: string }[],
   grounding: ChatMessage[] = [],
+  images: ChatImage[] = [],
 ): ChatMessage[] {
   const draftsBlock = drafts
     .map((d, i) => `Draft ${i + 1} (${d.candidate.displayName}):\n${d.text}`)
     .join("\n\n---\n\n");
-  return [
-    ...grounding,
-    { role: "system", content: SYNTHESIS_SYSTEM_PROMPT },
-    { role: "user", content: `Original request:\n${originalMessage}\n\n${draftsBlock}` },
-  ];
+  const userMessage: ChatMessage = {
+    role: "user",
+    content: `Original request:\n${originalMessage}\n\n${draftsBlock}`,
+    ...(images.length > 0 ? { images } : {}),
+  };
+  return [...grounding, { role: "system", content: SYNTHESIS_SYSTEM_PROMPT }, userMessage];
 }
 
 /**
@@ -45,12 +47,19 @@ export async function streamTeamUp(
   webSearch: boolean,
   onEvent: (ev: StreamEvent) => void,
   signal?: AbortSignal,
-  options: { think?: boolean; canvas?: boolean } = {},
+  options: { think?: boolean; canvas?: boolean; images?: ChatImage[]; requiresVision?: boolean } = {},
 ): Promise<void> {
+  const requiresVision = options.requiresVision ?? false;
+  const images = options.images ?? [];
   const pool = await listChatCandidates();
-  const proposers = pickDistinctProviders(pool, TEAMUP_MAX_MODELS);
+  const proposers = pickDistinctProviders(pool, TEAMUP_MAX_MODELS, requiresVision);
   if (proposers.length === 0) {
-    onEvent({ t: "err", c: "No chat models are enabled yet" });
+    onEvent({
+      t: "err",
+      c: requiresVision
+        ? "None of your enabled models can see images — enable a vision-capable model or remove the attachment."
+        : "No chat models are enabled yet",
+    });
     onEvent({ t: "done" });
     return;
   }
@@ -101,9 +110,9 @@ export async function streamTeamUp(
     onEvent({ t: "text", c: full });
   } else {
     onEvent({ t: "status", s: "synthesizing" });
-    finalCandidate = pickStrongest(pool);
+    finalCandidate = pickStrongest(pool, requiresVision);
     const grounding = webSearch ? [searchResultsToSystemMessage(searchResults)] : [];
-    const synthMessages = buildSynthesisMessages(content, drafts, grounding);
+    const synthMessages = buildSynthesisMessages(content, drafts, grounding, images);
     const adapter = getProviderAdapter(finalCandidate.slug);
     const apiKey = await getWorkingKeyForProvider(finalCandidate.slug);
     if (adapter.chatStream) {
