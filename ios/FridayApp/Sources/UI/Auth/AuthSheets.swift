@@ -206,9 +206,10 @@ enum OAuthLauncher {
 struct SVGPathShape: Shape {
     let d: String
     let viewport: CGFloat
+    var dy: CGFloat = 0
 
     func path(in rect: CGRect) -> Path {
-        var path = SVGPathParser.parse(d)
+        var path = SVGPathParser.parse(d).applying(CGAffineTransform(translationX: 0, y: dy))
         let scale = min(rect.width, rect.height) / viewport
         path = path.applying(CGAffineTransform(scaleX: scale, y: scale))
         return path

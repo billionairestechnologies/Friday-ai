@@ -8,6 +8,7 @@ enum class ModelBrand(val logo: Int?) {
     OpenAi(R.drawable.ic_openai),
     Nvidia(R.drawable.ic_nvidia),
     Glm(R.drawable.ic_glm),
+    Sarvam(R.drawable.ic_sarvam),
     Other(null),
 }
 
@@ -18,9 +19,9 @@ private val modelNameBrandPrefixes = listOf("Claude ", "Z.ai: ", "NVIDIA: ")
 
 fun shortModelName(displayName: String): String {
     for (prefix in modelNameBrandPrefixes) {
-        if (displayName.startsWith(prefix)) return displayName.removePrefix(prefix)
+        if (displayName.startsWith(prefix)) return displayName.removePrefix(prefix).removeSuffix(" (chat)")
     }
-    return displayName
+    return displayName.removeSuffix(" (chat)")
 }
 
 fun brandOf(modelId: String, displayName: String): ModelBrand {
@@ -33,6 +34,7 @@ fun brandOf(modelId: String, displayName: String): ModelBrand {
         "gpt" in key -> ModelBrand.OpenAi
         "nemotron" in key || "nvidia" in key -> ModelBrand.Nvidia
         "glm" in key || "z-ai" in key -> ModelBrand.Glm
+        "sarvam" in key -> ModelBrand.Sarvam
         else -> ModelBrand.Other
     }
 }
