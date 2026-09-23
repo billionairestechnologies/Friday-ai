@@ -42,7 +42,7 @@ struct SettingsScreen: View {
                     Spacer()
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
+            .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 0)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -111,7 +111,7 @@ private struct SubPage<Content: View>: View {
                     Spacer()
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
+            .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 0)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) { content() }

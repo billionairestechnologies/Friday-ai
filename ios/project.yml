@@ -15,8 +15,9 @@ targets:
     platform: iOS
     sources:
       - path: FridayApp/Sources
-    resources:
       - path: FridayApp/Resources
+        excludes:
+          - Info.plist
     info:
       path: FridayApp/Resources/Info.plist
       properties:
@@ -37,4 +38,5 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.friday.app.ios
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES

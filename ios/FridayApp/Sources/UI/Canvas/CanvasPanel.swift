@@ -33,7 +33,7 @@ struct CanvasPanel: View {
                 }
             }
         }
-        .background(FridayColor.bg)
+        .background(FridayColor.bg.ignoresSafeArea())
     }
 
     private var header: some View {

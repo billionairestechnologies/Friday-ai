@@ -105,7 +105,7 @@ struct DrawerPane: View {
                 Image(systemName: "xmark").foregroundColor(FridayColor.text).frame(width: 32, height: 32).background(FridayColor.surface).clipShape(Circle())
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 4)
     }
 
     private func navRow(icon: String, label: String, action: @escaping () -> Void) -> some View {

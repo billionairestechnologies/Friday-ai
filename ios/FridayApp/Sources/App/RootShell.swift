@@ -71,12 +71,14 @@ private struct ChatShell: View {
                     }
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 40)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 25)
                             .onEnded { value in
-                                if value.translation.width < -120 && !vm.canvasOpen {
+                                let dx = value.translation.width, dy = value.translation.height
+                                guard abs(dx) > abs(dy) * 1.5 else { return }
+                                if dx < -60 && !vm.canvasOpen {
                                     withAnimation(.easeInOut(duration: 0.3)) { vm.canvasOpen = true }
-                                } else if value.translation.width > 120 && !vm.drawerOpen && !vm.canvasOpen {
+                                } else if dx > 60 && !vm.drawerOpen && !vm.canvasOpen {
                                     withAnimation(.easeInOut(duration: 0.3)) { vm.drawerOpen = true }
                                 }
                             }
@@ -96,10 +98,11 @@ private struct ChatShell: View {
                     DrawerPane()
                         .frame(maxWidth: .infinity)
                         .transition(.move(edge: .leading))
-                        .gesture(
-                            DragGesture(minimumDistance: 30)
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 25)
                                 .onEnded { value in
-                                    if value.translation.width < -60 {
+                                    let dx = value.translation.width, dy = value.translation.height
+                                    if dx < -50 && abs(dx) > abs(dy) * 1.5 {
                                         withAnimation(.easeInOut(duration: 0.3)) { vm.drawerOpen = false }
                                     }
                                 }
@@ -113,16 +116,16 @@ private struct ChatShell: View {
                             .frame(width: UIScreen.main.bounds.width)
                             .transition(.move(edge: .trailing))
                             .shadow(radius: 12)
-                            .gesture(
-                                DragGesture(minimumDistance: 30)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 25)
                                     .onEnded { value in
-                                        if value.translation.width > 80 {
+                                        let dx = value.translation.width, dy = value.translation.height
+                                        if dx > 60 && abs(dx) > abs(dy) * 1.5 {
                                             withAnimation(.easeInOut(duration: 0.3)) { vm.canvasOpen = false }
                                         }
                                     }
                             )
                     }
-                    .ignoresSafeArea()
                 }
 
                 if vm.sheet == .model {
@@ -211,7 +214,8 @@ private struct ChatShell: View {
             }
         }
         .padding(.horizontal, 16)
-        .frame(height: 56)
+        .frame(height: 46)
+        .padding(.top, -8)
     }
 
     private var emptyState: some View {
