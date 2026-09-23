@@ -137,22 +137,27 @@ final class FridayViewModel: ObservableObject {
 
     // MARK: - Sending
 
-    func send() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !pendingAttachments.isEmpty else { return }
-        if let id = currentId, streamJobs[id] != nil { return }
+    /// `override` sends text without touching the composer's draft/attachments (used by Voice Mode).
+    /// Returns the new assistant message's id, or nil if nothing was sent.
+    @discardableResult
+    func send(text override: String? = nil) -> String? {
+        let text = (override ?? draft).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || (override == nil && !pendingAttachments.isEmpty) else { return nil }
+        if let id = currentId, streamJobs[id] != nil { return nil }
 
         guard TokenStore.shared.hasSession() else {
             authRequired = true
-            return
+            return nil
         }
 
         Haptics.impact(.medium)
 
-        let attachmentsForSend = pendingAttachments
-        let modesSnapshot = modes
-        draft = ""
-        pendingAttachments = []
+        let attachmentsForSend = override == nil ? pendingAttachments : []
+        let modesSnapshot = override == nil ? modes : []
+        if override == nil {
+            draft = ""
+            pendingAttachments = []
+        }
 
         var localId = currentId
         if localId == nil {
@@ -179,6 +184,7 @@ final class FridayViewModel: ObservableObject {
             )
         }
         streamJobs[workingId] = job
+        return assistantMsg.id
     }
 
     private func runSend(localId: String, content: String, attachments: [PendingAttachment], modes: Set<Mode>, assistantMessageId: String) async {
