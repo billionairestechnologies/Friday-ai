@@ -90,9 +90,13 @@ struct ComposerBar: View {
 
                 Button { vm.sheet = .model } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: modelIcon)
-                            .font(.system(size: 13))
-                            .foregroundColor(modelIconColor)
+                        if let key = modelLogoKey {
+                            ModelLogo(key: key, size: 15)
+                        } else {
+                            Image(systemName: modelIcon)
+                                .font(.system(size: 13))
+                                .foregroundColor(modelIconColor)
+                        }
                         if vm.modes.count < 2 {
                             Text(modelLabel).font(.system(size: 13, weight: .medium)).lineLimit(1).frame(maxWidth: 96, alignment: .leading).fixedSize(horizontal: true, vertical: false)
                         }
@@ -113,6 +117,12 @@ struct ComposerBar: View {
             trailingAction
         }
         .animation(.easeInOut(duration: 0.2), value: vm.draft.isEmpty && vm.modes.isEmpty)
+    }
+
+    private var modelLogoKey: String? {
+        guard vm.selectedModelId != AUTO_MODEL_ID, vm.selectedModelId != TEAMUP_MODEL_ID,
+              let m = vm.remoteModels.first(where: { $0.modelId == vm.selectedModelId }) else { return nil }
+        return m.modelId + " " + m.displayName
     }
 
     private var modelIcon: String {

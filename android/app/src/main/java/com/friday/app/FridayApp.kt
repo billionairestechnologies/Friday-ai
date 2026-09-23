@@ -303,7 +303,9 @@ fun FridayApp(
                     remoteModels = ui.remoteModels,
                     selectedModelId = ui.selectedModelId,
                     localSelected = ui.model,
+                    plan = ui.plan,
                     onPickRemote = vm::setRemoteModel,
+                    onLocked = { vm.closeSheet(); page = "plans" },
                     onPickLocal = vm::setModel,
                 )
                 Sheet.Attach -> AttachSheet(

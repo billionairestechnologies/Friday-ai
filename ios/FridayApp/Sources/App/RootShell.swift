@@ -261,7 +261,8 @@ private struct ChatShell: View {
                     subtitle: (model.minTier?.isEmpty == false ? model.minTier!.capitalized + " tier" : nil),
                     selected: vm.selectedModelId == model.modelId,
                     iconColor: ModelBrand.color(for: model.modelId + " " + model.displayName),
-                    locked: locked
+                    locked: locked,
+                    logoKey: model.modelId + " " + model.displayName
                 ) {
                     if locked {
                         vm.sheet = .none

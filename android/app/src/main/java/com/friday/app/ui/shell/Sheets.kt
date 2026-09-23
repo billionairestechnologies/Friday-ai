@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Photo
@@ -32,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -80,6 +82,8 @@ fun ModelSheet(
     remoteModels: List<RemoteModel>,
     selectedModelId: String?,
     localSelected: ModelId,
+    plan: String?,
+    onLocked: () -> Unit,
     onPickRemote: (String) -> Unit,
     onPickLocal: (ModelId) -> Unit,
 ) {
@@ -87,11 +91,14 @@ fun ModelSheet(
         if (remoteModels.isNotEmpty()) {
             remoteModels.forEach { m ->
                 val isSelected = m.modelId == selectedModelId
+                val rank = mapOf("free" to 0, "pro" to 1, "premium" to 2)
+                val locked = (rank[plan?.lowercase() ?: "free"] ?: 0) < (rank[m.minTier.lowercase()] ?: 0)
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable { onPickRemote(m.modelId) }
+                        .clickable { if (locked) onLocked() else onPickRemote(m.modelId) }
+                        .alpha(if (locked) 0.55f else 1f)
                         .background(if (isSelected) FridaySurface else androidx.compose.ui.graphics.Color.Transparent)
                         .padding(horizontal = 10.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -107,7 +114,8 @@ fun ModelSheet(
                         }
                         Text(subtitle, color = FridayMuted, fontSize = 12.5.sp)
                     }
-                    if (isSelected) Icon(Icons.Default.Check, null, tint = FridayText, modifier = Modifier.size(20.dp))
+                    if (locked) Icon(Icons.Default.Lock, null, tint = FridayMuted, modifier = Modifier.size(18.dp))
+                    else if (isSelected) Icon(Icons.Default.Check, null, tint = FridayText, modifier = Modifier.size(20.dp))
                 }
             }
         } else {

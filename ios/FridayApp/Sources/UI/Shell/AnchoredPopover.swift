@@ -59,6 +59,7 @@ struct PopoverRow: View {
     /// Model is above the user's plan tier — shown dimmed with a lock, tapping routes to upgrade
     /// instead of selecting it (mirrors backend's planSatisfiesTier gate in tokenQuotaService.ts).
     var locked: Bool = false
+    var logoKey: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -71,6 +72,10 @@ struct PopoverRow: View {
                         .frame(width: 40, height: 40)
                         .background(FridayColor.surface)
                         .clipShape(Circle())
+                } else if let logoKey {
+                    ModelLogo(key: logoKey, size: 22, dim: locked)
+                        .frame(width: 22)
+                        .padding(.top, subtitle == nil ? 0 : 2)
                 } else {
                     Image(systemName: icon)
                         .font(.system(size: 17))
