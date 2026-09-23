@@ -23,6 +23,7 @@ import { detectImageIntent, type ImageIntent } from "./imageIntent.js";
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
+import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDocs.js";
 import {
   appendExtractedText,
   attachImages,
@@ -53,22 +54,26 @@ export {
 } from "./conversations.js";
 
 /**
- * Extracts text from every PDF/PNG/JPEG/DOCX/XLSX attachment and returns it combined, or null if
- * nothing extractable was attached or every extraction failed. PDF/image goes through Sarvam's
- * Doc AI digitise pipeline (OCR — verified directly against the real API); DOCX/XLSX are parsed
- * locally (mammoth/exceljs — these are structured XML formats, not scanned documents, and
- * Sarvam's API rejects them outright, confirmed directly: "only JPEG and PNG entries are
- * allowed"). Never throws — extraction is a best-effort enhancement layered on top of (not
- * required for) whatever native support the chosen model already has. This is what makes any of
- * these files readable by ANY model, not just ones with native document/vision support, and gives
- * even a non-vision model a way to "read" an image's text.
+ * Extracts text from every PDF/PNG/JPEG/DOCX/XLSX/plain-text-or-code attachment and returns it
+ * combined, or null if nothing extractable was attached or every extraction failed. PDF/image
+ * goes through Sarvam's Doc AI digitise pipeline (OCR — verified directly against the real API);
+ * DOCX/XLSX are parsed locally (mammoth/exceljs — these are structured XML formats, not scanned
+ * documents, and Sarvam's API rejects them outright, confirmed directly: "only JPEG and PNG
+ * entries are allowed"); plain text/code (.py, .xml, .csv, .json, .md, etc — see
+ * plainTextDocs.ts) is just decoded directly, no parsing needed. Never throws — extraction is a
+ * best-effort enhancement layered on top of (not required for) whatever native support the
+ * chosen model already has. This is what makes any of these files readable by ANY model, not
+ * just ones with native document/vision support, and gives even a non-vision model a way to
+ * "read" an image's text.
  */
 async function extractDocumentText(attachments: ChatImage[]): Promise<string | null> {
   const officeFiles = attachments.filter((a) => isOfficeDocument(a.mime));
   const digitisableFiles = attachments.filter((a) => isDigitisable(a.mime));
-  if (officeFiles.length === 0 && digitisableFiles.length === 0) return null;
+  const plainTextFiles = attachments.filter((a) => isPlainTextDocument(a.mime, a.name));
+  if (officeFiles.length === 0 && digitisableFiles.length === 0 && plainTextFiles.length === 0) return null;
 
   const officeTexts = officeFiles.map((f) => extractOfficeText(f.dataUrl, f.mime));
+  const plainTexts = plainTextFiles.map((f) => Promise.resolve(extractPlainText(f.dataUrl, f.mime, f.name)));
   const digitiseTexts = (async () => {
     if (digitisableFiles.length === 0) return [];
     const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
@@ -76,9 +81,13 @@ async function extractDocumentText(attachments: ChatImage[]): Promise<string | n
     return digitisableFiles.map((f, i) => digitiseDocument(sarvamKey, f.dataUrl, f.mime, `attachment-${i + 1}`));
   })();
 
-  const [officeResults, digitiseResultPromises] = await Promise.all([Promise.all(officeTexts), digitiseTexts]);
+  const [officeResults, plainTextResults, digitiseResultPromises] = await Promise.all([
+    Promise.all(officeTexts),
+    Promise.all(plainTexts),
+    digitiseTexts,
+  ]);
   const digitiseResults = await Promise.all(digitiseResultPromises);
-  const allResults = [...officeResults, ...digitiseResults];
+  const allResults = [...officeResults, ...plainTextResults, ...digitiseResults];
 
   const extracted = allResults
     .map((text, i) => (text ? (allResults.length > 1 ? `[Attachment ${i + 1}]\n${text}` : text) : null))
@@ -296,47 +305,65 @@ export async function streamMessage(
     }
 
     let candidates: ChatCandidate[];
+    let usedVisionFallback = false;
     if (mode === "single") {
       if (!conversation.providers || !conversation.model_id) {
         throw new HttpError(500, "Conversation is missing its provider/model");
       }
       // The vision gate is about actual images needing a multimodal-capable model to see the raw
       // pixels — but Sarvam's OCR extraction gives a non-vision model a way to "read" an image's
-      // text too, so this only blocks when there's an image AND extraction didn't already cover it
-      // (no working Sarvam key, or OCR found nothing — e.g. a low-resolution image with no legible
-      // text, confirmed directly against the real API).
+      // text too, so this only matters when there's an image AND extraction didn't already cover
+      // it (no working Sarvam key, or OCR found nothing — e.g. a low-resolution image with no
+      // legible text, confirmed directly against the real API).
       const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
       const vision = await getModelVisionSupport(conversation.provider_id as string, conversation.model_id);
+      // Previously this hard-errored, telling the user to manually switch models. Now it falls
+      // back to a vision-capable model for THIS turn only (same ranked pool Auto mode uses,
+      // filtered to vision) — the user's picked model stays selected for the conversation, this
+      // is just a one-turn substitution so attaching an image never requires a manual model
+      // switch. Falls through to the normal single-model path below when the picked model
+      // already has vision, or when OCR already covered the image.
+      let visionFallback: ChatCandidate | null = null;
       if (hasImageAttachment && !vision && !extractedDocText) {
-        onEvent({
-          t: "err",
-          c: `${conversation.providers.display_name} can't see images — pick a vision-capable model or remove the attachment.`,
-        });
-        onEvent({ t: "done" });
-        return;
+        const visionPool = rankCandidatesForMessage(await listChatCandidates(), content, true);
+        visionFallback = visionPool[0] ?? null;
+        if (!visionFallback) {
+          onEvent({
+            t: "err",
+            c: "None of your enabled models can see images — enable a vision-capable model or remove the attachment.",
+          });
+          onEvent({ t: "done" });
+          return;
+        }
       }
       // Only a gate now, not the primary path — extractedDocText being non-null means Sarvam
       // already turned the PDF into text that ANY model can read, so a PDF-incapable model is only
-      // actually blocked here if that extraction also failed/wasn't available.
-      const unsupportedReason = extractedDocText
-        ? null
-        : unsupportedAttachmentReason(conversation.providers.slug, attachments);
+      // actually blocked here if that extraction also failed/wasn't available. Skipped entirely
+      // when falling back to a different model above (unsupportedAttachmentReason is about the
+      // ORIGINALLY selected provider, moot once a different one is about to be used instead).
+      const unsupportedReason =
+        extractedDocText || visionFallback ? null : unsupportedAttachmentReason(conversation.providers.slug, attachments);
       if (unsupportedReason) {
         onEvent({ t: "err", c: `${conversation.providers.display_name} ${unsupportedReason}` });
         onEvent({ t: "done" });
         return;
       }
-      const minTier = await getModelMinTier(conversation.provider_id as string, conversation.model_id);
-      candidates = [
-        {
-          slug: conversation.providers.slug,
-          providerDisplayName: conversation.providers.display_name,
-          modelId: conversation.model_id,
-          displayName: await getModelDisplayName(conversation.provider_id as string, conversation.model_id),
-          vision,
-          minTier,
-        },
-      ];
+      if (visionFallback) {
+        candidates = [visionFallback];
+        usedVisionFallback = true;
+      } else {
+        const minTier = await getModelMinTier(conversation.provider_id as string, conversation.model_id);
+        candidates = [
+          {
+            slug: conversation.providers.slug,
+            providerDisplayName: conversation.providers.display_name,
+            modelId: conversation.model_id,
+            displayName: await getModelDisplayName(conversation.provider_id as string, conversation.model_id),
+            vision,
+            minTier,
+          },
+        ];
+      }
     } else {
       // Same vision gate single-mode applies, ported to Auto so it can't silently pick a
       // non-vision model that would just ignore the image (see modelRouting.ts).
@@ -454,7 +481,12 @@ export async function streamMessage(
       reservation?.reserveTokens ?? 0,
     );
 
-    const label = mode === "auto" ? `Auto → ${usedCandidate.displayName}` : usedCandidate.displayName;
+    const label =
+      mode === "auto"
+        ? `Auto → ${usedCandidate.displayName}`
+        : usedVisionFallback
+          ? `${usedCandidate.displayName} (switched to see your image)`
+          : usedCandidate.displayName;
     await insertAssistantMessage(conversationId, full, label, {
       thinking,
       citations: searchResults.map((result) => ({ url: result.url, title: result.title })),

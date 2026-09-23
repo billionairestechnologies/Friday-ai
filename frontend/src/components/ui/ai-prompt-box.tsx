@@ -942,10 +942,12 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 ref={documentInputRef}
                 type="file"
                 className="hidden"
-                // PDF/DOCX/XLSX are the document types the backend actually processes (PDF via
-                // Sarvam's Doc AI OCR, DOCX/XLSX parsed directly) — anything else here would look
-                // attached in the UI but silently vanish before the request went out.
-                accept=".pdf,.docx,.xlsx"
+                // Document types the backend actually processes: PDF (Sarvam Doc AI OCR),
+                // DOCX/XLSX (parsed directly), and plain text/code files (decoded directly, no
+                // parsing needed — .py/.xml/.json/etc). Drag-and-drop bypasses this `accept`
+                // filter (it's a UI hint, not enforcement), so the backend independently handles
+                // any mime it doesn't recognize by just not extracting it rather than erroring.
+                accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.py,.js,.ts,.jsx,.tsx,.java,.c,.cpp,.go,.rs,.rb,.php,.swift,.kt,.html,.css,.yaml,.yml,.sh,.sql,.log"
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);
                   if (e.target) e.target.value = "";
