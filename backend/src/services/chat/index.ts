@@ -152,7 +152,7 @@ export async function streamMessage(
     const conversation = await getOwnedConversation(userId, conversationId);
     const mode = conversation.mode as ConversationMode;
 
-    await insertUserMessage(conversationId, content, inputMode, attachments, userId);
+    const userMessageRow = await insertUserMessage(conversationId, content, inputMode, attachments, userId);
     void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
     if (attachments.length > 0) {
       void recordUsageEvent(userId, "attachment_upload", attachments.length, {
@@ -165,9 +165,16 @@ export async function streamMessage(
     // role/content, so message_attachments (populated by insertUserMessage below, and already
     // used to redisplay thumbnails in listMessages) was written but never read back into the
     // prompt, meaning an attachment only ever worked on the exact turn it was sent with.
+    //
+    // Also selects extracted_text (PDF OCR / DOCX/XLSX / plain-text — persisted once at upload
+    // time, see the update() right after extractDocumentText() below) so an uploaded document's
+    // actual content is recalled on every later turn too, not just images — previously a PDF's
+    // text only ever reached the model on the exact turn it was attached; asking about it again
+    // one message later got "please upload the original PDF" even though the file was already
+    // sitting right there in the conversation.
     const { data: historyRows, error: historyError } = await supabaseAdmin
       .from("messages")
-      .select("role, content, message_attachments(mime, data_url, storage_bucket, storage_path)")
+      .select("role, content, extracted_text, message_attachments(mime, data_url, storage_bucket, storage_path)")
       .eq("conversation_id", conversationId)
       .order("created_at");
     if (historyError) throw new HttpError(500, historyError.message);
@@ -176,8 +183,10 @@ export async function streamMessage(
       (historyRows ?? []).map(async (row) => {
         const attachmentRows = (row as { message_attachments?: Array<Record<string, unknown>> | null }).message_attachments;
         const imageRows = (attachmentRows ?? []).filter((a) => String(a.mime ?? "").startsWith("image/"));
+        const rowExtractedText = (row as { extracted_text?: string | null }).extracted_text;
+        const content = rowExtractedText ? `${row.content}\n\n--- Extracted text from an attached file ---\n${rowExtractedText}` : row.content;
         if (imageRows.length === 0) {
-          return { role: row.role, content: row.content } as ChatMessage;
+          return { role: row.role, content } as ChatMessage;
         }
         const images: ChatImage[] = await Promise.all(
           imageRows.map(async (a) => ({
@@ -190,7 +199,7 @@ export async function streamMessage(
             }),
           })),
         );
-        return { role: row.role, content: row.content, images: images.filter((img) => img.dataUrl) } as ChatMessage;
+        return { role: row.role, content, images: images.filter((img) => img.dataUrl) } as ChatMessage;
       }),
     );
 
@@ -226,6 +235,18 @@ export async function streamMessage(
       for (const r of searchResults) onEvent({ t: "cite", u: r.url, title: r.title });
     }
     const extractedDocText = await extractDocumentText(attachments);
+    // Persisted once here so a LATER turn can recall this file's content without the user
+    // re-uploading it (see historyWithImages below, which reads this back) — and so Sarvam's
+    // paid OCR call never has to re-run for the same file on every subsequent message.
+    if (extractedDocText) {
+      void supabaseAdmin
+        .from("messages")
+        .update({ extracted_text: extractedDocText })
+        .eq("id", userMessageRow.id)
+        .then(({ error }) => {
+          if (error) console.error("[chat] failed to persist extracted_text:", error.message);
+        });
+    }
     // DOCX/XLSX have no native fallback on ANY provider — extraction succeeding is the only way
     // one of these ever reaches the model at all, so a failure here (corrupt file, unsupported
     // internal structure) needs to surface regardless of mode, not just single's per-provider

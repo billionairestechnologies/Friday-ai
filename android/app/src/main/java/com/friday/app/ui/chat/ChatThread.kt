@@ -1,6 +1,8 @@
 package com.friday.app.ui.chat
 
 import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -20,6 +22,9 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,8 +48,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -89,6 +96,7 @@ import com.friday.app.ui.theme.FridaySearch
 import com.friday.app.ui.theme.FridayStop
 import com.friday.app.ui.theme.FridaySuccess
 import com.friday.app.ui.theme.FridaySurface
+import com.friday.app.ui.theme.FridayHairline
 import com.friday.app.ui.theme.FridayText
 import com.friday.app.ui.theme.FridayThink
 import kotlinx.coroutines.delay
@@ -193,6 +201,7 @@ private fun AssistantBlock(msg: ChatMessage) {
 @Composable
 private fun MessageActions(text: String) {
     val clipboard = LocalClipboardManager.current
+    val ctx = LocalContext.current
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
@@ -200,23 +209,59 @@ private fun MessageActions(text: String) {
             copied = false
         }
     }
-    Box(
-        Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .clickable {
-                clipboard.setText(AnnotatedString(text))
-                copied = true
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-            if (copied) "Copied" else "Copy response",
-            tint = FridayMuted,
-            modifier = Modifier.size(16.dp),
-        )
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .clickable {
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                if (copied) "Copied" else "Copy response",
+                tint = FridayMuted,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .clickable { shareReplyAsFile(ctx, text) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Download,
+                "Download response",
+                tint = FridayMuted,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
+}
+
+/** Saves the reply as a .md file and hands it to the OS share sheet — matches web's "Download
+ *  response" action (saveFile("friday-reply.md", ...) in message-thread.tsx), previously Android
+ *  only had Copy for a full reply (CanvasPanel.kt already had this exact FileProvider/ACTION_SEND
+ *  pattern for canvas artifacts and chat export; this reuses the same approach). */
+private fun shareReplyAsFile(ctx: android.content.Context, text: String) {
+    val uri = runCatching {
+        val dir = File(ctx.cacheDir, "replies").apply { mkdirs() }
+        val file = File(dir, "friday-reply.md")
+        file.writeText(text)
+        FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+    }.getOrNull() ?: return
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/markdown"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { ctx.startActivity(Intent.createChooser(intent, "Save reply").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }
 
 /** Shown the instant a message starts streaming, before any status/reasoning/content has arrived. */
@@ -699,6 +744,48 @@ private fun MarkdownText(text: String) {
                     }
                 }
                 is MdLine.Para -> Text(annotatedFromBold(line.text), color = FridayText, fontSize = 15.5.sp, lineHeight = 24.sp)
+                is MdLine.Table -> MarkdownTable(line.headers, line.rows)
+            }
+        }
+    }
+}
+
+/** GFM-style table — matches web's react-markdown table rendering (a horizontally-scrollable
+ *  bordered grid) rather than the raw `| a | b |` pipe text this used to fall through to. */
+@Composable
+private fun MarkdownTable(headers: List<String>, rows: List<List<String>>) {
+    val colCount = headers.size
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, FridayHairline, RoundedCornerShape(12.dp)),
+    ) {
+        Column(Modifier.horizontalScroll(rememberScrollState())) {
+            Row(Modifier.background(FridaySurface)) {
+                headers.forEach { cell ->
+                    Text(
+                        cell,
+                        color = FridayText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.widthIn(min = 96.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            HorizontalDivider(color = FridayHairline)
+            rows.forEachIndexed { rowIndex, row ->
+                Row {
+                    for (c in 0 until colCount) {
+                        Text(
+                            row.getOrElse(c) { "" },
+                            color = FridayText,
+                            fontSize = 13.sp,
+                            modifier = Modifier.widthIn(min = 96.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                if (rowIndex != rows.lastIndex) HorizontalDivider(color = FridayHairline)
             }
         }
     }
@@ -707,12 +794,23 @@ private fun MarkdownText(text: String) {
 private sealed class MdLine {
     data class Para(val text: String) : MdLine()
     data class Bullet(val text: String, val ordinal: String? = null) : MdLine()
+    data class Table(val headers: List<String>, val rows: List<List<String>>) : MdLine()
 }
 
 private val headingLineRegex = Regex("^#{1,6}\\s+(.*)$")
 private val bulletLineRegex = Regex("^[-*•]\\s+(.*)$")
 private val numberedLineRegex = Regex("^(\\d+)[.)]\\s+(.*)$")
 private val boldRegex = Regex("\\*\\*(.+?)\\*\\*")
+
+// GFM table syntax: a header row, a `|---|---|` separator row, then N data rows, all pipe-
+// delimited. Previously not recognized at all — a ledger/comparison reply's table (which the
+// backend's FORMAT_SYSTEM_PROMPT now actively asks for when data is tabular) rendered as raw
+// `| Col | Col |` pipe text, unlike web's react-markdown+remark-gfm which already handles it.
+private val tableRowRegex = Regex("^\\|(.+)\\|$")
+private val tableSeparatorRegex = Regex("^\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?$")
+
+private fun splitTableCells(line: String): List<String> =
+    line.trim().removePrefix("|").removeSuffix("|").split("|").map { it.trim() }
 
 private fun parseMarkdownLines(text: String): List<MdLine> {
     val out = mutableListOf<MdLine>()
@@ -721,12 +819,28 @@ private fun parseMarkdownLines(text: String): List<MdLine> {
         if (para.isNotBlank()) out += MdLine.Para(para.toString().trim())
         para.clear()
     }
-    for (raw in text.split("\n")) {
-        val line = raw.trim()
+    val rawLines = text.split("\n")
+    var i = 0
+    while (i < rawLines.size) {
+        val line = rawLines[i].trim()
         val heading = headingLineRegex.find(line)
         val bullet = bulletLineRegex.find(line)
         val numbered = numberedLineRegex.find(line)
+        val isTableHeader = tableRowRegex.matches(line) &&
+            i + 1 < rawLines.size && tableSeparatorRegex.matches(rawLines[i + 1].trim())
         when {
+            isTableHeader -> {
+                flushPara()
+                val headers = splitTableCells(line)
+                val rows = mutableListOf<List<String>>()
+                i += 2 // skip header + separator
+                while (i < rawLines.size && tableRowRegex.matches(rawLines[i].trim())) {
+                    rows += splitTableCells(rawLines[i].trim())
+                    i++
+                }
+                out += MdLine.Table(headers, rows)
+                continue
+            }
             line.isEmpty() -> flushPara()
             heading != null -> {
                 flushPara()
@@ -745,6 +859,7 @@ private fun parseMarkdownLines(text: String): List<MdLine> {
                 para.append(line)
             }
         }
+        i++
     }
     flushPara()
     return out.ifEmpty { listOf(MdLine.Para(text)) }

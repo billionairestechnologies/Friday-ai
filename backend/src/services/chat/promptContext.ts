@@ -67,8 +67,13 @@ const FORMAT_SYSTEM_PROMPT =
   "Structure your replies for readability: use short paragraphs, and when a reply covers multiple " +
   "points, steps, or items, use a bulleted or numbered markdown list (\"- \" or \"1. \") instead of " +
   "run-on prose. Bold (**like this**) section titles or key terms with markdown, not by writing " +
-  "them in caps or repeating them. Only add structure where it actually helps — a short " +
-  "conversational reply doesn't need headers or bullets forced onto it.";
+  "them in caps or repeating them. When the data itself is naturally tabular — rows with the same " +
+  "set of fields, ledger/transaction entries, comparisons across items, anything with clear " +
+  "columns — use an actual markdown table (`| Col | Col |` with a `|---|---|` header separator) " +
+  "instead of a bulleted list or prose paragraph describing each row; a table is far easier to " +
+  "scan than \"On 17 December, balance was X, debit was Y\" repeated per entry. Only add structure " +
+  "where it actually helps — a short conversational reply doesn't need headers, bullets, or a " +
+  "table forced onto it.";
 
 // "Think" has no per-provider API today, so it's implemented as a universal system-prompt nudge
 // that works the same across every adapter rather than a provider-specific reasoning param.
