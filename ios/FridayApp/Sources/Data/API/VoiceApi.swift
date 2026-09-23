@@ -9,7 +9,10 @@ enum VoiceApi {
     static func voices() async throws -> [Voice] {
         let json = try await ApiClient.shared.requestJSON(path: "voice/voices", authed: true)
         guard let arr = json["voices"] as? [[String: Any]] else { return [] }
-        return arr.map { Voice(id: $0["id"] as? String ?? "", name: $0["name"] as? String ?? "") }
+        return arr.compactMap {
+            guard let id = ($0["voiceId"] as? String) ?? ($0["id"] as? String), !id.isEmpty else { return nil }
+            return Voice(id: id, name: ($0["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? id)
+        }
     }
 
     static func speak(text: String, voiceId: String?) async throws -> Data {

@@ -27,7 +27,8 @@ object VoiceApi {
                 val arr = JSONObject(text).optJSONArray("voices") ?: JSONArray()
                 (0 until arr.length()).map { i ->
                     val o = arr.getJSONObject(i)
-                    VoiceOption(id = o.optString("id"), name = o.optString("name").ifBlank { o.optString("id") })
+                    val id = o.optString("voiceId").ifBlank { o.optString("id") }
+                    VoiceOption(id = id, name = o.optString("name").ifBlank { id })
                 }
             }
         }.getOrElse { emptyList() }
