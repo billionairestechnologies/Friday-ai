@@ -41,7 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
@@ -491,7 +491,7 @@ private fun ChatShell(
                     .clickable(onClick = { vm.toggleMode(Mode.Canvas) }),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.Dashboard, "Canvas", tint = if (canvasOn) FridayCanvas else FridayText)
+                Icon(Icons.Outlined.GridView, "Canvas", tint = if (canvasOn) FridayCanvas else FridayText)
             }
         }
 

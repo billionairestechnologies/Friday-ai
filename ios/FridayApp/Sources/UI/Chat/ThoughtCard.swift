@@ -79,19 +79,14 @@ struct ThoughtCard: View {
                             BouncingDots(color: FridayColor.think)
                             RotatingPhrase(pool: ThinkingLines.pillPool(for: message.modesUsed), interval: 2.6, font: .system(size: 12).italic(), color: FridayColor.muted)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(FridayColor.muted.opacity(0.1))
-                        .cornerRadius(10)
+                        .padding(.vertical, 2)
                     }
                 }
                 .padding(.top, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(12)
-        .background(FridayColor.surface.opacity(0.5))
-        .cornerRadius(14)
+        .padding(.vertical, 4)
     }
 
     private func stepRow(title: String, caption: String) -> some View {
@@ -161,9 +156,7 @@ struct AgentsRow: View {
                 .padding(.top, 10)
             }
         }
-        .padding(12)
-        .background(FridayColor.surface.opacity(0.5))
-        .cornerRadius(14)
+        .padding(.vertical, 4)
     }
 }
 

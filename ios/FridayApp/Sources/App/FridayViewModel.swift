@@ -182,7 +182,11 @@ final class FridayViewModel: ObservableObject {
     }
 
     private func runSend(localId: String, content: String, attachments: [PendingAttachment], modes: Set<Mode>, assistantMessageId: String) async {
-        defer { streamJobs[localId] = nil }
+        var finalId: String?
+        defer {
+            streamJobs[localId] = nil
+            if let finalId { streamJobs[finalId] = nil }
+        }
 
         let mode: String = selectedModelId == AUTO_MODEL_ID ? "auto" : (selectedModelId == TEAMUP_MODEL_ID ? "teamup" : "single")
         let modelId = mode == "single" ? selectedModelId : nil
@@ -196,6 +200,7 @@ final class FridayViewModel: ObservableObject {
             return
         }
 
+        finalId = realId
         if realId != localId {
             swapChatId(from: localId, to: realId)
             if let job = streamJobs[localId] {
