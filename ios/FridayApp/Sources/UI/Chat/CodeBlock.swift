@@ -49,46 +49,62 @@ struct CodeBlock: View {
         .cornerRadius(FridayRadius.code)
     }
 
+    /// Built as a flat AttributedString: chaining `Text + Text` per token nests
+    /// the view tree thousands deep and overflows the stack on long code.
     private var highlightedText: Text {
         let keywords: Set<String> = ["fun", "val", "var", "class", "from", "import", "def", "for", "if", "else", "return", "const", "let", "function", "struct", "enum", "public", "private", "static"]
-        var result = Text("")
+        var result = AttributedString()
         for rawLine in code.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = String(rawLine)
             if let range = line.range(of: "//") {
-                result = result + colorize(String(line[..<range.lowerBound]), keywords: keywords) + Text(String(line[range.lowerBound...])).foregroundColor(FridayColor.codeComment)
+                colorize(String(line[..<range.lowerBound]), keywords: keywords, into: &result)
+                append(String(line[range.lowerBound...]), FridayColor.codeComment, to: &result)
             } else if line.trimmingCharacters(in: .whitespaces).hasPrefix("#") {
-                result = result + Text(line).foregroundColor(FridayColor.codeComment)
+                append(line, FridayColor.codeComment, to: &result)
             } else {
-                result = result + colorize(line, keywords: keywords)
+                colorize(line, keywords: keywords, into: &result)
             }
-            result = result + Text("\n")
+            result.append(AttributedString("\n"))
         }
-        return result
+        return Text(result)
     }
 
-    private func colorize(_ line: String, keywords: Set<String>) -> Text {
-        var out = Text("")
+    private func append(_ s: String, _ color: Color, to out: inout AttributedString) {
+        var piece = AttributedString(s)
+        piece.foregroundColor = color
+        out.append(piece)
+    }
+
+    private func colorize(_ line: String, keywords: Set<String>, into out: inout AttributedString) {
         var inString = false
         var token = ""
-        func flush() {
+        var stringBuf = ""
+        var plain = ""
+        func flushPlain() {
+            guard !plain.isEmpty else { return }
+            append(plain, FridayColor.codeFg, to: &out)
+            plain = ""
+        }
+        func flushToken() {
             guard !token.isEmpty else { return }
             if keywords.contains(token) {
-                out = out + Text(token).foregroundColor(FridayColor.codeTag)
+                flushPlain()
+                append(token, FridayColor.codeTag, to: &out)
             } else {
-                out = out + Text(token).foregroundColor(FridayColor.codeFg)
+                plain += token
             }
             token = ""
         }
-        var stringBuf = ""
         for ch in line {
             if ch == "\"" {
                 if inString {
                     stringBuf.append(ch)
-                    out = out + Text(stringBuf).foregroundColor(FridayColor.codeString)
+                    append(stringBuf, FridayColor.codeString, to: &out)
                     stringBuf = ""
                     inString = false
                 } else {
-                    flush()
+                    flushToken()
+                    flushPlain()
                     inString = true
                     stringBuf = String(ch)
                 }
@@ -98,13 +114,13 @@ struct CodeBlock: View {
             if ch.isLetter || ch == "_" {
                 token.append(ch)
             } else {
-                flush()
-                out = out + Text(String(ch)).foregroundColor(FridayColor.codeFg)
+                flushToken()
+                plain.append(ch)
             }
         }
-        flush()
-        if inString { out = out + Text(stringBuf).foregroundColor(FridayColor.codeString) }
-        return out
+        flushToken()
+        flushPlain()
+        if inString { append(stringBuf, FridayColor.codeString, to: &out) }
     }
 }
 
