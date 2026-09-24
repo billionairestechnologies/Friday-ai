@@ -41,6 +41,9 @@ final class FridayViewModel: ObservableObject {
     @Published var voiceName: String?
 
     private var streamJobs: [String: Task<Void, Never>] = [:]
+    // Model last applied to each server conversation, so a send only PATCHes it when the picker
+    // actually changed. Unknown (e.g. a conversation loaded from the drawer) → PATCH once.
+    private var conversationModels: [String: String] = [:]
     private let currentVersion = "1.0.0"
 
     var currentChat: ChatThread? {
@@ -198,9 +201,26 @@ final class FridayViewModel: ObservableObject {
         let modelId = mode == "single" ? selectedModelId : nil
         let providerSlug = mode == "single" ? remoteModels.first(where: { $0.modelId == selectedModelId })?.providerSlug : nil
 
+        // Reuse the chat's server conversation once it has one. This used to create a brand-new
+        // conversation on EVERY send, so the backend (which builds the model's context from that
+        // conversation's saved messages) only ever saw the current message — a follow-up like
+        // "the name is Stockbricks" got "what can I do for you?" with no memory of the request.
         var realId: String
         do {
-            realId = try await ChatApi.createConversation(mode: mode, modelId: modelId, providerSlug: providerSlug)
+            if UUID(uuidString: localId) != nil {
+                realId = localId
+                if conversationModels[localId] != selectedModelId {
+                    // Best-effort: on failure the reply just comes from the previous model.
+                    if (try? await ChatApi.updateConversation(
+                        id: localId, mode: mode, modelId: modelId, providerSlug: providerSlug
+                    )) != nil {
+                        conversationModels[localId] = selectedModelId
+                    }
+                }
+            } else {
+                realId = try await ChatApi.createConversation(mode: mode, modelId: modelId, providerSlug: providerSlug)
+                conversationModels[realId] = selectedModelId
+            }
         } catch {
             appendError(localId: localId, assistantMessageId: assistantMessageId, message: "Couldn't start the conversation: \(error.localizedDescription)")
             return

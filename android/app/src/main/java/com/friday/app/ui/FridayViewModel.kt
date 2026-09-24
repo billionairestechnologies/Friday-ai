@@ -93,6 +93,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     // chats "getting stuck" when switching screens or opening a new chat mid-reply. Each chat now
     // owns its own job and can run fully independently of every other chat.
     private val streamJobs = mutableMapOf<String, Job>()
+    // Model last applied to each server conversation, so a send only PATCHes the conversation when
+    // the picker actually changed. Unknown (e.g. a conversation loaded from the drawer) → PATCH once.
+    private val conversationModels = mutableMapOf<String, String?>()
 
     init {
         viewModelScope.launch {
@@ -545,7 +548,23 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         else -> "single"
                     }
                     val selected = _state.value.remoteModels.firstOrNull { it.modelId == selectedId }
-                    val remoteId = ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode)
+                    // Reuse the chat's server conversation once it has one. This used to create a
+                    // brand-new conversation on EVERY send, so the backend (which builds the model's
+                    // context from that conversation's saved messages) only ever saw the current
+                    // message: "build me a website" → "name is Stockbricks" got "what can I do for
+                    // you?" because the second message landed in an empty conversation.
+                    val existingId = chatId!!.takeIf { isServerConversationId(it) }
+                    val remoteId = if (existingId != null) {
+                        if (conversationModels[existingId] != selectedId &&
+                            ChatApi.updateConversation(existingId, selected?.modelId, selected?.providerSlug, conversationMode)
+                        ) {
+                            conversationModels[existingId] = selectedId
+                        }
+                        existingId
+                    } else {
+                        ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode)
+                            ?.also { conversationModels[it] = selectedId }
+                    }
                     if (remoteId != null) {
                         val oldId = chatId!!
                         if (remoteId != oldId) {
@@ -660,3 +679,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         SupabaseRealtime.disconnect()
     }
 }
+
+// Real backend conversation ids are UUIDs; everything else ("c-<millis>" for a just-started chat,
+// "seed-…"/showcase threads) is a local placeholder that still needs a server conversation.
+private val SERVER_CONVERSATION_ID = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+private fun isServerConversationId(id: String): Boolean = SERVER_CONVERSATION_ID.matches(id)

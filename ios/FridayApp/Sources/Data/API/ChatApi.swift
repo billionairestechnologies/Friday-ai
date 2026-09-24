@@ -34,6 +34,17 @@ enum ChatApi {
         return id
     }
 
+    /// PATCH /chat/conversations/:id — switches an EXISTING conversation to a different
+    /// model/mode without starting a new one (which would drop the history the model sees).
+    static func updateConversation(id: String, mode: String, modelId: String?, providerSlug: String?) async throws {
+        var body: [String: Any] = ["mode": mode]
+        if mode == "single" {
+            if let modelId { body["modelId"] = modelId }
+            if let providerSlug { body["providerSlug"] = providerSlug }
+        }
+        _ = try await ApiClient.shared.requestJSON(path: "chat/conversations/\(id)", method: "PATCH", body: body, authed: true)
+    }
+
     /// Streams one assistant reply. Yields cumulative buffers per the
     /// backend's contract (not deltas) — the caller replaces, not appends.
     static func streamMessage(
