@@ -436,7 +436,8 @@ private fun ChatShell(
     var autoClosedMessageId by remember { mutableStateOf<String?>(null) }
     val latestArtifactMsg = chat?.messages?.asReversed()?.firstOrNull { artifactFor(it) != null }
     val latestArtifact = latestArtifactMsg?.let { artifactFor(it) }
-    val autoOpen = latestArtifact != null && latestArtifactMsg?.id != autoClosedMessageId
+    // Plain code (ArtifactKind.Code) only shows when Canvas is turned on — it never auto-opens the panel.
+    val autoOpen = latestArtifact != null && latestArtifact.kind != com.friday.app.ui.canvas.ArtifactKind.Code && latestArtifactMsg?.id != autoClosedMessageId
     val canvasOn = Mode.Canvas in ui.modes || autoOpen
     val ctx = LocalContext.current
     val reduce = remember {

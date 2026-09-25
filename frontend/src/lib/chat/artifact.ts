@@ -3,7 +3,17 @@ export type Artifact = {
   body: string;
   lang?: string;
   title: string;
+  /** Separate ```css fence(s) from the same reply — a React component or page is usually
+   *  written as `App.jsx` + `App.css`, so the preview needs the stylesheet too. */
+  css?: string;
 };
+
+/** Injects an extra stylesheet into a full HTML document for the preview. */
+export function withExtraCss(html: string, css?: string): string {
+  if (!css) return html;
+  const tag = `<style>${css}</style>`;
+  return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${tag}</head>`) : `${tag}${html}`;
+}
 
 const FENCE = /```(\w+)?\n([\s\S]*?)```/g;
 // Languages Canvas can actually execute for real (in an isolated E2B VM), vs. just
@@ -39,8 +49,13 @@ export function extractArtifact(content: string): Artifact | null {
   if (!text) return null;
   const blocks = [...text.matchAll(FENCE)];
   const html = blocks.find((b) => (b[1] ?? "").toLowerCase() === "html");
+  const css = blocks
+    .filter((b) => (b[1] ?? "").toLowerCase() === "css")
+    .map((b) => (b[2] ?? "").trim())
+    .filter(Boolean)
+    .join("\n\n") || undefined;
   if (html?.[2]?.trim()) {
-    return { kind: "html", body: html[2].trim(), title: "Canvas", lang: "html" };
+    return { kind: "html", body: html[2].trim(), title: "Canvas", lang: "html", css };
   }
   const react = blocks.find((b) => {
     const lang = (b[1] ?? "").toLowerCase();
@@ -48,7 +63,7 @@ export function extractArtifact(content: string): Artifact | null {
     return ["javascript", "js", "typescript", "ts"].includes(lang) && looksLikeReactComponent(b[2] ?? "");
   });
   if (react?.[2]?.trim()) {
-    return { kind: "react", body: react[2].trim(), lang: react[1] || "jsx", title: `${react[1] || "jsx"} canvas` };
+    return { kind: "react", body: react[2].trim(), lang: react[1] || "jsx", title: `${react[1] || "jsx"} canvas`, css };
   }
   const runnable = blocks.find((b) => RUNNABLE_LANGS.has((b[1] ?? "").toLowerCase()));
   if (runnable?.[2]?.trim()) {

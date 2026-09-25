@@ -114,7 +114,7 @@ fun CanvasPanel(
         ) {
             Text("Canvas", color = FridayCanvas, fontWeight = FontWeight.Medium, fontSize = 15.sp)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (artifact != null && artifact.kind != ArtifactKind.Runnable) {
+                if (artifact != null && artifact.previewable) {
                     HeaderIcon(Icons.Default.OpenInBrowser, "Open in browser") {
                         openInBrowser(ctx, artifact)
                     }
@@ -128,7 +128,7 @@ fun CanvasPanel(
             }
         }
 
-        if (artifact != null && artifact.kind != ArtifactKind.Runnable) {
+        if (artifact != null && artifact.previewable) {
             SegmentedTabs(tab, onSelect = { tab = it })
         }
 
@@ -141,8 +141,9 @@ fun CanvasPanel(
                 modifier = Modifier.padding(20.dp),
             )
             artifact.kind == ArtifactKind.Runnable -> RunnableBody(artifact, runState, onRunAgain = { runNow() })
+            artifact.kind == ArtifactKind.Code -> CodeBody(artifact.code)
             tab == CanvasTab.Preview -> ArtifactWebView(
-                html = if (artifact.kind == ArtifactKind.Html) artifact.code else wrapReactHtml(artifact.code),
+                html = renderableContent(artifact),
                 modifier = Modifier.fillMaxSize().padding(top = 4.dp),
             )
             else -> CodeBody(artifact.code)
@@ -297,36 +298,14 @@ private fun ShimmerBody() {
     }
 }
 
-/** Best-effort standalone preview shell for JSX/TSX via CDN-hosted React + Babel standalone. */
-private fun wrapReactHtml(code: String): String = """
-    <!DOCTYPE html><html><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <style>body{font-family:sans-serif;margin:0;padding:16px;}</style>
-    </head><body>
-    <div id="root">Loading preview…</div>
-    <script type="text/babel">
-    try {
-      $code
-      const mount = document.getElementById('root');
-      const Comp = typeof App !== 'undefined' ? App : (typeof Component !== 'undefined' ? Component : null);
-      if (Comp) {
-        ReactDOM.createRoot(mount).render(React.createElement(Comp));
-      } else {
-        mount.innerText = 'No default component named App/Component found to preview.';
-      }
-    } catch (e) {
-      document.getElementById('root').innerText = 'Preview error: ' + e.message;
-    }
-    </script>
-    </body></html>
-""".trimIndent()
-
 private fun extensionFor(artifact: DetectedArtifact): String = when (artifact.kind) {
     ArtifactKind.Html -> "html"
     ArtifactKind.React -> "html"
+    ArtifactKind.Code -> when (artifact.lang) {
+        "css" -> "css"; "json" -> "json"; "sql" -> "sql"; "go" -> "go"; "php" -> "php"; "rust", "rs" -> "rs"
+        "kotlin", "kt" -> "kt"; "swift" -> "swift"; "c" -> "c"; "cpp", "c++" -> "cpp"; "yaml", "yml" -> "yml"
+        else -> "txt"
+    }
     ArtifactKind.Runnable -> when (artifact.lang) {
         "python", "py" -> "py"
         "javascript", "js" -> "js"
@@ -339,9 +318,9 @@ private fun extensionFor(artifact: DetectedArtifact): String = when (artifact.ki
 }
 
 private fun renderableContent(artifact: DetectedArtifact): String = when (artifact.kind) {
-    ArtifactKind.Html -> artifact.code
-    ArtifactKind.React -> wrapReactHtml(artifact.code)
-    ArtifactKind.Runnable -> artifact.code
+    ArtifactKind.Html -> htmlWithCss(artifact.code, artifact.css)
+    ArtifactKind.React -> reactPreviewHtml(artifact.code, artifact.css)
+    ArtifactKind.Runnable, ArtifactKind.Code -> artifact.code
 }
 
 private fun writeCanvasFile(ctx: android.content.Context, artifact: DetectedArtifact): android.net.Uri? = runCatching {

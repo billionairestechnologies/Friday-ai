@@ -54,7 +54,7 @@ struct CanvasPanel: View {
     private func isWebKind(_ artifact: DetectedArtifact) -> Bool {
         switch artifact.kind {
         case .html, .react: return true
-        case .runnable: return false
+        case .runnable, .code: return false
         }
     }
 
@@ -71,12 +71,13 @@ struct CanvasPanel: View {
                 .padding(12)
 
                 if tab == "preview" {
-                    let html = { if case .react = artifact.kind { return ArtifactDetect.reactShellHTML(code: artifact.code) } else { return artifact.code } }()
-                    WebPreview(html: html)
+                    WebPreview(html: ArtifactDetect.renderableHTML(artifact))
                 } else {
                     codeView(artifact.code)
                 }
             }
+        case .code:
+            ScrollView { codeView(artifact.code).padding(16) }
         case .runnable(let language):
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -176,10 +177,16 @@ struct CanvasPanel: View {
         switch artifact.kind {
         case .html, .react: ext = "html"
         case .runnable(let lang): ext = lang
+        case .code:
+            let map = ["css": "css", "json": "json", "sql": "sql", "go": "go", "php": "php", "rust": "rs", "rs": "rs", "kotlin": "kt", "kt": "kt", "swift": "swift", "c": "c", "cpp": "cpp", "yaml": "yml", "yml": "yml"]
+            ext = map[artifact.language] ?? "txt"
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("canvas-artifact.\(ext)")
         let content: String
-        if case .react = artifact.kind { content = ArtifactDetect.reactShellHTML(code: artifact.code) } else { content = artifact.code }
+        switch artifact.kind {
+        case .html, .react: content = ArtifactDetect.renderableHTML(artifact)
+        case .runnable, .code: content = artifact.code
+        }
         try? content.write(to: url, atomically: true, encoding: .utf8)
         return url
     }

@@ -11,7 +11,7 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
-import { extractArtifact, extractStreamingCodeBody, type Artifact } from "@/lib/chat/artifact";
+import { extractArtifact, extractStreamingCodeBody, withExtraCss, type Artifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
 import { normalizeRunLanguage, runSandboxCode, type AutoRunResult } from "@/lib/chat/runnable";
@@ -331,7 +331,7 @@ function CanvasBody({
             type="button"
             aria-label="Open in new tab"
             onClick={() => {
-              const html = artifact.kind === "react" ? buildReactPreviewHtml(artifact.body) : artifact.body;
+              const html = artifact.kind === "react" ? buildReactPreviewHtml(artifact.body, artifact.css) : withExtraCss(artifact.body, artifact.css);
               const blob = new Blob([html], { type: "text/html;charset=utf-8" });
               const url = URL.createObjectURL(blob);
               window.open(url, "_blank", "noopener,noreferrer");
@@ -400,7 +400,7 @@ function CanvasBody({
               transition={{ duration: 0.22 }}
               title="Canvas"
               sandbox="allow-scripts"
-              srcDoc={artifact.body}
+              srcDoc={withExtraCss(artifact.body, artifact.css)}
               className="h-full min-h-[24rem] w-full border-0 bg-white"
             />
           ) : artifact?.kind === "react" && view === "code" ? (
@@ -423,7 +423,7 @@ function CanvasBody({
               transition={{ duration: 0.22 }}
               title="Canvas"
               sandbox="allow-scripts"
-              srcDoc={buildReactPreviewHtml(artifact.body)}
+              srcDoc={buildReactPreviewHtml(artifact.body, artifact.css)}
               className="h-full min-h-[24rem] w-full border-0 bg-white"
             />
           ) : artifact?.kind === "runnable" ? (
