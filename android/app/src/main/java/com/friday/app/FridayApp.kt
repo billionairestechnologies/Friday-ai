@@ -116,7 +116,7 @@ fun FridayApp(
     paymentResults: MutableStateFlow<PaymentOutcome?>? = null,
 ) {
     val ui by vm.state.collectAsState()
-    val drawerState = rememberDrawerState(if (ui.drawerOpen) DrawerValue.Open else DrawerValue.Closed)
+    val drawerState = com.friday.app.ui.shell.rememberSwipeDrawerState(ui.drawerOpen)
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     var page by remember { mutableStateOf("chat") }
@@ -171,14 +171,16 @@ fun FridayApp(
     }
 
     LaunchedEffect(ui.drawerOpen) {
-        if (ui.drawerOpen) drawerState.open() else drawerState.close()
+        if (ui.drawerOpen != drawerState.isOpen) {
+            if (ui.drawerOpen) drawerState.open() else drawerState.close()
+        }
     }
-    LaunchedEffect(drawerState.currentValue) {
-        vm.setDrawer(drawerState.currentValue == DrawerValue.Open)
+    LaunchedEffect(drawerState.isOpen) {
+        vm.setDrawer(drawerState.isOpen)
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
+    com.friday.app.ui.shell.SwipeDrawer(
+        state = drawerState,
         gesturesEnabled = page == "chat",
         drawerContent = {
             Box(Modifier.fillMaxWidth()) {
@@ -196,6 +198,7 @@ fun FridayApp(
                         vm.openChat(it)
                         page = "chat"
                     },
+                    onDeleteChat = { id -> vm.deleteChat(id) { android.widget.Toast.makeText(ctx, "Couldn't delete that chat — check your connection.", android.widget.Toast.LENGTH_LONG).show() } },
                     onOpenSheet = { dest ->
                         if (dest == Sheet.Auth) {
                             vm.setDrawer(false)
@@ -208,14 +211,14 @@ fun FridayApp(
                         vm.setDrawer(false)
                         page = dest
                     },
-                    onClose = { scope.launch { drawerState.close() } },
+                    onClose = { drawerState.close() },
                     onUpdate = { openUpdate() },
                 )
             }
         },
     ) {
         when (page) {
-            "library" -> StubPage("Library", "Your files and images will live here.") { page = "chat" }
+            "library" -> com.friday.app.ui.library.LibraryScreen(onClose = { page = "chat" })
             "projects" -> StubPage("Projects", "Project-scoped chats and files will live here.") { page = "chat" }
             "automations" -> StubPage("Automations", "Scheduled prompts are coming soon.") { page = "chat" }
             "settings" -> com.friday.app.ui.settings.SettingsScreen(
@@ -268,7 +271,7 @@ fun FridayApp(
             )
             else -> ChatShell(
                 vm = vm,
-                onOpenDrawer = { scope.launch { drawerState.open() } },
+                onOpenDrawer = { drawerState.open() },
                 onOpenAuth = { page = "auth" },
                 onOpenPlans = { page = "plans" },
                 onOpenUpdate = { openUpdate() },
@@ -468,7 +471,7 @@ private fun ChatShell(
             ) {
                 Icon(Icons.Default.Menu, "Open menu", tint = FridayText)
             }
-            if (ui.user == null || com.friday.app.ui.settings.isFreePlan(ui.plan)) {
+            if (ui.user == null || (ui.plan != null && com.friday.app.ui.settings.isFreePlan(ui.plan))) {
                 Spacer(Modifier.width(6.dp))
                 Box(
                     Modifier
@@ -524,6 +527,7 @@ private fun ChatShell(
 
         Column(Modifier.weight(1f).fillMaxWidth()) {
             var dragTotal by remember { mutableStateOf(0f) }
+            val composerFocus = remember { androidx.compose.ui.focus.FocusRequester() }
             val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
             val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
             val hideKeyboardOnPull = remember {
@@ -545,20 +549,34 @@ private fun ChatShell(
                     .weight(1f)
                     .fillMaxWidth()
                     .nestedScroll(hideKeyboardOnPull)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 10f) {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                            }
-                        }
+                    .pointerInput(empty) {
+                        var upTotal = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { upTotal = 0f },
+                            onVerticalDrag = { _, dragAmount ->
+                                if (dragAmount > 10f) {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
+                                }
+                                // Swipe up on the (non-scrolling) start screen brings up the keyboard.
+                                if (empty && dragAmount < 0f) {
+                                    upTotal += dragAmount
+                                    if (upTotal < -60f) {
+                                        upTotal = 0f
+                                        composerFocus.requestFocus()
+                                        keyboardController?.show()
+                                    }
+                                }
+                            },
+                        )
                     }
                     .pointerInput(canvasOn) {
                         detectHorizontalDragGestures(
                             onDragStart = { dragTotal = 0f },
                             onHorizontalDrag = { change, dragAmount ->
+                                // Deliberately NOT consumed — the drawer's own drag detector must still
+                                // see this gesture, otherwise swiping right to open it stalls.
                                 dragTotal += dragAmount
-                                change.consume()
                             },
                             onDragEnd = {
                                 if (!canvasOn && dragTotal < -120f) vm.toggleMode(Mode.Canvas)
@@ -647,6 +665,7 @@ private fun ChatShell(
                     onVoiceMessage = vm::sendVoiceMessage,
                     attachments = ui.pendingAttachments,
                     onRemoveAttachment = vm::removeAttachment,
+                    focusRequester = composerFocus,
                 )
               }
             }

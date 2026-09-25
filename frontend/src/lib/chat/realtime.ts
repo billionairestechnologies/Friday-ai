@@ -56,6 +56,10 @@ export function startRealtimeSync(userId: string, accessToken: string) {
       { event: "*", schema: "public", table: "conversations", filter: `user_id=eq.${userId}` },
       () => refetchConversations(),
     )
+    // Postgres can't filter DELETE events by column, so the user_id filter above never fires for
+    // a delete made on another device. An unfiltered DELETE subscription (ids only, and we just
+    // refetch our own list) is what makes a cross-device delete disappear here.
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "conversations" }, () => refetchConversations())
     .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
       const conversationId = (payload.new as { conversation_id?: string } | null)?.conversation_id
         ?? (payload.old as { conversation_id?: string } | null)?.conversation_id;

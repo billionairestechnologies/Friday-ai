@@ -18,7 +18,7 @@ import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
 import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { filteredChats, useChat } from "@/lib/chat/store";
+import { filteredChats, useChat, type ServerConversation } from "@/lib/chat/store";
 import { usePlan } from "@/lib/usage/planStore";
 import type { AssistantProject } from "@/routes/projects";
 import { cn } from "@/lib/utils";
@@ -85,7 +85,17 @@ export function Sidebar() {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
     deleteChatLocal(id);
     if (id === activeId) void navigate({ to: "/" });
-    if (conversationId) void api.delete(`/chat/conversations/${conversationId}`).catch(() => {});
+    if (conversationId) {
+      api.delete(`/chat/conversations/${conversationId}`).catch(() => {
+        // The delete didn't reach the server, so the chat would silently come back on the next
+        // sync — refetch now so it visibly returns instead of looking deleted but not being.
+        void api
+          .get<{ conversations: ServerConversation[] }>("/chat/conversations")
+          .then((res) => useChat.getState().hydrateFromServer(res.conversations))
+          .catch(() => {});
+        window.alert("Couldn't delete that chat — check your connection and try again.");
+      });
+    }
   }
 
   return (

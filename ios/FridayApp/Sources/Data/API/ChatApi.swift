@@ -48,7 +48,7 @@ enum ChatApi {
     /// POST /chat/conversations/:id/stop — the backend keeps generating after the client
     /// disconnects, so an explicit Stop has to be sent to it. Best-effort (204, no body).
     static func stop(conversationId: String) async {
-        _ = try? await ApiClient.shared.requestJSON(path: "chat/conversations/\(conversationId)/stop", method: "POST", body: [:], authed: true)
+        _ = try? await ApiClient.shared.request(path: "chat/conversations/\(conversationId)/stop", method: "POST", body: [:], authed: true)
     }
 
     /// Streams one assistant reply. Yields cumulative buffers per the
@@ -193,11 +193,11 @@ enum ConversationsApi {
     }
 
     static func delete(conversationId: String) async throws {
-        _ = try await ApiClient.shared.requestJSON(path: "chat/conversations/\(conversationId)", method: "DELETE", authed: true)
+        _ = try await ApiClient.shared.request(path: "chat/conversations/\(conversationId)", method: "DELETE", authed: true)
     }
 
     static func deleteAll() async throws {
-        _ = try await ApiClient.shared.requestJSON(path: "chat/conversations", method: "DELETE", authed: true)
+        _ = try await ApiClient.shared.request(path: "chat/conversations", method: "DELETE", authed: true)
     }
 }
 

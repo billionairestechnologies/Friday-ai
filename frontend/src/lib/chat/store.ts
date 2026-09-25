@@ -423,9 +423,29 @@ export const useChat = create<ChatState>()(
               messages: [],
               projectId: projectId ?? sc.project_id ?? undefined,
             }));
-          if (additions.length === 0) return {};
-          const merged = [...s.chats, ...additions].sort((a, b) => b.updatedAt - a.updatedAt);
-          return { chats: merged };
+          const serverIds = new Map(conversations.map((sc) => [sc.id, sc]));
+          // An unscoped list below the page size is the COMPLETE set of top-level chats, so a
+          // synced chat missing from it was deleted on another device — drop it here too.
+          // (Never a chat that's mid-stream, still local-only, or belongs to a project.)
+          const complete = !projectId && conversations.length < 50;
+          const kept = s.chats.filter(
+            (c) =>
+              !complete ||
+              !c.conversationId ||
+              c.projectId ||
+              serverIds.has(c.conversationId) ||
+              c.messages.some((m) => m.streaming),
+          );
+          const retitled = kept.map((c) => {
+            const sc = c.conversationId ? serverIds.get(c.conversationId) : undefined;
+            return sc && sc.title && sc.title !== c.title ? { ...c, title: sc.title } : c;
+          });
+          if (additions.length === 0 && retitled.every((c, i) => c === kept[i]) && kept.length === s.chats.length) {
+            return {};
+          }
+          const merged = [...retitled, ...additions].sort((a, b) => b.updatedAt - a.updatedAt);
+          const activeGone = s.activeId && !merged.some((c) => c.id === s.activeId);
+          return { chats: merged, ...(activeGone ? { activeId: null } : {}) };
         }),
       loadMessagesInto: (chatId, messages) =>
         set((s) => ({

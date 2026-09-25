@@ -48,6 +48,12 @@ class TokenStore(context: Context) {
         get() = prefs.getString(KEY_VOICE_NAME, null)
         set(value) = prefs.edit().putString(KEY_VOICE_NAME, value).apply()
 
+    /** Last plan the backend reported, so the top bar can render the right state on cold start
+     *  instead of flashing "Upgrade" for a second while GET /usage/quota is in flight. */
+    var plan: String?
+        get() = prefs.getString(KEY_PLAN, null)
+        set(value) = prefs.edit().putString(KEY_PLAN, value).apply()
+
     fun hasSession(): Boolean = !accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank()
 
     fun saveSession(accessToken: String, refreshToken: String) {
@@ -58,7 +64,7 @@ class TokenStore(context: Context) {
     /** Clears the session only — [voiceId]/[voiceName] are a device-level preference (mirrors the
      *  web app's own persisted store, which doesn't wipe it on logout either) and survive this. */
     fun clear() {
-        prefs.edit().remove(KEY_ACCESS).remove(KEY_REFRESH).remove(KEY_NAME).remove(KEY_EMAIL).apply()
+        prefs.edit().remove(KEY_ACCESS).remove(KEY_REFRESH).remove(KEY_NAME).remove(KEY_EMAIL).remove(KEY_PLAN).apply()
     }
 
     companion object {
@@ -66,6 +72,7 @@ class TokenStore(context: Context) {
         private const val KEY_REFRESH = "refresh_token"
         private const val KEY_NAME = "user_name"
         private const val KEY_EMAIL = "user_email"
+        private const val KEY_PLAN = "plan"
         private const val KEY_VOICE_ID = "voice_id"
         private const val KEY_VOICE_NAME = "voice_name"
     }

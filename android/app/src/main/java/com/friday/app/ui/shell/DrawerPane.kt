@@ -2,6 +2,7 @@ package com.friday.app.ui.shell
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,7 @@ import java.time.ZoneId
 import java.time.format.TextStyle as JTextStyle
 import java.util.Locale
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DrawerPane(
     user: FridayUser?,
@@ -73,6 +75,7 @@ fun DrawerPane(
     currentId: String?,
     onNewChat: () -> Unit,
     onOpenChat: (String) -> Unit,
+    onDeleteChat: (String) -> Unit = {},
     onOpenSheet: (Sheet) -> Unit,
     onNavigate: (String) -> Unit,
     onClose: () -> Unit,
@@ -80,6 +83,7 @@ fun DrawerPane(
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
+    var pendingDelete by remember { mutableStateOf<ChatThread?>(null) }
     val filtered = recents.filter { it.title.contains(query, ignoreCase = true) }
 
     Column(
@@ -119,7 +123,7 @@ fun DrawerPane(
                 }
                 // A plain small-caps label, not a filled pill — reads as a status line under the
                 // name rather than a second tappable button sitting next to it.
-                if (user != null) {
+                if (user != null && plan != null) {
                     val free = plan.isNullOrBlank() || plan.equals("free", ignoreCase = true)
                     Text(
                         (plan?.replaceFirstChar { it.uppercase() } ?: "Free") + " plan",
@@ -160,6 +164,20 @@ fun DrawerPane(
             modifier = Modifier.padding(start = 24.dp, bottom = 6.dp),
         )
 
+        pendingDelete?.let { chat ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { pendingDelete = null },
+                title = { Text("Delete chat?") },
+                text = { Text("\"${chat.title}\" will be deleted on all your devices.") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { onDeleteChat(chat.id); pendingDelete = null }) { Text("Delete") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+                },
+            )
+        }
+
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
             if (filtered.isEmpty()) {
                 Text("No conversations yet", color = FridayMuted, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
@@ -171,7 +189,7 @@ fun DrawerPane(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .background(if (active) FridaySurface else Color.Transparent)
-                            .clickable { onOpenChat(chat.id) }
+                            .combinedClickable(onClick = { onOpenChat(chat.id) }, onLongClick = { pendingDelete = chat })
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Text(

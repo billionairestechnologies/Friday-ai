@@ -10,7 +10,7 @@ struct RootShell: View {
             switch vm.page {
             case "settings": SettingsScreen()
             case "plans": PlansScreen()
-            case "library": StubPage(title: "Library", body: "Your files and images will live here.") { vm.page = "chat" }
+            case "library": LibraryScreen()
             case "projects": StubPage(title: "Projects", body: "Project-scoped chats and files will live here.") { vm.page = "chat" }
             case "automations": StubPage(title: "Automations", body: "Scheduled prompts are coming soon.") { vm.page = "chat" }
             default: ChatShell()
@@ -44,6 +44,40 @@ private struct ChatShell: View {
 
     private var reduced: Bool { Motion.reduced }
 
+    // Drawer follows the finger 1:1 and settles with a stiff spring — WhatsApp-style. A quarter
+    // of the width, or any quick flick, commits it (the old code only reacted on finger-up, then
+    // played a 0.3s ease-in-out, which is what made swiping feel slow).
+    @State private var drawerX: CGFloat = -UIScreen.main.bounds.width
+    @State private var drawerDragging = false
+    private var screenW: CGFloat { UIScreen.main.bounds.width }
+    private let settleSpring = Animation.spring(response: 0.26, dampingFraction: 0.88)
+
+    private func settleDrawer(open: Bool) {
+        drawerDragging = false
+        vm.drawerOpen = open
+        withAnimation(settleSpring) { drawerX = open ? 0 : -screenW }
+    }
+
+    private func trackDrawer(_ value: DragGesture.Value, startedOpen: Bool) {
+        let dx = value.translation.width, dy = value.translation.height
+        guard drawerDragging || (abs(dx) > 8 && abs(dx) > abs(dy) * 1.2) else { return }
+        if !startedOpen && dx <= 0 && !drawerDragging { return }
+        if startedOpen && dx >= 0 && !drawerDragging { return }
+        drawerDragging = true
+        let base: CGFloat = startedOpen ? 0 : -screenW
+        drawerX = min(0, max(-screenW, base + dx))
+    }
+
+    private func finishDrawer(_ value: DragGesture.Value, startedOpen: Bool) {
+        guard drawerDragging else { return }
+        let revealed = (drawerX + screenW) / screenW
+        let velocity = value.predictedEndTranslation.width - value.translation.width
+        let open: Bool
+        if abs(velocity) > 160 { open = velocity > 0 }
+        else { open = startedOpen ? revealed > 0.75 : revealed > 0.25 }
+        settleDrawer(open: open)
+    }
+
     var body: some View {
         ZStack(alignment: .leading) {
                 VStack(spacing: 0) {
@@ -72,18 +106,25 @@ private struct ChatShell: View {
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .simultaneousGesture(
-                        DragGesture(minimumDistance: 25)
+                        DragGesture(minimumDistance: 10)
+                            .onChanged { value in
+                                if !vm.drawerOpen && !vm.canvasOpen { trackDrawer(value, startedOpen: false) }
+                            }
                             .onEnded { value in
+                                if drawerDragging { finishDrawer(value, startedOpen: false); return }
                                 let dx = value.translation.width, dy = value.translation.height
                                 if dy > 40 && abs(dy) > abs(dx) * 1.5 {
                                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                                     return
                                 }
+                                // Swipe up on the (non-scrolling) start screen brings up the keyboard.
+                                if dy < -50 && abs(dy) > abs(dx) * 1.5 && (vm.currentChat?.messages.isEmpty ?? true) {
+                                    vm.composerFocusTick += 1
+                                    return
+                                }
                                 guard abs(dx) > abs(dy) * 1.5 else { return }
                                 if dx < -60 && !vm.canvasOpen {
-                                    withAnimation(.easeInOut(duration: 0.3)) { vm.canvasOpen = true }
-                                } else if dx > 60 && !vm.drawerOpen && !vm.canvasOpen {
-                                    withAnimation(.easeInOut(duration: 0.3)) { vm.drawerOpen = true }
+                                    withAnimation(settleSpring) { vm.canvasOpen = true }
                                 }
                             }
                     )
@@ -95,21 +136,17 @@ private struct ChatShell: View {
                 }
                 .background(FridayColor.bg.ignoresSafeArea())
 
-                if vm.drawerOpen {
+                if vm.drawerOpen || drawerDragging || drawerX > -screenW + 1 {
                     Color.black.opacity(0.001)
                         .ignoresSafeArea()
-                        .onTapGesture { withAnimation(.easeInOut(duration: 0.3)) { vm.drawerOpen = false } }
+                        .onTapGesture { settleDrawer(open: false) }
                     DrawerPane()
                         .frame(maxWidth: .infinity)
-                        .transition(.move(edge: .leading))
+                        .offset(x: drawerX)
                         .simultaneousGesture(
-                            DragGesture(minimumDistance: 25)
-                                .onEnded { value in
-                                    let dx = value.translation.width, dy = value.translation.height
-                                    if dx < -50 && abs(dx) > abs(dy) * 1.5 {
-                                        withAnimation(.easeInOut(duration: 0.3)) { vm.drawerOpen = false }
-                                    }
-                                }
+                            DragGesture(minimumDistance: 10)
+                                .onChanged { value in trackDrawer(value, startedOpen: true) }
+                                .onEnded { value in finishDrawer(value, startedOpen: true) }
                         )
                 }
 
@@ -125,7 +162,7 @@ private struct ChatShell: View {
                                     .onEnded { value in
                                         let dx = value.translation.width, dy = value.translation.height
                                         if dx > 60 && abs(dx) > abs(dy) * 1.5 {
-                                            withAnimation(.easeInOut(duration: 0.3)) { vm.canvasOpen = false }
+                                            withAnimation(settleSpring) { vm.canvasOpen = false }
                                         }
                                     }
                             )
@@ -150,6 +187,9 @@ private struct ChatShell: View {
             PluginsSheet()
         }
         .photosPicker(isPresented: $triggerPhotosPicker, selection: $photoItem, matching: .any(of: [.images]))
+        .onChange(of: vm.drawerOpen) { open in
+            if !drawerDragging { withAnimation(settleSpring) { drawerX = open ? 0 : -screenW } }
+        }
         .onChange(of: photoItem) { item in
             guard let item else { return }
             Task { await loadPhoto(item) }
@@ -188,11 +228,11 @@ private struct ChatShell: View {
 
     private var topBar: some View {
         HStack {
-            Button { withAnimation(.easeInOut(duration: 0.3)) { vm.drawerOpen = true } } label: {
+            Button { vm.drawerOpen = true } label: {
                 Image(systemName: "line.3.horizontal").foregroundColor(FridayColor.text)
             }
 
-            if vm.user == nil || vm.plan == "free" {
+            if vm.user == nil || (vm.planLoaded && vm.plan == "free") {
                 Button {
                     if vm.user == nil { vm.startAuth(signup: false) } else { vm.page = "plans" }
                 } label: {
@@ -209,7 +249,7 @@ private struct ChatShell: View {
             Text("Friday").font(.system(size: 17, weight: .semibold)).foregroundColor(FridayColor.text)
             Spacer()
 
-            Button { withAnimation(.easeInOut(duration: 0.3)) { vm.canvasOpen.toggle() } } label: {
+            Button { withAnimation(settleSpring) { vm.canvasOpen.toggle() } } label: {
                 Image(systemName: "square.grid.2x2")
                     .foregroundColor(vm.canvasOpen ? FridayColor.canvas : FridayColor.text)
                     .padding(6)

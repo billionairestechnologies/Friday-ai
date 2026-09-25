@@ -30,13 +30,17 @@ final class FridayViewModel: ObservableObject {
     // Navigation / UI
     @Published var page: String = "chat"
     @Published var drawerOpen = false
+    /// Bumped to ask the composer to grab focus (swipe-up on the start screen opens the keyboard).
+    @Published var composerFocusTick = 0
     @Published var sheet: SheetState = .none
     @Published var playEntrance = true
     @Published var canvasOpen = false
     @Published var voiceModeOpen = false
 
     // Plan / usage
-    @Published var plan: String = "free"
+    @Published var plan: String = TokenStore.shared.hasSession() ? (TokenStore.shared.plan ?? "free") : "free"
+    /// False until the plan is known (cached or fetched) — gates the "Upgrade" button so a paid user never sees it flash.
+    @Published var planLoaded: Bool = TokenStore.shared.hasSession() && TokenStore.shared.plan != nil
     @Published var updateInfo: UpdateApi.Info?
 
     // Voice preference (device-level, survives logout)
@@ -358,7 +362,20 @@ final class FridayViewModel: ObservableObject {
     func deleteChat(_ id: String) {
         chats.removeAll { $0.id == id }
         if currentId == id { currentId = nil }
-        Task { try? await ConversationsApi.delete(conversationId: id) }
+        streamJobs[id]?.cancel()
+        streamJobs[id] = nil
+        queued[id] = nil
+        guard UUID(uuidString: id) != nil else { return }
+        Task {
+            do {
+                try await ConversationsApi.delete(conversationId: id)
+            } catch {
+                // The delete didn't reach the server — resync so the chat visibly comes back
+                // instead of silently reappearing later, and tell the user.
+                await syncConversations()
+                attachmentError = "Couldn't delete that chat — check your connection."
+            }
+        }
     }
 
     func toggleMode(_ mode: Mode) {
@@ -435,7 +452,11 @@ final class FridayViewModel: ObservableObject {
     }
 
     func refreshPlan() async {
-        if let p = (try? await UsageApi.quota())?.plan?.lowercased(), !p.isEmpty { plan = p }
+        if let p = (try? await UsageApi.quota())?.plan?.lowercased(), !p.isEmpty {
+            plan = p
+            planLoaded = true
+            TokenStore.shared.plan = p
+        }
     }
 
     func logout() async {
@@ -447,6 +468,7 @@ final class FridayViewModel: ObservableObject {
         await RealtimeClient.shared.disconnect()
         user = nil
         plan = "free"
+        planLoaded = false
         chats = []
         currentId = nil
         page = "chat"

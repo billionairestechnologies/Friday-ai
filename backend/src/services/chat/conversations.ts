@@ -1,3 +1,4 @@
+import { saveFromMessage } from "../libraryService.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import type { ConversationMode } from "./types.js";
@@ -256,5 +257,7 @@ export async function insertAssistantMessage(
     .select()
     .single();
   if (error || !data) throw new HttpError(500, error?.message ?? "Failed to save reply");
+  // Auto-save any code / pages / images in the reply to the user's Library (fire-and-forget).
+  void saveFromMessage(conversationId, data.id as string, content);
   return data;
 }

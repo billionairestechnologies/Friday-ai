@@ -95,7 +95,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ChatRepository()
     private val tokenStore = TokenStore(app).also { ApiClient.init(it) }
     private val vibrator = app.getSystemService(Vibrator::class.java)
-    private val _state = MutableStateFlow(FridayUiState())
+    private val _state = MutableStateFlow(FridayUiState(plan = if (tokenStore.hasSession()) tokenStore.plan else null))
     val state: StateFlow<FridayUiState> = _state.asStateFlow()
     // Per-chat, not a single shared slot — one Job used to cover the whole app, so sending in a
     // second chat cancelled whatever the first chat was still streaming, and a single isGenerating
@@ -167,7 +167,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         if (!tokenStore.hasSession()) return
         viewModelScope.launch {
             val quota = UsageApi.quota()
-            if (quota != null) _state.update { it.copy(plan = quota.plan) }
+            if (quota != null) {
+                tokenStore.plan = quota.plan
+                _state.update { it.copy(plan = quota.plan) }
+            }
         }
     }
 
@@ -202,8 +205,16 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     private fun syncConversations() {
         if (!tokenStore.hasSession()) return
         viewModelScope.launch {
-            val remote = ConversationsApi.list()
-            if (remote.isNotEmpty()) _state.update { it.copy(chats = remote) }
+            val remote = ConversationsApi.list() ?: return@launch
+            _state.update { s ->
+                // Keep any chat that's mid-stream or not yet on the server (local "c-…" ids) —
+                // dropping it would orphan the running reply — and reuse already-loaded messages.
+                val remoteIds = remote.map { it.id }.toSet()
+                val merged = remote.map { r -> s.chats.firstOrNull { it.id == r.id }?.let { old -> r.copy(messages = old.messages) } ?: r }
+                val keep = s.chats.filter { it.id !in remoteIds && (streamJobs[it.id]?.isActive == true || !isServerConversationId(it.id)) && it.id != Seed.SHOWCASE_ID }
+                val chats = keep + merged
+                s.copy(chats = chats, currentId = if (s.currentId == null || chats.any { it.id == s.currentId }) s.currentId else null)
+            }
         }
     }
 
@@ -445,12 +456,12 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun newChat() {
-        stop()
+        cancelLocalStream()
         _state.update { it.copy(currentId = null, draft = "", drawerOpen = false) }
     }
 
     fun openChat(id: String) {
-        stop()
+        cancelLocalStream()
         _state.update { s ->
             val chat = s.chats.find { it.id == id } ?: return@update s
             val filled = if (chat.id == Seed.SHOWCASE_ID && chat.messages.isEmpty()) Seed.showcase() else chat
@@ -670,6 +681,39 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             val transcript = if (tokenStore.hasSession()) VoiceApi.transcribe(file) else null
             file.delete()
             transcript?.takeIf { it.isNotBlank() }?.let { setDraft(it) }
+        }
+    }
+
+    /** Drops the on-screen stream when switching chats. Unlike [stop] this does NOT tell the server
+     *  to stop — the reply keeps generating and lands via realtime sync. */
+    private fun cancelLocalStream() {
+        val id = _state.value.currentId ?: return
+        streamJobs.remove(id)?.cancel()
+        _state.update { s ->
+            s.copy(chats = s.chats.map { chat ->
+                if (chat.id != id) chat else chat.copy(messages = chat.messages.map { m -> m.copy(isStreaming = false) })
+            })
+        }
+    }
+
+    /** Deletes a chat locally and on the server; if the server call fails the list is resynced so
+     *  the chat visibly comes back instead of silently reappearing later. */
+    fun deleteChat(id: String, onFailure: () -> Unit = {}) {
+        streamJobs.remove(id)?.cancel()
+        _state.update { s ->
+            s.copy(
+                chats = s.chats.filterNot { it.id == id },
+                currentId = if (s.currentId == id) null else s.currentId,
+                queued = s.queued - id,
+            )
+        }
+        if (isServerConversationId(id) && tokenStore.hasSession()) {
+            viewModelScope.launch {
+                if (!ConversationsApi.delete(id)) {
+                    syncConversations()
+                    onFailure()
+                }
+            }
         }
     }
 

@@ -56,6 +56,7 @@ struct ComposerBar: View {
                 }
             }
         }
+        .onChange(of: vm.composerFocusTick) { _ in focused = true }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(FridayColor.bg)

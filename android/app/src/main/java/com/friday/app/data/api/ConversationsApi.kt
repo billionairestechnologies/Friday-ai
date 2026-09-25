@@ -14,11 +14,12 @@ import org.json.JSONObject
 object ConversationsApi {
 
     /** GET /api/chat/conversations — the drawer's recent-chats list. */
-    suspend fun list(): List<ChatThread> = withContext(Dispatchers.IO) {
+    /** Null means the request failed (keep the current list); an empty list means genuinely no chats. */
+    suspend fun list(): List<ChatThread>? = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder().url(ApiClient.BASE_URL + "chat/conversations").get().build()
             ApiClient.authed.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) return@use emptyList()
+                if (!resp.isSuccessful) return@use null
                 val text = resp.body?.string().orEmpty()
                 val arr = JSONObject(text).optJSONArray("conversations") ?: JSONArray()
                 (0 until arr.length()).map { i ->
@@ -27,11 +28,12 @@ object ConversationsApi {
                         id = o.optString("id"),
                         title = o.optString("title").ifBlank { "New chat" },
                         messages = emptyList(),
-                        updatedAt = o.optLong("updated_at", System.currentTimeMillis()),
+                        updatedAt = runCatching { java.time.Instant.parse(o.optString("updated_at")).toEpochMilli() }
+                            .getOrDefault(System.currentTimeMillis()),
                     )
                 }
             }
-        }.getOrElse { emptyList() }
+        }.getOrNull()
     }
 
     /** GET /api/chat/conversations/:id/messages — fetched lazily when a synced thread is opened. */

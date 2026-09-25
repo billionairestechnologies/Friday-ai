@@ -91,7 +91,7 @@ struct DrawerPane: View {
                         Text(vm.user?.name ?? "Guest").font(.system(size: 17, weight: .bold))
                         Image(systemName: "chevron.down").font(.system(size: 11))
                     }
-                    if vm.user != nil {
+                    if vm.user != nil && vm.planLoaded {
                         Text("\(vm.plan.capitalized) plan")
                             .font(.system(size: 12))
                             .foregroundColor(vm.plan == "free" ? FridayColor.muted : FridayColor.search)

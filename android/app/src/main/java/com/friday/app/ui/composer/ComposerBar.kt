@@ -97,6 +97,7 @@ import com.friday.app.ui.theme.FridayStop
 import com.friday.app.ui.theme.FridayText
 import com.friday.app.ui.theme.FridayThink
 import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.focusRequester
 import kotlin.math.sqrt
 
 @Composable
@@ -117,6 +118,7 @@ fun ComposerBar(
     onVoiceMessage: (java.io.File) -> Unit = {},
     attachments: List<PendingAttachment> = emptyList(),
     onRemoveAttachment: (String) -> Unit = {},
+    focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
 ) {
     val shape = RoundedCornerShape(ComposerCorner)
     val hasText = draft.trim().isNotEmpty()
@@ -214,7 +216,8 @@ fun ComposerBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 44.dp, max = 160.dp)
-                        .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp),
+                        .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp)
+                        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
                     decorationBox = { inner ->
                         Box {
                             if (draft.isEmpty()) {

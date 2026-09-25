@@ -14,6 +14,7 @@ import { adminQuotaRouter } from "./routes/adminQuota.js";
 import { modelsRouter } from "./routes/models.js";
 import { chatRouter } from "./routes/chat.js";
 import { pushRouter } from "./routes/push.js";
+import { libraryRouter } from "./routes/library.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
 import { requestContext } from "./middleware/requestContext.js";
@@ -72,6 +73,7 @@ export function createApp() {
   app.use("/api/models", modelsRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/push", pushRouter);
+  app.use("/api/library", libraryRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/sandbox", sandboxRouter);
   app.use("/api/usage", usageRouter);

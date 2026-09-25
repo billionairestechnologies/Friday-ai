@@ -15,6 +15,7 @@ final class TokenStore {
         static let refresh = "refreshToken"
         static let userName = "userName"
         static let userEmail = "userEmail"
+        static let plan = "plan"
         static let voiceId = "voiceId"
         static let voiceName = "voiceName"
     }
@@ -39,6 +40,13 @@ final class TokenStore {
         set { defaults.set(newValue, forKey: Key.userEmail) }
     }
 
+    /// Last plan the backend reported — lets the top bar render correctly on cold start instead of
+    /// flashing "Upgrade" while the quota request is in flight.
+    var plan: String? {
+        get { defaults.string(forKey: Key.plan) }
+        set { defaults.set(newValue, forKey: Key.plan) }
+    }
+
     var voiceId: String? {
         get { defaults.string(forKey: Key.voiceId) }
         set { defaults.set(newValue, forKey: Key.voiceId) }
@@ -61,6 +69,7 @@ final class TokenStore {
         writeKeychain(Key.refresh, nil)
         defaults.removeObject(forKey: Key.userName)
         defaults.removeObject(forKey: Key.userEmail)
+        defaults.removeObject(forKey: Key.plan)
         // voiceId/voiceName intentionally preserved across logout.
     }
 

@@ -77,6 +77,9 @@ actor RealtimeClient {
             "config": [
                 "postgres_changes": [
                     ["event": "*", "schema": "public", "table": "conversations", "filter": "user_id=eq.\(userId)"],
+                    // DELETE can't be column-filtered, so the filtered entry above never fires for a
+                    // delete made on another device — this unfiltered one does.
+                    ["event": "DELETE", "schema": "public", "table": "conversations"],
                     ["event": "*", "schema": "public", "table": "messages"],
                 ],
             ],

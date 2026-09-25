@@ -185,6 +185,14 @@ object SupabaseRealtime {
                             .put("table", "conversations")
                             .put("filter", "user_id=eq.$uid"),
                     )
+                    // DELETE events can't be filtered by column, so the filtered entry above never
+                    // fires for a delete made on another device — this unfiltered one does.
+                    put(
+                        JSONObject()
+                            .put("event", "DELETE")
+                            .put("schema", "public")
+                            .put("table", "conversations"),
+                    )
                     put(
                         JSONObject()
                             .put("event", "*")
