@@ -18,7 +18,7 @@ import {
   estimateTokenUsageFromText,
   type TokenUsage,
 } from "../tokenUsage.js";
-import { detectNeedsLiveSearch } from "./liveSearchIntent.js";
+import { detectNeedsLiveSearch, shouldProbeForLiveSearch } from "./liveSearchIntent.js";
 import { detectImageIntent, findImageCorrection, isShortEnoughForCorrection, type ImageIntent } from "./imageIntent.js";
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
@@ -33,6 +33,7 @@ import {
 } from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
+import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
@@ -151,11 +152,37 @@ export async function streamMessage(
   reservation?: Reservation,
 ): Promise<void> {
   let reconcileTokens = 0;
+  // Stage timings (FRIDAY_CHAT_TIMING=1) — how long each pre-model step takes before the first token.
+  const timingStart = Date.now();
+  const mark = (label: string) => {
+    if (process.env.FRIDAY_CHAT_TIMING) console.log(`[chat timing] +${Date.now() - timingStart}ms ${label}`);
+  };
   try {
     const conversation = await getOwnedConversation(userId, conversationId);
+    mark("conversation loaded");
     const mode = conversation.mode as ConversationMode;
 
     const userMessageRow = await insertUserMessage(conversationId, content, inputMode, attachments, userId);
+
+    // Intent probes are small model calls (≤2-3s each). They used to run one after the other, on the
+    // critical path, before the real reply could start. They depend only on the message text, so kick
+    // them off NOW, in parallel with each other and with the history query below, and await them only
+    // where the result is needed — the latency hides behind work that had to happen anyway.
+    const SHORT_CAPTION_CHARS_EARLY = 20;
+    const searchIntentPromise: Promise<boolean> =
+      !webSearch &&
+      (attachments.length === 0 || content.trim().length >= SHORT_CAPTION_CHARS_EARLY) &&
+      shouldProbeForLiveSearch(content)
+        ? detectNeedsLiveSearch(content)
+        : Promise.resolve(false);
+    mark("user message stored");
+    // The plan/tier lookup is a DB round trip that doesn't depend on anything above — start it now.
+    const effectivePlanPromise = resolveEffectivePlan(userId);
+    effectivePlanPromise.catch(() => {}); // surfaced where it is awaited; avoids an unhandled rejection on early returns
+    const buildIntentPromise: Promise<boolean> =
+      !canvas && mode !== "teamup"
+        ? getProject(conversationId).then((project) => detectBuildIntent(content, Boolean(project))).catch(() => false)
+        : Promise.resolve(false);
     void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
     if (attachments.length > 0) {
       void recordUsageEvent(userId, "attachment_upload", attachments.length, {
@@ -218,10 +245,9 @@ export async function streamMessage(
     // message actually needs live/current information — see liveSearchIntent.ts for why that beats
     // a keyword list. Skipped entirely when Search is already on (nothing to detect) or the message
     // doesn't look like a real query (short caption on an attachment).
-    const autoSearch =
-      !webSearch && looksLikeSearchQuery && content.trim().length > 0
-        ? await detectNeedsLiveSearch(content)
-        : false;
+    mark("history loaded");
+    const autoSearch = await searchIntentPromise;
+    mark("search intent resolved");
     const effectiveWebSearch = webSearch || autoSearch;
 
     // Gates both the actual search call AND the "a search ran" system message below — skipping the
@@ -431,7 +457,7 @@ export async function streamMessage(
     // Plan/tier gate — separate from the token-quota reservation the route middleware already
     // made (that's "can you spend tokens at all"; this is "can you use THIS model"). Resolved
     // once here since it needs the actual candidate(s), which the middleware doesn't have.
-    const effectivePlan = await resolveEffectivePlan(userId);
+    const effectivePlan = await effectivePlanPromise;
     const tierAllows = (c: ChatCandidate) =>
       effectivePlan.enterprise != null || planSatisfiesTier(effectivePlan.plan, c.minTier);
     if (mode === "single") {
@@ -455,7 +481,8 @@ export async function streamMessage(
     // Build Mode: a request for a real, runnable project goes to the sandbox agent (write files →
     // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
     // Canvas (single-file preview) — Team Up already returned above.
-    if (!canvas && (await detectBuildIntent(content, Boolean(await getProject(conversationId))))) {
+    mark("candidates + tier resolved");
+    if (await buildIntentPromise) {
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
       onEvent({ t: "status", s: "building" });
       const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal });
@@ -512,6 +539,7 @@ export async function streamMessage(
             candidate.modelId,
             history,
             (delta) => {
+              if (!started) mark("first token");
               started = true;
               onEvent({ t: "text", c: delta });
             },
@@ -525,9 +553,10 @@ export async function streamMessage(
               tokenUsage = usage;
               sawProviderUsage = true;
             },
+            { cacheKey: conversationId },
           );
         } else {
-          text = await adapter.chat(apiKey, candidate.modelId, history);
+          text = await adapter.chat(apiKey, candidate.modelId, history, { cacheKey: conversationId });
           started = true;
           onEvent({ t: "text", c: text });
         }
@@ -536,6 +565,8 @@ export async function streamMessage(
         break;
       } catch (err) {
         lastError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
+        // A rejected key (rotated/revoked) must not keep being served from the lookup cache.
+        if (/\b(401|403)\b|invalid.{0,20}(api )?key|unauthori[sz]ed/i.test(lastError)) invalidateMemoized();
         // Already streamed partial text for this reply — cannot silently retry another
         // candidate without confusing the client with two overlapping replies.
         if (started) break;

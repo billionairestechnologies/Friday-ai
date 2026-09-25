@@ -32,7 +32,30 @@ const INTENT_SYSTEM_PROMPT =
  *  enabled provider as the probe — without a bound here, one slow/hanging provider silently adds
  *  its full hang time to every single message's latency, not just its own. Confirmed live
  *  (2026-09-22) as the dominant cause of "every model feels slow to reply." */
-const INTENT_PROBE_TIMEOUT_MS = 2000;
+const INTENT_PROBE_TIMEOUT_MS = 1500;
+
+/**
+ * Cheap pre-check that lets the probe be SKIPPED — it costs ~2s on the critical path of every reply,
+ * which is the single biggest avoidable delay before the first token. The probe (a model's judgment)
+ * still decides every information-seeking question; only messages that are plainly a task rather than
+ * a question about the world are waved through: code, writing/rewriting/translating/explaining
+ * requests, chit-chat — and only when they carry none of the words that hint at live data. Anything
+ * ambiguous still goes to the model.
+ */
+const LIVE_HINTS =
+  /\b(today|tonight|now|current(ly)?|latest|recent(ly)?|news|price|prices|stock|stocks|share|weather|forecast|score|scores|live|update[sd]?|yesterday|tomorrow|this (week|month|year|season)|20[2-9]\d|trending|release[sd]?|version|market|nifty|sensex|bitcoin|crypto|rate|election|match|result|results|ceo|president|prime minister|who (is|won|are)|when (is|does|did)|how much|status|open|closing|winner|standings|ranking|earnings|ipo)\b/i;
+const TASK_LIKE =
+  /^(write|rewrite|draft|compose|translate|summari[sz]e|explain|fix|debug|refactor|implement|generate|create|make|build|design|convert|format|improve|proofread|paraphrase|brainstorm|list|give me (an? )?(example|idea|summary)|show me (an? )?example|help me (write|draft|understand|with))\b/i;
+
+export function shouldProbeForLiveSearch(content: string): boolean {
+  const text = content.trim();
+  if (!text) return false;
+  if (LIVE_HINTS.test(text)) return true;
+  if (text.includes("```") || text.split("\n").length > 6) return false; // code / long pasted material
+  if (TASK_LIKE.test(text)) return false;
+  if (text.length < 25 && !/\?/.test(text)) return false; // greetings, acknowledgements
+  return true;
+}
 
 export async function detectNeedsLiveSearch(content: string): Promise<boolean> {
   try {

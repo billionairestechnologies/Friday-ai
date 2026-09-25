@@ -41,6 +41,10 @@ type OpenAiCompatibleChunk = {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    /** OpenAI / OpenRouter report prompt-cache hits here. */
+    prompt_tokens_details?: { cached_tokens?: number };
+    /** Some OpenAI-compatible hosts (DeepSeek-style) use these names instead. */
+    prompt_cache_hit_tokens?: number;
   };
 };
 
@@ -93,6 +97,7 @@ export async function streamOpenAiCompatibleChat(
           chunk.usage.total_tokens ??
             Number(chunk.usage.prompt_tokens ?? 0) + Number(chunk.usage.completion_tokens ?? 0),
         ),
+        cachedTokens: Number(chunk.usage.prompt_tokens_details?.cached_tokens ?? chunk.usage.prompt_cache_hit_tokens ?? 0),
       });
     }
     const delta = chunk.choices?.[0]?.delta;

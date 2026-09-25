@@ -57,6 +57,8 @@ export async function recordTokenUsage(
       modelId,
       promptTokens: usage.promptTokens,
       completionTokens: usage.completionTokens,
+      cachedTokens: usage.cachedTokens ?? 0,
+      cacheWriteTokens: usage.cacheWriteTokens ?? 0,
       estimated: Boolean(usage.estimated),
       ...metadata,
     },

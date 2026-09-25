@@ -30,6 +30,17 @@ export interface ChatMessage {
    *  and adapters that only support some mime types (e.g. Anthropic: images + PDF, not video)
    *  filter accordingly rather than sending a request their provider will reject. */
   images?: ChatImage[];
+  /** System messages only: content that changes from request to request (web-search results, the
+   *  current canvas artifact, per-turn attachment focus). Kept AFTER the stable system prompt so the
+   *  stable prefix — and therefore the provider's prompt cache — survives when these vary. */
+  volatile?: boolean;
+}
+
+/** Per-request hints adapters can use for prompt caching / routing. */
+export interface ChatRequestOptions {
+  /** Stable id for this conversation (or agent run) — lets providers route requests that share a prefix
+   *  to the same cache (OpenAI's `prompt_cache_key`). */
+  cacheKey?: string;
 }
 
 export interface HealthCheckResult {
@@ -44,7 +55,7 @@ export interface HealthCheckResult {
 export interface ProviderAdapter {
   slug: string;
   listModels(apiKey: string): Promise<ProviderModel[]>;
-  chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string>;
+  chat(apiKey: string, model: string, messages: ChatMessage[], options?: ChatRequestOptions): Promise<string>;
   healthCheck(apiKey: string): Promise<HealthCheckResult>;
   /**
    * Optional token-by-token variant of `chat()`. Calls `onDelta` with each text chunk as it
@@ -63,6 +74,7 @@ export interface ProviderAdapter {
     signal?: AbortSignal,
     onThink?: (text: string) => void,
     onUsage?: (usage: import("../tokenUsage.js").TokenUsage) => void,
+    options?: ChatRequestOptions,
   ): Promise<string>;
 }
 
