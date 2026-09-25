@@ -26,6 +26,7 @@ RULES
 - The project root is ${PROJECT_DIR}. All paths are relative to it. Never write outside it.
 - Each action tag must be well-formed and closed. Do not put action tags inside code blocks or quote them.
 - Write ALL files a project needs (package.json, config, index.html, source, styles, README). Do not use interactive scaffolders (npm create …, npx create-… without flags) — write the files yourself.
+- Pin dependency versions that are known to work together instead of "latest": vite ^5, @vitejs/plugin-react ^4, react/react-dom ^18. Tailwind: use tailwindcss ^3.4 with postcss + autoprefixer and a tailwind.config.js (content: ["./index.html","./src/**/*.{js,jsx,ts,tsx}"]) and "@tailwind base/components/utilities" in the CSS — do NOT use Tailwind v4 through the postcss "tailwindcss" plugin (it errors). Other libraries: use versions you are sure about.
 - Web apps: prefer Vite (React or plain) with a package.json that has a "dev" script running "vite --host 0.0.0.0 --port 5173". Bind servers to 0.0.0.0 and use the port you pass to <friday-start>. Backend/API projects (Express, Flask, FastAPI, …) are fine too — start them on a port and verify with curl.
 - Order: write files → <friday-run> install → <friday-start> the server (only if it is a server/app). After every result, read it: if a command failed or the server log shows errors, fix the cause and retry. Keep going until it truly works — don't stop at the first error.
 - For a server, after it starts you may verify with <friday-run>curl -s localhost:PORT | head -20</friday-run>.
@@ -113,6 +114,10 @@ export async function runBuildAgent(opts: {
   const seenErrors = new Map<string, number>();
   let finalDone: string | null = null;
   let nudges = 0;
+  let donePushbacks = 0;
+  let appBroken = false;
+  // Last outcome per command: a build that failed and was never re-run successfully is unresolved.
+  const lastRunState = new Map<string, "ok" | "error">();
 
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     if (signal?.aborted) break;
@@ -167,6 +172,7 @@ export async function runBuildAgent(opts: {
           }
         } else if (action.kind === "run") {
           const out = await box.run(action.cmd, 5 * 60_000, signal);
+          lastRunState.set(action.cmd, out.ok ? "ok" : "error");
           finish(out.ok ? "ok" : "error", out.output);
           turn.results.push(`[run ${JSON.stringify(action.cmd)}] exit ${out.exitCode}\n${tail(out.output)}`);
           if (!out.ok) {
@@ -180,8 +186,21 @@ export async function runBuildAgent(opts: {
             build.previewUrl = res.url;
             build.port = action.port;
             onEvent({ t: "preview", url: res.url, port: action.port });
-            finish("ok", res.log);
-            turn.results.push(`[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}\n${tail(res.log, 1500)}`);
+            // The port answering isn't proof the app works — crawl it and surface real errors.
+            const problems = await box.probeApp(action.port);
+            if (problems) {
+              finish("error", `The server is up but the app fails to load:\n${problems}`);
+              turn.results.push(
+                `[start ${JSON.stringify(action.cmd)}] server is listening on port ${action.port} BUT the app is BROKEN — requesting its files fails:\n${tail(problems, 2500)}\nServer log:\n${tail(res.log, 1500)}\nFix the cause (check dependency versions/config), then <friday-start> again.`,
+              );
+              const key = `probe::${tail(problems, 300)}`;
+              seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
+              appBroken = true;
+            } else {
+              appBroken = false;
+              finish("ok", res.log);
+              turn.results.push(`[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}; all pages/scripts/styles load without errors\n${tail(res.log, 1500)}`);
+            }
           } else {
             finish("error", res.log || "The server did not respond in time");
             turn.results.push(`[start ${JSON.stringify(action.cmd)}] NOT ready after 90s. Server log:\n${tail(res.log)}`);
@@ -248,6 +267,21 @@ export async function runBuildAgent(opts: {
     if (signal?.aborted) break;
 
     if (turn.done !== null) {
+      // Don't accept "done" while something is known to be broken — push back a few times first.
+      const failedCmds = [...lastRunState.entries()].filter(([, state]) => state === "error").map(([cmd]) => cmd);
+      if ((appBroken || failedCmds.length > 0) && donePushbacks < 3) {
+        donePushbacks++;
+        conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });
+        conversation.push({
+          role: "user",
+          content:
+            `<results>\n${turn.results.join("\n\n")}\n</results>\n` +
+            `You said you're done, but something is still failing${appBroken ? " (the running app does not load cleanly)" : ""}${failedCmds.length ? `; these commands last failed: ${failedCmds.map((c) => JSON.stringify(c)).join(", ")}` : ""}. ` +
+            "Find the root cause, fix it, re-run/re-start, and only finish with <friday-done> after it genuinely works.",
+        });
+        emitText("\n\n");
+        continue;
+      }
       finalDone = turn.done;
       break;
     }

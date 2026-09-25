@@ -142,6 +142,50 @@ export class BuildSandbox {
     return { ready: false, url: null, log: await this.logTail(logFile) };
   }
 
+  /**
+   * Crawls the running app from inside the sandbox — the page, then every script/stylesheet/module
+   * it pulls in — and reports anything that errors. "The server answered on the port" isn't proof
+   * the app works: a Vite dev server happily serves index.html while a broken PostCSS/JSX file only
+   * fails when that file is first requested (that is exactly how a Tailwind-v4-as-PostCSS-plugin
+   * error slipped through as "launched"). Returns "" when everything loaded cleanly.
+   */
+  async probeApp(port: number): Promise<string> {
+    const script = `
+const base = "http://localhost:${port}";
+const seen = new Set(); const queue = ["/"]; const problems = [];
+const bad = /vite-error-overlay|\\[plugin:|Internal server error|SyntaxError|Failed to resolve import|Cannot find module|ReferenceError/i;
+(async () => {
+  while (queue.length && seen.size < 80) {
+    const path = queue.shift();
+    if (seen.has(path)) continue;
+    seen.add(path);
+    let res, body = "";
+    try { res = await fetch(base + path, { signal: AbortSignal.timeout(20000) }); body = await res.text(); }
+    catch (e) { problems.push(path + " -> request failed: " + e.message); continue; }
+    if (res.status >= 400 || (/javascript|html|css|json/.test(res.headers.get("content-type") || "") && bad.test(body.slice(0, 4000)))) {
+      const errMsg = body.match(/"message":"(.*?)","/);
+      problems.push(path + " -> HTTP " + res.status + ": " + (errMsg ? errMsg[1] : body.slice(0, 700)));
+      continue;
+    }
+    const found = [...body.matchAll(/(?:src|href)=["']([^"']+)["']/g)].map(m => m[1])
+      .concat([...body.matchAll(/(?:from|import)\\s*\\(?\\s*["']([^"']+)["']/g)].map(m => m[1]));
+    for (let ref of found) {
+      if (ref.startsWith("./")) ref = ref.slice(1);
+      if (!ref.startsWith("/") || ref.startsWith("//") || ref.startsWith("/@") || ref.includes("/node_modules/") || /\\.(png|jpe?g|gif|svg|ico|webp|woff2?)($|\\?)/.test(ref)) continue;
+      queue.push(ref);
+    }
+  }
+  console.log(problems.length ? problems.slice(0, 3).join("\\n---\\n") : "");
+})();`;
+    await this.sandbox.files.write("/tmp/friday-probe.mjs", script);
+    const out = await this.sandbox.commands
+      .run("node /tmp/friday-probe.mjs", { timeoutMs: 120_000 })
+      .catch((e: { stdout?: string; stderr?: string; message?: string }) => ({
+        stdout: `${e.stdout ?? ""}${e.stderr ? `\n${e.stderr}` : ""}`.trim() || e.message || "probe failed",
+      }));
+    return out.stdout.trim();
+  }
+
   private async logTail(file: string): Promise<string> {
     const out = await this.sandbox.commands.run(`tail -c 3000 ${file} 2>/dev/null || true`).catch(() => null);
     return out?.stdout ?? "";
