@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import JSZip from "jszip";
 import { getOwnedConversation } from "../services/chat/conversations.js";
-import { ensurePreview, getProject } from "../services/build/sandbox.js";
+import { ensurePreview, getProject } from "../services/projectBuild/sandbox.js";
 import { HttpError } from "../middleware/errorHandler.js";
 
 async function ownedProject(req: Request) {

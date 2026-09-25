@@ -32,9 +32,9 @@ import {
   withSystemPreamble,
 } from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
-import { detectBuildIntent } from "../build/intent.js";
-import { runBuildAgent } from "../build/agent.js";
-import { getProject } from "../build/sandbox.js";
+import { detectBuildIntent } from "../projectBuild/intent.js";
+import { runBuildAgent } from "../projectBuild/agent.js";
+import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
