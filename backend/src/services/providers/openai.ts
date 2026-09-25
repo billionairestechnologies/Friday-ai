@@ -1,17 +1,11 @@
 import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
-import type { ChatMessage, ChatRequestOptions, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
+import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { mergeSystemMessages, safeErrorMessage, toOpenAiStyleMessages } from "./types.js";
 
 const BASE_URL = "https://api.openai.com/v1";
 
 // Non-chat model families we don't want cluttering the chat model picker.
 const EXCLUDE_PATTERNS = [/embedding/, /whisper/, /tts/, /moderation/, /^dall-e/, /^davinci/, /^babbage/];
-
-/** OpenAI caches automatically once a prompt shares a ≥1024-token prefix; `prompt_cache_key` routes
- *  requests of one conversation to the same cache shard so follow-up turns actually land on it. */
-function cacheParams(options?: ChatRequestOptions): Record<string, unknown> {
-  return options?.cacheKey ? { prompt_cache_key: options.cacheKey } : {};
-}
 
 export const openaiAdapter: ProviderAdapter = {
   slug: "openai",
@@ -32,11 +26,11 @@ export const openaiAdapter: ProviderAdapter = {
       }));
   },
 
-  async chat(apiKey: string, model: string, messages: ChatMessage[], options?: ChatRequestOptions): Promise<string> {
+  async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)), ...cacheParams(options) }),
+      body: JSON.stringify({ model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) }),
     });
     if (!res.ok) throw new Error(`OpenAI chat failed: ${res.status} ${await res.text()}`);
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
@@ -53,11 +47,11 @@ export const openaiAdapter: ProviderAdapter = {
     }
   },
 
-  async chatStream(apiKey, model, messages, onDelta, signal, onThink, onUsage, options) {
+  async chatStream(apiKey, model, messages, onDelta, signal, onThink, onUsage) {
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/chat/completions`,
       { Authorization: `Bearer ${apiKey}` },
-      { model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)), ...cacheParams(options) },
+      { model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) },
       onDelta,
       signal,
       onThink,

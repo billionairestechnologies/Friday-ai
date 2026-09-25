@@ -1,7 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { AnthropicUsageTracker, toAnthropicCachedRequest } from "./promptCache.js";
-import { safeErrorMessage } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -28,7 +27,7 @@ export const anthropicAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const { system, messages: requestMessages } = toAnthropicCachedRequest(messages);
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -47,7 +46,7 @@ export const anthropicAdapter: ProviderAdapter = {
         // out — indistinguishable from the reply randomly stopping mid-thought.
         max_tokens: 8192,
         system,
-        messages: requestMessages,
+        messages: toAnthropicStyleMessages(conversation),
       }),
     });
     if (!res.ok) throw new Error(`Anthropic chat failed: ${res.status} ${await res.text()}`);
@@ -68,7 +67,7 @@ export const anthropicAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
-    const { system, messages: requestMessages } = toAnthropicCachedRequest(messages);
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -83,7 +82,7 @@ export const anthropicAdapter: ProviderAdapter = {
         max_tokens: 8192,
         system,
         stream: true,
-        messages: requestMessages,
+        messages: toAnthropicStyleMessages(conversation),
       }),
       signal,
     });
@@ -92,18 +91,16 @@ export const anthropicAdapter: ProviderAdapter = {
     }
 
     let full = "";
-    // input + cache fields arrive on message_start, cumulative output on message_delta — merge both so
-    // cached-token counts (and the real input size) aren't lost.
-    const usageTracker = new AnthropicUsageTracker();
     await readSseStream(res.body, (data) => {
-      if (data.type === "message_start") {
-        usageTracker.ingest((data.message as { usage?: Record<string, number> } | undefined)?.usage);
-        return;
-      }
       if (data.type === "message_delta") {
-        usageTracker.ingest(data.usage as Record<string, number> | undefined);
-        const snapshot = usageTracker.snapshot();
-        if (snapshot && onUsage) onUsage(snapshot);
+        const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+        if (usage && onUsage) {
+          onUsage({
+            promptTokens: Number(usage.input_tokens ?? 0),
+            completionTokens: Number(usage.output_tokens ?? 0),
+            totalTokens: Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0),
+          });
+        }
         return;
       }
       if (data.type !== "content_block_delta") return;

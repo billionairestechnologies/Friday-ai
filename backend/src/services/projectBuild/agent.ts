@@ -395,22 +395,11 @@ export async function runBuildAgent(opts: {
           parser.feed(delta);
         };
         if (adapter.chatStream) {
-          await adapter.chatStream(
-            apiKey,
-            candidate.modelId,
-            conversation,
-            onDelta,
-            signal,
-            undefined,
-            (u) => {
-              providerUsage = u;
-            },
-            // Build Mode re-sends a growing transcript every iteration — the rolling cache breakpoint
-            // (see providers/promptCache.ts) makes every iteration after the first mostly a cache read.
-            { cacheKey: `${conversationId}:build` },
-          );
+          await adapter.chatStream(apiKey, candidate.modelId, conversation, onDelta, signal, undefined, (u) => {
+            providerUsage = u;
+          });
         } else {
-          onDelta(await adapter.chat(apiKey, candidate.modelId, conversation, { cacheKey: `${conversationId}:build` }));
+          onDelta(await adapter.chat(apiKey, candidate.modelId, conversation));
         }
         usage = mergeTokenUsage(
           usage,

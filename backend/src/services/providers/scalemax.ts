@@ -1,7 +1,6 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { AnthropicUsageTracker, toAnthropicCachedRequest } from "./promptCache.js";
-import { safeErrorMessage } from "./types.js";
+import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
 
 // ScaleMax (api.scalemax.pro) proxies Claude AND GPT models (confirmed directly against the
 // real API 2026-09-18 — its catalog grew well past the Claude-only set this adapter used to
@@ -48,7 +47,7 @@ export const scalemaxAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const { system, messages: requestMessages } = toAnthropicCachedRequest(messages);
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -64,7 +63,7 @@ export const scalemaxAdapter: ProviderAdapter = {
         // long-context/reasoning replies were done.
         max_tokens: 8192,
         system,
-        messages: requestMessages,
+        messages: toAnthropicStyleMessages(conversation),
       }),
     });
     if (!res.ok) throw new Error(`ScaleMax chat failed: ${res.status} ${await res.text()}`);
@@ -85,7 +84,7 @@ export const scalemaxAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
-    const { system, messages: requestMessages } = toAnthropicCachedRequest(messages);
+    const { system, conversation } = splitSystemPrompt(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -99,7 +98,7 @@ export const scalemaxAdapter: ProviderAdapter = {
         max_tokens: 8192,
         system,
         stream: true,
-        messages: requestMessages,
+        messages: toAnthropicStyleMessages(conversation),
       }),
       signal,
     });
@@ -108,18 +107,16 @@ export const scalemaxAdapter: ProviderAdapter = {
     }
 
     let full = "";
-    // input + cache fields arrive on message_start, cumulative output on message_delta — merge both so
-    // cached-token counts (and the real input size) aren't lost.
-    const usageTracker = new AnthropicUsageTracker();
     await readSseStream(res.body, (data) => {
-      if (data.type === "message_start") {
-        usageTracker.ingest((data.message as { usage?: Record<string, number> } | undefined)?.usage);
-        return;
-      }
       if (data.type === "message_delta") {
-        usageTracker.ingest(data.usage as Record<string, number> | undefined);
-        const snapshot = usageTracker.snapshot();
-        if (snapshot && onUsage) onUsage(snapshot);
+        const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+        if (usage && onUsage) {
+          onUsage({
+            promptTokens: Number(usage.input_tokens ?? 0),
+            completionTokens: Number(usage.output_tokens ?? 0),
+            totalTokens: Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0),
+          });
+        }
         return;
       }
       if (data.type !== "content_block_delta") return;

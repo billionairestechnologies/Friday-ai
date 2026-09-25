@@ -39,7 +39,6 @@ type Attempt = {
 export async function streamWithHedging(opts: {
   candidates: ChatCandidate[];
   history: ChatMessage[];
-  cacheKey: string;
   signal?: AbortSignal;
   /** 0 disables hedging (single-model conversations have nothing to hedge with). */
   hedgeAfterMs: number;
@@ -53,7 +52,7 @@ export async function streamWithHedging(opts: {
 }): Promise<HedgedResult> {
   const getAdapter = opts.deps?.getAdapter ?? getProviderAdapter;
   const getKey = opts.deps?.getKey ?? getWorkingKeyForProvider;
-  const { candidates, history, cacheKey, signal, hedgeAfterMs } = opts;
+  const { candidates, history, signal, hedgeAfterMs } = opts;
   let winner: Attempt | null = null;
   let nextIndex = 0;
   let lastError: string | undefined;
@@ -109,10 +108,9 @@ export async function streamWithHedging(opts: {
             (usage) => {
               attempt.usage = usage;
             },
-            { cacheKey },
           );
         } else {
-          attempt.text = await adapter.chat(apiKey, candidate.modelId, history, { cacheKey });
+          attempt.text = await adapter.chat(apiKey, candidate.modelId, history);
           if (claim()) {
             attempt.started = true;
             opts.onText(attempt.text);

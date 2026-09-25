@@ -210,10 +210,6 @@ export function withSystemPreamble(
   canvas: boolean = false,
   hasAttachments: boolean = false,
 ): ChatMessage[] {
-  // Order matters for prompt caching (see providers/promptCache.ts): everything that is the same from
-  // request to request comes FIRST as one stable block; anything that varies per turn (search results,
-  // the current canvas artifact, attachment focus) is tagged `volatile` and goes after it, so a search
-  // or an attachment never invalidates the cached prefix.
   const preamble: ChatMessage[] = [
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
     { role: "system", content: HONESTY_SYSTEM_PROMPT },
@@ -221,18 +217,19 @@ export function withSystemPreamble(
     { role: "system", content: IMAGE_HONESTY_SYSTEM_PROMPT },
     { role: "system", content: FORMAT_SYSTEM_PROMPT },
   ];
+  if (webSearch) preamble.push(searchResultsToSystemMessage(searchResults));
   if (behavior.trim()) preamble.push({ role: "system", content: behavior.trim() });
   if (think) preamble.push({ role: "system", content: THINK_SYSTEM_PROMPT });
-  if (canvas) preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
-  // Volatile tail. The most recent instruction is the most salient one, so attachment-focus stays
-  // last: a fresh attachment with a short caption must win over an old topic or irrelevant search
-  // results — exactly the case that failed in production (see ATTACHMENT_FOCUS_SYSTEM_PROMPT).
-  if (webSearch) preamble.push({ ...searchResultsToSystemMessage(searchResults), volatile: true });
+  // Canvas, then attachment-focus last of all — each overrides what came before it for the same
+  // reason: the most recent instruction is the most salient one. A fresh attachment with a short
+  // caption needs to win over everything else (an old topic, irrelevant search results), which is
+  // exactly the case that failed in production — see ATTACHMENT_FOCUS_SYSTEM_PROMPT's comment.
   if (canvas) {
+    preamble.push({ role: "system", content: CANVAS_SYSTEM_PROMPT });
     const lastArtifact = findLastCanvasArtifact(history);
-    if (lastArtifact) preamble.push({ ...canvasArtifactSystemMessage(lastArtifact), volatile: true });
+    if (lastArtifact) preamble.push(canvasArtifactSystemMessage(lastArtifact));
   }
-  if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT, volatile: true });
+  if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT });
   return preamble.length ? [...preamble, ...history] : history;
 }
 

@@ -97,7 +97,6 @@ export const geminiAdapter: ProviderAdapter = {
           promptTokenCount?: number;
           candidatesTokenCount?: number;
           totalTokenCount?: number;
-          cachedContentTokenCount?: number;
         };
       };
       if (body.usageMetadata && onUsage) {
@@ -109,8 +108,6 @@ export const geminiAdapter: ProviderAdapter = {
               Number(body.usageMetadata.promptTokenCount ?? 0) +
                 Number(body.usageMetadata.candidatesTokenCount ?? 0),
           ),
-          // Gemini 2.5+ caches shared prefixes implicitly and reports the hit here.
-          cachedTokens: Number(body.usageMetadata.cachedContentTokenCount ?? 0),
         });
       }
       const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";

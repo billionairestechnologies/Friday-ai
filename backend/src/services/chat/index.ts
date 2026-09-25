@@ -533,7 +533,6 @@ export async function streamMessage(
     const streamed = await streamWithHedging({
       candidates,
       history,
-      cacheKey: conversationId,
       signal,
       hedgeAfterMs: mode === "single" ? 0 : HEDGE_MS,
       onText: (delta) => {
