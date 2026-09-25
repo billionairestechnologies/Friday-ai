@@ -9,6 +9,7 @@ import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
+import { BuildSteps, ProjectZipCard } from "@/components/build-steps";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
@@ -113,6 +114,7 @@ const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage 
 });
 
 const AssistantBlock = memo(function AssistantBlock({ message }: { message: ChatMessage }) {
+  const conversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
   const plan = shouldShowPlan(message);
   const { user } = useCurrentUserState();
   // The backend sends `status: "thinking"` almost immediately after a plain (no Think/Search/
@@ -141,6 +143,10 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
       className="msg-enter group/msg flex min-h-[1.75rem] flex-col items-start gap-3"
       style={done ? { contentVisibility: "auto", containIntrinsicSize: "auto 120px" } : undefined}
     >
+      {message.build && message.build.steps.length > 0 && (
+        <BuildSteps build={message.build} streaming={Boolean(message.streaming)} />
+      )}
+
       {plan && (
         <div className="min-h-[1.75rem] w-full">
           <LiveChainOfThought message={message} />
@@ -201,6 +207,8 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
           {message.error}
         </p>
       )}
+
+      {message.build?.zipBytes && !message.streaming && <ProjectZipCard build={message.build} conversationId={conversationId} />}
 
       {message.content && !message.streaming && <MessageActions text={message.content} />}
     </div>

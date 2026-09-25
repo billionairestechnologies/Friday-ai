@@ -9,6 +9,8 @@ enum ChatEvent {
     case cite(title: String?, url: String)
     case err(String)
     case agent(AgentStatus)
+    case step(BuildStep)
+    case preview(url: String, port: Int)
     case done
 }
 
@@ -124,6 +126,16 @@ enum ChatApi {
                                 error: json["error"] as? String
                             )
                             continuation.yield(.agent(status))
+                        case "step":
+                            continuation.yield(.step(BuildStep(
+                                id: json["id"] as? String ?? UUID().uuidString,
+                                kind: json["kind"] as? String ?? "run",
+                                label: json["label"] as? String ?? "",
+                                state: json["state"] as? String ?? "running",
+                                detail: json["detail"] as? String
+                            )))
+                        case "preview":
+                            continuation.yield(.preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0))
                         case "done":
                             continuation.yield(.done)
                         default:
@@ -183,11 +195,25 @@ enum ConversationsApi {
                 guard let u = s["u"] as? String else { return nil }
                 return Source(title: s["title"] as? String, url: u)
             }
+            var build: BuildInfo?
+            if let b = row["build"] as? [String: Any] {
+                let steps = (b["steps"] as? [[String: Any]] ?? []).map {
+                    BuildStep(
+                        id: $0["id"] as? String ?? UUID().uuidString,
+                        kind: $0["kind"] as? String ?? "run",
+                        label: $0["label"] as? String ?? "",
+                        state: $0["state"] as? String ?? "ok",
+                        detail: $0["detail"] as? String
+                    )
+                }
+                build = BuildInfo(steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int)
+            }
             return ChatMessage(
                 id: row["id"] as? String ?? UUID().uuidString,
                 role: (row["role"] as? String) == "user" ? .user : .assistant,
                 content: row["content"] as? String ?? "",
-                sources: sources
+                sources: sources,
+                build: build
             )
         }
     }

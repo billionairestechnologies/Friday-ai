@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import { DEFAULT_MODEL_ID } from "./models";
-import type { AgentStatus, Attachment, Chat, ChatMessage, Citation } from "./types";
+import type { AgentStatus, Attachment, BuildInfo, Chat, ChatMessage, Citation } from "./types";
 import { uid } from "../utils";
 
 const TITLE_FROM = 48;
@@ -29,6 +29,8 @@ export type TurnCommit = {
    *  the chain-of-thought canvas step log past the end of streaming, same reasoning as usedSearch
    *  above. */
   usedCanvas?: boolean;
+  /** Build Mode steps + preview for this turn (see BuildInfo). */
+  build?: BuildInfo;
 };
 
 export type ServerConversation = {
@@ -50,6 +52,7 @@ export type ServerMessage = {
   used_search?: boolean | null;
   used_canvas?: boolean | null;
   error?: string | null;
+  build?: BuildInfo | null;
   message_attachments?: {
     id: string;
     name: string;
@@ -341,6 +344,7 @@ export const useChat = create<ChatState>()(
                           agents: data.agents,
                           usedSearch: m.usedSearch || data.usedSearch,
                           usedCanvas: m.usedCanvas || data.usedCanvas,
+                          build: data.build ?? m.build,
                           streaming: false,
                           status: null,
                         }
@@ -468,6 +472,7 @@ export const useChat = create<ChatState>()(
                       usedSearch: Boolean(m.used_search),
                       usedCanvas: Boolean(m.used_canvas),
                       error: m.error ?? undefined,
+                      build: m.build ?? undefined,
                       attachments: m.message_attachments?.map((a) => ({
                         id: a.id,
                         name: a.name,

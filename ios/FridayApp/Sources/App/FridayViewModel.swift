@@ -32,6 +32,8 @@ final class FridayViewModel: ObservableObject {
     @Published var drawerOpen = false
     /// Bumped to ask the composer to grab focus (swipe-up on the start screen opens the keyboard).
     @Published var composerFocusTick = 0
+    /// Assistant messages whose Build Mode preview URL was produced live on this device.
+    @Published var freshBuildMessageIds: Set<String> = []
     @Published var sheet: SheetState = .none
     @Published var playEntrance = true
     @Published var canvasOpen = false
@@ -306,6 +308,19 @@ final class FridayViewModel: ObservableObject {
             } else {
                 chats[ci].messages[mi].agents.append(status)
             }
+        case .step(let step):
+            var build = chats[ci].messages[mi].build ?? BuildInfo()
+            if let i = build.steps.firstIndex(where: { $0.id == step.id }) { build.steps[i] = step } else { build.steps.append(step) }
+            chats[ci].messages[mi].build = build
+        case .preview(let url, let port):
+            var build = chats[ci].messages[mi].build ?? BuildInfo()
+            build.previewUrl = url
+            build.port = port
+            chats[ci].messages[mi].build = build
+            // This device watched it stream in → the URL is known-good (no restore round-trip), and
+            // the panel opens on the running app.
+            freshBuildMessageIds.insert(assistantMessageId)
+            withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) { canvasOpen = true }
         case .done:
             chats[ci].messages[mi].isStreaming = false
         }

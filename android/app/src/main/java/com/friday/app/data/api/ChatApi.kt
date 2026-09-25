@@ -1,6 +1,7 @@
 package com.friday.app.data.api
 
 import com.friday.app.data.AgentStatus
+import com.friday.app.data.BuildStep
 import com.friday.app.data.ChatEvent
 import com.friday.app.data.Mode
 import com.friday.app.data.PendingAttachment
@@ -160,6 +161,18 @@ object ChatApi {
                                         ),
                                     ),
                                 )
+                                "step" -> emit(
+                                    ChatEvent.Step(
+                                        BuildStep(
+                                            id = json.optString("id"),
+                                            kind = json.optString("kind"),
+                                            label = json.optString("label"),
+                                            state = json.optString("state"),
+                                            detail = json.optString("detail").ifBlank { null },
+                                        ),
+                                    ),
+                                )
+                                "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))
                                 "done" -> done = true
                             }
                         }

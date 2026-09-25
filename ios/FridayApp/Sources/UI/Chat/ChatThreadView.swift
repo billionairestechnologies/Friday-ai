@@ -61,6 +61,9 @@ private struct MessageRow: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 8) {
+                if let build = message.build, !build.steps.isEmpty {
+                    BuildStepsCard(build: build, streaming: message.isStreaming)
+                }
                 if !message.agents.isEmpty {
                     AgentsRow(message: message)
                 } else if !message.modesUsed.isEmpty {

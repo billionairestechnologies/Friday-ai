@@ -30,6 +30,24 @@ export type AgentStatus = {
   error?: string;
 };
 
+export type BuildStep = {
+  id: string;
+  kind: "write" | "run" | "start" | "read";
+  label: string;
+  state: "running" | "ok" | "error";
+  detail?: string;
+};
+
+/** What Build Mode did for a message: the steps it ran and the live preview it produced. */
+export type BuildInfo = {
+  steps: BuildStep[];
+  previewUrl?: string;
+  port?: number;
+  elapsedMs?: number;
+  zipBytes?: number;
+  zipName?: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: Role;
@@ -48,6 +66,7 @@ export type ChatMessage = {
   modelLabel?: string;
   /** Live per-model progress during a Team Up run — which models are answering and how it went. */
   agents?: AgentStatus[];
+  build?: BuildInfo;
 };
 
 export type Chat = {
@@ -77,5 +96,7 @@ export type StreamEvent =
   | { t: "think"; c: string }
   | { t: "text"; c: string }
   | { t: "cite"; u: string; title?: string }
+  | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string }
+  | { t: "preview"; url: string; port: number }
   | { t: "err"; c: string }
   | { t: "done" };

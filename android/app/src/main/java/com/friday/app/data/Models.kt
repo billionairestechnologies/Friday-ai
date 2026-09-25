@@ -47,6 +47,22 @@ data class PendingAttachment(
     val dataUrl: String,
 )
 
+/** One thing Build Mode did — "Ran command · Install dependencies", "Wrote src/App.jsx". */
+data class BuildStep(
+    val id: String,
+    val kind: String, // write | run | start | read
+    val label: String,
+    val state: String, // running | ok | error
+    val detail: String? = null,
+)
+
+/** What Build Mode did for a message: its steps plus the live preview it produced (if any). */
+data class BuildInfo(
+    val steps: List<BuildStep> = emptyList(),
+    val previewUrl: String? = null,
+    val port: Int? = null,
+)
+
 data class ChatMessage(
     val id: String,
     val role: Role,
@@ -68,6 +84,7 @@ data class ChatMessage(
     /** Populated only for a Team Up turn, from {"t":"agent",...} frames — one entry per model
      *  consulted, upserted by (slug, model) as its state changes. */
     val agents: List<AgentStatus> = emptyList(),
+    val build: BuildInfo? = null,
 )
 
 enum class Role { User, Assistant }
@@ -98,6 +115,10 @@ sealed class ChatEvent {
     data class CanvasUpdate(val html: String) : ChatEvent()
     /** One model's progress within a Team Up turn, from {"t":"agent",...} frames. */
     data class Agent(val status: AgentStatus) : ChatEvent()
+    /** Build Mode step, upserted by id as it goes running → ok/error (from {"t":"step",...}). */
+    data class Step(val step: BuildStep) : ChatEvent()
+    /** Build Mode started a server and it is reachable (from {"t":"preview",...}). */
+    data class Preview(val url: String, val port: Int) : ChatEvent()
     data object Done : ChatEvent()
 }
 

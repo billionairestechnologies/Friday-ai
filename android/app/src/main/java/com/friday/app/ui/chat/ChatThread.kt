@@ -102,7 +102,7 @@ import com.friday.app.ui.theme.FridayThink
 import kotlinx.coroutines.delay
 
 @Composable
-fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier) {
+fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier, onOpenPreview: () -> Unit = {}) {
     val list = rememberLazyListState()
     // Whether the last item is the (or nearly the) last one visible — used to gate auto-scroll
     // during streaming so it doesn't fight a user who scrolled up to read earlier messages. Every
@@ -134,7 +134,7 @@ fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         items(messages, key = { it.id }) { msg ->
-            if (msg.role == Role.User) UserBubble(msg.content) else AssistantBlock(msg)
+            if (msg.role == Role.User) UserBubble(msg.content) else AssistantBlock(msg, onOpenPreview)
         }
     }
 }
@@ -157,8 +157,9 @@ private fun UserBubble(text: String) {
 }
 
 @Composable
-private fun AssistantBlock(msg: ChatMessage) {
+private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        msg.build?.takeIf { it.steps.isNotEmpty() }?.let { BuildStepsCard(it, msg.isStreaming, onOpenPreview) }
         // Bare pill for as long as there's no actual reply text yet. Gating this on msg.status
         // used to hide it the instant the backend's generic "thinking" status frame landed (it
         // sends one on every reply, mode or no mode — see trailModeActive below) even though the

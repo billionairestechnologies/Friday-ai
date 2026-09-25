@@ -1,5 +1,7 @@
 package com.friday.app.data.api
 
+import com.friday.app.data.BuildInfo
+import com.friday.app.data.BuildStep
 import com.friday.app.data.ChatMessage
 import com.friday.app.data.ChatThread
 import com.friday.app.data.Role
@@ -55,11 +57,30 @@ object ConversationsApi {
                         val c = citeArr.getJSONObject(j)
                         Source(title = c.optString("title").ifBlank { c.optString("u") }, url = c.optString("u"))
                     }
+                    val buildObj = o.optJSONObject("build")
+                    val build = buildObj?.let { b ->
+                        val stepArr = b.optJSONArray("steps") ?: JSONArray()
+                        BuildInfo(
+                            steps = (0 until stepArr.length()).map { k ->
+                                val st = stepArr.getJSONObject(k)
+                                BuildStep(
+                                    id = st.optString("id"),
+                                    kind = st.optString("kind"),
+                                    label = st.optString("label"),
+                                    state = st.optString("state"),
+                                    detail = st.optString("detail").ifBlank { null },
+                                )
+                            },
+                            previewUrl = b.optString("previewUrl").ifBlank { null },
+                            port = b.optInt("port").takeIf { it > 0 },
+                        )
+                    }
                     ChatMessage(
                         id = o.optString("id").ifBlank { "m-$i" },
                         role = role,
                         content = o.optString("content"),
                         sources = sources,
+                        build = build,
                     )
                 }
             }

@@ -14,6 +14,7 @@ export type MessageMetadata = {
   usedSearch?: boolean;
   usedCanvas?: boolean;
   error?: string;
+  build?: import("./types.js").BuildMeta;
 };
 
 export type PageOptions = {
@@ -253,6 +254,7 @@ export async function insertAssistantMessage(
       used_search: metadata.usedSearch ?? Boolean(metadata.citations?.length),
       used_canvas: metadata.usedCanvas ?? false,
       error: metadata.error ?? null,
+      build: metadata.build ?? null,
     })
     .select()
     .single();

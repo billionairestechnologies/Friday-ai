@@ -37,6 +37,22 @@ struct AgentStatus: Identifiable, Hashable {
     var error: String?
 }
 
+/// One thing Build Mode did — "Ran command · Install dependencies", "Wrote src/App.jsx".
+struct BuildStep: Identifiable, Hashable {
+    let id: String
+    let kind: String // write | run | start | read
+    let label: String
+    let state: String // running | ok | error
+    var detail: String?
+}
+
+/// What Build Mode did for a message: its steps plus the live preview it produced (if any).
+struct BuildInfo: Hashable {
+    var steps: [BuildStep] = []
+    var previewUrl: String?
+    var port: Int?
+}
+
 struct ChatMessage: Identifiable, Hashable {
     let id: String
     let role: Role
@@ -51,6 +67,7 @@ struct ChatMessage: Identifiable, Hashable {
     var attachments: [PendingAttachment] = []
     var modesUsed: Set<Mode> = []
     var agents: [AgentStatus] = []
+    var build: BuildInfo?
 }
 
 struct ChatThread: Identifiable, Hashable {

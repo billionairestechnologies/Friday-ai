@@ -13,6 +13,7 @@ import com.friday.app.data.TEAMUP_MODEL_ID
 import com.friday.app.data.ChatMessage
 import com.friday.app.data.ChatRepository
 import com.friday.app.data.ChatThread
+import com.friday.app.data.BuildInfo
 import com.friday.app.data.ChatEvent
 import com.friday.app.data.AuthStep
 import com.friday.app.data.FridayUser
@@ -655,6 +656,15 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             val i = msg.agents.indexOfFirst { it.slug == event.status.slug && it.model == event.status.model }
                             val nextAgents = if (i == -1) msg.agents + event.status else msg.agents.toMutableList().apply { set(i, event.status) }
                             msg.copy(agents = nextAgents)
+                        }
+                        is ChatEvent.Step -> patchMessage(chatId!!, asstId) { msg ->
+                            val cur = msg.build ?: BuildInfo()
+                            val i = cur.steps.indexOfFirst { it.id == event.step.id }
+                            val steps = if (i == -1) cur.steps + event.step else cur.steps.toMutableList().apply { set(i, event.step) }
+                            msg.copy(build = cur.copy(steps = steps))
+                        }
+                        is ChatEvent.Preview -> patchMessage(chatId!!, asstId) { msg ->
+                            msg.copy(build = (msg.build ?: BuildInfo()).copy(previewUrl = event.url, port = event.port))
                         }
                         ChatEvent.Done -> patchMessage(chatId!!, asstId) {
                             it.copy(isStreaming = false)

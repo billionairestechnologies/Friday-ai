@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { extractArtifact, extractStreamingCodeBody, withExtraCss, type Artifact } from "@/lib/chat/artifact";
 import { extForLang, saveFile } from "@/lib/chat/download";
+import { BuildCanvas } from "@/components/build-preview";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
 import { normalizeRunLanguage, runSandboxCode, type AutoRunResult } from "@/lib/chat/runnable";
 import { useLiveStream } from "@/lib/chat/live-stream";
@@ -260,6 +261,19 @@ function CanvasBody({
     }
     return "";
   });
+  // Build Mode: a running project newer than any single-file artifact takes over the panel.
+  const conversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
+  const storedBuildUrl = useChat((s) => {
+    const list = s.chats.find((c) => c.id === s.activeId)?.messages ?? [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i]!;
+      if (m.role !== "assistant") continue;
+      if (m.build?.previewUrl) return m.build.previewUrl;
+      if (extractArtifact(m.content)) return "";
+    }
+    return "";
+  });
+  const buildUrl = live?.preview?.url ?? storedBuildUrl;
   const content = live?.text || stored;
   const streaming = Boolean(live);
   const artifact = content ? extractArtifact(content) : null;
@@ -272,6 +286,17 @@ function CanvasBody({
   // markdown) only ever has one view.
   const [view, setView] = useState<"preview" | "code">("preview");
   const hasPreview = artifact?.kind === "html" || artifact?.kind === "react";
+
+  if (buildUrl && conversationId) {
+    return (
+      <BuildCanvas
+        conversationId={conversationId}
+        liveUrl={live?.preview?.url}
+        onClose={onClose}
+        onResizeStart={onResizeStart}
+      />
+    );
+  }
 
   return (
     <aside className="premium-panel relative flex h-full w-full min-w-0 flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-40">

@@ -12,7 +12,27 @@ struct CanvasPanel: View {
         return ArtifactDetect.detect(in: last.content)
     }
 
+    /// Build Mode: a running project newer than any single-file artifact takes over the panel.
+    private var buildTarget: (conversationId: String, message: ChatMessage)? {
+        guard let chat = vm.currentChat, UUID(uuidString: chat.id) != nil else { return nil }
+        let messages = chat.messages
+        guard let buildIdx = messages.lastIndex(where: { $0.build?.previewUrl != nil }) else { return nil }
+        let artifactIdx = messages.lastIndex(where: { $0.role == .assistant && ArtifactDetect.detect(in: $0.content) != nil }) ?? -1
+        return buildIdx > artifactIdx ? (chat.id, messages[buildIdx]) : nil
+    }
+
     var body: some View {
+        if let target = buildTarget {
+            BuildPanel(
+                conversationId: target.conversationId,
+                liveUrl: vm.freshBuildMessageIds.contains(target.message.id) ? target.message.build?.previewUrl : nil
+            )
+        } else {
+            artifactBody
+        }
+    }
+
+    private var artifactBody: some View {
         VStack(spacing: 0) {
             header
             Divider().background(FridayColor.hairline)

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { StreamAcc } from "./raf-batch";
-import type { AgentStatus, AssistantStatus, ChatMessage, Citation } from "./types";
+import type { AgentStatus, AssistantStatus, BuildStep, ChatMessage, Citation } from "./types";
 
 export type LiveSnapshot = {
   chatId: string;
@@ -12,6 +12,8 @@ export type LiveSnapshot = {
   agents: AgentStatus[];
   error?: string;
   canvasOn: boolean;
+  steps: BuildStep[];
+  preview?: { url: string; port: number };
 };
 
 type Draft = LiveSnapshot;
@@ -41,6 +43,8 @@ function emit(chatId: string) {
           agents: draft.agents.slice(),
           error: draft.error,
           canvasOn: draft.canvasOn,
+          steps: draft.steps.slice(),
+          preview: draft.preview,
         }
       : null,
   );
@@ -62,6 +66,7 @@ export function startLive(
     cites: [],
     agents: [],
     canvasOn,
+    steps: [],
   });
   emit(chatId);
 }
@@ -98,6 +103,23 @@ export function applyLive(chatId: string, acc: StreamAcc) {
     }
   }
   if (acc.error) draft.error = acc.error;
+  emit(chatId);
+}
+
+/** Build Mode: upserts a step (matched by id — the server re-sends it as it goes running → ok/error). */
+export function applyLiveStep(chatId: string, step: BuildStep) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  const i = draft.steps.findIndex((s) => s.id === step.id);
+  if (i === -1) draft.steps.push(step);
+  else draft.steps[i] = step;
+  emit(chatId);
+}
+
+export function setLivePreview(chatId: string, url: string, port: number) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  draft.preview = { url, port };
   emit(chatId);
 }
 
@@ -159,6 +181,9 @@ export function overlayLive(
       // send time, so the chain-of-thought panel/sources still render for it.
       usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
       usedCanvas: m.usedCanvas || live.canvasOn,
+      build: live.steps.length || live.preview
+        ? { steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port }
+        : m.build,
     };
   });
   return hit ? next : messages;

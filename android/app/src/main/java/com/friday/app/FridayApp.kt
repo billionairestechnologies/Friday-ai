@@ -438,7 +438,19 @@ private fun ChatShell(
     val latestArtifact = latestArtifactMsg?.let { artifactFor(it) }
     // Plain code (ArtifactKind.Code) only shows when Canvas is turned on — it never auto-opens the panel.
     val autoOpen = latestArtifact != null && latestArtifact.kind != com.friday.app.ui.canvas.ArtifactKind.Code && latestArtifactMsg?.id != autoClosedMessageId
-    val canvasOn = Mode.Canvas in ui.modes || autoOpen
+    // Build Mode: a running project newer than any single-file artifact takes over the panel.
+    val messages = chat?.messages.orEmpty()
+    val buildMsg = messages.lastOrNull { it.build?.previewUrl != null }
+    val buildIdx = buildMsg?.let { messages.indexOf(it) } ?: -1
+    val artifactIdx = latestArtifactMsg?.let { messages.indexOf(it) } ?: -1
+    val buildActive = buildMsg != null && buildIdx > artifactIdx
+    var buildOpen by remember { mutableStateOf(false) }
+    // Opens on its own the moment a preview URL first appears (live or when loading history is
+    // deliberately NOT auto-opened — only when this device is watching it stream in).
+    LaunchedEffect(buildMsg?.build?.previewUrl) {
+        if (buildMsg?.isStreaming == true) buildOpen = true
+    }
+    val canvasOn = (Mode.Canvas in ui.modes || autoOpen) && !buildActive || (buildActive && buildOpen)
     val ctx = LocalContext.current
     val reduce = remember {
         Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
@@ -594,7 +606,7 @@ private fun ChatShell(
                         )
                     }
                 } else {
-                    ChatThread(chat?.messages.orEmpty())
+                    ChatThread(chat?.messages.orEmpty(), onOpenPreview = { buildOpen = true })
                 }
             }
             Box(
@@ -671,7 +683,9 @@ private fun ChatShell(
     val canvasSpring = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.9f, stiffness = 650f)
     val canvasScope = rememberCoroutineScope()
     val canvasOnNow by androidx.compose.runtime.rememberUpdatedState(canvasOn)
+    val buildActiveNow by androidx.compose.runtime.rememberUpdatedState(buildActive)
     val closeCanvas = {
+        if (buildActive) buildOpen = false
         if (Mode.Canvas in ui.modes) vm.toggleMode(Mode.Canvas)
         if (latestArtifactMsg != null) autoClosedMessageId = latestArtifactMsg.id
     }
@@ -689,7 +703,7 @@ private fun ChatShell(
                     fromOpen -> revealed > 0.75f
                     else -> revealed > 0.25f
                 }
-                if (open && !canvasOnNow) vm.toggleMode(Mode.Canvas)
+                if (open && !canvasOnNow) { if (buildActiveNow) buildOpen = true else vm.toggleMode(Mode.Canvas) }
                 if (!open && canvasOnNow) closeCanvas()
                 canvasScope.launch { canvasX.animateTo(if (open) 0f else panelW, canvasSpring, initialVelocity = velocity) }
             }
@@ -697,16 +711,28 @@ private fun ChatShell(
         onDispose { swipe.registerRightPanel(null) }
     }
     if (canvasX.value < panelW - 1f) {
-        CanvasPanel(
-            artifact = latestArtifact,
-            generating = isGenerating && latestArtifact == null,
-            onClose = closeCanvas,
-            modifier = Modifier
-                .fillMaxSize()
-                .offset { androidx.compose.ui.unit.IntOffset(canvasX.value.roundToInt(), 0) }
-                .statusBarsPadding()
-                .shadow(24.dp),
-        )
+        val panelModifier = Modifier
+            .fillMaxSize()
+            .offset { androidx.compose.ui.unit.IntOffset(canvasX.value.roundToInt(), 0) }
+            .statusBarsPadding()
+            .shadow(24.dp)
+        if (buildActive && buildMsg != null && chat != null) {
+            com.friday.app.ui.canvas.BuildPanel(
+                conversationId = chat.id,
+                // Just-built (this device is watching it) → known-good URL; a loaded-from-history
+                // build gets re-verified/restored by the backend first.
+                liveUrl = buildMsg.build?.previewUrl?.takeIf { buildMsg.id.startsWith("a-") },
+                onClose = { buildOpen = false },
+                modifier = panelModifier,
+            )
+        } else {
+            CanvasPanel(
+                artifact = latestArtifact,
+                generating = isGenerating && latestArtifact == null,
+                onClose = closeCanvas,
+                modifier = panelModifier,
+            )
+        }
     }
 
     if (voiceModeOpen) {

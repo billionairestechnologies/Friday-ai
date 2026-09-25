@@ -32,6 +32,9 @@ import {
   withSystemPreamble,
 } from "./promptContext.js";
 import { streamTeamUp } from "./teamUp.js";
+import { detectBuildIntent } from "../build/intent.js";
+import { runBuildAgent } from "../build/agent.js";
+import { getProject } from "../build/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
@@ -447,6 +450,42 @@ export async function streamMessage(
         onEvent({ t: "done" });
         return;
       }
+    }
+
+    // Build Mode: a request for a real, runnable project goes to the sandbox agent (write files →
+    // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
+    // Canvas (single-file preview) — Team Up already returned above.
+    if (!canvas && (await detectBuildIntent(content, Boolean(await getProject(conversationId))))) {
+      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal });
+      if (built.error && !built.text && built.build.steps.length === 0) {
+        onEvent({ t: "err", c: built.error });
+        onEvent({ t: "done" });
+        return;
+      }
+      if (built.candidate) {
+        reconcileTokens = built.usage.totalTokens;
+        void recordTokenUsage(userId, built.candidate.slug, built.candidate.modelId, built.usage, { conversationId, mode });
+        void recordTokenLedger(
+          userId,
+          effectivePlan.enterprise?.organizationId ?? null,
+          built.candidate.slug,
+          built.candidate.modelId,
+          built.usage,
+          reservation?.reserveTokens ?? 0,
+        );
+      }
+      const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
+      await insertAssistantMessage(conversationId, built.text || "Done.", buildLabel, {
+        usedCanvas: false,
+        usedSearch: false,
+        usedThink: false,
+        build: built.build,
+        error: built.error,
+      });
+      await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+      if (built.error) onEvent({ t: "err", c: built.error });
+      onEvent({ t: "done" });
+      return;
     }
 
     onEvent({ t: "status", s: "thinking" });

@@ -15,6 +15,7 @@ import { modelsRouter } from "./routes/models.js";
 import { chatRouter } from "./routes/chat.js";
 import { pushRouter } from "./routes/push.js";
 import { libraryRouter } from "./routes/library.js";
+import { buildRouter } from "./routes/build.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
 import { requestContext } from "./middleware/requestContext.js";
@@ -74,6 +75,7 @@ export function createApp() {
   app.use("/api/chat", chatRouter);
   app.use("/api/push", pushRouter);
   app.use("/api/library", libraryRouter);
+  app.use("/api/build", buildRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/sandbox", sandboxRouter);
   app.use("/api/usage", usageRouter);
