@@ -456,6 +456,8 @@ export async function streamMessage(
     // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
     // Canvas (single-file preview) — Team Up already returned above.
     if (!canvas && (await detectBuildIntent(content, Boolean(await getProject(conversationId))))) {
+      // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
+      onEvent({ t: "status", s: "building" });
       const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });

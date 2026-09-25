@@ -9,7 +9,7 @@ import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
-import { BuildSteps, ProjectZipCard } from "@/components/build-steps";
+import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
@@ -143,6 +143,8 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
       className="msg-enter group/msg flex min-h-[1.75rem] flex-col items-start gap-3"
       style={done ? { contentVisibility: "auto", containIntrinsicSize: "auto 120px" } : undefined}
     >
+      {message.streaming && message.build && message.build.steps.length === 0 && <BuildBanner />}
+
       {message.build && message.build.steps.length > 0 && (
         <BuildSteps build={message.build} streaming={Boolean(message.streaming)} />
       )}

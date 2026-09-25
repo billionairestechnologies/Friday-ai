@@ -15,6 +15,9 @@ export type LiveSnapshot = {
   steps: BuildStep[];
   preview?: { url: string; port: number };
   meta?: { elapsedMs?: number; zipBytes?: number; zipName?: string };
+  /** True once the server announced Build Mode (status "building") — keeps the start-up banner up
+   *  until the first step exists, even though narration text flips status to "writing" meanwhile. */
+  buildStarted?: boolean;
 };
 
 type Draft = LiveSnapshot;
@@ -47,6 +50,7 @@ function emit(chatId: string) {
           steps: draft.steps.slice(),
           preview: draft.preview,
           meta: draft.meta,
+          buildStarted: draft.buildStarted,
         }
       : null,
   );
@@ -92,6 +96,7 @@ export function applyLive(chatId: string, acc: StreamAcc) {
   if (acc.text) draft.text += acc.text;
   if (acc.think) draft.think += acc.think;
   if (acc.status) draft.status = acc.status;
+  if (acc.status === "building") draft.buildStarted = true;
   if (acc.cites.length) {
     for (const c of acc.cites) {
       if (!draft.cites.some((x) => x.url === c.url)) draft.cites.push(c);
@@ -190,7 +195,7 @@ export function overlayLive(
       // send time, so the chain-of-thought panel/sources still render for it.
       usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
       usedCanvas: m.usedCanvas || live.canvasOn,
-      build: live.steps.length || live.preview
+      build: live.steps.length || live.preview || live.buildStarted
         ? { steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
         : m.build,
     };

@@ -638,7 +638,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             it.copy(thinkingLabel = event.label, thinkingSteps = event.steps)
                         }
                         is ChatEvent.Status -> patchMessage(chatId!!, asstId) {
-                            it.copy(status = event.phase)
+                            // "building" = Build Mode started: keep a BuildInfo around so the start-up
+                            // banner stays visible until the first step exists (narration flips status meanwhile).
+                            it.copy(status = event.phase, build = if (event.phase == "building" && it.build == null) BuildInfo() else it.build)
                         }
                         is ChatEvent.Sources -> patchMessage(chatId!!, asstId) {
                             it.copy(sources = event.items)

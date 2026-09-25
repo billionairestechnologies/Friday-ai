@@ -1,5 +1,54 @@
 import SwiftUI
 
+/// Spinning multicolor ring — the "working" symbol next to steps and "Working for 26s".
+struct BuildOrb: View {
+    var size: CGFloat = 14
+    @State private var spin = false
+    var body: some View {
+        Circle()
+            .strokeBorder(
+                AngularGradient(colors: [Color(hex: 0x4F8CFF), Color(hex: 0xA855F7), Color(hex: 0xFF6B6B), Color(hex: 0xFFB547), Color(hex: 0x34D399), Color(hex: 0x4F8CFF)], center: .center),
+                lineWidth: size * 0.22
+            )
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(spin ? 360 : 0))
+            .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: spin)
+            .onAppear { spin = true }
+    }
+}
+
+/// "Build Mode" start-up card shown the instant a build begins (before any step exists).
+struct BuildBanner: View {
+    @State private var phase: CGFloat = -0.4
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "hammer.fill").font(.system(size: 16)).foregroundColor(FridayColor.text)
+                .frame(width: 36, height: 36).background(FridayColor.chip).cornerRadius(10)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text("Build Mode").font(.system(size: 14.5, weight: .semibold)).foregroundColor(FridayColor.text)
+                    BuildOrb()
+                }
+                Text("Spinning up a sandbox to build, install, run and test your project…").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { geo in
+                LinearGradient(colors: [FridayColor.surface, Color(hex: 0x788CFF).opacity(0.18), FridayColor.surface], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geo.size.width * 2)
+                    .offset(x: geo.size.width * (phase * 2 - 0.5))
+            }
+            .background(FridayColor.surface)
+            .clipped()
+        )
+        .cornerRadius(16)
+        .onAppear { withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) { phase = 0.6 } }
+    }
+}
+
 private func formatDuration(_ total: Int) -> String {
     let s = max(0, total)
     return s >= 60 ? "\(s / 60)m \(s % 60)s" : "\(s)s"
@@ -20,9 +69,20 @@ struct BuildStepsCard: View {
     @State private var expanded = false
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    /// Consecutive file writes fold into one "Edited 9 files" row, like the reference product.
+    private var groups: [[BuildStep]] {
+        var out: [[BuildStep]] = []
+        for step in build.steps {
+            if step.kind == "write", let last = out.last, last.first?.kind == "write" { out[out.count - 1].append(step) } else { out.append([step]) }
+        }
+        return out
+    }
+
     private var rows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(build.steps) { StepRow(step: $0) }
+            ForEach(groups, id: \.first!.id) { g in
+                if g.first!.kind == "write" { WriteGroup(steps: g) } else { StepRow(step: g[0]) }
+            }
         }
         .background(alignment: .leading) {
             Rectangle().fill(FridayColor.hairline).frame(width: 1).padding(.leading, 7).padding(.vertical, 10)
@@ -32,9 +92,16 @@ struct BuildStepsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if streaming {
+                HStack(spacing: 6) {
+                    Image(systemName: "hammer.fill").font(.system(size: 10))
+                    Text("Build Mode").font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(FridayColor.text)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(FridayColor.chip).clipShape(Capsule())
                 rows
                 HStack(spacing: 8) {
-                    ProgressView().scaleEffect(0.6)
+                    BuildOrb(size: 13)
                     Text("Working for \(formatDuration(elapsed))")
                 }
                 .font(.system(size: 13)).foregroundColor(FridayColor.muted)
@@ -125,7 +192,7 @@ private struct StepRow: View {
 
     private var icon: String {
         switch step.kind {
-        case "write", "read": return "doc.text"
+        case "write", "read": return "pencil"
         case "start": return "play.fill"
         default: return "terminal"
         }
@@ -138,7 +205,7 @@ private struct StepRow: View {
             } label: {
                 HStack(spacing: 8) {
                     if step.state == "running" {
-                        ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                        BuildOrb(size: 14).frame(width: 14, height: 14)
                     } else if step.state == "error" {
                         Image(systemName: "exclamationmark.circle.fill").font(.system(size: 13)).foregroundColor(FridayColor.error).frame(width: 14)
                     } else {
@@ -162,6 +229,39 @@ private struct StepRow: View {
                 .background(FridayColor.chip)
                 .cornerRadius(8)
                 .padding(.leading, 22).padding(.bottom, 6)
+            }
+        }
+    }
+}
+
+private struct WriteGroup: View {
+    let steps: [BuildStep]
+    @State private var open = false
+
+    var body: some View {
+        let running = steps.contains { $0.state == "running" }
+        let failed = steps.contains { $0.state == "error" }
+        VStack(alignment: .leading, spacing: 0) {
+            Button { withAnimation(.easeOut(duration: 0.15)) { open.toggle() } } label: {
+                HStack(spacing: 8) {
+                    if running { BuildOrb(size: 14).frame(width: 14, height: 14) }
+                    else if failed { Image(systemName: "exclamationmark.circle.fill").font(.system(size: 13)).foregroundColor(FridayColor.error).frame(width: 14) }
+                    else { Image(systemName: "pencil").font(.system(size: 12)).foregroundColor(FridayColor.muted).frame(width: 14) }
+                    Text("\(running ? "Editing" : "Edited") \(steps.count) file\(steps.count == 1 ? "" : "s")").foregroundColor(FridayColor.text)
+                    Text(steps.map { $0.label.replacingOccurrences(of: "Wrote ", with: "") }.joined(separator: ", "))
+                        .foregroundColor(FridayColor.muted).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .font(.system(size: 13.5))
+                .padding(.vertical, 5)
+            }
+            .buttonStyle(.plain)
+            if open {
+                Text(steps.map { $0.label.replacingOccurrences(of: "Wrote ", with: "") }.joined(separator: "\n"))
+                    .font(.system(size: 11, design: .monospaced)).foregroundColor(FridayColor.muted)
+                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(FridayColor.chip).cornerRadius(8)
+                    .padding(.leading, 22).padding(.bottom, 6)
             }
         }
     }

@@ -612,3 +612,29 @@ textarea::-webkit-scrollbar-thumb {
     transition: none !important;
   }
 }
+
+/* Build Mode: spinning multicolor "working" orb + start-up banner sheen. */
+@keyframes build-orb-spin { to { transform: rotate(360deg); } }
+.build-orb {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, #4f8cff, #a855f7, #ff6b6b, #ffb547, #34d399, #4f8cff);
+  -webkit-mask: radial-gradient(farthest-side, transparent 55%, #000 58%);
+  mask: radial-gradient(farthest-side, transparent 55%, #000 58%);
+  animation: build-orb-spin 0.9s linear infinite;
+}
+@keyframes build-sheen { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.build-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background-image: linear-gradient(110deg, transparent 30%, rgba(120, 140, 255, 0.14) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: build-sheen 2.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .build-orb, .build-banner { animation: none; }
+}

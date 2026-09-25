@@ -18,12 +18,15 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -57,6 +60,67 @@ private fun verbFor(step: BuildStep): String = when (step.kind) {
     else -> ""
 }
 
+/** Spinning multicolor ring — the "working" symbol next to steps and "Working for 26s". */
+@Composable
+fun BuildOrb(size: androidx.compose.ui.unit.Dp = 14.dp) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "orb")
+    val angle by t.animateFloat(
+        0f, 360f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "angle",
+    )
+    androidx.compose.foundation.Canvas(Modifier.size(size).rotate(angle)) {
+        val stroke = this.size.minDimension * 0.22f
+        drawArc(
+            brush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                listOf(
+                    androidx.compose.ui.graphics.Color(0xFF4F8CFF), androidx.compose.ui.graphics.Color(0xFFA855F7),
+                    androidx.compose.ui.graphics.Color(0xFFFF6B6B), androidx.compose.ui.graphics.Color(0xFFFFB547),
+                    androidx.compose.ui.graphics.Color(0xFF34D399), androidx.compose.ui.graphics.Color(0xFF4F8CFF),
+                ),
+            ),
+            startAngle = 0f, sweepAngle = 360f, useCenter = false,
+            topLeft = androidx.compose.ui.geometry.Offset(stroke / 2, stroke / 2),
+            size = androidx.compose.ui.geometry.Size(this.size.width - stroke, this.size.height - stroke),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
+        )
+    }
+}
+
+/** "Build Mode" start-up card shown the instant a build begins (before any step exists). */
+@Composable
+fun BuildBanner() {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "sheen")
+    val x by t.animateFloat(
+        -300f, 900f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2400, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "x",
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    listOf(FridaySurface, androidx.compose.ui.graphics.Color(0x2E788CFF), FridaySurface),
+                    startX = x, endX = x + 300f,
+                ),
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Build, null, tint = FridayText, modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(com.friday.app.ui.theme.FridayChip).padding(8.dp).size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Build Mode", color = FridayText, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold)
+                BuildOrb()
+            }
+            Text("Spinning up a sandbox to build, install, run and test your project…", color = FridayMuted, fontSize = 12.sp)
+        }
+    }
+}
+
 private fun formatDuration(totalSeconds: Long): String {
     val s = totalSeconds.coerceAtLeast(0)
     return if (s >= 60) "${s / 60}m ${s % 60}s" else "${s}s"
@@ -80,15 +144,29 @@ fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Un
     }
     val rows: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().animateContentSize()) {
-            build.steps.forEach { StepRow(it) }
+            // Consecutive file writes fold into one "Edited 9 files" row, like the reference product.
+            val groups = mutableListOf<List<BuildStep>>()
+            build.steps.forEach { st ->
+                val last = groups.lastOrNull()
+                if (st.kind == "write" && last != null && last.first().kind == "write") groups[groups.lastIndex] = last + st
+                else groups += listOf(st)
+            }
+            groups.forEach { g -> if (g.first().kind == "write") WriteGroup(g) else StepRow(g.first()) }
         }
     }
     Column(Modifier.fillMaxWidth().animateContentSize()) {
         if (streaming) {
+            Row(
+                Modifier.padding(bottom = 6.dp).clip(RoundedCornerShape(50)).background(com.friday.app.ui.theme.FridayChip).padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(Icons.Default.Build, null, tint = FridayText, modifier = Modifier.size(12.dp))
+                Text("Build Mode", color = FridayText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
             rows()
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CircularProgressIndicator(strokeWidth = 1.5.dp, color = FridayMuted, modifier = Modifier.size(12.dp))
+                BuildOrb(13.dp)
                 Text("Working for ${formatDuration(elapsed)}", color = FridayMuted, fontSize = 13.sp)
             }
         } else {
@@ -184,11 +262,11 @@ private fun StepRow(step: BuildStep) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             when {
-                step.state == "running" -> CircularProgressIndicator(strokeWidth = 1.5.dp, color = FridayMuted, modifier = Modifier.size(14.dp))
+                step.state == "running" -> BuildOrb(14.dp)
                 step.state == "error" -> Icon(Icons.Default.Error, null, tint = FridayError, modifier = Modifier.size(14.dp))
                 else -> Icon(
                     when (step.kind) {
-                        "write", "read" -> Icons.Default.Description
+                        "write", "read" -> Icons.Default.Edit
                         "start" -> Icons.Default.PlayArrow
                         else -> Icons.Default.Terminal
                     },
@@ -224,6 +302,39 @@ private fun StepRow(step: BuildStep) {
                     .background(com.friday.app.ui.theme.FridayChip)
                     .horizontalScroll(rememberScrollState())
                     .padding(8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WriteGroup(steps: List<BuildStep>) {
+    var open by remember { mutableStateOf(false) }
+    val running = steps.any { it.state == "running" }
+    val failed = steps.any { it.state == "error" }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().clickable { open = !open }.padding(vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when {
+                running -> BuildOrb(14.dp)
+                failed -> Icon(Icons.Default.Error, null, tint = FridayError, modifier = Modifier.size(14.dp))
+                else -> Icon(Icons.Default.Edit, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("${if (running) "Editing" else "Edited"} ${steps.size} file${if (steps.size == 1) "" else "s"}", color = FridayText, fontSize = 13.5.sp)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                steps.joinToString(", ") { it.label.removePrefix("Wrote ") },
+                color = FridayMuted, fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+        }
+        if (open) {
+            Text(
+                steps.joinToString("\n") { it.label.removePrefix("Wrote ") },
+                fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = FridayMuted,
+                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, bottom = 6.dp).clip(RoundedCornerShape(8.dp)).background(com.friday.app.ui.theme.FridayChip).padding(8.dp),
             )
         }
     }

@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, ChevronRight, Download, FileArchive, FileCode2, Loader2, Play, Terminal } from "lucide-react";
+import { AlertCircle, ChevronRight, Download, FileArchive, FilePen, Hammer, Play, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildInfo, BuildStep } from "@/lib/chat/types";
 import { useChat } from "@/lib/chat/store";
 import { downloadProjectZip } from "@/components/build-preview";
 
 function StepIcon({ step }: { step: BuildStep }) {
-  if (step.state === "running") return <Loader2 className="size-3.5 animate-spin text-muted" />;
+  if (step.state === "running") return <span className="build-orb" aria-hidden />;
   if (step.state === "error") return <AlertCircle className="size-3.5 text-danger" />;
-  const Icon = step.kind === "write" || step.kind === "read" ? FileCode2 : step.kind === "start" ? Play : Terminal;
+  const Icon = step.kind === "write" || step.kind === "read" ? FilePen : step.kind === "start" ? Play : Terminal;
   return <Icon className="size-3.5 text-muted" />;
 }
 
@@ -45,6 +45,58 @@ function StepRow({ step }: { step: BuildStep }) {
   );
 }
 
+function WriteGroup({ steps }: { steps: BuildStep[] }) {
+  const [open, setOpen] = useState(false);
+  const running = steps.some((st) => st.state === "running");
+  const failed = steps.some((st) => st.state === "error");
+  return (
+    <div className="relative pl-6">
+      <span className="absolute top-1/2 left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
+        {running ? <span className="build-orb" aria-hidden /> : failed ? <AlertCircle className="size-3.5 text-danger" /> : <FilePen className="size-3.5 text-muted" />}
+      </span>
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 py-1 text-left text-sm hover:text-foreground">
+        <span className="text-foreground">{running ? "Editing" : "Edited"} {steps.length} file{steps.length === 1 ? "" : "s"}</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{steps.map((st) => st.label.replace(/^Wrote /, "")).join(", ")}</span>
+        <ChevronRight className={cn("size-3.5 text-subtle transition-transform", open && "rotate-90")} />
+      </button>
+      {open && (
+        <div className="mb-1 rounded-lg bg-chip p-2 font-mono text-[11px] leading-relaxed text-muted">
+          {steps.map((st) => (
+            <div key={st.id}>{st.label.replace(/^Wrote /, "")}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "Build Mode" start-up card: shown the instant a build starts (before any step exists) and as a small
+ *  pill above the live steps, so it's obvious Friday switched into building an actual project. */
+export function BuildBanner({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-chip px-2.5 py-1 text-xs font-medium text-foreground">
+        <Hammer className="size-3" /> Build Mode
+      </span>
+    );
+  }
+  return (
+    <div className="build-banner w-full px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-chip">
+          <Hammer className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            Build Mode <span className="build-orb" aria-hidden />
+          </div>
+          <div className="text-xs text-muted">Spinning up a sandbox to build, install, run and test your project…</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatDuration(totalSeconds: number) {
   const s = Math.max(0, Math.round(totalSeconds));
   return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
@@ -69,21 +121,29 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming]);
 
+  // Consecutive file writes fold into one "Edited 9 files" row (like the reference product) so a big
+  // scaffold doesn't bury the commands that matter.
+  const groups: Array<BuildStep | BuildStep[]> = [];
+  for (const step of build.steps) {
+    const prev = groups[groups.length - 1];
+    if (step.kind === "write" && Array.isArray(prev)) prev.push(step);
+    else if (step.kind === "write") groups.push([step]);
+    else groups.push(step);
+  }
   const rows = (
     <div className="relative">
       <span className="absolute top-3 bottom-3 left-[7.5px] w-px bg-border" aria-hidden />
-      {build.steps.map((step) => (
-        <StepRow key={step.id} step={step} />
-      ))}
+      {groups.map((g) => (Array.isArray(g) ? <WriteGroup key={g[0]!.id} steps={g} /> : <StepRow key={g.id} step={g} />))}
     </div>
   );
 
   if (streaming) {
     return (
       <div className="w-full">
+        <BuildBanner compact />
         {rows}
         <div className="flex items-center gap-2 pt-2 text-sm text-muted">
-          <Loader2 className="size-3.5 animate-spin" /> Working for {formatDuration(elapsed)}
+          <span className="build-orb" aria-hidden /> Working for {formatDuration(elapsed)}
         </div>
       </div>
     );

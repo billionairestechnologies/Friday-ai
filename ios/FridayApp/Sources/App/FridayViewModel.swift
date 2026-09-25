@@ -294,6 +294,8 @@ final class FridayViewModel: ObservableObject {
         switch event {
         case .status(let s):
             chats[ci].messages[mi].status = s
+            // "building" = Build Mode started: keep a BuildInfo so the start-up banner stays up until the first step exists.
+            if s == "building", chats[ci].messages[mi].build == nil { chats[ci].messages[mi].build = BuildInfo() }
         case .think(let t):
             chats[ci].messages[mi].reasoning = t
         case .text(let t):

@@ -20,6 +20,7 @@ export type AssistantStatus =
   | "thinking"
   | "synthesizing"
   | "writing"
+  | "building"
   | "generating_image"
   | null;
 
@@ -91,7 +92,7 @@ export type ChatRequestMessage = {
 };
 
 export type StreamEvent =
-  | { t: "status"; s: "thinking" | "searching" | "synthesizing" | "writing" | "generating_image" }
+  | { t: "status"; s: "thinking" | "searching" | "synthesizing" | "writing" | "building" | "generating_image" }
   | { t: "agent"; slug: string; model: string; state: "start" | "done" | "error"; error?: string }
   | { t: "think"; c: string }
   | { t: "text"; c: string }

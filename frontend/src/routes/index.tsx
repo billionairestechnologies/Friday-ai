@@ -265,7 +265,8 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
 
     try {
       await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
-        if (ev.t === "status") batch.status(ev.s);
+        if (ev.t === "status" && ev.s === "building") applyLive(chatId, { text: "", think: "", cites: [], agents: [], status: "building" });
+        else if (ev.t === "status") batch.status(ev.s);
         else if (ev.t === "think") batch.think(ev.c);
         else if (ev.t === "text") {
           batch.text(ev.c);

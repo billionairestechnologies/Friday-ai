@@ -86,7 +86,6 @@ export async function runBuildAgent(opts: {
     onEvent({ t: "text", c: text });
   };
 
-  onEvent({ t: "status", s: "writing" });
 
   let box: BuildSandbox;
   try {
