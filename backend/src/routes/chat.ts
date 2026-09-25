@@ -36,3 +36,4 @@ chatRouter.post(
   quotaLimit,
   asyncHandler(controller.streamMessage),
 );
+chatRouter.post("/conversations/:id/stop", asyncHandler(controller.stopMessage));

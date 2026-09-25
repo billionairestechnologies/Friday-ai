@@ -202,7 +202,7 @@ fun ComposerBar(
                 BasicTextField(
                     value = draft,
                     onValueChange = onDraft,
-                    enabled = !isGenerating,
+                    enabled = true,
                     textStyle = TextStyle(
                         color = FridayText,
                         fontSize = 16.sp,
@@ -292,7 +292,7 @@ AnimatedVisibility(modes.size < 2, enter = expandHorizontally() + fadeIn(), exit
                     }
                     TrailingAction(
                         hasText = hasText,
-                        generating = isGenerating,
+                        generating = isGenerating && !hasText,
                         onSend = onSend,
                         onStop = onStop,
                         onStartRecording = { requestRecording() },

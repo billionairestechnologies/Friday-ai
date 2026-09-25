@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, API_BASE_URL, setAccessToken, setUnauthorizedHandler } from "@/lib/api";
 import { useChat } from "@/lib/chat/store";
+import { registerWebPush } from "@/lib/push";
 import { setRealtimeAuth, startRealtimeSync, stopRealtimeSync } from "@/lib/chat/realtime";
 import type { AuthUser, Session } from "@/lib/types";
 
@@ -94,6 +95,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: res.user, isPending: false });
       useChat.getState().syncOwner(res.user.id);
       startRealtimeSync(res.user.id, stored.session.access_token);
+      void registerWebPush();
       const invite = new URLSearchParams(window.location.search).get("invite");
       if (invite) {
         try {
@@ -124,6 +126,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: res.user, isPending: false });
     useChat.getState().syncOwner(res.user.id);
     startRealtimeSync(res.user.id, res.session.access_token);
+    void registerWebPush();
   },
 
   resendOtp: async (email) => {

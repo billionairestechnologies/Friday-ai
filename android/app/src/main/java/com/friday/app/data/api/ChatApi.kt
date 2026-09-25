@@ -66,6 +66,18 @@ object ChatApi {
         }.getOrDefault(false)
     }
 
+    /** POST /api/chat/conversations/:id/stop — the backend keeps generating after the client
+     *  disconnects, so an explicit Stop has to be sent to it. */
+    suspend fun stopMessage(conversationId: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url(ApiClient.BASE_URL + "chat/conversations/" + conversationId + "/stop")
+                .post("{}".toRequestBody(JSON))
+                .build()
+            ApiClient.authed.newCall(request).execute().use { resp -> resp.isSuccessful }
+        }.getOrDefault(false)
+    }
+
     /** POST /api/chat/conversations/:id/messages/stream — text/event-stream, "t"-discriminated JSON frames.
      * [attachments] (max 4, enforced server-side) ride inline in this same request body as base64 data
      * URLs — the backend has no separate upload endpoint for chat attachments. */

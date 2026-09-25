@@ -20,6 +20,8 @@ import { extractArtifact } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
+import { useQueue } from "@/lib/chat/queue";
+import { X } from "lucide-react";
 
 type ConversationMode = "single" | "auto" | "teamup";
 
@@ -62,6 +64,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     Boolean(s.chats.find((c) => c.id === s.activeId)?.messages.some((m) => m.streaming)),
   );
   const activeId = useChat((s) => s.activeId);
+  const queued = useQueue((s) => (activeId ? s.byChat[activeId] : undefined)) ?? [];
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
@@ -153,10 +156,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     return { conversationId: res.conversation.id };
   }
 
-  async function send(text: string, files?: File[]) {
+  async function send(text: string, files?: File[], queuedAttachments?: ChatMessage["attachments"]) {
     const s = useChat.getState();
     const trimmed = text.trim();
-    let attachments = s.attachments;
+    let attachments = queuedAttachments ?? s.attachments;
     if (files?.length) {
       try {
         attachments = await Promise.all(files.map(fileToAttachment));
@@ -170,9 +173,16 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     // Only blocks re-sending into the SAME chat that's already streaming — a global busy flag
     // here used to refuse sending into any OTHER chat too (and a stuck one made every send
     // forever after do nothing silently), which is exactly what broke multitasking across chats.
-    if (!available || isStreamActive(s.activeId)) {
-      setSendError(available ? "Still working on the last message — try again in a moment." : "No models available right now.");
+    if (!available) {
+      setSendError("No models available right now.");
       window.setTimeout(() => setSendError(null), 4000);
+      return;
+    }
+    // A reply is still generating in this chat: park the message in the queue instead of
+    // refusing it. It sends automatically, in order, when the current turn finishes.
+    if (s.activeId && isStreamActive(s.activeId)) {
+      if (!queuedAttachments) s.clearDraft();
+      useQueue.getState().enqueue(s.activeId, { id: uid(), text: trimmed, attachments });
       return;
     }
 
@@ -293,11 +303,17 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       });
       clearLive(chatId);
       endStream(chatId, ac);
+      const next = useQueue.getState().shift(chatId);
+      if (next) void send(next.text, undefined, next.attachments ?? []);
     }
   }
 
   function stop() {
-    if (activeId) stopStream(activeId);
+    if (!activeId) return;
+    stopStream(activeId);
+    // The server keeps generating after a disconnect, so aborting the fetch is no longer enough.
+    const conversationId = useChat.getState().chats.find((c) => c.id === activeId)?.conversationId;
+    if (conversationId) void api.post(`/chat/conversations/${conversationId}/stop`, {}).catch(() => {});
   }
 
   function usePrompt(text: string) {
@@ -416,6 +432,27 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
               <div className="relative shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
                 <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-b from-transparent to-background" />
                 <div className="mx-auto w-full max-w-3xl lg:max-w-4xl 2xl:max-w-5xl">
+                  {queued.length > 0 && (
+                    <div className="mb-2 flex flex-col gap-1.5">
+                      {queued.map((q, i) => (
+                        <div
+                          key={q.id}
+                          className="flex items-center gap-2 rounded-xl border border-border bg-composer px-3 py-1.5 text-sm text-muted"
+                        >
+                          <span className="shrink-0 text-xs text-subtle">Queued {i + 1}</span>
+                          <span className="min-w-0 flex-1 truncate">{q.text || "Attachment"}</span>
+                          <button
+                            type="button"
+                            aria-label="Remove queued message"
+                            onClick={() => activeId && useQueue.getState().remove(activeId, q.id)}
+                            className="rounded-full p-1 hover:bg-chip hover:text-foreground"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}

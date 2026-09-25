@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import * as chatService from "../services/chat/index.js";
+import { finishGeneration, registerGeneration, stopGeneration } from "../services/chat/activeGenerations.js";
+import { notifyUser } from "../services/pushService.js";
 
 const pageSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -107,10 +109,21 @@ export async function streamMessage(req: Request, res: Response) {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders?.();
 
-  const abortController = new AbortController();
-  req.on("close", () => abortController.abort());
+  // Generation is decoupled from the connection: closing the tab / killing the app only drops
+  // this socket, the reply still finishes and is persisted (other devices pick it up via
+  // realtime, and a push notification goes out below). Only an explicit Stop cancels it.
+  const abortController = registerGeneration(req.params.id, req.user!.id);
+  let clientGone = false;
+  req.on("close", () => {
+    clientGone = true;
+  });
 
+  let replyText = "";
+  let failed = false;
   const send = (event: chatService.StreamEvent) => {
+    if (event.t === "text") replyText += event.c;
+    if (event.t === "err") failed = true;
+    if (clientGone || res.writableEnded) return;
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
@@ -118,7 +131,9 @@ export async function streamMessage(req: Request, res: Response) {
   // no bytes on the wire in that window looks identical, to Railway's edge/Cloudflare, to a dead
   // connection, and either can close it. An SSE comment line (ignored by the client's parser,
   // which only reads `data:` lines) keeps the connection visibly alive without affecting events.
-  const heartbeat = setInterval(() => res.write(": ping\n\n"), 15_000);
+  const heartbeat = setInterval(() => {
+    if (!clientGone && !res.writableEnded) res.write(": ping\n\n");
+  }, 15_000);
 
   try {
     await chatService.streamMessage(
@@ -141,6 +156,20 @@ export async function streamMessage(req: Request, res: Response) {
     send({ t: "done" });
   } finally {
     clearInterval(heartbeat);
-    res.end();
+    finishGeneration(req.params.id, abortController);
+    if (!res.writableEnded) res.end();
+    if (clientGone && !failed && !abortController.signal.aborted && replyText.trim()) {
+      const body = replyText.trim().replace(/\s+/g, " ");
+      void notifyUser(req.user!.id, {
+        title: "Friday replied",
+        body: body.length > 140 ? `${body.slice(0, 137)}...` : body,
+        conversationId: req.params.id,
+      });
+    }
   }
+}
+
+export async function stopMessage(req: Request, res: Response) {
+  stopGeneration(req.params.id, req.user!.id);
+  res.status(204).end();
 }

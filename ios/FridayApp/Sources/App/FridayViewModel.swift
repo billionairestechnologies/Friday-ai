@@ -19,6 +19,9 @@ final class FridayViewModel: ObservableObject {
     @Published var modes: Set<Mode> = []
     @Published var pendingAttachments: [PendingAttachment] = []
     @Published var attachmentError: String?
+    /// Messages typed while a reply was still generating, per chat id. They send one at a time,
+    /// in order, as each turn finishes.
+    @Published var queued: [String: [QueuedMessage]] = [:]
 
     // Models
     @Published var remoteModels: [RemoteModel] = []
@@ -146,23 +149,41 @@ final class FridayViewModel: ObservableObject {
     func send(text override: String? = nil) -> String? {
         let text = (override ?? draft).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || (override == nil && !pendingAttachments.isEmpty) else { return nil }
-        if let id = currentId, streamJobs[id] != nil { return nil }
 
         guard TokenStore.shared.hasSession() else {
             authRequired = true
             return nil
         }
 
-        Haptics.impact(.medium)
-
         let attachmentsForSend = override == nil ? pendingAttachments : []
         let modesSnapshot = override == nil ? modes : []
+
+        // A reply is still generating in this chat: park the message in the queue instead of
+        // dropping it. It sends automatically, in order, once the current turn finishes.
+        if let id = currentId, streamJobs[id] != nil {
+            guard override == nil else { return nil }
+            queued[id, default: []].append(QueuedMessage(id: UUID().uuidString, text: text, attachments: attachmentsForSend, modes: modesSnapshot))
+            draft = ""
+            pendingAttachments = []
+            Haptics.impact(.light)
+            return nil
+        }
+
         if override == nil {
             draft = ""
             pendingAttachments = []
         }
+        return startTurn(chatId: currentId, text: text, attachments: attachmentsForSend, modes: modesSnapshot)
+    }
 
-        var localId = currentId
+    func removeQueued(chatId: String, id: String) {
+        queued[chatId]?.removeAll { $0.id == id }
+    }
+
+    private func startTurn(chatId: String?, text: String, attachments attachmentsForSend: [PendingAttachment], modes modesSnapshot: Set<Mode>) -> String {
+        Haptics.impact(.medium)
+
+        var localId = chatId
         if localId == nil {
             localId = "c-\(Int(Date().timeIntervalSince1970 * 1000))"
             chats.insert(ChatThread(id: localId!, title: titleFrom(text)), at: 0)
@@ -195,6 +216,11 @@ final class FridayViewModel: ObservableObject {
         defer {
             streamJobs[localId] = nil
             if let finalId { streamJobs[finalId] = nil }
+            let doneId = finalId ?? localId
+            if let next = queued[doneId]?.first, TokenStore.shared.hasSession() {
+                queued[doneId]?.removeFirst()
+                _ = startTurn(chatId: doneId, text: next.text, attachments: next.attachments, modes: next.modes)
+            }
         }
 
         let mode: String = selectedModelId == AUTO_MODEL_ID ? "auto" : (selectedModelId == TEAMUP_MODEL_ID ? "teamup" : "single")
@@ -300,6 +326,7 @@ final class FridayViewModel: ObservableObject {
         var chat = chats[idx]
         let newChat = ChatThread(id: to, title: chat.title, messages: chat.messages, updatedAt: chat.updatedAt)
         chats[idx] = newChat
+        if let q = queued[from] { queued[from] = nil; queued[to] = q }
         if currentId == from { currentId = to }
         _ = chat // avoid unused warning
     }
@@ -308,6 +335,9 @@ final class FridayViewModel: ObservableObject {
         guard let id = currentId, let job = streamJobs[id] else { return }
         job.cancel()
         streamJobs[id] = nil
+        // The server keeps generating after a disconnect, so cancelling the local stream isn't
+        // enough — tell it to stop too.
+        if UUID(uuidString: id) != nil { Task { await ChatApi.stop(conversationId: id) } }
         if let ci = chats.firstIndex(where: { $0.id == id }) {
             if let mi = chats[ci].messages.lastIndex(where: { $0.role == .assistant }) {
                 chats[ci].messages[mi].isStreaming = false
@@ -409,6 +439,7 @@ final class FridayViewModel: ObservableObject {
     }
 
     func logout() async {
+        queued = [:]
         for (_, job) in streamJobs { job.cancel() }
         streamJobs.removeAll()
         await AuthApi.logout()
@@ -455,4 +486,11 @@ enum Haptics {
             UIImpactFeedbackGenerator(style: style).impactOccurred()
         }
     }
+}
+
+struct QueuedMessage: Identifiable {
+    let id: String
+    let text: String
+    let attachments: [PendingAttachment]
+    let modes: Set<Mode>
 }

@@ -79,6 +79,16 @@ data class FridayUiState(
     /** Selected TTS voice for Voice Mode / spoken replies (GET /api/voice/voices id + display name). */
     val voiceId: String? = null,
     val voiceName: String? = null,
+    /** Messages typed while a reply was still generating, per chat id. They send one at a time,
+     *  in order, as each turn finishes. */
+    val queued: Map<String, List<QueuedMessage>> = emptyMap(),
+)
+
+data class QueuedMessage(
+    val id: String,
+    val text: String,
+    val attachments: List<PendingAttachment>,
+    val modes: Set<Mode>,
 )
 
 class FridayViewModel(app: Application) : AndroidViewModel(app) {
@@ -411,6 +421,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     fun logout() {
         // Every chat is about to be cleared below, not just the one being viewed — stop() alone
         // only stops the current chat's job.
+        _state.update { it.copy(queued = emptyMap()) }
         streamJobs.values.forEach { it.cancel() }
         streamJobs.clear()
         val hadSession = tokenStore.hasSession()
@@ -514,16 +525,36 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         val text = (override ?: _state.value.draft).trim()
         val attachments = _state.value.pendingAttachments
         if (text.isEmpty() && attachments.isEmpty()) return
-        // Only blocks re-sending into the SAME chat that's already streaming, not every chat.
         val activeChatId = _state.value.currentId
-        if (activeChatId != null && streamJobs[activeChatId]?.isActive == true) return
         if (!tokenStore.hasSession()) {
             _state.update { it.copy(authRequired = true) }
             return
         }
+        // A reply is still generating in this chat: park the message in the queue instead of
+        // dropping it. It sends automatically, in order, once the current turn finishes.
+        if (activeChatId != null && streamJobs[activeChatId]?.isActive == true) {
+            val item = QueuedMessage("q-${System.nanoTime()}", text, attachments, _state.value.modes)
+            _state.update {
+                it.copy(
+                    draft = "",
+                    pendingAttachments = emptyList(),
+                    queued = it.queued + (activeChatId to (it.queued[activeChatId].orEmpty() + item)),
+                )
+            }
+            haptic(10)
+            return
+        }
+        _state.update { it.copy(draft = "", pendingAttachments = emptyList()) }
+        startTurn(activeChatId, text, attachments, _state.value.modes)
+    }
+
+    fun removeQueued(chatId: String, id: String) {
+        _state.update { it.copy(queued = it.queued + (chatId to it.queued[chatId].orEmpty().filterNot { q -> q.id == id })) }
+    }
+
+    private fun startTurn(existingChatId: String?, text: String, attachments: List<PendingAttachment>, modes: Set<Mode>) {
         haptic(14)
-        val modes = _state.value.modes
-        var chatId = _state.value.currentId
+        var chatId = existingChatId
         if (chatId == null) {
             chatId = "c-${System.currentTimeMillis()}"
             val thread = ChatThread(id = chatId, title = titleFrom(text), messages = emptyList())
@@ -534,7 +565,6 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         val asst = ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true, modesUsed = modes)
         val titleSeed = text.ifBlank { attachments.firstOrNull()?.name.orEmpty() }
         patchChat(chatId) { it.copy(messages = it.messages + userMsg + asst, title = if (it.messages.isEmpty()) titleFrom(titleSeed) else it.title, updatedAt = System.currentTimeMillis()) }
-        _state.update { it.copy(draft = "", pendingAttachments = emptyList()) }
 
         val startChatId = chatId!!
         lateinit var job: Job
@@ -574,6 +604,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                                 s.copy(
                                     currentId = if (s.currentId == oldId) remoteId else s.currentId,
                                     chats = s.chats.map { if (it.id == oldId) it.copy(id = remoteId) else it },
+                                    queued = s.queued[oldId]?.let { q -> s.queued - oldId + (remoteId to q) } ?: s.queued,
                                 )
                             }
                             // Follow the id swap so stop()/the "already streaming" guard, both keyed
@@ -622,6 +653,11 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 patchMessage(chatId!!, asstId) { it.copy(isStreaming = false) }
                 streamJobs.remove(chatId)
+                val next = _state.value.queued[chatId]?.firstOrNull()
+                if (next != null && tokenStore.hasSession()) {
+                    removeQueued(chatId!!, next.id)
+                    startTurn(chatId, next.text, next.attachments, next.modes)
+                }
             }
         }
         streamJobs[startChatId] = job
@@ -642,6 +678,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     fun stop() {
         val id = _state.value.currentId ?: return
         streamJobs.remove(id)?.cancel()
+        // The server keeps generating after a disconnect, so cancelling the local stream isn't
+        // enough — tell it to stop too.
+        if (isServerConversationId(id)) viewModelScope.launch { ChatApi.stopMessage(id) }
         _state.update { s ->
             s.copy(
                 chats = s.chats.map { chat ->

@@ -45,6 +45,12 @@ enum ChatApi {
         _ = try await ApiClient.shared.requestJSON(path: "chat/conversations/\(id)", method: "PATCH", body: body, authed: true)
     }
 
+    /// POST /chat/conversations/:id/stop — the backend keeps generating after the client
+    /// disconnects, so an explicit Stop has to be sent to it. Best-effort (204, no body).
+    static func stop(conversationId: String) async {
+        _ = try? await ApiClient.shared.requestJSON(path: "chat/conversations/\(conversationId)/stop", method: "POST", body: [:], authed: true)
+    }
+
     /// Streams one assistant reply. Yields cumulative buffers per the
     /// backend's contract (not deltas) — the caller replaces, not appends.
     static func streamMessage(

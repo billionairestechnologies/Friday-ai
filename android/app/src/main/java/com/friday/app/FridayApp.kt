@@ -597,6 +597,38 @@ private fun ChatShell(
                     .alpha(compA)
                     .scale(if (play) 0.96f + 0.04f * compA else 1f),
             ) {
+              Column {
+                val queuedHere = ui.currentId?.let { ui.queued[it] }.orEmpty()
+                queuedHere.forEachIndexed { i, q ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(com.friday.app.ui.theme.FridaySurface)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Queued ${i + 1}", color = FridayMuted, fontSize = 12.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            q.text.ifBlank { "Attachment" },
+                            color = FridayText,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Remove queued message",
+                            tint = FridayMuted,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clickable { ui.currentId?.let { id -> vm.removeQueued(id, q.id) } },
+                        )
+                    }
+                }
                 ComposerBar(
                     draft = ui.draft,
                     onDraft = vm::setDraft,
@@ -616,6 +648,7 @@ private fun ChatShell(
                     attachments = ui.pendingAttachments,
                     onRemoveAttachment = vm::removeAttachment,
                 )
+              }
             }
         }
     }

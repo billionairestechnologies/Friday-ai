@@ -792,7 +792,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             isRecording && "border-red-500/70",
             className,
           )}
-          disabled={disabled || isLoading || isRecording}
+          disabled={disabled || isRecording}
           ref={ref || promptBoxRef}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -1164,14 +1164,16 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
 
               <PromptInputAction
                 tooltip={
-                  isLoading
+                  isLoading && !hasContent
                     ? "Stop generation"
                     : isRecording
                       ? "Stop recording"
                       : isTranscribing
                         ? "Transcribing…"
                         : hasContent
-                          ? "Send message"
+                          ? isLoading
+                            ? "Add to queue"
+                            : "Send message"
                           : "Voice message"
                 }
               >
@@ -1187,14 +1189,14 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                         : "bg-transparent text-muted hover:bg-chip hover:text-foreground",
                   )}
                   onClick={() => {
-                    if (isLoading) onStop?.();
+                    if (isLoading && !hasContent) onStop?.();
                     else if (isRecording) stopRecording();
                     else if (hasContent) handleSubmit();
                     else if (!isTranscribing) void startRecording();
                   }}
-                  disabled={(disabled && !isLoading) || isTranscribing}
+                  disabled={(disabled && !(isLoading && !hasContent)) || isTranscribing}
                 >
-                  {isLoading ? (
+                  {isLoading && !hasContent ? (
                     <Square className="h-4 w-4 animate-pulse fill-primary-foreground" />
                   ) : isRecording ? (
                     <StopCircle className="h-5 w-5 text-red-500" />

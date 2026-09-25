@@ -18,6 +18,25 @@ struct ComposerBar: View {
                 }
             }
 
+            if let id = vm.currentId, let items = vm.queued[id], !items.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        HStack(spacing: 8) {
+                            Text("Queued \(index + 1)").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                            Text(item.text.isEmpty ? "Attachment" : item.text)
+                                .font(.system(size: 14)).foregroundColor(FridayColor.text).lineLimit(1)
+                            Spacer(minLength: 0)
+                            Button { vm.removeQueued(chatId: id, id: item.id) } label: {
+                                Image(systemName: "xmark").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                            }
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(FridayColor.surface)
+                        .cornerRadius(12)
+                    }
+                }
+            }
+
             if let error = vm.attachmentError {
                 Text(error).font(.system(size: 12)).foregroundColor(FridayColor.error)
             }
@@ -153,7 +172,8 @@ struct ComposerBar: View {
 
     @ViewBuilder
     private var trailingAction: some View {
-        if vm.isStreamingCurrent {
+        let hasContent = !vm.draft.trimmingCharacters(in: .whitespaces).isEmpty || !vm.pendingAttachments.isEmpty
+        if vm.isStreamingCurrent && !hasContent {
             Button { vm.stop() } label: {
                 Image(systemName: "square.fill")
                     .font(.system(size: 14))
@@ -162,7 +182,7 @@ struct ComposerBar: View {
                     .background(FridayColor.stop)
                     .clipShape(Circle())
             }
-        } else if !vm.draft.trimmingCharacters(in: .whitespaces).isEmpty || !vm.pendingAttachments.isEmpty {
+        } else if hasContent {
             Button { vm.send() } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .semibold))
