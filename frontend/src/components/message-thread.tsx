@@ -143,9 +143,9 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
       className="msg-enter group/msg flex min-h-[1.75rem] flex-col items-start gap-3"
       style={done ? { contentVisibility: "auto", containIntrinsicSize: "auto 120px" } : undefined}
     >
-      {message.streaming && message.build && message.build.steps.length === 0 && <BuildBanner />}
+      {message.streaming && message.build && message.build.steps.length === 0 && !message.build.plan && <BuildBanner />}
 
-      {message.build && message.build.steps.length > 0 && (
+      {message.build && (message.build.steps.length > 0 || message.build.plan) && (
         <BuildSteps build={message.build} streaming={Boolean(message.streaming)} />
       )}
 

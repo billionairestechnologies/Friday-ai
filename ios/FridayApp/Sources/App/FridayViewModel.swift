@@ -323,6 +323,10 @@ final class FridayViewModel: ObservableObject {
             // the panel opens on the running app.
             freshBuildMessageIds.insert(assistantMessageId)
             withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) { canvasOpen = true }
+        case .plan(let plan):
+            var build = chats[ci].messages[mi].build ?? BuildInfo()
+            build.plan = plan
+            chats[ci].messages[mi].build = build
         case .buildMeta(let elapsedMs, let zipBytes, let zipName):
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.elapsedMs = elapsedMs

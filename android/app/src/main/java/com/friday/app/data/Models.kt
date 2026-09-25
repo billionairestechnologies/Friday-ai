@@ -56,8 +56,15 @@ data class BuildStep(
     val detail: String? = null,
 )
 
+/** One line of the Build Mode plan — todo | doing | done. */
+data class BuildPlanItem(val text: String, val state: String)
+
+/** Architecture + todo checklist Build Mode drafts before coding, updated live as items finish. */
+data class BuildPlan(val architecture: String, val items: List<BuildPlanItem>)
+
 /** What Build Mode did for a message: its steps plus the live preview it produced (if any). */
 data class BuildInfo(
+    val plan: BuildPlan? = null,
     val steps: List<BuildStep> = emptyList(),
     val previewUrl: String? = null,
     val port: Int? = null,
@@ -123,6 +130,7 @@ sealed class ChatEvent {
     /** Build Mode started a server and it is reachable (from {"t":"preview",...}). */
     data class Preview(val url: String, val port: Int) : ChatEvent()
     /** End-of-build summary: how long it took and the project zip's size/name (from {"t":"build",...}). */
+    data class Plan(val plan: BuildPlan) : ChatEvent()
     data class BuildMeta(val elapsedMs: Long?, val zipBytes: Long?, val zipName: String?) : ChatEvent()
     data object Done : ChatEvent()
 }

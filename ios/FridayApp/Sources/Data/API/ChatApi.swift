@@ -11,6 +11,7 @@ enum ChatEvent {
     case agent(AgentStatus)
     case step(BuildStep)
     case preview(url: String, port: Int)
+    case plan(BuildPlan)
     case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
     case done
 }
@@ -137,6 +138,9 @@ enum ChatApi {
                             )))
                         case "preview":
                             continuation.yield(.preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0))
+                        case "plan":
+                            let items = (json["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
+                            continuation.yield(.plan(BuildPlan(architecture: json["architecture"] as? String ?? "", items: items)))
                         case "build":
                             continuation.yield(.buildMeta(elapsedMs: json["elapsedMs"] as? Int, zipBytes: json["zipBytes"] as? Int, zipName: json["zipName"] as? String))
                         case "done":
@@ -209,7 +213,14 @@ enum ConversationsApi {
                         detail: $0["detail"] as? String
                     )
                 }
-                build = BuildInfo(steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String)
+                var plan: BuildPlan?
+                if let p = b["plan"] as? [String: Any] {
+                    plan = BuildPlan(
+                        architecture: p["architecture"] as? String ?? "",
+                        items: (p["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
+                    )
+                }
+                build = BuildInfo(plan: plan, steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String)
             }
             return ChatMessage(
                 id: row["id"] as? String ?? UUID().uuidString,

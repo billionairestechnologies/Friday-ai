@@ -62,10 +62,10 @@ private struct MessageRow: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                if message.isStreaming, let build = message.build, build.steps.isEmpty {
+                if message.isStreaming, let build = message.build, build.steps.isEmpty, build.plan == nil {
                     BuildBanner()
                 }
-                if let build = message.build, !build.steps.isEmpty {
+                if let build = message.build, !build.steps.isEmpty || build.plan != nil {
                     BuildStepsCard(build: build, streaming: message.isStreaming)
                 }
                 if !message.agents.isEmpty {

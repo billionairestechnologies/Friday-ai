@@ -7,6 +7,11 @@
  *   <friday-run desc="Install dependencies">npm install</friday-run>
  *   <friday-start port="5173" desc="Start the dev server">npm run dev</friday-start>
  *   <friday-read path="package.json"/>
+ *   <friday-progress>
+- [x] finished item
+- [~] item in progress
+- [ ] item still to do
+</friday-progress>
  *   <friday-done>one-paragraph summary for the user</friday-done>
  */
 export type BuildAction =
@@ -14,11 +19,12 @@ export type BuildAction =
   | { kind: "run"; desc: string; cmd: string }
   | { kind: "start"; desc: string; cmd: string; port: number }
   | { kind: "read"; path: string }
+  | { kind: "progress"; body: string }
   | { kind: "done"; summary: string }
   | { kind: "malformed"; reason: string };
 
 const OPEN = "<friday-";
-const NAMES = new Set(["write", "run", "start", "read", "done"]);
+const NAMES = new Set(["write", "run", "start", "read", "done", "progress"]);
 
 function attrs(source: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -131,6 +137,8 @@ export class ActionParser {
       case "read":
         if (!a.path) return this.onAction({ kind: "malformed", reason: "<friday-read> is missing its path" });
         return this.onAction({ kind: "read", path: a.path });
+      case "progress":
+        return this.onAction({ kind: "progress", body });
       case "done":
         return this.onAction({ kind: "done", summary: body.trim() });
     }

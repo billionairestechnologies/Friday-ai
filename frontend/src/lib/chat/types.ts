@@ -33,14 +33,18 @@ export type AgentStatus = {
 
 export type BuildStep = {
   id: string;
-  kind: "write" | "run" | "start" | "read";
+  kind: "write" | "run" | "start" | "read" | "note";
   label: string;
   state: "running" | "ok" | "error";
   detail?: string;
 };
 
+export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
+export type BuildPlan = { architecture: string; items: BuildPlanItem[] };
+
 /** What Build Mode did for a message: the steps it ran and the live preview it produced. */
 export type BuildInfo = {
+  plan?: BuildPlan;
   steps: BuildStep[];
   previewUrl?: string;
   port?: number;
@@ -100,5 +104,6 @@ export type StreamEvent =
   | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string }
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string }
+  | { t: "plan"; architecture: string; items: BuildPlanItem[] }
   | { t: "err"; c: string }
   | { t: "done" };

@@ -46,8 +46,21 @@ struct BuildStep: Identifiable, Hashable {
     var detail: String?
 }
 
+/// One line of the Build Mode plan — todo | doing | done.
+struct BuildPlanItem: Hashable {
+    let text: String
+    var state: String
+}
+
+/// Architecture + todo checklist Build Mode drafts before coding, updated live as items finish.
+struct BuildPlan: Hashable {
+    var architecture: String
+    var items: [BuildPlanItem]
+}
+
 /// What Build Mode did for a message: its steps plus the live preview it produced (if any).
 struct BuildInfo: Hashable {
+    var plan: BuildPlan?
     var steps: [BuildStep] = []
     var previewUrl: String?
     var port: Int?

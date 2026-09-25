@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PlayArrow
@@ -129,6 +131,53 @@ private fun formatDuration(totalSeconds: Long): String {
 private fun formatBytes(bytes: Long): String =
     if (bytes >= 1024 * 1024) "%.2f MB".format(bytes / 1024.0 / 1024.0) else "%.2f KB".format(bytes / 1024.0)
 
+/** The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish. */
+@Composable
+private fun PlanCard(plan: com.friday.app.data.BuildPlan) {
+    var showArch by remember { mutableStateOf(false) }
+    val done = plan.items.count { it.state == "done" }
+    Column(
+        Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(16.dp)).background(FridaySurface).padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Plan", color = FridayText, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("$done/${plan.items.size}", color = FridayMuted, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(com.friday.app.ui.theme.FridayChip)) {
+            Box(Modifier.fillMaxWidth(if (plan.items.isEmpty()) 0f else done.toFloat() / plan.items.size).height(4.dp).clip(RoundedCornerShape(50)).background(FridayText))
+        }
+        if (plan.architecture.isNotBlank()) {
+            Row(Modifier.padding(top = 8.dp).clickable { showArch = !showArch }, verticalAlignment = Alignment.CenterVertically) {
+                Text("Architecture", color = FridayMuted, fontSize = 12.sp)
+                Icon(Icons.Default.ChevronRight, null, tint = FridayMuted, modifier = Modifier.size(14.dp).rotate(if (showArch) 90f else 0f))
+            }
+            if (showArch) Text(plan.architecture, color = FridayMuted, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        plan.items.forEach { item ->
+            Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
+                Box(Modifier.padding(top = 2.dp).size(16.dp), contentAlignment = Alignment.Center) {
+                    when (item.state) {
+                        "done" -> Icon(
+                            Icons.Default.Check, null, tint = FridaySurface,
+                            modifier = Modifier.size(16.dp).clip(androidx.compose.foundation.shape.CircleShape).background(FridayText).padding(2.dp),
+                        )
+                        "doing" -> BuildOrb(14.dp)
+                        else -> Box(Modifier.size(14.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.friday.app.ui.theme.FridayChip))
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    item.text, fontSize = 13.5.sp, lineHeight = 19.sp,
+                    color = if (item.state == "done") FridayMuted else FridayText,
+                    textDecoration = if (item.state == "done") androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                )
+            }
+        }
+    }
+}
+
 /** Build Mode's task list, laid out like the reference product: while working, flat rows joined by
  *  a thin vertical line plus "Working for 15s"; once finished it folds into one
  *  "Worked for 7m 39s ›" line that expands to the same rows. */
@@ -155,6 +204,7 @@ fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Un
         }
     }
     Column(Modifier.fillMaxWidth().animateContentSize()) {
+        build.plan?.let { PlanCard(it) }
         if (streaming) {
             Row(
                 Modifier.padding(bottom = 6.dp).clip(RoundedCornerShape(50)).background(com.friday.app.ui.theme.FridayChip).padding(horizontal = 10.dp, vertical = 4.dp),
@@ -253,6 +303,15 @@ fun ProjectZipCard(build: BuildInfo, conversationId: String) {
 @Composable
 private fun StepRow(step: BuildStep) {
     var open by remember { mutableStateOf(false) }
+    // Narration between actions — a plain thought line, not a command.
+    if (step.kind == "note") {
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+            Icon(Icons.Default.Lightbulb, null, tint = FridayMuted, modifier = Modifier.padding(top = 2.dp).size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(step.label, color = FridayText, fontSize = 13.5.sp, lineHeight = 19.sp)
+        }
+        return
+    }
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier

@@ -58,6 +58,64 @@ private func formatBytes(_ bytes: Int) -> String {
     bytes >= 1024 * 1024 ? String(format: "%.2f MB", Double(bytes) / 1024 / 1024) : String(format: "%.2f KB", Double(bytes) / 1024)
 }
 
+/// The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish.
+private struct PlanCard: View {
+    let plan: BuildPlan
+    @State private var showArch = false
+
+    var body: some View {
+        let done = plan.items.filter { $0.state == "done" }.count
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Plan").font(.system(size: 14.5, weight: .semibold)).foregroundColor(FridayColor.text)
+                Spacer()
+                Text("\(done)/\(plan.items.count)").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(FridayColor.chip)
+                    Capsule().fill(FridayColor.text)
+                        .frame(width: plan.items.isEmpty ? 0 : geo.size.width * CGFloat(done) / CGFloat(plan.items.count))
+                        .animation(.easeOut(duration: 0.4), value: done)
+                }
+            }
+            .frame(height: 4)
+            if !plan.architecture.isEmpty {
+                Button { withAnimation(.easeOut(duration: 0.15)) { showArch.toggle() } } label: {
+                    HStack(spacing: 4) {
+                        Text("Architecture").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                        Image(systemName: "chevron.right").font(.system(size: 9)).foregroundColor(FridayColor.muted).rotationEffect(.degrees(showArch ? 90 : 0))
+                    }
+                }
+                if showArch { Text(plan.architecture).font(.system(size: 12)).foregroundColor(FridayColor.muted) }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(plan.items.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .top, spacing: 8) {
+                        Group {
+                            if item.state == "done" {
+                                Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundColor(FridayColor.text)
+                            } else if item.state == "doing" {
+                                BuildOrb(size: 14)
+                            } else {
+                                Circle().stroke(FridayColor.hairline, lineWidth: 1.5).frame(width: 14, height: 14)
+                            }
+                        }
+                        .frame(width: 16, height: 16)
+                        Text(item.text).font(.system(size: 13.5))
+                            .foregroundColor(item.state == "done" ? FridayColor.muted : FridayColor.text)
+                            .strikethrough(item.state == "done")
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(FridayColor.surface)
+        .cornerRadius(16)
+    }
+}
+
 /// Build Mode's task list, laid out like the reference product: while working, flat rows joined by
 /// a thin vertical line plus "Working for 15s"; once finished it folds into one
 /// "Worked for 7m 39s ›" line that expands to the same rows.
@@ -91,6 +149,7 @@ struct BuildStepsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let plan = build.plan { PlanCard(plan: plan) }
             if streaming {
                 HStack(spacing: 6) {
                     Image(systemName: "hammer.fill").font(.system(size: 10))
@@ -199,6 +258,15 @@ private struct StepRow: View {
     }
 
     var body: some View {
+        if step.kind == "note" {
+            // Narration between actions — a plain thought line, not a command.
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "lightbulb").font(.system(size: 12)).foregroundColor(FridayColor.muted).frame(width: 14).padding(.top, 3)
+                Text(step.label).font(.system(size: 13.5)).foregroundColor(FridayColor.text)
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 5)
+        } else {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 if step.detail != nil { withAnimation(.easeOut(duration: 0.15)) { open.toggle() } }
@@ -230,6 +298,7 @@ private struct StepRow: View {
                 .cornerRadius(8)
                 .padding(.leading, 22).padding(.bottom, 6)
             }
+        }
         }
     }
 }

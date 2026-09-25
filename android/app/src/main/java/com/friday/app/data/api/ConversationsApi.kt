@@ -1,6 +1,8 @@
 package com.friday.app.data.api
 
 import com.friday.app.data.BuildInfo
+import com.friday.app.data.BuildPlan
+import com.friday.app.data.BuildPlanItem
 import com.friday.app.data.BuildStep
 import com.friday.app.data.ChatMessage
 import com.friday.app.data.ChatThread
@@ -61,6 +63,10 @@ object ConversationsApi {
                     val build = buildObj?.let { b ->
                         val stepArr = b.optJSONArray("steps") ?: JSONArray()
                         BuildInfo(
+                            plan = b.optJSONObject("plan")?.let { po ->
+                                val arr = po.optJSONArray("items") ?: JSONArray()
+                                BuildPlan(po.optString("architecture"), (0 until arr.length()).map { k -> arr.getJSONObject(k).let { BuildPlanItem(it.optString("text"), it.optString("state")) } })
+                            },
                             steps = (0 until stepArr.length()).map { k ->
                                 val st = stepArr.getJSONObject(k)
                                 BuildStep(

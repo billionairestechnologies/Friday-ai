@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { StreamAcc } from "./raf-batch";
-import type { AgentStatus, AssistantStatus, BuildStep, ChatMessage, Citation } from "./types";
+import type { AgentStatus, AssistantStatus, BuildPlan, BuildStep, ChatMessage, Citation } from "./types";
 
 export type LiveSnapshot = {
   chatId: string;
@@ -18,6 +18,7 @@ export type LiveSnapshot = {
   /** True once the server announced Build Mode (status "building") — keeps the start-up banner up
    *  until the first step exists, even though narration text flips status to "writing" meanwhile. */
   buildStarted?: boolean;
+  plan?: BuildPlan;
 };
 
 type Draft = LiveSnapshot;
@@ -51,6 +52,7 @@ function emit(chatId: string) {
           preview: draft.preview,
           meta: draft.meta,
           buildStarted: draft.buildStarted,
+          plan: draft.plan,
         }
       : null,
   );
@@ -120,6 +122,13 @@ export function applyLiveStep(chatId: string, step: BuildStep) {
   const i = draft.steps.findIndex((s) => s.id === step.id);
   if (i === -1) draft.steps.push(step);
   else draft.steps[i] = step;
+  emit(chatId);
+}
+
+export function setLivePlan(chatId: string, plan: BuildPlan) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  draft.plan = plan;
   emit(chatId);
 }
 
@@ -195,8 +204,8 @@ export function overlayLive(
       // send time, so the chain-of-thought panel/sources still render for it.
       usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
       usedCanvas: m.usedCanvas || live.canvasOn,
-      build: live.steps.length || live.preview || live.buildStarted
-        ? { steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
+      build: live.steps.length || live.preview || live.buildStarted || live.plan
+        ? { plan: live.plan, steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
         : m.build,
     };
   });

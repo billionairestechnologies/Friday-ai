@@ -2,16 +2,36 @@ import { getProviderAdapter } from "../providers/registry.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
-import type { BuildMeta, BuildStep, StreamEvent } from "../chat/types.js";
+import type { BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
 import { ActionParser, compactAssistantTurn, type BuildAction } from "./protocol.js";
 import JSZip from "jszip";
 import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, tail } from "./sandbox.js";
 
-const MAX_ITERATIONS = 30;
-const MAX_WALL_MS = 14 * 60_000;
-const STUCK_REPEATS = 3;
+const MAX_ITERATIONS = 45;
+const MAX_WALL_MS = 18 * 60_000;
+// The same failure this many times in a row = genuinely stuck. Before that it gets a "step back and
+// change approach" reflection at REFLECT_AT, so it recovers instead of giving up.
+const REFLECT_AT = 2;
+const STUCK_REPEATS = 5;
+
+const PLAN_PROMPT = `You are the tech lead of a coding agent that will build the user's request as a real, runnable project in a Linux sandbox (Node.js, npm, Python 3). Before any code is written, produce the plan. Reply in EXACTLY this format and nothing else:
+<architecture>
+3-8 short lines: the stack and why, the folder structure (key folders/files), how the pieces talk (ports: frontend 5173, API 4000 if any), and the main design decisions.
+</architecture>
+- [ ] first concrete step
+- [ ] second concrete step
+(5-9 checklist items in execution order: scaffold/config, each major feature or module, integration, then a final item "Run it, verify it in a browser and fix any issues". Concrete and short — each item one line.)
+If the user is asking to change/fix an existing project, keep the plan small and specific to that change.`;
 
 const BUILD_SYSTEM_PROMPT = `You are Friday's Build agent. You have a real Linux sandbox (Node.js LTS + npm, Python 3, git, curl, internet access) and you build the user's project inside it for real: write every file, install dependencies, run it, read the errors and fix them until it works. You are NOT limited to snippets — deliver a complete, runnable project with a proper folder structure.
+
+WORKFLOW (like a senior engineer): a PLAN (architecture + todo checklist) has already been drafted for you and is shown to the user. Execute it item by item. After you finish an item — or start the next one — send the checklist with updated markers so the user sees live progress:
+<friday-progress>
+- [x] finished item text
+- [~] item you are working on now
+- [ ] item still to do
+</friday-progress>
+(Repeat every item, same order and wording as the plan.) If reality forces a change of approach, keep going and adapt — the plan is a guide, the working result is the goal.
 
 ACTIONS — you act by writing these tags in your reply (they are executed for you, in order; the user sees each as a step):
 <friday-write path="relative/path.ext">
@@ -23,6 +43,7 @@ full file contents (no markdown fences inside)
 <friday-done>Short summary for the user: what you built, how it is organised, how to use it.</friday-done>
 
 RULES
+- Sandbox gotchas: do NOT rely on a PORT environment variable — put explicit ports in commands/config (frontend/Vite 5173, API 4000, etc.). Restarting a server is just another <friday-start> for the same port (the old stack is stopped for you) — never use pkill/killall. Avoid long multi-line shell one-liners with nested quotes: write a small script file with <friday-write> and run it. Use curl with simple single-line commands.
 - The project root is ${PROJECT_DIR}. All paths are relative to it. Never write outside it.
 - Each action tag must be well-formed and closed. Do not put action tags inside code blocks or quote them.
 - Write ALL files a project needs (package.json, config, index.html, source, styles, README). Do not use interactive scaffolders (npm create …, npx create-… without flags) — write the files yourself.
@@ -36,7 +57,7 @@ RULES
 - NEVER tell the user to run commands themselves ("run npm install", "then npm start"). You run them, with <friday-run>/<friday-start>, and you only say it works after you saw it work.
 - If the user asks to change/fix/extend an existing project, edit the existing files (read them first if needed) instead of starting over.`;
 
-type Iteration = { assistantText: string; results: string[]; done: string | null; anyAction: boolean };
+type Iteration = { assistantText: string; results: string[]; done: string | null; anyAction: boolean; doneLead?: string; plainReply?: string };
 
 export type BuildAgentResult = {
   /** Visible prose from every iteration, for the chat bubble. */
@@ -80,10 +101,20 @@ export async function runBuildAgent(opts: {
   let stepSeq = 0;
   const last: { start: { cmd: string; port: number } | null } = { start: null };
 
+  // The chat bubble only carries the FINAL answer. Narration between actions ("Installing dependencies…")
+  // becomes a short "note" row inside the steps list instead — otherwise every sentence of narration
+  // piles up as a run-together wall of text under the steps.
   const emitText = (text: string) => {
     if (!text) return;
     visibleText += text;
     onEvent({ t: "text", c: text });
+  };
+  const pushNote = (raw: string) => {
+    const text = raw.replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const note: BuildStep = { id: `s${++stepSeq}`, kind: "note", label: text.slice(0, 400), state: "ok" };
+    steps.push(note);
+    onEvent({ t: "step", ...note });
   };
 
 
@@ -110,7 +141,118 @@ export async function runBuildAgent(opts: {
     ...opts.history.filter((m) => m.role !== "system"),
   ];
 
+  const userRequest = [...opts.history].reverse().find((m) => m.role === "user")?.content ?? "";
+  let visualRounds = 0;
+
+  /** Sends the rendered page to a vision-capable model that acts as a strict UI reviewer. */
+  const reviewScreenshot = async (png: Uint8Array): Promise<string | null> => {
+    const reviewer = opts.candidates.find((c) => c.vision);
+    if (!reviewer) return null;
+    try {
+      const adapter = getProviderAdapter(reviewer.slug);
+      const apiKey = await getWorkingKeyForProvider(reviewer.slug);
+      const messages: ChatMessage[] = [
+        {
+          role: "system",
+          content:
+            "You are a strict UI QA reviewer looking at a screenshot of a web page that was just built. Reply with exactly the single word OK if the page looks polished, correctly styled and fits the request. " +
+            "Otherwise list the concrete visual defects as short bullet points (max 8), each with the most likely cause when you can tell — e.g. layout/spacing/container styles not applied (CSS file not imported or Tailwind classes not generated), content hugging the left edge with no padding, text overflowing or overlapping, broken/missing images, unreadable contrast, empty sections, a blank page, unstyled default browser look. Do not praise; do not restate the request.",
+        },
+        {
+          role: "user",
+          content: `The user asked for: ${userRequest.slice(0, 600)}\n\nReview this screenshot of the page rendered at 1280px wide.`,
+          images: [{ mime: "image/png", dataUrl: `data:image/png;base64,${Buffer.from(png).toString("base64")}` }],
+        },
+      ];
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("review timed out")), 60_000));
+      const reply = await Promise.race([adapter.chat(apiKey, reviewer.modelId, messages), timeout]);
+      usage = mergeTokenUsage(usage, estimateTokenUsageFromText(3000, reply.length));
+      return reply.trim();
+    } catch (err) {
+      console.error("[build] visual review failed:", err instanceof Error ? err.message : err);
+      return null;
+    }
+  };
+
+  /** Runs the page in a real browser and reviews the result. Returns a problem report, or "" if fine. */
+  const qualityGate = async (): Promise<string> => {
+    if (!last.start || visualRounds >= 2 || signal?.aborted) return "";
+    visualRounds++;
+    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: "Checking how it looks in a browser", state: "running" };
+    steps.push(step);
+    onEvent({ t: "step", ...step });
+    const problems: string[] = [];
+    let detail = "";
+    try {
+      const shot = await box.screenshot(last.start.port);
+      if (shot.note) detail = shot.note;
+      if (shot.consoleErrors.length) problems.push(`Browser console errors:\n${shot.consoleErrors.join("\n")}`);
+      if (shot.bodyTextLength === 0) problems.push("The page renders completely blank (no visible text at all).");
+      if (shot.png) {
+        const review = await reviewScreenshot(shot.png);
+        if (review && !/^\s*ok\b/i.test(review)) problems.push(`Visual review of the rendered page:\n${review}`);
+        detail = review ? `Reviewer: ${review}` : detail;
+      }
+    } catch (err) {
+      detail = `check skipped: ${err instanceof Error ? err.message : "failed"}`;
+    }
+    step.state = problems.length ? "error" : "ok";
+    step.detail = tail(problems.join("\n\n") || detail || "Looks good", 700);
+    onEvent({ t: "step", ...step });
+    return problems.join("\n\n");
+  };
+
+  // ---- Planning phase: architecture + todo checklist, drafted before any code is written. ----
+  let plan: BuildPlan | null = null;
+  const emitPlan = () => {
+    if (!plan) return;
+    build.plan = plan;
+    onEvent({ t: "plan", architecture: plan.architecture, items: plan.items.map((i) => ({ ...i })) });
+  };
+  const applyProgress = (body: string) => {
+    if (!plan) return;
+    const lines = body.split("\n").map((l) => l.trim()).filter((l) => /^[-*]\s*\[[ xX~]\]/.test(l));
+    if (lines.length === 0) return;
+    const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    lines.forEach((line, i) => {
+      const mark = line.match(/\[([ xX~])\]/)![1]!;
+      const text = line.replace(/^[-*]\s*\[[ xX~]\]\s*/, "");
+      let idx = plan!.items.findIndex((it) => norm(it.text) === norm(text) || norm(it.text).startsWith(norm(text).slice(0, 24)));
+      if (idx === -1 && lines.length === plan!.items.length) idx = i;
+      if (idx === -1) return;
+      plan!.items[idx]!.state = mark === "~" ? "doing" : mark === " " ? "todo" : "done";
+    });
+    emitPlan();
+  };
+  try {
+    const planner = opts.candidates[0];
+    if (planner) {
+      const adapter = getProviderAdapter(planner.slug);
+      const apiKey = await getWorkingKeyForProvider(planner.slug);
+      const planMessages: ChatMessage[] = [
+        { role: "system", content: `${PLAN_PROMPT}\n\n${stateNote}` },
+        ...opts.history.filter((m) => m.role !== "system").slice(-6),
+      ];
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("planning timed out")), 75_000));
+      const planText = await Promise.race([adapter.chat(apiKey, planner.modelId, planMessages), timeout]);
+      usage = mergeTokenUsage(usage, estimateTokenUsageFromText(planMessages.reduce((n, m) => n + m.content.length, 0), planText.length));
+      const architecture = planText.match(/<architecture>([\s\S]*?)<\/architecture>/i)?.[1]?.trim() ?? "";
+      const items = [...planText.matchAll(/^\s*[-*]\s*\[[ xX~]?\]\s*(.+)$/gm)].map((m) => m[1]!.trim()).filter(Boolean).slice(0, 12);
+      if (items.length >= 2) {
+        plan = { architecture, items: items.map((text, i) => ({ text, state: i === 0 ? "doing" : "todo" })) };
+        emitPlan();
+        conversation[0] = {
+          role: "system",
+          content: `${conversation[0]!.content}\n\nAPPROVED PLAN\nArchitecture:\n${architecture || "(none)"}\nTodo:\n${items.map((t) => `- [ ] ${t}`).join("\n")}`,
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[build] planning skipped:", err instanceof Error ? err.message : err);
+  }
+
   const seenErrors = new Map<string, number>();
+  const reflected = new Set<string>();
   let finalDone: string | null = null;
   let nudges = 0;
   let donePushbacks = 0;
@@ -132,6 +274,10 @@ export async function runBuildAgent(opts: {
       turn.anyAction = true;
       if (action.kind === "done") {
         turn.done = action.summary;
+        return;
+      }
+      if (action.kind === "progress") {
+        applyProgress(action.body);
         return;
       }
       if (action.kind === "malformed") {
@@ -214,14 +360,24 @@ export async function runBuildAgent(opts: {
       }
     };
 
+    let pendingText = "";
+    let actionsSeen = 0;
     const parser = new ActionParser(
       (text) => {
         turn.assistantText += text;
-        emitText(text);
+        pendingText += text;
       },
       (action) => {
-        // Serialised so file writes / installs / starts always run in the order the model wrote them.
-        chain = chain.then(() => runAction(action));
+        actionsSeen++;
+        // Prose written before this action is narration → a note row, in order with the steps.
+        const narration = pendingText;
+        pendingText = "";
+        // Serialised so notes / file writes / installs / starts always appear in the order the model wrote them.
+        chain = chain.then(() => {
+          if (action.kind !== "done") pushNote(narration);
+          else if (narration.trim()) turn.doneLead = narration;
+          return runAction(action);
+        });
       },
     );
 
@@ -259,6 +415,15 @@ export async function runBuildAgent(opts: {
     }
     parser.end();
     await chain;
+    if (process.env.FRIDAY_BUILD_DEBUG) console.log(`[build debug] iteration ${iteration} raw (${raw.length} chars):\n${raw.slice(0, 1800)}\n---`);
+    // Text after the last action of a turn: narration if the turn did things, otherwise the model is
+    // answering directly (a plain reply) and this is final content.
+    const trailing = pendingText;
+    pendingText = "";
+    if (trailing.trim()) {
+      if (actionsSeen > 0) pushNote(trailing);
+      else turn.plainReply = trailing;
+    }
 
     if (modelError && !raw) {
       return { text: visibleText, build, usage, candidate: usedCandidate, error: modelError };
@@ -268,7 +433,9 @@ export async function runBuildAgent(opts: {
     if (turn.done !== null) {
       // Don't accept "done" while something is known to be broken — push back a few times first.
       const failedCmds = [...lastRunState.entries()].filter(([, state]) => state === "error").map(([cmd]) => cmd);
-      if ((appBroken || failedCmds.length > 0) && donePushbacks < 3) {
+      // Last gate before "done": actually look at the page in a browser (and have a vision model review it).
+      const gateProblems = !appBroken && failedCmds.length === 0 && donePushbacks < 3 ? await qualityGate() : "";
+      if ((appBroken || failedCmds.length > 0 || gateProblems) && donePushbacks < 3) {
         donePushbacks++;
         conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });
         conversation.push({
@@ -276,35 +443,52 @@ export async function runBuildAgent(opts: {
           content:
             `<results>\n${turn.results.join("\n\n")}\n</results>\n` +
             `You said you're done, but something is still failing${appBroken ? " (the running app does not load cleanly)" : ""}${failedCmds.length ? `; these commands last failed: ${failedCmds.map((c) => JSON.stringify(c)).join(", ")}` : ""}. ` +
-            "Find the root cause, fix it, re-run/re-start, and only finish with <friday-done> after it genuinely works.",
+            (gateProblems ? `\n<review>\n${gateProblems}\n</review>\n` : "") +
+            "Find the root cause, fix it, re-run/re-start, and only finish with <friday-done> after it genuinely works and looks right.",
         });
-        emitText("\n\n");
         continue;
       }
       finalDone = turn.done;
+      if (plan) {
+        plan.items.forEach((item) => (item.state = "done"));
+        emitPlan();
+      }
       break;
     }
     if (!turn.anyAction) {
       // Some models write the files and then just describe how the USER can run them. Nothing has
       // actually been executed yet — push back (a few times) instead of accepting that as done.
       const ranSomething = steps.some((st) => (st.kind === "run" || st.kind === "start") && st.state === "ok");
-      if (!ranSomething && steps.length > 0 && nudges < 3) {
+      const wroteNothing = steps.every((st) => st.kind === "note");
+      if (!ranSomething && nudges < 4) {
         nudges++;
+        if (turn.plainReply) pushNote(turn.plainReply);
         conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });
         conversation.push({
           role: "user",
           content:
-            "You have not run anything yet. Do not tell me to run commands — execute them yourself now with <friday-run> (install dependencies) and <friday-start> (start the server), check the output, fix errors, and only then finish with <friday-done>.",
+            wroteNothing
+              ? "Your last reply contained NO action tags, so nothing was executed — no files exist yet. Do the work now: emit the actions as plain text tags exactly like <friday-write path=\"package.json\">…</friday-write> and <friday-run desc=\"Install dependencies\">npm install</friday-run>. These are ordinary text tags in your reply, not function/tool calls. Start writing the files now."
+              : "You have not run anything yet. Do not tell me to run commands — execute them yourself now with <friday-run> (install dependencies) and <friday-start> (start the server), check the output, fix errors, and only then finish with <friday-done>.",
         });
-        emitText("\n\n");
         continue;
       }
+      if (turn.plainReply) emitText(turn.plainReply.trim());
       break; // plain reply, nothing left to do
     }
 
     if ([...seenErrors.values()].some((n) => n >= STUCK_REPEATS)) {
-      emitText("\n\nI keep hitting the same error and my fixes aren't changing it, so I'm stopping here rather than looping. The steps above show exactly where it fails.");
+      emitText("I kept hitting the same error even after changing approach several times, so I'm stopping here rather than looping. The steps above show exactly where it fails — tell me how you'd like to proceed and I'll continue from the current state.");
       break;
+    }
+    // Recall/reflect: the same failure twice means the current approach isn't working. Instead of
+    // repeating it, force a step back — diagnose the real cause and pick a different route.
+    const repeating = [...seenErrors.entries()].filter(([key, n]) => n >= REFLECT_AT && !reflected.has(key));
+    let reflection = "";
+    if (repeating.length > 0) {
+      repeating.forEach(([key]) => reflected.add(key));
+      reflection =
+        "\n\nSTOP — this same failure has now happened repeatedly, so repeating the same fix will not work. Step back like a debugger: (1) state what you have tried and why it did not work, (2) form a hypothesis about the TRUE root cause (wrong dependency version? config/import path? port clash? missing file? bad syntax you cannot see?), (3) inspect real evidence with <friday-read>/<friday-run> (package versions, config files, logs, the exact failing file), then (4) apply a genuinely DIFFERENT fix — or simplify that part of the design if needed.";
     }
 
     conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });
@@ -312,12 +496,12 @@ export async function runBuildAgent(opts: {
       role: "user",
       content:
         `<results>\n${turn.results.join("\n\n") || "(no results)"}\n</results>\n` +
-        "Continue. Fix anything that failed. When the project runs correctly, finish with <friday-done>.",
+        `Continue with the plan. Fix anything that failed. When the project runs correctly, finish with <friday-done>.${reflection}`,
     });
-    emitText("\n\n");
   }
 
   if (finalDone) emitText(`${visibleText.trim() ? "\n\n" : ""}${finalDone}`);
+  else if (!visibleText.trim() && steps.length > 0) emitText("Here is where the project stands — see the steps above.");
 
   // Persist a restorable snapshot (files + how to start it) so the preview survives sandbox expiry.
   try {

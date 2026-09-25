@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, ChevronRight, Download, FileArchive, FilePen, Hammer, Play, Terminal } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildInfo, BuildStep } from "@/lib/chat/types";
 import { useChat } from "@/lib/chat/store";
@@ -20,6 +20,17 @@ function verb(step: BuildStep): string {
 
 function StepRow({ step }: { step: BuildStep }) {
   const [open, setOpen] = useState(false);
+  // Narration between actions ("Installing dependencies…") — a plain thought line, not a command.
+  if (step.kind === "note") {
+    return (
+      <div className="relative py-1 pl-6 text-sm text-foreground">
+        <span className="absolute top-2 left-0 flex size-4 items-center justify-center bg-background">
+          <Lightbulb className="size-3.5 text-muted" />
+        </span>
+        {step.label}
+      </div>
+    );
+  }
   const expandable = Boolean(step.detail);
   return (
     <div className="relative pl-6">
@@ -66,6 +77,51 @@ function WriteGroup({ steps }: { steps: BuildStep[] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish. */
+function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
+  const [showArch, setShowArch] = useState(false);
+  const done = plan.items.filter((i) => i.state === "done").length;
+  return (
+    <div className="mb-3 w-full rounded-2xl border border-border bg-composer px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <ListChecks className="size-4" /> Plan
+        <span className="ml-auto text-xs font-normal text-muted">
+          {done}/{plan.items.length}
+        </span>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-chip">
+        <div className="h-full rounded-full bg-foreground transition-all duration-500" style={{ width: `${(done / plan.items.length) * 100}%` }} />
+      </div>
+      {plan.architecture && (
+        <div className="mt-2">
+          <button type="button" onClick={() => setShowArch((v) => !v)} className="flex items-center gap-1 text-xs text-muted hover:text-foreground">
+            Architecture <ChevronRight className={cn("size-3 transition-transform", showArch && "rotate-90")} />
+          </button>
+          {showArch && <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-muted">{plan.architecture}</p>}
+        </div>
+      )}
+      <ul className="mt-2 space-y-1">
+        {plan.items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm">
+            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
+              {item.state === "done" ? (
+                <span className="flex size-4 items-center justify-center rounded-full bg-foreground text-background">
+                  <Check className="size-3" strokeWidth={3} />
+                </span>
+              ) : item.state === "doing" ? (
+                <span className="build-orb" aria-hidden />
+              ) : (
+                <span className="size-3.5 rounded-full border border-border" />
+              )}
+            </span>
+            <span className={cn(item.state === "done" ? "text-muted line-through decoration-border" : "text-foreground")}>{item.text}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -141,6 +197,7 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
     return (
       <div className="w-full">
         <BuildBanner compact />
+        {build.plan && <PlanCard plan={build.plan} />}
         {rows}
         <div className="flex items-center gap-2 pt-2 text-sm text-muted">
           <span className="build-orb" aria-hidden /> Working for {formatDuration(elapsed)}
@@ -152,6 +209,7 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
   const seconds = build.elapsedMs != null ? build.elapsedMs / 1000 : 0;
   return (
     <div className="w-full">
+      {build.plan && <PlanCard plan={build.plan} />}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}

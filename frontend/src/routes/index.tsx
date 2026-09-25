@@ -10,7 +10,7 @@ import { useGreeting, useHeroLine } from "@/hooks/use-greeting";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { applyLive, applyLiveStep, clearLive, markLiveCanvasOn, peekLive, setLiveBuildMeta, setLivePreview, startLive } from "@/lib/chat/live-stream";
+import { applyLive, applyLiveStep, clearLive, markLiveCanvasOn, peekLive, setLiveBuildMeta, setLivePlan, setLivePreview, startLive } from "@/lib/chat/live-stream";
 import { beginStream, endStream, isStreamActive, stopStream } from "@/lib/chat/active-streams";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/chat/models";
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
@@ -275,6 +275,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         else if (ev.t === "cite") batch.cite({ url: ev.u, title: ev.title });
         else if (ev.t === "agent") batch.agent({ slug: ev.slug, model: ev.model, state: ev.state, error: ev.error });
         else if (ev.t === "step") applyLiveStep(chatId, { id: ev.id, kind: ev.kind, label: ev.label, state: ev.state, detail: ev.detail });
+        else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName });
         else if (ev.t === "preview") {
           setLivePreview(chatId, ev.url, ev.port);
@@ -307,8 +308,8 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         // manual, so the chain-of-thought/sources panel still renders after the turn completes.
         usedSearch: Boolean(live?.cites?.length),
         usedCanvas: live?.canvasOn,
-        build: live && (live.steps.length || live.preview)
-          ? { steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
+        build: live && (live.steps.length || live.preview || live.plan)
+          ? { plan: live.plan, steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
           : undefined,
       });
       clearLive(chatId);

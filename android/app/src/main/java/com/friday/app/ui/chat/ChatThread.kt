@@ -159,8 +159,8 @@ private fun UserBubble(text: String) {
 @Composable
 private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, conversationId: String? = null) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (msg.isStreaming && msg.build != null && msg.build.steps.isEmpty()) BuildBanner()
-        msg.build?.takeIf { it.steps.isNotEmpty() }?.let { BuildStepsCard(it, msg.isStreaming, onOpenPreview) }
+        if (msg.isStreaming && msg.build != null && msg.build.steps.isEmpty() && msg.build.plan == null) BuildBanner()
+        msg.build?.takeIf { it.steps.isNotEmpty() || it.plan != null }?.let { BuildStepsCard(it, msg.isStreaming, onOpenPreview) }
         // Bare pill for as long as there's no actual reply text yet. Gating this on msg.status
         // used to hide it the instant the backend's generic "thinking" status frame landed (it
         // sends one on every reply, mode or no mode — see trailModeActive below) even though the

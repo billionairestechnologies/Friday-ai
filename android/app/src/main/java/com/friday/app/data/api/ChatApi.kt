@@ -1,6 +1,8 @@
 package com.friday.app.data.api
 
 import com.friday.app.data.AgentStatus
+import com.friday.app.data.BuildPlan
+import com.friday.app.data.BuildPlanItem
 import com.friday.app.data.BuildStep
 import com.friday.app.data.ChatEvent
 import com.friday.app.data.Mode
@@ -173,6 +175,16 @@ object ChatApi {
                                     ),
                                 )
                                 "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))
+                                "plan" -> emit(
+                                    ChatEvent.Plan(
+                                        BuildPlan(
+                                            architecture = json.optString("architecture"),
+                                            items = json.optJSONArray("items")?.let { arr ->
+                                                (0 until arr.length()).map { k -> arr.getJSONObject(k).let { BuildPlanItem(it.optString("text"), it.optString("state")) } }
+                                            } ?: emptyList(),
+                                        ),
+                                    ),
+                                )
                                 "build" -> emit(
                                     ChatEvent.BuildMeta(
                                         elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },

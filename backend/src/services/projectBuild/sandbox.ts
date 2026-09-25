@@ -120,12 +120,20 @@ export class BuildSandbox {
   async start(cmd: string, port: number): Promise<{ ready: boolean; url: string | null; log: string }> {
     this.touch();
     const logFile = `/tmp/friday-server-${port}.log`;
-    await this.sandbox.commands.run(`fuser -k ${port}/tcp >/dev/null 2>&1 || true`).catch(() => {});
-    const script = `cd ${PROJECT_DIR} && (${cmd}) > ${logFile} 2>&1`;
-    await this.sandbox.commands.run(`bash -lc ${JSON.stringify(script)}`, {
+    const pidFile = `/tmp/friday-server-${port}.pid`;
+    // Restarting must really replace the old stack (dev commands like `concurrently` spawn several
+    // processes). Each start runs in its own process group, so the whole group can be killed cleanly —
+    // no fragile `pkill -f` (which matches its own command line) and no orphaned listeners on other ports.
+    await this.sandbox.commands
+      .run(`test -f ${pidFile} && kill -TERM -$(cat ${pidFile}) 2>/dev/null; sleep 0.5; fuser -k ${port}/tcp >/dev/null 2>&1; true`)
+      .catch(() => {});
+    const script = `echo $$ > ${pidFile}; cd ${PROJECT_DIR} && exec bash -lc ${JSON.stringify(cmd)} > ${logFile} 2>&1`;
+    await this.sandbox.commands.run(`setsid bash -c ${JSON.stringify(script)}`, {
       background: true,
       // Vite (5.4.12+) rejects unknown Host headers by default; the preview is served from *.e2b.app.
-      envs: { HOST: "0.0.0.0", PORT: String(port), BROWSER: "none", __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ".e2b.app", FORCE_COLOR: "0" },
+      // No PORT is injected on purpose: it leaked into multi-process stacks (an API that reads PORT
+      // grabbed the frontend's port). Ports are set explicitly in the command / config.
+      envs: { HOST: "0.0.0.0", BROWSER: "none", __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ".e2b.app", FORCE_COLOR: "0" },
     });
 
     const deadline = Date.now() + 90_000;
@@ -162,7 +170,7 @@ const bad = /vite-error-overlay|\\[plugin:|Internal server error|SyntaxError|Fai
     let res, body = "";
     try { res = await fetch(base + path, { signal: AbortSignal.timeout(20000) }); body = await res.text(); }
     catch (e) { problems.push(path + " -> request failed: " + e.message); continue; }
-    if (res.status >= 400 || (/javascript|html|css|json/.test(res.headers.get("content-type") || "") && bad.test(body.slice(0, 4000)))) {
+    if ((path === "/" ? res.status >= 500 : res.status >= 400) || (/javascript|html|css|json/.test(res.headers.get("content-type") || "") && bad.test(body.slice(0, 4000)))) {
       const errMsg = body.match(/"message":"(.*?)","/);
       problems.push(path + " -> HTTP " + res.status + ": " + (errMsg ? errMsg[1] : body.slice(0, 700)));
       continue;
@@ -184,6 +192,50 @@ const bad = /vite-error-overlay|\\[plugin:|Internal server error|SyntaxError|Fai
         stdout: `${e.stdout ?? ""}${e.stderr ? `\n${e.stderr}` : ""}`.trim() || e.message || "probe failed",
       }));
     return out.stdout.trim();
+  }
+
+  /**
+   * Opens the running app in a real headless Chromium (Playwright, installed into the sandbox on first
+   * use — about 30s once) and returns a full-page screenshot plus any browser console errors. This is
+   * what lets Friday actually SEE the result: an HTTP 200 says nothing about a page whose layout CSS
+   * never loaded, or a React app that renders blank.
+   */
+  async screenshot(port: number): Promise<{ png: Uint8Array | null; consoleErrors: string[]; bodyTextLength: number; note?: string }> {
+    const ready = await this.run("test -f /tmp/pw/.ready && echo y", 15_000);
+    if (!ready.output.includes("y")) {
+      const setup = await this.run(
+        "mkdir -p /tmp/pw && cd /tmp/pw && (test -f package.json || npm init -y >/dev/null) && npm i playwright-core --no-audit --no-fund 2>&1 | tail -1 && npx playwright-core install chromium 2>&1 | tail -1 && sudo npx playwright-core install-deps chromium >/dev/null 2>&1; touch /tmp/pw/.ready",
+        4 * 60_000,
+      );
+      if (!setup.ok) return { png: null, consoleErrors: [], bodyTextLength: -1, note: `browser setup failed: ${tail(setup.output, 300)}` };
+    }
+    await this.sandbox.files.write(
+      "/tmp/pw/shot.mjs",
+      `import { chromium } from "playwright-core";
+const errors = [];
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text().slice(0, 300)); });
+page.on("pageerror", (e) => errors.push("uncaught: " + String(e.message).slice(0, 300)));
+page.on("requestfailed", (r) => { if (!/fonts\\.g|google/.test(r.url())) errors.push("request failed: " + r.url().slice(0, 150)); });
+try { await page.goto("http://localhost:${port}/", { waitUntil: "networkidle", timeout: 25000 }); } catch (e) { errors.push("navigation: " + e.message.slice(0, 200)); }
+await page.waitForTimeout(1200);
+const len = await page.evaluate(() => (document.body ? document.body.innerText.length : 0));
+const height = await page.evaluate(() => document.documentElement.scrollHeight);
+await page.screenshot({ path: "/tmp/pw/shot.png", fullPage: true, clip: { x: 0, y: 0, width: 1280, height: Math.min(height, 2800) } });
+await browser.close();
+console.log(JSON.stringify({ errors: errors.slice(0, 8), len }));`,
+    );
+    const out = await this.run("cd /tmp/pw && node shot.mjs", 90_000);
+    if (!out.ok) return { png: null, consoleErrors: [], bodyTextLength: -1, note: `screenshot failed: ${tail(out.output, 300)}` };
+    let meta = { errors: [] as string[], len: 0 };
+    try {
+      meta = JSON.parse(out.output.trim().split("\n").pop() ?? "{}");
+    } catch {
+      /* keep defaults */
+    }
+    const png = await this.sandbox.files.read("/tmp/pw/shot.png", { format: "bytes" }).catch(() => null);
+    return { png, consoleErrors: meta.errors ?? [], bodyTextLength: meta.len ?? 0 };
   }
 
   private async logTail(file: string): Promise<string> {
