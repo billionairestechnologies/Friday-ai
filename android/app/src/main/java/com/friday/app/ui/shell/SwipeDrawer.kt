@@ -38,6 +38,18 @@ class SwipeDrawerState internal constructor(initiallyOpen: Boolean) {
 
     fun open() { request = true }
     fun close() { request = false }
+
+    /** The Canvas panel (registered by the chat screen) that slides in from the right. The same
+     *  horizontal drag drives both panels so the two gestures can never fight each other. */
+    internal var rightPanel: RightPanel? = null
+    fun registerRightPanel(panel: RightPanel?) { rightPanel = panel }
+}
+
+interface RightPanel {
+    val isOpen: Boolean
+    fun dragBy(delta: Float)
+    /** Called on release; [velocity] is px/s (negative = leftwards), [fromOpen] the state at drag start. */
+    fun settle(velocity: Float, fromOpen: Boolean)
 }
 
 @Composable
@@ -73,8 +85,20 @@ fun SwipeDrawer(
             state.request = null
         }
 
+        // Which panel the current drag belongs to, decided by its start state / first direction.
+        var target by remember { mutableStateOf(0) } // 0 undecided, 1 drawer, 2 right panel
         val dragState = rememberDraggableState { delta ->
-            scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) }
+            if (target == 0) {
+                target = when {
+                    state.isOpen -> 1
+                    state.rightPanel?.isOpen == true -> 2
+                    delta > 0 -> 1
+                    state.rightPanel != null -> 2
+                    else -> 1
+                }
+            }
+            if (target == 1) scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) }
+            else state.rightPanel?.dragBy(delta)
         }
 
         Box(
@@ -84,8 +108,14 @@ fun SwipeDrawer(
                     state = dragState,
                     orientation = Orientation.Horizontal,
                     enabled = gesturesEnabled,
-                    onDragStarted = { startedOpen = state.isOpen },
+                    onDragStarted = { startedOpen = state.isOpen; target = 0 },
                     onDragStopped = { velocity ->
+                        if (target == 2) {
+                            state.rightPanel?.settle(velocity, fromOpen = state.rightPanel?.isOpen == true)
+                            target = 0
+                            return@draggable
+                        }
+                        target = 0
                         val revealed = (offset.value + widthPx) / widthPx // 0 closed .. 1 open
                         val open = when {
                             abs(velocity) > 500f -> velocity > 0

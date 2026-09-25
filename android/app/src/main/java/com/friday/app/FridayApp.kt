@@ -65,6 +65,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -271,6 +272,7 @@ fun FridayApp(
             )
             else -> ChatShell(
                 vm = vm,
+                swipe = drawerState,
                 onOpenDrawer = { drawerState.open() },
                 onOpenAuth = { page = "auth" },
                 onOpenPlans = { page = "plans" },
@@ -404,6 +406,7 @@ private fun CompactAnchoredPopup(
 @Composable
 private fun ChatShell(
     vm: FridayViewModel,
+    swipe: com.friday.app.ui.shell.SwipeDrawerState,
     onOpenDrawer: () -> Unit,
     onOpenAuth: () -> Unit,
     onOpenPlans: () -> Unit,
@@ -569,19 +572,6 @@ private fun ChatShell(
                                 }
                             },
                         )
-                    }
-                    .pointerInput(canvasOn) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { dragTotal = 0f },
-                            onHorizontalDrag = { change, dragAmount ->
-                                // Deliberately NOT consumed — the drawer's own drag detector must still
-                                // see this gesture, otherwise swiping right to open it stalls.
-                                dragTotal += dragAmount
-                            },
-                            onDragEnd = {
-                                if (!canvasOn && dragTotal < -120f) vm.toggleMode(Mode.Canvas)
-                            },
-                        )
                     },
                 contentAlignment = if (empty) Alignment.Center else Alignment.TopStart,
             ) {
@@ -672,27 +662,47 @@ private fun ChatShell(
         }
     }
 
-    AnimatedVisibility(
-        visible = canvasOn,
-        modifier = Modifier.fillMaxSize(),
-        enter = slideInHorizontally(
-            initialOffsetX = { it },
-            animationSpec = tween(340, easing = FastOutSlowInEasing),
-        ) + fadeIn(tween(200)),
-        exit = slideOutHorizontally(
-            targetOffsetX = { it },
-            animationSpec = tween(280, easing = FastOutSlowInEasing),
-        ) + fadeOut(tween(150)),
-    ) {
+    // Canvas slides in from the right, following the finger — the same single horizontal drag that
+    // drives the left drawer (see SwipeDrawer), so both feel identical to iOS.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val panelW = with(density) { androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx() }
+    val canvasX = remember(panelW) { androidx.compose.animation.core.Animatable(if (canvasOn) 0f else panelW) }
+    val canvasSpring = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.9f, stiffness = 650f)
+    val canvasScope = rememberCoroutineScope()
+    val canvasOnNow by androidx.compose.runtime.rememberUpdatedState(canvasOn)
+    val closeCanvas = {
+        if (Mode.Canvas in ui.modes) vm.toggleMode(Mode.Canvas)
+        if (latestArtifactMsg != null) autoClosedMessageId = latestArtifactMsg.id
+    }
+    LaunchedEffect(canvasOn, panelW) { canvasX.animateTo(if (canvasOn) 0f else panelW, canvasSpring) }
+    androidx.compose.runtime.DisposableEffect(swipe, panelW) {
+        swipe.registerRightPanel(object : com.friday.app.ui.shell.RightPanel {
+            override val isOpen get() = canvasOnNow
+            override fun dragBy(delta: Float) {
+                canvasScope.launch { canvasX.snapTo((canvasX.value + delta).coerceIn(0f, panelW)) }
+            }
+            override fun settle(velocity: Float, fromOpen: Boolean) {
+                val revealed = 1f - canvasX.value / panelW
+                val open = when {
+                    kotlin.math.abs(velocity) > 500f -> velocity < 0
+                    fromOpen -> revealed > 0.75f
+                    else -> revealed > 0.25f
+                }
+                if (open && !canvasOnNow) vm.toggleMode(Mode.Canvas)
+                if (!open && canvasOnNow) closeCanvas()
+                canvasScope.launch { canvasX.animateTo(if (open) 0f else panelW, canvasSpring, initialVelocity = velocity) }
+            }
+        })
+        onDispose { swipe.registerRightPanel(null) }
+    }
+    if (canvasX.value < panelW - 1f) {
         CanvasPanel(
             artifact = latestArtifact,
             generating = isGenerating && latestArtifact == null,
-            onClose = {
-                if (Mode.Canvas in ui.modes) vm.toggleMode(Mode.Canvas)
-                if (latestArtifactMsg != null) autoClosedMessageId = latestArtifactMsg.id
-            },
+            onClose = closeCanvas,
             modifier = Modifier
                 .fillMaxSize()
+                .offset { androidx.compose.ui.unit.IntOffset(canvasX.value.roundToInt(), 0) }
                 .statusBarsPadding()
                 .shadow(24.dp),
         )
