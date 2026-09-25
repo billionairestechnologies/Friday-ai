@@ -43,7 +43,7 @@ const INTENT_PROBE_TIMEOUT_MS = 1500;
  * ambiguous still goes to the model.
  */
 const LIVE_HINTS =
-  /\b(today|tonight|now|current(ly)?|latest|recent(ly)?|news|price|prices|stock|stocks|share|weather|forecast|score|scores|live|update[sd]?|yesterday|tomorrow|this (week|month|year|season)|20[2-9]\d|trending|release[sd]?|version|market|nifty|sensex|bitcoin|crypto|rate|election|match|result|results|ceo|president|prime minister|who (is|won|are)|when (is|does|did)|how much|status|open|closing|winner|standings|ranking|earnings|ipo)\b/i;
+  /\b(today|tonight|now|current(ly)?|latest|recent(ly)?|news|price|prices|stock|stocks|share|weather|forecast|score|scores|live|update[sd]?|yesterday|tomorrow|this (week|month|year|season)|20[2-9]\d|trending|release[sd]?|version|market|nifty|sensex|bitcoin|crypto|rate|election|match|result|results|ceo|president|prime minister|who (is|won|are)|when (is|does|did)|how much|status|open|closing|winner|standings|ranking|earnings|ipo|announced|happened|happening|launch(ed)?|died|dead|alive|minister|government|war|stock|valuation|salary of|net worth)\b/i;
 const TASK_LIKE =
   /^(write|rewrite|draft|compose|translate|summari[sz]e|explain|fix|debug|refactor|implement|generate|create|make|build|design|convert|format|improve|proofread|paraphrase|brainstorm|list|give me (an? )?(example|idea|summary)|show me (an? )?example|help me (write|draft|understand|with))\b/i;
 
@@ -54,6 +54,9 @@ export function shouldProbeForLiveSearch(content: string): boolean {
   if (text.includes("```") || text.split("\n").length > 6) return false; // code / long pasted material
   if (TASK_LIKE.test(text)) return false;
   if (text.length < 25 && !/\?/.test(text)) return false; // greetings, acknowledgements
+  // A question about the WORLD names something specific — a proper noun or a number. "and a semaphore?" /
+  // "why is that?" / "explain the difference" have neither and are about the conversation itself.
+  if (!/[A-Z0-9]/.test(text.slice(1))) return false;
   return true;
 }
 

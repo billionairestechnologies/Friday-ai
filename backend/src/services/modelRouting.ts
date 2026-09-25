@@ -4,6 +4,9 @@ type ModelTag = "code" | "reasoning" | "multilingual" | "long-context" | "genera
 
 interface ModelProfile {
   tags: ModelTag[];
+  /** Time-to-first-token class (1 slow … 5 fast). Measured against the live catalog, not guessed:
+   *  gpt-5.6-luna / gpt-5.4-mini ≈1.6s, gpt-5.5 / terra ≈2.2s, sonnet / fable ≈3s+, opus / sol / astra 3-4s+. */
+  speed?: number;
   /** Rough overall capability tier (1-5), used both as a routing tiebreaker and to pick a Team Up synthesizer. */
   power: number;
 }
@@ -11,6 +14,9 @@ interface ModelProfile {
 // Keyword → profile, matched against "slug/model_id" lowercased. Order matters — first match wins,
 // so put more specific patterns first. Anything unmatched falls back to a safe general-purpose profile.
 const PROFILE_RULES: { pattern: RegExp; profile: ModelProfile }[] = [
+  { pattern: /gpt-5\.6-luna|mini|haiku|flash|nano|lite/, profile: { tags: ["general", "code"], power: 3, speed: 5 } },
+  { pattern: /gpt-5\.6-terra|gpt-5\.5/, profile: { tags: ["reasoning", "code", "general"], power: 4, speed: 4 } },
+  { pattern: /gpt-6|gpt-5\.6-sol/, profile: { tags: ["reasoning", "code"], power: 5, speed: 2 } },
   { pattern: /opus/, profile: { tags: ["reasoning", "code", "general"], power: 5 } },
   { pattern: /o[13](-|$)|gpt-5/, profile: { tags: ["reasoning", "code"], power: 5 } },
   { pattern: /sonnet/, profile: { tags: ["reasoning", "code", "general"], power: 4 } },
@@ -68,6 +74,16 @@ export function rankCandidatesForMessage(
 ): ChatCandidate[] {
   const tags = detectTags(message);
   const pool = requiresVision ? candidates.filter((c) => c.vision) : candidates;
+  // A short, plain message (no code / reasoning / long-context signals) doesn't need the most powerful
+  // model — and the most powerful ones are also the slowest to start answering. For those, rank by how
+  // fast the model starts (then power as a tiebreaker) so the reply begins sooner. Anything that looks
+  // like real work keeps the capability-first ordering.
+  const simple = tags.length === 0 && message.length < 500;
+  if (simple) {
+    return [...pool].sort(
+      (a, b) => (profileFor(b).speed ?? 3) - (profileFor(a).speed ?? 3) || profileFor(b).power - profileFor(a).power,
+    );
+  }
   return [...pool].sort((a, b) => score(b, tags) - score(a, tags));
 }
 

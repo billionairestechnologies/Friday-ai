@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { memoAsync } from "../../utils/ttlMemo.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { getRedisClient } from "../redisClient.js";
 import { logger } from "../../utils/logger.js";
@@ -32,18 +33,16 @@ export type EffectivePlan = {
 
 /** A user's individual `plan` column, plus whether they're covered by an enterprise org's pool
  *  (which takes priority — pooled compute is what they're actually billed against). */
-export async function resolveEffectivePlan(userId: string): Promise<EffectivePlan> {
-  const { data: profile, error } = await supabaseAdmin
-    .from("profiles")
-    .select("plan, plan_renews_at, custom_monthly_cap")
-    .eq("id", userId)
-    .maybeSingle();
+async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePlan> {
+  // Two independent lookups — run them together (they used to run back to back).
+  const [{ data: profile, error }, { data: membership }] = await Promise.all([
+    supabaseAdmin.from("profiles").select("plan, plan_renews_at, custom_monthly_cap").eq("id", userId).maybeSingle(),
+    supabaseAdmin
+      .from("organization_memberships")
+      .select("organization_id, organizations(plan, seat_count, pooled_monthly_tokens)")
+      .eq("user_id", userId),
+  ]);
   if (error) logger.warn("quota_profile_lookup_failed", { userId, error: error.message });
-
-  const { data: membership } = await supabaseAdmin
-    .from("organization_memberships")
-    .select("organization_id, organizations(plan, seat_count, pooled_monthly_tokens)")
-    .eq("user_id", userId);
 
   const enterpriseRow = (membership ?? []).find((row) => {
     const org = row.organizations as { plan: string } | { plan: string }[] | null;
@@ -75,6 +74,10 @@ export async function resolveEffectivePlan(userId: string): Promise<EffectivePla
     enterprise,
   };
 }
+
+/** Resolved once per message by the quota middleware and again by the chat service — memoized briefly
+ *  (single-flight) so the second call is free. Plan changes take effect within the TTL. */
+export const resolveEffectivePlan = memoAsync(15_000, resolveEffectivePlanUncached, (userId) => userId);
 
 /** Rough pre-flight estimate: ~4 chars/token for the prompt, plus a fixed completion buffer,
  *  reserved before dispatch and corrected to the real count once the provider reports usage. */

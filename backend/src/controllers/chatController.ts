@@ -112,6 +112,10 @@ export async function streamMessage(req: Request, res: Response) {
   // Generation is decoupled from the connection: closing the tab / killing the app only drops
   // this socket, the reply still finishes and is persisted (other devices pick it up via
   // realtime, and a push notification goes out below). Only an explicit Stop cancels it.
+  // Immediate first frame: the client can show its "thinking" state the instant the stream opens instead
+  // of waiting for the server to finish its pre-model work.
+  res.write(`data: ${JSON.stringify({ t: "status", s: "thinking" })}\n\n`);
+
   const abortController = registerGeneration(req.params.id, req.user!.id);
   let clientGone = false;
   req.on("close", () => {

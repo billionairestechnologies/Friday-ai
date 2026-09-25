@@ -34,6 +34,7 @@ import {
 import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
+import { streamWithHedging } from "./hedgedStream.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
@@ -527,51 +528,35 @@ export async function streamMessage(
     let tokenUsage: TokenUsage = emptyTokenUsage();
     let sawProviderUsage = false;
 
-    for (const candidate of candidates) {
-      const adapter = getProviderAdapter(candidate.slug);
-      const apiKey = await getWorkingKeyForProvider(candidate.slug);
-      let started = false;
-      let text = "";
-      try {
-        if (adapter.chatStream) {
-          text = await adapter.chatStream(
-            apiKey,
-            candidate.modelId,
-            history,
-            (delta) => {
-              if (!started) mark("first token");
-              started = true;
-              onEvent({ t: "text", c: delta });
-            },
-            signal,
-            (thinkDelta) => {
-              started = true;
-              thinking += thinkDelta;
-              onEvent({ t: "think", c: thinkDelta });
-            },
-            (usage) => {
-              tokenUsage = usage;
-              sawProviderUsage = true;
-            },
-            { cacheKey: conversationId },
-          );
-        } else {
-          text = await adapter.chat(apiKey, candidate.modelId, history, { cacheKey: conversationId });
-          started = true;
-          onEvent({ t: "text", c: text });
-        }
-        full = text;
-        usedCandidate = candidate;
-        break;
-      } catch (err) {
-        lastError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
-        // A rejected key (rotated/revoked) must not keep being served from the lookup cache.
-        if (/\b(401|403)\b|invalid.{0,20}(api )?key|unauthori[sz]ed/i.test(lastError)) invalidateMemoized();
-        // Already streamed partial text for this reply — cannot silently retry another
-        // candidate without confusing the client with two overlapping replies.
-        if (started) break;
+    // Failover + hedging (see hedgedStream.ts): a slow first candidate is raced against the next one.
+    const HEDGE_MS = Number(process.env.FRIDAY_HEDGE_MS ?? 2200);
+    const streamed = await streamWithHedging({
+      candidates,
+      history,
+      cacheKey: conversationId,
+      signal,
+      hedgeAfterMs: mode === "single" ? 0 : HEDGE_MS,
+      onText: (delta) => {
+        if (!full) mark("first token");
+        full += delta;
+        onEvent({ t: "text", c: delta });
+      },
+      onThink: (delta) => {
+        thinking += delta;
+        onEvent({ t: "think", c: delta });
+      },
+    });
+    if (streamed.candidate) {
+      usedCandidate = streamed.candidate;
+      full = streamed.text || full;
+      thinking = streamed.thinking || thinking;
+      if (streamed.usage) {
+        tokenUsage = streamed.usage;
+        sawProviderUsage = true;
       }
+      if (streamed.hedged) console.log(`[chat] hedged: ${streamed.candidate.slug}/${streamed.candidate.modelId} answered first`);
     }
+    lastError = streamed.lastError;
 
     if (!usedCandidate) {
       onEvent({ t: "err", c: lastError ?? "The model failed to respond" });
