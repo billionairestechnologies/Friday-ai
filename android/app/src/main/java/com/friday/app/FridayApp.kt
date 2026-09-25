@@ -606,7 +606,7 @@ private fun ChatShell(
                         )
                     }
                 } else {
-                    ChatThread(chat?.messages.orEmpty(), onOpenPreview = { buildOpen = true })
+                    ChatThread(chat?.messages.orEmpty(), onOpenPreview = { buildOpen = true }, conversationId = chat?.id)
                 }
             }
             Box(

@@ -14,6 +14,7 @@ export type LiveSnapshot = {
   canvasOn: boolean;
   steps: BuildStep[];
   preview?: { url: string; port: number };
+  meta?: { elapsedMs?: number; zipBytes?: number; zipName?: string };
 };
 
 type Draft = LiveSnapshot;
@@ -45,6 +46,7 @@ function emit(chatId: string) {
           canvasOn: draft.canvasOn,
           steps: draft.steps.slice(),
           preview: draft.preview,
+          meta: draft.meta,
         }
       : null,
   );
@@ -116,6 +118,13 @@ export function applyLiveStep(chatId: string, step: BuildStep) {
   emit(chatId);
 }
 
+export function setLiveBuildMeta(chatId: string, meta: { elapsedMs?: number; zipBytes?: number; zipName?: string }) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  draft.meta = meta;
+  emit(chatId);
+}
+
 export function setLivePreview(chatId: string, url: string, port: number) {
   const draft = drafts.get(chatId);
   if (!draft) return;
@@ -182,7 +191,7 @@ export function overlayLive(
       usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
       usedCanvas: m.usedCanvas || live.canvasOn,
       build: live.steps.length || live.preview
-        ? { steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port }
+        ? { steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
         : m.build,
     };
   });

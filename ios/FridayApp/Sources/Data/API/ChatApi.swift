@@ -11,6 +11,7 @@ enum ChatEvent {
     case agent(AgentStatus)
     case step(BuildStep)
     case preview(url: String, port: Int)
+    case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
     case done
 }
 
@@ -136,6 +137,8 @@ enum ChatApi {
                             )))
                         case "preview":
                             continuation.yield(.preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0))
+                        case "build":
+                            continuation.yield(.buildMeta(elapsedMs: json["elapsedMs"] as? Int, zipBytes: json["zipBytes"] as? Int, zipName: json["zipName"] as? String))
                         case "done":
                             continuation.yield(.done)
                         default:
@@ -206,7 +209,7 @@ enum ConversationsApi {
                         detail: $0["detail"] as? String
                     )
                 }
-                build = BuildInfo(steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int)
+                build = BuildInfo(steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String)
             }
             return ChatMessage(
                 id: row["id"] as? String ?? UUID().uuidString,

@@ -19,27 +19,66 @@ struct BuildPanel: View {
     @State private var selected: String?
     @State private var shareItem: URL?
 
+    @State private var showTree = true
+    @State private var mobile = false
+    @State private var openDirs: Set<String> = []
+
+    private struct TreeRowItem: Identifiable { let path: String; let isDir: Bool; let depth: Int; var id: String { path } }
+
+    private func treeRows(_ paths: [String]) -> [TreeRowItem] {
+        var out: [TreeRowItem] = []
+        func walk(_ prefix: String, _ depth: Int) {
+            let direct = paths.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)).components(separatedBy: "/") }
+            let dirs = Array(Set(direct.filter { $0.count > 1 }.map { $0[0] })).sorted()
+            let fileNames = direct.filter { $0.count == 1 }.map { $0[0] }.sorted()
+            for d in dirs {
+                let p = prefix + d + "/"
+                out.append(TreeRowItem(path: p, isDir: true, depth: depth))
+                if openDirs.contains(p) || (depth == 0 && openDirs.isEmpty) { walk(p, depth + 1) }
+            }
+            for f in fileNames { out.append(TreeRowItem(path: prefix + f, isDir: false, depth: depth)) }
+        }
+        walk("", 0)
+        return out
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Live project").font(.system(size: 15, weight: .semibold)).foregroundColor(FridayColor.canvas)
-                Spacer()
-                Button { if url != nil { reloadTick += 1 } else { Task { await ensure() } } } label: { Image(systemName: "arrow.clockwise") }
-                if let url, let u = URL(string: url) {
-                    Button { UIApplication.shared.open(u) } label: { Image(systemName: "safari") }
+            // Icon tabs: globe = running preview, stack = project files.
+            HStack(spacing: 4) {
+                ForEach([("preview", "globe"), ("files", "square.stack.3d.up")], id: \.0) { id, icon in
+                    Button { tab = id } label: {
+                        Image(systemName: icon).font(.system(size: 17))
+                            .foregroundColor(tab == id ? FridayColor.text : FridayColor.muted)
+                            .frame(width: 36, height: 34)
+                            .background(tab == id ? FridayColor.surface : Color.clear)
+                            .cornerRadius(10)
+                    }
                 }
-                Button { Task { await download() } } label: { Image(systemName: "square.and.arrow.up") }
-                Button { withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) { vm.canvasOpen = false } } label: { Image(systemName: "xmark") }
+                Spacer()
+                Button { withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) { vm.canvasOpen = false } } label: {
+                    Image(systemName: "xmark").foregroundColor(FridayColor.text).padding(8)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+
+            HStack(spacing: 10) {
+                if tab == "preview" {
+                    Button { if url != nil { reloadTick += 1 } else { Task { await ensure() } } } label: { Image(systemName: "arrow.clockwise") }
+                    Text((url ?? "").replacingOccurrences(of: "https://", with: "")).font(.system(size: 12)).foregroundColor(FridayColor.muted).lineLimit(1)
+                    Spacer()
+                    if let url, let u = URL(string: url) { Button { UIApplication.shared.open(u) } label: { Image(systemName: "safari") } }
+                    Button { mobile.toggle() } label: { Image(systemName: "iphone").foregroundColor(mobile ? FridayColor.text : FridayColor.muted) }
+                } else {
+                    Button { showTree.toggle() } label: { Image(systemName: "list.bullet.indent").foregroundColor(showTree ? FridayColor.text : FridayColor.muted) }
+                    Text(selected ?? "").font(.system(size: 13)).foregroundColor(FridayColor.text).lineLimit(1)
+                    Spacer()
+                    Button { Task { await download() } } label: { Image(systemName: "square.and.arrow.up") }
+                }
             }
             .foregroundColor(FridayColor.text)
-            .padding(.horizontal, 16).padding(.vertical, 12)
-
-            Picker("", selection: $tab) {
-                Text("Preview").tag("preview")
-                Text("Files").tag("files")
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 12).padding(.bottom, 8)
+            .padding(.horizontal, 16).padding(.vertical, 6)
+            Divider().background(FridayColor.hairline)
 
             if tab == "preview" {
                 if loading {
@@ -57,25 +96,56 @@ struct BuildPanel: View {
                         Spacer()
                     }.padding(20)
                 } else if let url {
-                    BuildWebView(url: url, reloadTick: reloadTick)
+                    ZStack {
+                        if mobile { FridayColor.surface }
+                        BuildWebView(url: url, reloadTick: reloadTick)
+                            .frame(maxWidth: mobile ? 390 : .infinity)
+                    }
                 }
             } else if let files {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(files.keys.sorted(), id: \.self) { path in
-                            Button { selected = path } label: {
-                                Text(path).font(.system(size: 12)).lineLimit(1)
-                                    .foregroundColor(path == selected ? FridayColor.text : FridayColor.muted)
-                                    .padding(.horizontal, 10).padding(.vertical, 6)
-                                    .background(path == selected ? FridayColor.surface : Color.clear)
-                                    .cornerRadius(8)
+                HStack(spacing: 0) {
+                    if showTree {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text("Files").font(.system(size: 12)).foregroundColor(FridayColor.muted).padding(.leading, 6).padding(.bottom, 4)
+                                ForEach(treeRows(Array(files.keys))) { row in
+                                    let name = row.path.split(separator: "/").last.map(String.init) ?? row.path
+                                    let open = row.isDir && (openDirs.contains(row.path) || (row.depth == 0 && openDirs.isEmpty))
+                                    Button {
+                                        if row.isDir {
+                                            if openDirs.isEmpty, row.depth == 0 { openDirs = [row.path] }
+                                            if open { openDirs.remove(row.path) } else { openDirs.insert(row.path) }
+                                        } else { selected = row.path }
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: row.isDir ? (open ? "folder.fill" : "folder") : "doc.text").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                                            Text(name).font(.system(size: 12.5)).lineLimit(1)
+                                                .foregroundColor(!row.isDir && row.path == selected ? FridayColor.text : FridayColor.muted)
+                                            Spacer(minLength: 0)
+                                        }
+                                        .padding(.leading, CGFloat(6 + row.depth * 12)).padding(.vertical, 6).padding(.trailing, 4)
+                                        .background(!row.isDir && row.path == selected ? FridayColor.surface : Color.clear)
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
+                            .padding(8)
+                        }
+                        .frame(width: 150)
+                        Divider().background(FridayColor.hairline)
+                    }
+                    ScrollView([.horizontal, .vertical]) {
+                        let lines = (selected.flatMap { files[$0] } ?? "").components(separatedBy: "\n")
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(lines.enumerated()), id: \.offset) { i, line in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("\(i + 1)").font(.system(size: 11, design: .monospaced)).foregroundColor(FridayColor.muted).frame(width: 30, alignment: .trailing)
+                                    Text(line.isEmpty ? " " : line).font(.system(size: 12, design: .monospaced)).foregroundColor(FridayColor.text)
+                                }
                             }
                         }
-                    }.padding(.horizontal, 12)
-                }
-                ScrollView([.horizontal, .vertical]) {
-                    Text(selected.flatMap { files[$0] } ?? "")
-                        .font(.system(size: 12, design: .monospaced)).foregroundColor(FridayColor.text).padding(14)
+                        .padding(.vertical, 8)
+                    }
                 }
             } else {
                 VStack { Spacer(); ProgressView(); Spacer() }
@@ -93,7 +163,7 @@ struct BuildPanel: View {
         .task(id: tab) {
             guard tab == "files", files == nil else { return }
             files = await BuildApi.files(conversationId: conversationId) ?? [:]
-            selected = files?.keys.sorted().first
+            selected = files?.keys.first(where: { $0.range(of: #"(^|/)(App|main|index)\.(jsx|tsx|js|ts|html|py)$"#, options: .regularExpression) != nil }) ?? files?.keys.sorted().first
         }
         .sheet(item: Binding(get: { shareItem.map { ShareURL(url: $0) } }, set: { if $0 == nil { shareItem = nil } })) { item in
             ActivityView(items: [item.url])

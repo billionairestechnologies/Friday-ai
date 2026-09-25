@@ -16,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PlayArrow
@@ -33,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,58 +57,118 @@ private fun verbFor(step: BuildStep): String = when (step.kind) {
     else -> ""
 }
 
-/** Build Mode's live task list, matching the web app: one row per step with a state icon, tap to
- *  expand its output, a "Working for 1m 21s" footer while it runs, and an "Open preview" card once
- *  the app is up. */
+private fun formatDuration(totalSeconds: Long): String {
+    val s = totalSeconds.coerceAtLeast(0)
+    return if (s >= 60) "${s / 60}m ${s % 60}s" else "${s}s"
+}
+
+private fun formatBytes(bytes: Long): String =
+    if (bytes >= 1024 * 1024) "%.2f MB".format(bytes / 1024.0 / 1024.0) else "%.2f KB".format(bytes / 1024.0)
+
+/** Build Mode's task list, laid out like the reference product: while working, flat rows joined by
+ *  a thin vertical line plus "Working for 15s"; once finished it folds into one
+ *  "Worked for 7m 39s ›" line that expands to the same rows. */
 @Composable
 fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Unit) {
-    var elapsed by remember { mutableStateOf(0) }
+    var elapsed by remember { mutableStateOf(0L) }
+    var expanded by remember { mutableStateOf(false) }
     LaunchedEffect(streaming) {
         if (streaming) while (true) {
             delay(1000)
             elapsed += 1
         }
     }
-    val done = build.steps.count { it.state == "ok" }
-    Column(
+    val rows: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth().animateContentSize()) {
+            build.steps.forEach { StepRow(it) }
+        }
+    }
+    Column(Modifier.fillMaxWidth().animateContentSize()) {
+        if (streaming) {
+            rows()
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(strokeWidth = 1.5.dp, color = FridayMuted, modifier = Modifier.size(12.dp))
+                Text("Working for ${formatDuration(elapsed)}", color = FridayMuted, fontSize = 13.sp)
+            }
+        } else {
+            val seconds = (build.elapsedMs ?: 0L) / 1000
+            Row(
+                Modifier.clip(RoundedCornerShape(8.dp)).clickable { expanded = !expanded }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (seconds > 0) "Worked for ${formatDuration(seconds)}" else "${build.steps.size} steps",
+                    color = FridayMuted, fontSize = 13.5.sp,
+                )
+                Icon(
+                    Icons.Default.ChevronRight, null, tint = FridayMuted,
+                    modifier = Modifier.size(16.dp).rotate(if (expanded) 90f else 0f),
+                )
+            }
+            if (expanded) {
+                Spacer(Modifier.height(4.dp))
+                rows()
+            }
+            if (build.previewUrl != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Open live preview",
+                    color = FridayText, fontSize = 12.5.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(com.friday.app.ui.theme.FridayChip)
+                        .clickable(onClick = onOpenPreview)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+/** The downloadable project as a file card: "name.zip · Archive · 29.69 KB · Download". */
+@Composable
+fun ProjectZipCard(build: BuildInfo, conversationId: String) {
+    val bytes = build.zipBytes ?: return
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(FridaySurface)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .animateContentSize(),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        build.steps.forEach { StepRow(it) }
-        Spacer(Modifier.height(4.dp))
-        if (streaming) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CircularProgressIndicator(strokeWidth = 1.5.dp, color = FridayMuted, modifier = Modifier.size(12.dp))
-                val time = if (elapsed >= 60) "${elapsed / 60}m ${elapsed % 60}s" else "${elapsed}s"
-                Text("Working for $time", color = FridayMuted, fontSize = 12.sp)
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Check, null, tint = FridayMuted, modifier = Modifier.size(12.dp))
-                Text("$done step${if (done == 1) "" else "s"} completed", color = FridayMuted, fontSize = 12.sp)
-            }
+        Icon(Icons.Default.FolderZip, null, tint = FridayMuted, modifier = Modifier.size(34.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(build.zipName ?: "project.zip", color = FridayText, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("Archive · ${formatBytes(bytes)}", color = FridayMuted, fontSize = 12.sp)
         }
-        if (build.previewUrl != null) {
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(com.friday.app.ui.theme.FridayChip)
-                    .clickable(onClick = onOpenPreview)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Visibility, null, tint = FridayText, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Live preview is ready", color = FridayText, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                Text("Open", color = FridayMuted, fontSize = 12.sp)
-            }
-        }
+        Text(
+            "Download", color = FridayText, fontSize = 13.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(com.friday.app.ui.theme.FridayChip)
+                .clickable {
+                    scope.launch {
+                        val zip = com.friday.app.data.api.BuildApi.downloadZip(conversationId, java.io.File(ctx.cacheDir, "canvas"))
+                        if (zip == null) {
+                            android.widget.Toast.makeText(ctx, "Couldn't download the project — check your connection.", android.widget.Toast.LENGTH_LONG).show()
+                        } else {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", zip)
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "application/zip"
+                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "Save project").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        }
+                    }
+                }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
     }
 }
 

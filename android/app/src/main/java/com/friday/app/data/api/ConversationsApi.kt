@@ -73,6 +73,9 @@ object ConversationsApi {
                             },
                             previewUrl = b.optString("previewUrl").ifBlank { null },
                             port = b.optInt("port").takeIf { it > 0 },
+                            elapsedMs = b.optLong("elapsedMs").takeIf { it > 0 },
+                            zipBytes = b.optLong("zipBytes").takeIf { it > 0 },
+                            zipName = b.optString("zipName").ifBlank { null },
                         )
                     }
                     ChatMessage(

@@ -173,6 +173,13 @@ object ChatApi {
                                     ),
                                 )
                                 "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))
+                                "build" -> emit(
+                                    ChatEvent.BuildMeta(
+                                        elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },
+                                        zipBytes = json.optLong("zipBytes").takeIf { it > 0 },
+                                        zipName = json.optString("zipName").ifBlank { null },
+                                    ),
+                                )
                                 "done" -> done = true
                             }
                         }

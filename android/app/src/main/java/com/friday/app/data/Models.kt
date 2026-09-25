@@ -61,6 +61,9 @@ data class BuildInfo(
     val steps: List<BuildStep> = emptyList(),
     val previewUrl: String? = null,
     val port: Int? = null,
+    val elapsedMs: Long? = null,
+    val zipBytes: Long? = null,
+    val zipName: String? = null,
 )
 
 data class ChatMessage(
@@ -119,6 +122,8 @@ sealed class ChatEvent {
     data class Step(val step: BuildStep) : ChatEvent()
     /** Build Mode started a server and it is reachable (from {"t":"preview",...}). */
     data class Preview(val url: String, val port: Int) : ChatEvent()
+    /** End-of-build summary: how long it took and the project zip's size/name (from {"t":"build",...}). */
+    data class BuildMeta(val elapsedMs: Long?, val zipBytes: Long?, val zipName: String?) : ChatEvent()
     data object Done : ChatEvent()
 }
 

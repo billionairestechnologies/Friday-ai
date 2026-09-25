@@ -6,6 +6,7 @@ export type StreamEvent =
   | { t: "cite"; u: string; title?: string }
   | { t: "step"; id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string }
   | { t: "preview"; url: string; port: number }
+  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string }
   | { t: "err"; c: string }
   | { t: "done" };
 

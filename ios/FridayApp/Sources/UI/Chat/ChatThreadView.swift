@@ -43,6 +43,7 @@ struct ChatThreadView: View {
 }
 
 private struct MessageRow: View {
+    @EnvironmentObject var vm: FridayViewModel
     let message: ChatMessage
     @State private var copied = false
 
@@ -75,6 +76,10 @@ private struct MessageRow: View {
                 if !message.content.isEmpty {
                     MarkdownBody(text: message.content)
                         .transition(.opacity)
+                }
+
+                if !message.isStreaming, let build = message.build, build.zipBytes != nil, let conversationId = vm.currentId {
+                    ProjectZipCard(build: build, conversationId: conversationId)
                 }
 
                 if !message.content.isEmpty && !message.isStreaming {

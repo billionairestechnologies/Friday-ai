@@ -51,6 +51,9 @@ struct BuildInfo: Hashable {
     var steps: [BuildStep] = []
     var previewUrl: String?
     var port: Int?
+    var elapsedMs: Int?
+    var zipBytes: Int?
+    var zipName: String?
 }
 
 struct ChatMessage: Identifiable, Hashable {
