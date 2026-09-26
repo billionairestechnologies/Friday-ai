@@ -9,6 +9,7 @@ export const FRIDAY_TOOLS: PluginItem[] = [
   { id: "search", name: "Web Search", desc: "Live web results in the reply", group: "connected" },
   { id: "think", name: "Think", desc: "Show the reasoning trail", group: "connected" },
   { id: "canvas", name: "Canvas", desc: "Open a right-side workspace for builds", group: "connected" },
+  { id: "research", name: "Deep Research", desc: "Many searches + full sources → a cited report", group: "connected" },
 ];
 
 export const FEATURED_PLUGINS: PluginItem[] = [

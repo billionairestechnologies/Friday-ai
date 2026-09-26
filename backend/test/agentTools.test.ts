@@ -137,3 +137,16 @@ test("tool loop forces a text answer on the last round and falls back when nothi
   assert.equal(fb.candidate, null);
   assert.match(fb.error ?? "", /tools not supported/);
 });
+
+test("compactToolResults shortens the oldest tool results first until the budget fits", async () => {
+  const { compactToolResults } = await import("../src/services/agent/toolLoop.js");
+  const messages = [
+    { role: "user" as const, content: "q" },
+    { role: "tool" as const, toolCallId: "1", name: "fetch_url", content: "a".repeat(5000) },
+    { role: "tool" as const, toolCallId: "2", name: "fetch_url", content: "b".repeat(5000) },
+  ];
+  compactToolResults(messages, 7000);
+  assert.ok(messages[1]!.content.length < 2000, "oldest result shortened");
+  assert.equal(messages[2]!.content.length, 5000, "newest result kept intact once under budget");
+  assert.match(messages[1]!.content, /shortened/);
+});

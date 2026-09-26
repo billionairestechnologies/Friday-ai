@@ -444,7 +444,7 @@ export async function searchGitHubRepositories(userId: string, query: string) {
   }));
 }
 
-async function loadTokenCredentials(userId: string, provider: TokenConnectorId) {
+export async function loadTokenCredentials(userId: string, provider: TokenConnectorId) {
   const { data, error } = await supabaseAdmin
     .from("connector_accounts")
     .select("access_token_encrypted, refresh_token_encrypted, metadata")

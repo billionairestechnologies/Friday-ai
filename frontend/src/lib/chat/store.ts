@@ -73,6 +73,8 @@ type ChatState = {
   model: string;
   think: boolean;
   webSearch: boolean;
+  /** Deep Research: long multi-source research turns that end in a cited report. */
+  research: boolean;
   canvas: boolean;
   canvasOpen: boolean;
   settingsTab: string;
@@ -99,6 +101,7 @@ type ChatState = {
   setThink: (v: boolean) => void;
   setBehavior: (v: string) => void;
   setWebSearch: (v: boolean) => void;
+  setResearch: (v: boolean) => void;
   setCanvas: (v: boolean) => void;
   setCanvasOpen: (v: boolean) => void;
   setSettingsTab: (id: string) => void;
@@ -138,6 +141,7 @@ type Persisted = Pick<
   | "model"
   | "think"
   | "webSearch"
+  | "research"
   | "canvas"
   | "appearance"
   | "behavior"
@@ -205,6 +209,7 @@ export const useChat = create<ChatState>()(
       model: DEFAULT_MODEL_ID,
       think: false,
       webSearch: false,
+      research: false,
       canvas: false,
       canvasOpen: false,
       settingsTab: "account",
@@ -225,6 +230,7 @@ export const useChat = create<ChatState>()(
       setThink: (think) => set({ think }),
       setBehavior: (behavior) => set({ behavior }),
       setWebSearch: (webSearch) => set({ webSearch }),
+      setResearch: (research) => set({ research }),
       // On mobile the canvas panel is a fullscreen overlay (`max-md:fixed max-md:inset-0`) — if
       // arming Canvas also opened it immediately, tapping the toggle buried the composer under an
       // empty panel before the user could even type a message. Only auto-open on desktop widths,
@@ -508,6 +514,7 @@ export const useChat = create<ChatState>()(
         model: s.model,
         think: s.think,
         webSearch: s.webSearch,
+        research: s.research,
         canvas: s.canvas,
         appearance: s.appearance,
         behavior: s.behavior,

@@ -34,7 +34,8 @@ import {
 } from "./promptContext.js";
 import { loadMemoryPrompt } from "../memoryService.js";
 import { buildToolset, toolUsePrompt } from "../agent/toolset.js";
-import { runToolLoop, supportsTools, type ToolLoopResult } from "../agent/toolLoop.js";
+import { DEEP_RESEARCH_ROUNDS, runToolLoop, supportsTools, type ToolLoopResult } from "../agent/toolLoop.js";
+import { DEEP_RESEARCH_PROMPT } from "../agent/toolset.js";
 import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
@@ -155,7 +156,11 @@ export async function streamMessage(
   canvas = false,
   attachments: ChatImage[] = [],
   reservation?: Reservation,
+  options: { research?: boolean } = {},
 ): Promise<void> {
+  // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
+  const research = Boolean(options.research) && attachments.length === 0;
+  if (research) webSearch = true;
   let reconcileTokens = 0;
   // Stage timings (FRIDAY_CHAT_TIMING=1) — how long each pre-model step takes before the first token.
   const timingStart = Date.now();
@@ -187,7 +192,7 @@ export async function streamMessage(
     const memoryPromptPromise = loadMemoryPrompt(userId);
     effectivePlanPromise.catch(() => {}); // surfaced where it is awaited; avoids an unhandled rejection on early returns
     const buildIntentPromise: Promise<boolean> =
-      !canvas && mode !== "teamup"
+      !canvas && !research && mode !== "teamup"
         ? getProject(conversationId).then((project) => detectBuildIntent(content, Boolean(project))).catch(() => false)
         : Promise.resolve(false);
     void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
@@ -575,13 +580,18 @@ export async function streamMessage(
     const extraCitations: { url: string; title?: string }[] = [];
     let toolRun: ToolLoopResult | null = null;
     const toolStarted = Date.now();
+    // Deep Research in Auto mode prefers a tool-capable model even if routing ranked another first.
+    if (research && mode !== "single") candidates = [...candidates.filter(supportsTools), ...candidates.filter((c) => !supportsTools(c))];
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
+      if (research) onEvent({ t: "status", s: "searching" });
       const tools = await buildToolset(userId);
       const citedUrls = new Set(searchResults.map((r) => r.url));
+      const guidance = toolUsePrompt(tools) + (research ? `\n\n${DEEP_RESEARCH_PROMPT}` : "");
       toolRun = await runToolLoop({
         candidates: candidates.filter(supportsTools),
-        history: withToolPreamble(history, toolUsePrompt(tools)),
+        history: withToolPreamble(history, guidance),
         tools,
+        maxRounds: research ? DEEP_RESEARCH_ROUNDS : undefined,
         ctx: {
           userId,
           conversationId,

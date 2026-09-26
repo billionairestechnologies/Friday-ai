@@ -98,7 +98,7 @@ const guardedLookup: net.LookupFunction = (hostname, options, callback) => {
 
 export type SafeResponse = { url: string; status: number; contentType: string; body: Buffer; truncated: boolean };
 
-function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: AbortSignal): Promise<SafeResponse & { location?: string }> {
+function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: AbortSignal, extraHeaders: Record<string, string> = {}): Promise<SafeResponse & { location?: string }> {
   return new Promise((resolve, reject) => {
     const mod = url.protocol === "https:" ? https : http;
     const req = mod.request(
@@ -112,6 +112,7 @@ function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: Abo
           "User-Agent": "Mozilla/5.0 (compatible; FridayAI/1.0; +https://friday.ai)",
           Accept: "text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5",
           "Accept-Encoding": "gzip, deflate, br",
+          ...extraHeaders,
         },
       },
       (res) => {
@@ -166,13 +167,16 @@ function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: Abo
 
 export async function safeFetch(
   raw: string,
-  opts: { timeoutMs?: number; maxBytes?: number; signal?: AbortSignal } = {},
+  opts: { timeoutMs?: number; maxBytes?: number; signal?: AbortSignal; headers?: Record<string, string> } = {},
 ): Promise<SafeResponse> {
   let url = assertFetchableUrl(raw);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await requestOnce(url, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, opts.maxBytes ?? DEFAULT_MAX_BYTES, opts.signal);
+    const res = await requestOnce(url, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, opts.maxBytes ?? DEFAULT_MAX_BYTES, opts.signal, opts.headers);
     if (!res.location) return res;
-    url = assertFetchableUrl(new URL(res.location, url).toString());
+    const next = assertFetchableUrl(new URL(res.location, url).toString());
+    // Credentials never follow a redirect to a different host.
+    if (opts.headers && next.host !== url.host) throw new BlockedUrlError("Refusing to follow a cross-host redirect with credentials");
+    url = next;
   }
   throw new BlockedUrlError("Too many redirects");
 }

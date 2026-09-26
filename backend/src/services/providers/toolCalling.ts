@@ -316,7 +316,16 @@ export async function streamGeminiToolTurn(
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
   };
   if (opts.tools.length) {
-    body.tools = [{ functionDeclarations: opts.tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }];
+    // Gemini rejects an OBJECT schema with empty `properties` — a no-argument tool omits `parameters`.
+    body.tools = [
+      {
+        functionDeclarations: opts.tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          ...(Object.keys(t.parameters.properties).length ? { parameters: t.parameters } : {}),
+        })),
+      },
+    ];
     body.toolConfig = { functionCallingConfig: { mode: opts.toolChoice === "none" ? "NONE" : "AUTO" } };
   }
   const res = await fetch(

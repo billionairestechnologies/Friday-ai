@@ -89,6 +89,7 @@ const sendMessageSchema = z
     behavior: z.string().trim().max(1000).optional().default(""),
     webSearch: z.boolean().optional().default(false),
     canvas: z.boolean().optional().default(false),
+    research: z.boolean().optional().default(false),
     attachments: z.array(attachmentSchema).max(4).optional().default([]),
   })
   // The composer already allows sending an attachment with no caption text (an image with
@@ -101,7 +102,7 @@ const sendMessageSchema = z
   });
 
 export async function streamMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas, attachments } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas, research, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -153,6 +154,7 @@ export async function streamMessage(req: Request, res: Response) {
       canvas,
       attachments,
       req.quotaReservation,
+      { research },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong";

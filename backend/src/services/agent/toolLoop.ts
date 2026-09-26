@@ -13,6 +13,22 @@ import { clip, type FridayTool, type ToolContext } from "./tools/types.js";
  */
 
 export const MAX_TOOL_ROUNDS = 8;
+export const DEEP_RESEARCH_ROUNDS = 16;
+/** Past this much conversation text, older tool results are shortened so long loops fit any context window. */
+const CONTEXT_BUDGET_CHARS = 180_000;
+const COMPACTED_RESULT_CHARS = 1_500;
+
+/** Shortens the oldest tool results (keeping their start) until the conversation fits the budget. */
+export function compactToolResults(messages: AgentMessage[], budget = CONTEXT_BUDGET_CHARS): void {
+  let total = messages.reduce((n, m) => n + m.content.length, 0);
+  for (const m of messages) {
+    if (total <= budget) return;
+    if (m.role !== "tool" || m.content.length <= COMPACTED_RESULT_CHARS) continue;
+    const shorter = `${m.content.slice(0, COMPACTED_RESULT_CHARS)}\n…[older result shortened to save space — call the tool again if you need it]`;
+    total -= m.content.length - shorter.length;
+    m.content = shorter;
+  }
+}
 const MAX_RESULT_CHARS = 24_000;
 const TOOL_TIMEOUT_MS = 45_000;
 
@@ -114,6 +130,7 @@ export async function runToolLoop(opts: {
 
   for (let round = 1; round <= maxRounds; round++) {
     if (ctx.signal?.aborted) break;
+    compactToolResults(messages);
     const lastRound = round === maxRounds;
     const order: ChatCandidate[] = candidate ? [candidate] : opts.candidates;
     let result: ToolTurnResult | null = null;

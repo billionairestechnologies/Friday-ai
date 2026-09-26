@@ -10,6 +10,9 @@ export type OutgoingAttachment = {
   kind?: "image" | "file";
 };
 
+/** Per-turn options beyond the classic toggles. */
+export type StreamOptions = { research?: boolean };
+
 async function fetchStream(
   conversationId: string,
   content: string,
@@ -22,6 +25,7 @@ async function fetchStream(
   signal: AbortSignal,
   isRetry = false,
   isNetworkRetry = false,
+  extra: StreamOptions = {},
 ): Promise<Response> {
   const token = getAccessToken();
   let res: Response;
@@ -32,7 +36,7 @@ async function fetchStream(
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content, inputMode, think, behavior, webSearch, canvas, attachments }),
+      body: JSON.stringify({ content, inputMode, think, behavior, webSearch, canvas, attachments, ...extra }),
       signal,
     });
   } catch (err) {
@@ -41,7 +45,7 @@ async function fetchStream(
     // failed" before any bytes come back. That's usually transient, so retry once before
     // giving up and showing the user an opaque network error.
     if (isNetworkRetry || (err as { name?: string }).name === "AbortError") throw err;
-    return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, attachments, signal, isRetry, true);
+    return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, attachments, signal, isRetry, true, extra);
   }
   // Same short-lived-token gap as fetchSpeech in voices.ts: a raw 401 here surfaces the
   // backend's literal "Missing bearer token"/"Invalid or expired session" text to the user
@@ -49,7 +53,7 @@ async function fetchStream(
   if (res.status === 401 && !isRetry) {
     const refreshed = await useAuthStore.getState().refresh();
     if (refreshed) {
-      return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, attachments, signal, true);
+      return fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, attachments, signal, true, false, extra);
     }
   }
   return res;
@@ -67,8 +71,9 @@ export async function streamMessage(
   attachments: OutgoingAttachment[],
   onEvent: (ev: StreamEvent) => void,
   signal: AbortSignal,
+  extra: StreamOptions = {},
 ) {
-  const res = await fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, attachments, signal);
+  const res = await fetchStream(conversationId, content, inputMode, think, behavior, webSearch, canvas, attachments, signal, false, false, extra);
 
   if (!res.ok || !res.body) {
     let message = `Request failed (${res.status})`;

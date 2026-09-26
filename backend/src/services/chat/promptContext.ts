@@ -245,9 +245,9 @@ export function withSystemPreamble(
 /** Tool-aware replacement for EXECUTION_HONESTY_SYSTEM_PROMPT, used on turns where real tools are attached. */
 const TOOL_EXECUTION_HONESTY_SYSTEM_PROMPT =
   "You can use ONLY the tools attached to this request — nothing else. Never claim you ran code, opened a page, read " +
-  "an email or file, or performed an action unless a tool result in this conversation shows it. You have no code-execution " +
-  "tool: for python/javascript in Canvas, tell the user to click the Run button in the Canvas panel to see the real output — " +
-  "do not invent output.";
+  "an email or file, or performed an action unless a tool result in this conversation shows it, and never invent tool " +
+  "output. If no run_code tool is attached you cannot execute code: for python/javascript in Canvas, tell the user to " +
+  "click the Run button in the Canvas panel to see the real output.";
 
 /**
  * Turns a normal preamble into a tool-enabled one: swaps the "you have no tools" honesty prompt for a
