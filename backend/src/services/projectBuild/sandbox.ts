@@ -60,13 +60,27 @@ export async function saveProject(userId: string, conversationId: string, patch:
  * sandbox and restores the last file snapshot into it (dependencies get reinstalled by the caller).
  */
 export class BuildSandbox {
+  /** Mutable so a stale/expired connection can be swapped out transparently — see `withReconnect`. */
+  private sandbox: Sandbox;
+
   private constructor(
-    readonly sandbox: Sandbox,
+    sandbox: Sandbox,
     readonly userId: string,
     readonly conversationId: string,
     /** True when this call created a brand-new sandbox (files restored from snapshot, nothing installed). */
     readonly fresh: boolean,
-  ) {}
+  ) {
+    this.sandbox = sandbox;
+  }
+
+  /** Creates a brand-new sandbox and restores the last known file snapshot into it. */
+  private static async createFresh(userId: string, conversationId: string, apiKey: string, files: ProjectFiles): Promise<Sandbox> {
+    const sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
+    await sandbox.commands.run(`mkdir -p ${PROJECT_DIR}`);
+    await Promise.all(Object.entries(files).map(([path, content]) => sandbox.files.write(`${PROJECT_DIR}/${path}`, content)));
+    await saveProject(userId, conversationId, { sandbox_id: sandbox.sandboxId });
+    return sandbox;
+  }
 
   static async open(userId: string, conversationId: string): Promise<BuildSandbox> {
     if (!env.e2bApiKey) throw new HttpError(503, "Building isn't configured yet — missing E2B_API_KEY.");
@@ -83,12 +97,51 @@ export class BuildSandbox {
       }
     }
 
-    const sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
-    await sandbox.commands.run(`mkdir -p ${PROJECT_DIR}`);
-    const files = project?.files ?? {};
-    await Promise.all(Object.entries(files).map(([path, content]) => sandbox.files.write(`${PROJECT_DIR}/${path}`, content)));
-    await saveProject(userId, conversationId, { sandbox_id: sandbox.sandboxId });
+    const sandbox = await BuildSandbox.createFresh(userId, conversationId, apiKey, project?.files ?? {});
     return new BuildSandbox(sandbox, userId, conversationId, true);
+  }
+
+  /**
+   * `Sandbox.connect()` at open() can succeed against a sandbox that then turns out to be gone (E2B's
+   * TTL firing in the gap, or a connect that doesn't fully validate liveness) — confirmed in production
+   * 2026-09-26: a whole Build turn logged 15 straight "The sandbox was not found" write failures with
+   * no recovery, because nothing downstream of open() ever re-checked the connection. Every sandbox
+   * operation below runs through this: on that specific error it recreates the sandbox from the last
+   * saved snapshot ONCE and retries, instead of cascading through the rest of the turn broken.
+   */
+  private reconnecting: Promise<void> | null = null;
+  private async withReconnect<T>(op: () => Promise<T>): Promise<T> {
+    try {
+      return await op();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/sandbox.{0,15}(was )?not found|sandbox.{0,20}(timed? ?out|timeout)/i.test(message)) throw err;
+      if (!this.reconnecting) {
+        this.reconnecting = (async () => {
+          if (!env.e2bApiKey) throw new HttpError(503, "Building isn't configured yet — missing E2B_API_KEY.");
+          const project = await getProject(this.conversationId);
+          this.sandbox = await BuildSandbox.createFresh(this.userId, this.conversationId, env.e2bApiKey, project?.files ?? {});
+        })().finally(() => {
+          this.reconnecting = null;
+        });
+      }
+      await this.reconnecting;
+      return op();
+    }
+  }
+
+  /** True if the port answers a plain HTTP probe (200-499 — anything the server itself produced). */
+  async isServing(port: number): Promise<boolean> {
+    const probe = await this.withReconnect(() =>
+      this.sandbox.commands.run(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}/ || true`, { timeoutMs: 8000 }),
+    ).catch(() => null);
+    const code = Number(probe?.stdout.trim() ?? 0);
+    return code >= 200 && code < 500;
+  }
+
+  /** The public preview URL for a port this sandbox is serving on. */
+  previewUrl(port: number): string {
+    return `https://${this.sandbox.getHost(port)}`;
   }
 
   /** Destroys the sandbox for good (kill, not pause) and forgets it — the files stay in our database. */
@@ -103,11 +156,11 @@ export class BuildSandbox {
 
   async write(path: string, content: string) {
     this.touch();
-    await this.sandbox.files.write(`${PROJECT_DIR}/${path}`, content);
+    await this.withReconnect(() => this.sandbox.files.write(`${PROJECT_DIR}/${path}`, content));
   }
 
   async read(path: string): Promise<string> {
-    return this.sandbox.files.read(`${PROJECT_DIR}/${path}`);
+    return this.withReconnect(() => this.sandbox.files.read(`${PROJECT_DIR}/${path}`));
   }
 
   /** Runs a command to completion (installs, builds, scripts). Never throws — failures are data. */
@@ -115,10 +168,12 @@ export class BuildSandbox {
     this.touch();
     if (signal?.aborted) return { ok: false, exitCode: -1, output: "cancelled" };
     try {
-      const result = await this.sandbox.commands.run(`bash -lc ${JSON.stringify(`cd ${PROJECT_DIR} && ${cmd}`)}`, {
-        timeoutMs,
-        envs: { CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
-      });
+      const result = await this.withReconnect(() =>
+        this.sandbox.commands.run(`bash -lc ${JSON.stringify(`cd ${PROJECT_DIR} && ${cmd}`)}`, {
+          timeoutMs,
+          envs: { CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
+        }),
+      );
       return { ok: true, exitCode: 0, output: [result.stdout, result.stderr].filter(Boolean).join("\n") };
     } catch (err) {
       const e = err as { exitCode?: number; stdout?: string; stderr?: string; message?: string };
@@ -135,9 +190,11 @@ export class BuildSandbox {
   async runScript(script: string, timeoutMs: number, envs: Record<string, string>): Promise<RunOutcome> {
     this.touch();
     const file = `/tmp/friday-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.sh`;
-    await this.sandbox.files.write(file, `cd ${PROJECT_DIR}\n${script}\n`);
     try {
-      const result = await this.sandbox.commands.run(`bash ${file}`, { timeoutMs, envs: { CI: "true", ...envs } });
+      const result = await this.withReconnect(async () => {
+        await this.sandbox.files.write(file, `cd ${PROJECT_DIR}\n${script}\n`);
+        return this.sandbox.commands.run(`bash ${file}`, { timeoutMs, envs: { CI: "true", ...envs } });
+      });
       return { ok: true, exitCode: 0, output: [result.stdout, result.stderr].filter(Boolean).join("\n") };
     } catch (err) {
       const e = err as { exitCode?: number; stdout?: string; stderr?: string; message?: string };
@@ -348,12 +405,8 @@ export async function ensurePreview(userId: string, conversationId: string): Pro
   const box = await BuildSandbox.open(userId, conversationId);
   const { port, start_cmd: startCmd } = project;
 
-  if (!box.fresh) {
-    const probe = await box.sandbox.commands
-      .run(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}/ || true`, { timeoutMs: 8000 })
-      .catch(() => null);
-    const code = Number(probe?.stdout.trim() ?? 0);
-    if (code >= 200 && code < 500) return { url: `https://${box.sandbox.getHost(port)}`, port };
+  if (!box.fresh && (await box.isServing(port))) {
+    return { url: box.previewUrl(port), port };
   }
 
   if (project.files["package.json"] || (await box.run("test -f package.json && echo y").then((r) => r.output.includes("y")))) {
