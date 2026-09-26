@@ -1,6 +1,7 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
+import { streamAnthropicToolTurn } from "./toolCalling.js";
 
 // ScaleMax (api.scalemax.pro) proxies Claude AND GPT models (confirmed directly against the
 // real API 2026-09-18 — its catalog grew well past the Claude-only set this adapter used to
@@ -127,5 +128,16 @@ export const scalemaxAdapter: ProviderAdapter = {
       }
     });
     return full;
+  },
+
+  async chatStreamWithTools(apiKey, model, messages, opts, onDelta) {
+    return streamAnthropicToolTurn(
+      `${BASE_URL}/messages`,
+      { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION },
+      model,
+      messages,
+      opts,
+      onDelta,
+    );
   },
 };

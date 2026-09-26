@@ -1,6 +1,7 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
+import { streamAnthropicToolTurn } from "./toolCalling.js";
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -111,5 +112,16 @@ export const anthropicAdapter: ProviderAdapter = {
       }
     });
     return full;
+  },
+
+  async chatStreamWithTools(apiKey, model, messages, opts, onDelta) {
+    return streamAnthropicToolTurn(
+      `${BASE_URL}/messages`,
+      { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION, "anthropic-beta": ANTHROPIC_BETA },
+      model,
+      messages,
+      opts,
+      onDelta,
+    );
   },
 };

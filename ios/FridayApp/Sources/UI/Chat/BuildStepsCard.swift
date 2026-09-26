@@ -147,17 +147,30 @@ struct BuildStepsCard: View {
         }
     }
 
+    /// A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
+    private var toolsOnly: Bool {
+        !build.steps.isEmpty && build.steps.allSatisfy { $0.kind == "tool" } && build.plan == nil
+    }
+
+    private var collapsedLabel: String {
+        let seconds = (build.elapsedMs ?? 0) / 1000
+        if toolsOnly { return "Used \(build.steps.count) tool\(build.steps.count == 1 ? "" : "s")" }
+        return seconds > 0 ? "Worked for \(formatDuration(seconds))" : "\(build.steps.count) steps"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let plan = build.plan { PlanCard(plan: plan) }
             if streaming {
-                HStack(spacing: 6) {
-                    Image(systemName: "hammer.fill").font(.system(size: 10))
-                    Text("Build Mode").font(.system(size: 12, weight: .medium))
+                if !toolsOnly {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hammer.fill").font(.system(size: 10))
+                        Text("Build Mode").font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(FridayColor.text)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(FridayColor.chip).clipShape(Capsule())
                 }
-                .foregroundColor(FridayColor.text)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(FridayColor.chip).clipShape(Capsule())
                 rows
                 HStack(spacing: 8) {
                     BuildOrb(size: 13)
@@ -165,10 +178,9 @@ struct BuildStepsCard: View {
                 }
                 .font(.system(size: 13)).foregroundColor(FridayColor.muted)
             } else {
-                let seconds = (build.elapsedMs ?? 0) / 1000
                 Button { withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() } } label: {
                     HStack(spacing: 4) {
-                        Text(seconds > 0 ? "Worked for \(formatDuration(seconds))" : "\(build.steps.count) steps")
+                        Text(collapsedLabel)
                         Image(systemName: "chevron.right").font(.system(size: 11)).rotationEffect(.degrees(expanded ? 90 : 0))
                     }
                     .font(.system(size: 13.5)).foregroundColor(FridayColor.muted)

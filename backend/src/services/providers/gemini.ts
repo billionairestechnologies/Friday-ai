@@ -1,6 +1,7 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { base64PayloadOf, safeErrorMessage, splitSystemPrompt } from "./types.js";
+import { streamGeminiToolTurn } from "./toolCalling.js";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -117,5 +118,9 @@ export const geminiAdapter: ProviderAdapter = {
       }
     });
     return full;
+  },
+
+  async chatStreamWithTools(apiKey, model, messages, opts, onDelta) {
+    return streamGeminiToolTurn(BASE_URL, apiKey, model, messages, opts, onDelta);
   },
 };

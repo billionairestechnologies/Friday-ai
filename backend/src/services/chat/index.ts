@@ -30,7 +30,11 @@ import {
   trimHistoryToBudget,
   unsupportedAttachmentReason,
   withSystemPreamble,
+  withToolPreamble,
 } from "./promptContext.js";
+import { loadMemoryPrompt } from "../memoryService.js";
+import { buildToolset, toolUsePrompt } from "../agent/toolset.js";
+import { runToolLoop, supportsTools, type ToolLoopResult } from "../agent/toolLoop.js";
 import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
@@ -135,9 +139,8 @@ async function tryGenerateOrEditImage(
  * `reservation` is the token-quota pre-flight reservation the chat route's `quotaLimit`
  * middleware already made (see quotaLimit.ts) — every exit path below reconciles it in the
  * `finally` block via `reconcileTokens`, which defaults to 0 (a full refund) and is only set to
- * the real total right before the message that actually spent tokens is recorded. Team Up isn't
- * wired into the quota system yet — its reservation (sized for one message) always gets fully
- * refunded here, i.e. it stays unmetered for now.
+ * the real total right before the message that actually spent tokens is recorded. Team Up is
+ * metered too: every proposer plus the synthesizer is summed into `reconcileTokens`.
  */
 export async function streamMessage(
   userId: string,
@@ -180,6 +183,8 @@ export async function streamMessage(
     mark("user message stored");
     // The plan/tier lookup is a DB round trip that doesn't depend on anything above — start it now.
     const effectivePlanPromise = resolveEffectivePlan(userId);
+    // Long-term memory rides along on every turn (all modes); loaded in parallel, never fatal.
+    const memoryPromptPromise = loadMemoryPrompt(userId);
     effectivePlanPromise.catch(() => {}); // surfaced where it is awaited; avoids an unhandled rejection on early returns
     const buildIntentPromise: Promise<boolean> =
       !canvas && mode !== "teamup"
@@ -354,10 +359,16 @@ export async function streamMessage(
         ]
       : [];
 
+    // Memory + project context are pinned AFTER trimming, so a long chat can never trim them away.
+    const memoryPrompt = await memoryPromptPromise;
+    const pinnedContext: ChatMessage[] = [
+      ...(memoryPrompt ? [{ role: "system" as const, content: memoryPrompt }] : []),
+      ...projectContext,
+    ];
     const history = appendExtractedText(
       attachImages(
         withSystemPreamble(
-          trimHistoryToBudget([...projectContext, ...historyWithImages]),
+          [...pinnedContext, ...trimHistoryToBudget(historyWithImages)],
           think,
           behavior,
           searchActuallyRan,
@@ -372,12 +383,28 @@ export async function streamMessage(
 
     if (mode === "teamup") {
       const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
-      await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal, {
+      const spent = await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal, {
         think,
         canvas,
         images: attachments,
         requiresVision: hasImageAttachment && !extractedDocText,
       });
+      // Every proposer + the synthesizer counts against the quota (Team Up used to be unmetered).
+      if (spent.length > 0) {
+        const plan = await effectivePlanPromise.catch(() => null);
+        spent.forEach(({ candidate, usage }, i) => {
+          reconcileTokens += usage.totalTokens;
+          void recordTokenUsage(userId, candidate.slug, candidate.modelId, usage, { conversationId, mode });
+          void recordTokenLedger(
+            userId,
+            plan?.enterprise?.organizationId ?? null,
+            candidate.slug,
+            candidate.modelId,
+            usage,
+            i === 0 ? (reservation?.reserveTokens ?? 0) : 0,
+          );
+        });
+      }
       return;
     }
 
@@ -541,9 +568,56 @@ export async function streamMessage(
     let tokenUsage: TokenUsage = emptyTokenUsage();
     let sawProviderUsage = false;
 
+    // Agent path: when the chosen model supports native tool calling, it gets real tools (web search,
+    // page reading, memory, and the user's connected GitHub/Gmail/Drive/Calendar) and runs a bounded
+    // tool loop. If that path can't start at all (e.g. a model that rejects tools), fall back to the
+    // plain streaming path below, so tools can only ever add capability, never break chat.
+    const extraCitations: { url: string; title?: string }[] = [];
+    let toolRun: ToolLoopResult | null = null;
+    const toolStarted = Date.now();
+    if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
+      const tools = await buildToolset(userId);
+      const citedUrls = new Set(searchResults.map((r) => r.url));
+      toolRun = await runToolLoop({
+        candidates: candidates.filter(supportsTools),
+        history: withToolPreamble(history, toolUsePrompt(tools)),
+        tools,
+        ctx: {
+          userId,
+          conversationId,
+          signal,
+          onCite: (url, title) => {
+            if (citedUrls.has(url)) return;
+            citedUrls.add(url);
+            extraCitations.push({ url, title });
+            onEvent({ t: "cite", u: url, title });
+          },
+        },
+        onText: (delta) => {
+          if (!full) mark("first token");
+          full += delta;
+          onEvent({ t: "text", c: delta });
+        },
+        onStep: (step) => onEvent({ t: "step", ...step }),
+      });
+      if (!toolRun.candidate) {
+        if (toolRun.error) console.warn(`[chat] tool path unavailable, falling back: ${toolRun.error}`);
+        toolRun = null;
+        full = "";
+      } else {
+        usedCandidate = toolRun.candidate;
+        full = toolRun.text;
+        tokenUsage = toolRun.usage;
+        sawProviderUsage = true;
+        lastError = toolRun.error;
+        const webCalls = toolRun.toolNames.filter((name) => name === "web_search" || name === "fetch_url").length;
+        if (webCalls > 0) void recordUsageEvent(userId, "web_search", webCalls, { viaTools: true });
+      }
+    }
+
     // Failover + hedging (see hedgedStream.ts): a slow first candidate is raced against the next one.
     const HEDGE_MS = Number(process.env.FRIDAY_HEDGE_MS ?? 2200);
-    const streamed = await streamWithHedging({
+    const streamed = toolRun ? null : await streamWithHedging({
       candidates,
       history,
       signal,
@@ -558,7 +632,7 @@ export async function streamMessage(
         onEvent({ t: "think", c: delta });
       },
     });
-    if (streamed.candidate) {
+    if (streamed?.candidate) {
       usedCandidate = streamed.candidate;
       full = streamed.text || full;
       thinking = streamed.thinking || thinking;
@@ -568,7 +642,7 @@ export async function streamMessage(
       }
       if (streamed.hedged) console.log(`[chat] hedged: ${streamed.candidate.slug}/${streamed.candidate.modelId} answered first`);
     }
-    lastError = streamed.lastError;
+    if (streamed) lastError = streamed.lastError;
 
     if (!usedCandidate) {
       onEvent({ t: "err", c: lastError ?? "The model failed to respond" });
@@ -603,12 +677,16 @@ export async function streamMessage(
         : usedVisionFallback
           ? `${usedCandidate.displayName} (switched to see your image)`
           : usedCandidate.displayName;
+    const toolSteps = toolRun?.steps ?? [];
+    if (toolRun?.error) onEvent({ t: "err", c: "The reply was cut short — the model stopped responding. Send another message to continue." });
     await insertAssistantMessage(conversationId, full, label, {
       thinking,
-      citations: searchResults.map((result) => ({ url: result.url, title: result.title })),
+      citations: [...searchResults.map((result) => ({ url: result.url, title: result.title })), ...extraCitations],
       usedThink: think || Boolean(thinking),
-      usedSearch: searchActuallyRan,
+      usedSearch: searchActuallyRan || extraCitations.length > 0,
       usedCanvas: canvas,
+      ...(toolSteps.length ? { build: { steps: toolSteps, elapsedMs: Date.now() - toolStarted } } : {}),
+      ...(toolRun?.error ? { error: toolRun.error } : {}),
     });
     await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
     onEvent({ t: "done" });

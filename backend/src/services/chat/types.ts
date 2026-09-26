@@ -14,7 +14,7 @@ export type StreamEvent =
 
 export type ConversationMode = "single" | "auto" | "teamup";
 
-export type BuildStepKind = "write" | "run" | "start" | "read" | "note";
+export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
 
 /** What a Build Mode turn did — persisted on the message (`messages.build`) so it survives reloads. */
 export type BuildStep = { id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string };

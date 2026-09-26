@@ -33,7 +33,7 @@ export type AgentStatus = {
 
 export type BuildStep = {
   id: string;
-  kind: "write" | "run" | "start" | "read" | "note";
+  kind: "write" | "run" | "start" | "read" | "note" | "tool";
   label: string;
   state: "running" | "ok" | "error";
   detail?: string;

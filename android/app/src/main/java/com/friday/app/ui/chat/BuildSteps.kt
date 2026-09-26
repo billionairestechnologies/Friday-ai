@@ -203,10 +203,12 @@ fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Un
             groups.forEach { g -> if (g.first().kind == "write") WriteGroup(g) else StepRow(g.first()) }
         }
     }
+    // A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
+    val toolsOnly = build.steps.isNotEmpty() && build.steps.all { it.kind == "tool" } && build.plan == null
     Column(Modifier.fillMaxWidth().animateContentSize()) {
         build.plan?.let { PlanCard(it) }
         if (streaming) {
-            Row(
+            if (!toolsOnly) Row(
                 Modifier.padding(bottom = 6.dp).clip(RoundedCornerShape(50)).background(com.friday.app.ui.theme.FridayChip).padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -226,7 +228,11 @@ fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Un
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (seconds > 0) "Worked for ${formatDuration(seconds)}" else "${build.steps.size} steps",
+                    when {
+                        toolsOnly -> "Used ${build.steps.size} tool${if (build.steps.size == 1) "" else "s"}"
+                        seconds > 0 -> "Worked for ${formatDuration(seconds)}"
+                        else -> "${build.steps.size} steps"
+                    },
                     color = FridayMuted, fontSize = 13.5.sp,
                 )
                 Icon(

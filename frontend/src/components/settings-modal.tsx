@@ -4,12 +4,14 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   AudioLines,
   Bell,
+  Brain,
   Check,
   CreditCard,
   Lock,
   Palette,
   Shield,
   SlidersHorizontal,
+  Trash2,
   UserRound,
   X,
   Zap,
@@ -53,7 +55,10 @@ const NAV = [
   },
   {
     group: "Data & Information",
-    items: [{ id: "data", label: "Data Controls", icon: Shield }],
+    items: [
+      { id: "memory", label: "Memory", icon: Brain },
+      { id: "data", label: "Data Controls", icon: Shield },
+    ],
   },
 ];
 
@@ -127,6 +132,7 @@ export function SettingsModal() {
               {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
+              {tab === "memory" && <MemoryPane />}
               {tab === "data" && <DataPane />}
             </div>
           </div>
@@ -750,6 +756,129 @@ function DataPane() {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+type Memory = { id: string; content: string; createdAt: string };
+
+/** What Friday remembers about the user across chats (saved when they ask it to remember something). */
+function MemoryPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [memories, setMemories] = useState<Memory[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ memories: Memory[] }>("/memory")
+      .then((r) => setMemories(r.memories))
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load memory"));
+  }, [signedIn]);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () =>
+    run(async () => {
+      const content = draft.trim();
+      if (!content) return;
+      const { memory } = await api.post<{ memory: Memory }>("/memory", { content });
+      setMemories((m) => [...(m ?? []).filter((x) => x.id !== memory.id), memory]);
+      setDraft("");
+    });
+  const remove = (id: string) =>
+    run(async () => {
+      await api.delete(`/memory/${id}`);
+      setMemories((m) => (m ?? []).filter((x) => x.id !== id));
+    });
+  const clearAll = () =>
+    run(async () => {
+      if (!window.confirm("Delete everything Friday remembers about you?")) return;
+      await api.delete("/memory");
+      setMemories([]);
+    });
+
+  return (
+    <div>
+      <h2 className="mb-2 text-lg font-semibold">Memory</h2>
+      <p className="mb-4 text-sm text-muted">
+        Friday remembers things you ask it to (“remember that I prefer TypeScript”) and uses them in every new chat. You can
+        add, review and delete memories here.
+      </p>
+      {!signedIn ? (
+        <p className="text-sm text-muted">Sign in to use memory.</p>
+      ) : (
+        <>
+          {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+          <form
+            className="mb-4 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void add();
+            }}
+          >
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={500}
+              placeholder="Add something for Friday to remember…"
+              className="h-10 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground/40"
+            />
+            <button
+              type="submit"
+              disabled={busy || !draft.trim()}
+              className="h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background disabled:opacity-40"
+            >
+              Add
+            </button>
+          </form>
+          {memories === null ? (
+            <p className="text-sm text-muted">Loading…</p>
+          ) : memories.length === 0 ? (
+            <p className="text-sm text-muted">Nothing saved yet.</p>
+          ) : (
+            <ul className="mb-4 divide-y divide-border rounded-xl border border-border">
+              {memories.map((m) => (
+                <li key={m.id} className="flex items-start gap-3 px-4 py-3 text-sm">
+                  <span className="min-w-0 flex-1 break-words">{m.content}</span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(m.id)}
+                    aria-label="Delete memory"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-danger disabled:opacity-40"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {memories && memories.length > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void clearAll()}
+              className="h-10 rounded-full border border-danger/60 px-4 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
+            >
+              Clear all memories
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }

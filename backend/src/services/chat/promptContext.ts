@@ -242,6 +242,26 @@ export function withSystemPreamble(
   return preamble.length ? [...preamble, ...history] : history;
 }
 
+/** Tool-aware replacement for EXECUTION_HONESTY_SYSTEM_PROMPT, used on turns where real tools are attached. */
+const TOOL_EXECUTION_HONESTY_SYSTEM_PROMPT =
+  "You can use ONLY the tools attached to this request — nothing else. Never claim you ran code, opened a page, read " +
+  "an email or file, or performed an action unless a tool result in this conversation shows it. You have no code-execution " +
+  "tool: for python/javascript in Canvas, tell the user to click the Run button in the Canvas panel to see the real output — " +
+  "do not invent output.";
+
+/**
+ * Turns a normal preamble into a tool-enabled one: swaps the "you have no tools" honesty prompt for a
+ * tool-aware one and appends the tool-use guidance right after the other system messages.
+ */
+export function withToolPreamble(history: ChatMessage[], toolGuidance: string): ChatMessage[] {
+  const swapped = history.map((m) =>
+    m.role === "system" && m.content === EXECUTION_HONESTY_SYSTEM_PROMPT ? { ...m, content: TOOL_EXECUTION_HONESTY_SYSTEM_PROMPT } : m,
+  );
+  const firstNonSystem = swapped.findIndex((m) => m.role !== "system");
+  const at = firstNonSystem === -1 ? swapped.length : firstNonSystem;
+  return [...swapped.slice(0, at), { role: "system", content: toolGuidance }, ...swapped.slice(at)];
+}
+
 // Images ride along as base64 data URLs in the request body (no upload endpoint/storage yet), so
 // this bounds the request size and the number of images a single vision call has to process.
 const MAX_ATTACHMENTS = 4;
