@@ -8,7 +8,7 @@ struct MarkdownBody: View {
     let text: String
 
     private enum Block {
-        case code(lang: String, body: String)
+        case code(lang: String, body: String, complete: Bool)
         case paragraph(String)
         case bullet(String)
         case numbered(String)
@@ -19,8 +19,12 @@ struct MarkdownBody: View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block {
-                case .code(let lang, let body):
-                    CodeBlock(language: lang, code: body)
+                case .code(let lang, let body, let complete):
+                    if lang.lowercased() == "mermaid" {
+                        MermaidBlock(source: body, complete: complete)
+                    } else {
+                        CodeBlock(language: lang, code: body)
+                    }
                 case .paragraph(let s):
                     inlineText(s)
                 case .bullet(let s):
@@ -73,8 +77,9 @@ struct MarkdownBody: View {
                     codeLines.append(next)
                     lines = lines.dropFirst()
                 }
-                if lines.first != nil { lines = lines.dropFirst() } // consume closing fence
-                result.append(.code(lang: lang, body: codeLines.joined(separator: "\n")))
+                let closed = lines.first != nil
+                if closed { lines = lines.dropFirst() } // consume closing fence
+                result.append(.code(lang: lang, body: codeLines.joined(separator: "\n"), complete: closed))
             } else if let img = Self.imageMatch(trimmed) {
                 flushParagraph()
                 result.append(.image(url: img.url, alt: img.alt))

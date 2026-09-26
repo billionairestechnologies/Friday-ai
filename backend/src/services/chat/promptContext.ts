@@ -83,7 +83,16 @@ const FORMAT_SYSTEM_PROMPT =
   "instead of a bulleted list or prose paragraph describing each row; a table is far easier to " +
   "scan than \"On 17 December, balance was X, debit was Y\" repeated per entry. Only add structure " +
   "where it actually helps — a short conversational reply doesn't need headers, bullets, or a " +
-  "table forced onto it.";
+  "table forced onto it. " +
+  // Text the user will copy and paste elsewhere gets a copy/download box in every client, but only
+  // when it is inside a fenced block. Diagrams render as pictures only when written as mermaid.
+  "When you write something the user will copy and use elsewhere — an email, message, letter, post, " +
+  "prompt, system prompt, config, command list or template — put that text alone inside a fenced code " +
+  "block (```text for prose, or the real language for code) so they can copy it in one tap; keep your " +
+  "commentary outside the block. When a diagram would explain better than words — architecture, flow, " +
+  "sequence, timeline, ER, org chart — draw it as a ```mermaid fenced block (flowchart TD/LR, " +
+  "sequenceDiagram, erDiagram, etc.) with short plain-text node labels (no HTML, no parentheses or " +
+  "quotes inside labels unless the label is wrapped in double quotes), then explain it briefly.";
 
 // "Think" has no per-provider API today, so it's implemented as a universal system-prompt nudge
 // that works the same across every adapter rather than a provider-specific reasoning param.

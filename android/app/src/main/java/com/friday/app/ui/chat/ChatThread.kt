@@ -674,7 +674,7 @@ fun MarkdownBody(text: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         parts.forEach { part ->
             when (part) {
-                is Md.Code -> CodeBlock(part.lang, part.body)
+                is Md.Code -> if (part.lang.equals("mermaid", true)) MermaidBlock(part.body) else CodeBlock(part.lang, part.body)
                 is Md.Text -> MarkdownText(part.value)
                 is Md.Image -> GeneratedImage(part.url, part.alt)
             }

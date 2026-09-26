@@ -6,6 +6,7 @@ import rehypeHighlight from "rehype-highlight";
 import { Check, Copy, Download } from "lucide-react";
 import { filenameForLang, saveFile } from "@/lib/chat/download";
 import { cn } from "@/lib/utils";
+import { MermaidBlock } from "@/components/mermaid-block";
 
 function IconAction({
   label,
@@ -126,11 +127,12 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
                 : undefined;
             const lang = /language-([a-z0-9+#-]+)/i.exec(codeProps?.className ?? "")?.[1];
             const value = nodeText(codeProps?.children).replace(/\n$/, "");
-            return (
+            const block = (
               <CodeBlock lang={lang} text={value}>
                 {children}
               </CodeBlock>
             );
+            return lang === "mermaid" ? <MermaidBlock text={value} fallback={block} /> : block;
           },
           code: ({ className, children, node: _node, ...props }) => (
             <code className={className} {...props}>
