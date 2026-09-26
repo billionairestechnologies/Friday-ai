@@ -283,6 +283,7 @@ final class FridayViewModel: ObservableObject {
         let stream = ChatApi.streamMessage(
             conversationId: realId, content: content,
             think: modes.contains(.think), webSearch: modes.contains(.search), canvas: modes.contains(.canvas),
+            research: modes.contains(.research),
             attachments: streamAttachments
         )
 

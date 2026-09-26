@@ -12,7 +12,7 @@ struct RootShell: View {
             case "plans": PlansScreen()
             case "library": LibraryScreen()
             case "projects": StubPage(title: "Projects", body: "Project-scoped chats and files will live here.") { vm.page = "chat" }
-            case "automations": StubPage(title: "Automations", body: "Scheduled prompts are coming soon.") { vm.page = "chat" }
+            case "automations": AutomationsScreen()
             default: ChatShell()
             }
         }

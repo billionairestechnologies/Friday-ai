@@ -91,6 +91,7 @@ object ChatApi {
             put("think", Mode.Think in modes)
             put("webSearch", Mode.Search in modes)
             put("canvas", Mode.Canvas in modes)
+            put("research", Mode.Research in modes)
             if (attachments.isNotEmpty()) {
                 put(
                     "attachments",

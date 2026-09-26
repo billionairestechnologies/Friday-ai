@@ -6,7 +6,7 @@ let AUTO_MODEL_ID = "mode:auto"
 let TEAMUP_MODEL_ID = "mode:teamup"
 
 enum Mode: String, CaseIterable, Hashable {
-    case search, think, canvas
+    case search, think, canvas, research
 }
 
 enum Role: String, Codable {
@@ -125,6 +125,7 @@ enum AuthStep {
 func placeholderFor(_ modes: Set<Mode>) -> String {
     if modes.contains(.canvas) { return "Create on canvas…" }
     if modes.contains(.think) { return "Think deeply…" }
+    if modes.contains(.research) { return "What should I research?" }
     if modes.contains(.search) { return "Search the web…" }
     return "What do you want to know?"
 }

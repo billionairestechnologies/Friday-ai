@@ -3,6 +3,9 @@ import SwiftUI
 struct DrawerPane: View {
     @EnvironmentObject var vm: FridayViewModel
     @State private var search = ""
+    @State private var hits: [SearchHit] = []
+    @State private var searchError: String?
+    @State private var shareNote: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,8 +22,29 @@ struct DrawerPane: View {
                         .foregroundColor(FridayColor.muted)
                         .padding(.top, 16).padding(.horizontal, 16).padding(.bottom, 4)
 
+                    if let searchError {
+                        Text("Search failed: \(searchError)").font(.system(size: 13)).foregroundColor(FridayColor.error)
+                            .padding(.horizontal, 16).padding(.vertical, 6)
+                    }
+                    if !hits.isEmpty {
+                        Text("In messages").font(.system(size: 12, weight: .medium)).foregroundColor(FridayColor.muted)
+                            .padding(.horizontal, 16).padding(.top, 4)
+                        ForEach(hits) { h in
+                            Button { vm.selectChat(h.conversationId) } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(h.title).font(.system(size: 14, weight: .medium)).lineLimit(1)
+                                    Text(h.snippet).font(.system(size: 12.5)).foregroundColor(FridayColor.muted).lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16).padding(.vertical, 8)
+                            }
+                            .foregroundColor(FridayColor.text)
+                            .padding(.horizontal, 8)
+                        }
+                    }
+
                     if filteredChats.isEmpty {
-                        Text("No conversations yet")
+                        Text(search.isEmpty ? "No conversations yet" : "No matching titles")
                             .font(.system(size: 13))
                             .foregroundColor(FridayColor.muted)
                             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -39,6 +63,8 @@ struct DrawerPane: View {
                         .foregroundColor(FridayColor.text)
                         .padding(.horizontal, 8)
                         .contextMenu {
+                            Button { share(chat) } label: { Label("Copy public link", systemImage: "link") }
+                            Button { unshare(chat) } label: { Label("Turn off sharing", systemImage: "link.badge.plus") }
                             Button("Delete", role: .destructive) { vm.deleteChat(chat.id) }
                         }
                     }
@@ -74,6 +100,36 @@ struct DrawerPane: View {
             }
         }
         .background(FridayColor.bg.ignoresSafeArea())
+        .alert(shareNote ?? "", isPresented: Binding(get: { shareNote != nil }, set: { if !$0 { shareNote = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
+        // Debounced full-text search across message bodies (GET /api/chat/search); titles filter locally.
+        .task(id: search) {
+            hits = []; searchError = nil
+            let q = search.trimmingCharacters(in: .whitespaces)
+            guard vm.user != nil, q.count >= 2 else { return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if Task.isCancelled { return }
+            do { hits = try await AgentApi.search(q) }
+            catch { if !Task.isCancelled { searchError = error.localizedDescription } }
+        }
+    }
+
+    private func share(_ chat: ChatThread) {
+        Task {
+            do {
+                let url = try await AgentApi.shareConversation(id: chat.id)
+                UIPasteboard.general.string = url.absoluteString
+                shareNote = "Link copied — anyone with it can read this chat."
+            } catch { shareNote = "Couldn't create a link: \(error.localizedDescription)" }
+        }
+    }
+
+    private func unshare(_ chat: ChatThread) {
+        Task {
+            do { try await AgentApi.unshareConversation(id: chat.id); shareNote = "Sharing turned off." }
+            catch { shareNote = "Couldn't turn off sharing: \(error.localizedDescription)" }
+        }
     }
 
     private var filteredChats: [ChatThread] {

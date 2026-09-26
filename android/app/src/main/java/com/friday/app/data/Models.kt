@@ -1,6 +1,6 @@
 package com.friday.app.data
 
-enum class Mode { Search, Think, Canvas }
+enum class Mode { Search, Think, Canvas, Research }
 
 /** Sentinel remote-model ids for the two non-single conversation modes — mirrors the web app's
  *  AUTO_MODEL_ID/TEAMUP_MODEL_ID (exactly (frontend/src/lib/chat/models.ts), so both surfaces
@@ -156,6 +156,7 @@ sealed class ChatEvent {
 fun placeholderFor(modes: Set<Mode>): String = when {
     Mode.Canvas in modes -> "Create on canvas…"
     Mode.Think in modes -> "Think deeply…"
+    Mode.Research in modes -> "What should I research?"
     Mode.Search in modes -> "Search the web…"
     else -> "What do you want to know?"
 }

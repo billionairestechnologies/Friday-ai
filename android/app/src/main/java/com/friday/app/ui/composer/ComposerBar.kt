@@ -58,6 +58,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -91,6 +92,7 @@ import com.friday.app.data.placeholderFor
 import com.friday.app.ui.shell.brandOf
 import com.friday.app.ui.theme.ComposerCorner
 import com.friday.app.ui.theme.FridayBg
+import com.friday.app.ui.theme.FridayCanvas
 import com.friday.app.ui.theme.FridayMuted
 import com.friday.app.ui.theme.FridaySearch
 import com.friday.app.ui.theme.FridayStop
@@ -249,6 +251,8 @@ fun ComposerBar(
                         ModeChip(Icons.Outlined.Language, "Search", Mode.Search, FridaySearch, modes, onToggleMode)
                         ComposerDivider()
                         ModeChip(Icons.Outlined.Settings, "Think", Mode.Think, FridayThink, modes, onToggleMode)
+                        ComposerDivider()
+                        ModeChip(Icons.Outlined.Search, "Research", Mode.Research, FridayCanvas, modes, onToggleMode)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AnimatedVisibility(!hasText && modes.isEmpty(), enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {

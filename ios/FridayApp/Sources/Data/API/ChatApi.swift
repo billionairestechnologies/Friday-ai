@@ -74,6 +74,7 @@ enum ChatApi {
         think: Bool,
         webSearch: Bool,
         canvas: Bool,
+        research: Bool = false,
         attachments: [StreamAttachment]
     ) -> AsyncThrowingStream<ChatEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -85,6 +86,7 @@ enum ChatApi {
                         "think": think,
                         "webSearch": webSearch,
                         "canvas": canvas,
+                        "research": research,
                     ]
                     if !attachments.isEmpty {
                         body["attachments"] = attachments.map {

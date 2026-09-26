@@ -26,13 +26,13 @@ enum ThinkingLines {
 
     static func activePool(for modes: Set<Mode>) -> [String] {
         if modes.contains(.canvas) { return activeCanvas }
-        if modes.contains(.search) { return activeSearch }
+        if modes.contains(.search) || modes.contains(.research) { return activeSearch }
         return activeThink
     }
 
     static func pillPool(for modes: Set<Mode>) -> [String] {
         if modes.contains(.canvas) { return pillCanvas }
-        if modes.contains(.search) { return pillSearch }
+        if modes.contains(.search) || modes.contains(.research) { return pillSearch }
         return pillThink
     }
 }

@@ -92,6 +92,10 @@ struct ComposerBar: View {
                     ModeChip(icon: "gearshape", label: "Think", color: FridayColor.think, active: vm.modes.contains(.think)) {
                         vm.toggleMode(.think)
                     }
+                    Rectangle().fill(FridayColor.hairline).frame(width: 1, height: 18)
+                    ModeChip(icon: "magnifyingglass", label: "Research", color: FridayColor.canvas, active: vm.modes.contains(.research)) {
+                        vm.toggleMode(.research)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

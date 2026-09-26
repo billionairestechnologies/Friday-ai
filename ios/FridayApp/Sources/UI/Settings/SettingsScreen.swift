@@ -4,6 +4,7 @@ import AVFoundation
 private enum SettingsSub: String {
     case profile = "Profile", appearance = "Appearance", behavior = "Behavior", voice = "Voice"
     case billing = "Billing", usage = "Usage", dataControls = "Data Controls"
+    case memory = "Memory", connectors = "MCP servers"
 }
 
 /// Drill-down Settings mirroring android SettingsScreen.kt: a home list, each row opens its own page.
@@ -24,6 +25,8 @@ struct SettingsScreen: View {
                     case .billing: BillingPage()
                     case .usage: UsagePage()
                     case .dataControls: DataControlsPage(onAccountDeleted: { self.sub = nil })
+                    case .memory: MemoryContent()
+                    case .connectors: ConnectorsContent()
                     }
                 }
                 .transition(.move(edge: .trailing))
@@ -79,6 +82,10 @@ struct SettingsScreen: View {
                         SectionLabel("Friday")
                         SettingsCard {
                             SettingsRow(icon: "puzzlepiece.extension", label: "Plugins") { vm.page = "chat"; vm.sheet = .plugins }
+                            SettingsDivider()
+                            SettingsRow(icon: "brain", label: "Memory") { go(.memory) }
+                            SettingsDivider()
+                            SettingsRow(icon: "server.rack", label: "MCP servers") { go(.connectors) }
                         }
 
                         SectionLabel("Data & Information")

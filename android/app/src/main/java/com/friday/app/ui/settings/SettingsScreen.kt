@@ -106,7 +106,7 @@ import kotlin.math.roundToInt
  * the home list opens its own dedicated page; only Account/Appearance/Notifications are visible
  * to guests, everything else needs a session.
  */
-private enum class SettingsSub { Profile, Appearance, Behavior, Voice, Billing, Usage, DataControls }
+private enum class SettingsSub { Profile, Appearance, Behavior, Voice, Billing, Usage, DataControls, Memory, Connectors }
 
 @Composable
 fun SettingsScreen(
@@ -147,6 +147,12 @@ fun SettingsScreen(
         }
         SettingsSub.Usage -> SubPageScaffold("Usage", onBack = { sub = null }) {
             UsageSection()
+        }
+        SettingsSub.Memory -> SubPageScaffold("Memory", onBack = { sub = null }) {
+            com.friday.app.ui.agent.MemoryContent()
+        }
+        SettingsSub.Connectors -> SubPageScaffold("MCP servers", onBack = { sub = null }) {
+            com.friday.app.ui.agent.ConnectorsContent()
         }
         SettingsSub.DataControls -> SubPageScaffold("Data Controls", onBack = { sub = null }) {
             DataControlsSection(vm, onAccountDeleted = { sub = null; onBack() })
@@ -241,6 +247,10 @@ private fun SettingsHome(
                 SectionLabel("Friday")
                 SettingsCard {
                     SettingsRow(Icons.Default.Extension, "Plugins") { onOpenSheet(Sheet.Plugins) }
+                    SettingsDivider()
+                    SettingsRow(Icons.Default.Psychology, "Memory", onClick = { onOpen(SettingsSub.Memory) })
+                    SettingsDivider()
+                    SettingsRow(Icons.Default.Extension, "MCP servers", onClick = { onOpen(SettingsSub.Connectors) })
                 }
 
                 Spacer(Modifier.height(18.dp))

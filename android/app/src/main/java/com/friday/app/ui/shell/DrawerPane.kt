@@ -60,6 +60,7 @@ import com.friday.app.ui.theme.FridaySoftBlue
 import com.friday.app.ui.theme.FridayStop
 import com.friday.app.ui.theme.FridaySurface
 import com.friday.app.ui.theme.FridayText
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle as JTextStyle
@@ -85,6 +86,21 @@ fun DrawerPane(
     var query by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<ChatThread?>(null) }
     val filtered = recents.filter { it.title.contains(query, ignoreCase = true) }
+    var hits by remember { mutableStateOf<List<com.friday.app.data.api.SearchHit>>(emptyList()) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var actionChat by remember { mutableStateOf<ChatThread?>(null) }
+    var shareNote by remember { mutableStateOf<String?>(null) }
+    val drawerScope = androidx.compose.runtime.rememberCoroutineScope()
+    val drawerCtx = androidx.compose.ui.platform.LocalContext.current
+    // Debounced full-text search across message bodies (GET /api/chat/search); titles filter locally above.
+    androidx.compose.runtime.LaunchedEffect(query, user?.email) {
+        hits = emptyList(); searchError = null
+        if (user == null || query.trim().length < 2) return@LaunchedEffect
+        kotlinx.coroutines.delay(350)
+        val r = com.friday.app.data.api.AgentApi.search(query.trim())
+        hits = r.value ?: emptyList()
+        searchError = r.error
+    }
 
     Column(
         modifier
@@ -164,6 +180,49 @@ fun DrawerPane(
             modifier = Modifier.padding(start = 24.dp, bottom = 6.dp),
         )
 
+        actionChat?.let { chat ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { actionChat = null },
+                title = { Text(chat.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                text = {
+                    Column {
+                        Text(
+                            "Copy a public read-only link", color = FridayText, fontSize = 16.sp,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                actionChat = null
+                                drawerScope.launch {
+                                    val r = com.friday.app.data.api.AgentApi.shareConversation(chat.id)
+                                    val link = r.value
+                                    if (link != null) {
+                                        val cm = drawerCtx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Friday chat link", link))
+                                        android.widget.Toast.makeText(drawerCtx, "Link copied — anyone with it can read this chat", android.widget.Toast.LENGTH_LONG).show()
+                                    } else {
+                                        android.widget.Toast.makeText(drawerCtx, r.error ?: "Couldn't create a link", android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }.padding(vertical = 12.dp),
+                        )
+                        Text(
+                            "Turn off sharing", color = FridayText, fontSize = 16.sp,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                actionChat = null
+                                drawerScope.launch {
+                                    val r = com.friday.app.data.api.AgentApi.unshareConversation(chat.id)
+                                    android.widget.Toast.makeText(drawerCtx, if (r.error == null) "Sharing turned off" else r.error, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }.padding(vertical = 12.dp),
+                        )
+                        Text(
+                            "Delete chat", color = com.friday.app.ui.theme.FridayError, fontSize = 16.sp,
+                            modifier = Modifier.fillMaxWidth().clickable { pendingDelete = chat; actionChat = null }.padding(vertical = 12.dp),
+                        )
+                    }
+                },
+                confirmButton = { androidx.compose.material3.TextButton(onClick = { actionChat = null }) { Text("Close") } },
+            )
+        }
+
         pendingDelete?.let { chat ->
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { pendingDelete = null },
@@ -179,8 +238,21 @@ fun DrawerPane(
         }
 
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+            if (searchError != null) Text("Search failed: $searchError", color = com.friday.app.ui.theme.FridayError, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+            if (hits.isNotEmpty()) {
+                Text("In messages", color = FridayMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp))
+                hits.forEach { h ->
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onOpenChat(h.conversationId) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Text(h.title, color = FridayText, fontSize = 14.5.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(h.snippet, color = FridayMuted, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
             if (filtered.isEmpty()) {
-                Text("No conversations yet", color = FridayMuted, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
+                Text(if (query.isBlank()) "No conversations yet" else "No matching titles", color = FridayMuted, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
             } else {
                 filtered.forEach { chat ->
                     val active = chat.id == currentId
@@ -189,7 +261,7 @@ fun DrawerPane(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .background(if (active) FridaySurface else Color.Transparent)
-                            .combinedClickable(onClick = { onOpenChat(chat.id) }, onLongClick = { pendingDelete = chat })
+                            .combinedClickable(onClick = { onOpenChat(chat.id) }, onLongClick = { actionChat = chat })
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Text(
