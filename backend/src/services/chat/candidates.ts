@@ -1,10 +1,56 @@
 import { getProviderAdapter } from "../providers/registry.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
+import { detectTags } from "../modelRouting.js";
 
-// Team Up fans a message out to at most this many distinct providers, one model each,
-// so a single send doesn't burn through every configured key at once.
+// Team Up fans a message out to at most this many distinct providers, one model each, by default —
+// so an ordinary message doesn't burn through every configured key at once. teamUpProposerCount()
+// below can raise this per-message when the message itself calls for more breadth.
 export const TEAMUP_MAX_MODELS = 3;
+// Absolute ceiling regardless of how many providers are enabled or how strong the signal is —
+// protects latency (every proposer runs in parallel, but the slowest one still gates the reply)
+// and cost (every proposer is a full, separately-billed model call).
+export const TEAMUP_HARD_CAP = 6;
+
+// "use 4 models", "ask 5 different models", "compare 3 models" — an explicit count the user typed.
+const EXPLICIT_COUNT = /\b(?:use|ask|get(?: answers?)?|poll|compare|try)\s+(\d{1,2})\s+(?:different\s+)?models?\b/i;
+// "ask all models", "use every model" — as many distinct providers as are actually enabled.
+const EXPLICIT_ALL = /\b(?:use|ask|try)\s+(?:all|every)(?:\s+the)?\s+models?\b|\ball(?:\s+the)?\s+models?\b/i;
+// Language that signals the user wants breadth/consensus, not just one model's take.
+const BREADTH_HINTS =
+  /\b(compare|pros and cons|different (angles|approaches|opinions|perspectives)|second opinion|multiple (opinions|viewpoints|models)|debate|comprehensive|in[- ]depth|thorough|deep dive|every angle|cross[- ]check|get consensus)\b/i;
+const NUMBERED_LIST_ITEM = /(?:^|\n)\s*(?:[-*]|\d+[.)])\s+\S/g;
+const LONG_MESSAGE_CHARS = 600;
+
+/**
+ * How many distinct providers Team Up should fan a message out to. Stays at the historical default
+ * (TEAMUP_MAX_MODELS) for an ordinary message — this only ever adds MORE models when the message
+ * itself signals it needs the breadth: an explicit "use N models" / "ask all models", comparison
+ * or thoroughness language, several distinct routing-tag signals at once (e.g. both code AND
+ * reasoning — a genuinely harder ask), or a message already broken into several numbered/bulleted
+ * parts. Never exceeds TEAMUP_HARD_CAP, and never exceeds however many distinct providers are
+ * actually enabled with a working key (there is nothing to gain past that).
+ */
+export function teamUpProposerCount(pool: ChatCandidate[], message: string): number {
+  const distinctProviders = new Set(pool.map((c) => c.slug)).size;
+  const cap = Math.min(TEAMUP_HARD_CAP, distinctProviders);
+  if (cap <= TEAMUP_MAX_MODELS) return cap; // not enough distinct providers enabled for this to matter
+
+  if (EXPLICIT_ALL.test(message)) return cap;
+  const explicit = message.match(EXPLICIT_COUNT);
+  if (explicit) {
+    const n = Number(explicit[1]);
+    if (Number.isFinite(n) && n >= 2) return Math.min(cap, n);
+  }
+
+  let score = 0;
+  if (BREADTH_HINTS.test(message)) score++;
+  if (message.length > LONG_MESSAGE_CHARS) score++;
+  if (detectTags(message).length >= 2) score++; // e.g. code AND reasoning both present
+  if ((message.match(NUMBERED_LIST_ITEM)?.length ?? 0) >= 3) score++; // already broken into several parts
+
+  return Math.min(cap, TEAMUP_MAX_MODELS + score);
+}
 
 // adapter.chat() has no abort signal, so a slow/stuck provider (a local Ollama model with no
 // GPU, a network stall) can hang a fetch indefinitely. That's fatal for Auto/Team Up, which wait

@@ -36,6 +36,7 @@ Optional:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google login + connector (also refreshes connector tokens)
 - `FRIDAY_DISABLE_TOOLS=1` — kill switch: chat skips the agent tool loop (plain streaming)
 - `FRIDAY_DISABLE_AUTOMATIONS=1` — stop the in-process automation scheduler on this instance
+- `FRIDAY_PROMPT_CACHE=off` — disable Anthropic/OpenAI/Gemini prompt caching (on by default)
 
 Optional provider keys are managed through the admin panel. Missing provider keys should degrade
 model availability, not process startup.

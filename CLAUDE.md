@@ -55,6 +55,13 @@ Gotchas:
   (web, code, github, google, connectors, memory), `safeFetch.ts` (SSRF guard at socket level — use it
   for ANY server-side fetch of a user/model-supplied URL), `mcpClient.ts` + `mcpService.ts` (MCP over
   Streamable HTTP).
+- `services/providers/promptCache.ts` — prompt caching shared by every dialect: Anthropic/ScaleMax
+  explicit `cache_control` breakpoints (stable system block + a rolling breakpoint on the last 1-2
+  messages — the growing agent-tool-loop transcript is the biggest win), OpenAI/OpenRouter
+  `prompt_cache_key` + reading `cached_tokens`, Gemini's implicit caching (stable-first
+  `systemInstruction.parts` + reading `cachedContentTokenCount`). `ChatMessage.volatile` marks
+  per-turn-different system text (search results, Canvas snapshot, attachment nudge) so it never
+  breaks the cacheable stable prefix. Kill switch: `FRIDAY_PROMPT_CACHE=off`.
 - `services/projectBuild/` — Build Mode: `agent.ts` (plan → iterate → QA gate), `protocol.ts` (text-tag
   actions `<friday-write|edit|run|start|read|grep|ls|pr|progress|done>`), `sandbox.ts` (E2B; `run()` for
   model commands, `runScript()` for trusted scripts with env-passed values), `github.ts` (clone + PR).
@@ -81,7 +88,12 @@ Automations (+ page) · full-text chat search · share links · Build Mode edit/
 AGENTS.md/FRIDAY.md/CLAUDE.md read by Build Mode · Team Up metered · current date in prompts ·
 connector audit log · fixed env-dependent tests · removed committed scratch script.
 
-Deploy requires migrations `0023`–`0027`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`.
+Deploy requires migrations `0023`–`0028`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
+`FRIDAY_PROMPT_CACHE=off`.
+
+Also shipped since: prompt caching restored (Anthropic/ScaleMax/OpenAI/OpenRouter/Gemini, with
+cache-aware cost accounting in `token_ledger` — migration `0028`) and Team Up now fans out to more
+than 3 models when the message itself calls for it (`chat/candidates.ts#teamUpProposerCount`).
 
 Not yet verified with real credentials: live provider tool calls, E2B clone/PR flow, connector APIs,
 mobile builds.

@@ -41,6 +41,10 @@ type OpenAiCompatibleChunk = {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    /** OpenAI's automatic prompt caching reports the cached portion here — no request-side
+     *  config needed (unlike Anthropic's explicit cache_control breakpoints). Other OpenAI-
+     *  compatible backends that don't cache simply omit this field. */
+    prompt_tokens_details?: { cached_tokens?: number };
   };
 };
 
@@ -86,6 +90,7 @@ export async function streamOpenAiCompatibleChat(
   await readSseStream(res.body, (data) => {
     const chunk = data as OpenAiCompatibleChunk;
     if (chunk.usage && onUsage) {
+      const cachedTokens = Number(chunk.usage.prompt_tokens_details?.cached_tokens ?? 0);
       onUsage({
         promptTokens: Number(chunk.usage.prompt_tokens ?? 0),
         completionTokens: Number(chunk.usage.completion_tokens ?? 0),
@@ -93,6 +98,7 @@ export async function streamOpenAiCompatibleChat(
           chunk.usage.total_tokens ??
             Number(chunk.usage.prompt_tokens ?? 0) + Number(chunk.usage.completion_tokens ?? 0),
         ),
+        ...(cachedTokens > 0 ? { cachedTokens } : {}),
       });
     }
     const delta = chunk.choices?.[0]?.delta;

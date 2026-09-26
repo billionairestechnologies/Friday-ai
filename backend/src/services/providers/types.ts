@@ -30,6 +30,14 @@ export interface ChatMessage {
    *  and adapters that only support some mime types (e.g. Anthropic: images + PDF, not video)
    *  filter accordingly rather than sending a request their provider will reject. */
   images?: ChatImage[];
+  /**
+   * System messages only: true when this message's content is NOT byte-identical across repeated
+   * requests of the same conversation/turn — search results, the current Canvas artifact snapshot,
+   * a "you just attached a file" nudge. Prompt caching (promptCache.ts) puts these AFTER the stable,
+   * repeated system text so the cacheable prefix stays byte-identical turn to turn. Unset/false is
+   * the default and correct choice for ordinary static instruction text.
+   */
+  volatile?: boolean;
 }
 
 export interface HealthCheckResult {

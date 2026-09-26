@@ -3,7 +3,7 @@ import type { ChatImage, ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, listChatCandidates, type ChatCandidate } from "../providerService.js";
 import { pickStrongest } from "../modelRouting.js";
 import type { WebSearchResult } from "../webSearch.js";
-import { callCandidate, pickDistinctProviders, TEAMUP_MAX_MODELS } from "./candidates.js";
+import { callCandidate, pickDistinctProviders, teamUpProposerCount } from "./candidates.js";
 import { insertAssistantMessage } from "./conversations.js";
 import { searchResultsToSystemMessage } from "./promptContext.js";
 import type { StreamEvent } from "./types.js";
@@ -58,7 +58,9 @@ export async function streamTeamUp(
   const requiresVision = options.requiresVision ?? false;
   const images = options.images ?? [];
   const pool = await listChatCandidates();
-  const proposers = pickDistinctProviders(pool, TEAMUP_MAX_MODELS, requiresVision);
+  const eligiblePool = requiresVision ? pool.filter((c) => c.vision) : pool;
+  const proposerCount = teamUpProposerCount(eligiblePool, content);
+  const proposers = pickDistinctProviders(pool, proposerCount, requiresVision);
   if (proposers.length === 0) {
     onEvent({
       t: "err",

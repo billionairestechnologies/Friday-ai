@@ -68,9 +68,10 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 | E1 | Data-driven routing profiles (admin-editable in DB) instead of hardcoded regex | New models without a deploy | ⬜ |
 | E2 | Per-model capability metadata: tool support, context window, price | Correct routing + cost control | ⬜ |
 | E3 | Native reasoning controls (Anthropic extended thinking, OpenAI `reasoning_effort`, Gemini `thinkingConfig`) instead of a prompted "Think" | Better answers from reasoning models | ⬜ |
-| E4 | Re-evaluate prompt caching for long chats / Build Mode (removed in `0061d6b`) | Large cost savings on long contexts | ⬜ (needs product decision) |
+| E4 | Prompt caching for long chats / Build Mode / the agent tool loop (Anthropic+ScaleMax explicit breakpoints, OpenAI/OpenRouter `prompt_cache_key`, Gemini implicit) | Large cost/latency savings on long contexts and multi-round agent turns | ✅ |
 | E5 | Meter Team Up against the token quota | It's currently unmetered | ✅ |
 | E8 | Current date in every system prompt | Models otherwise answer "latest/this year" from their training cutoff | ✅ |
+| E9 | Team Up fans out to more than the default 3 models when the message itself calls for it (explicit "use N models"/"ask all models", comparison/thoroughness language, several distinct signals at once) | A hardcoded 3 undersells Team Up on genuinely hard/broad asks | ✅ |
 | E6 | Structured outputs / JSON mode for internal probes | Fewer parsing failures | ⬜ |
 | E7 | Rate-limit-aware failover (429 → next provider) with backoff | Reliability | 🚧 failover exists (hedgedStream); no backoff |
 

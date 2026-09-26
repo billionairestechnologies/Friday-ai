@@ -3,7 +3,7 @@ import { memoAsync } from "../../utils/ttlMemo.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { getRedisClient } from "../redisClient.js";
 import { logger } from "../../utils/logger.js";
-import { estimateCostCents } from "../tokenUsage.js";
+import { estimateCostCents, type TokenUsage } from "../tokenUsage.js";
 import {
   decideQuota,
   ENTERPRISE_MIN_SEATS,
@@ -293,7 +293,7 @@ export async function recordTokenLedger(
   organizationId: string | null,
   providerSlug: string,
   modelId: string,
-  usage: { promptTokens: number; completionTokens: number; totalTokens: number },
+  usage: TokenUsage,
   reservedTokens: number,
 ): Promise<void> {
   const { error } = await supabaseAdmin.from("token_ledger").insert({
@@ -304,6 +304,10 @@ export async function recordTokenLedger(
     input_tokens: usage.promptTokens,
     output_tokens: usage.completionTokens,
     total_tokens: usage.totalTokens,
+    // Both are already part of input_tokens above — these are just its cache breakdown, 0 when
+    // the provider/call reported no prompt-cache activity (see providers/promptCache.ts).
+    cached_tokens: usage.cachedTokens ?? 0,
+    cache_write_tokens: usage.cacheWriteTokens ?? 0,
     estimated_cost_cents: estimateCostCents(providerSlug, usage),
     reserved_tokens: reservedTokens,
   });

@@ -105,7 +105,8 @@ test("Anthropic dialect: parses tool_use + input_json_delta and usage; parallel 
     assert.deepEqual(r.toolCalls, [{ id: "toolu_1", name: "web_search", args: { query: "mumbai" } }]);
     assert.deepEqual(r.usage, { promptTokens: 42, completionTokens: 7, totalTokens: 49 });
     const body = mock.bodies[0]!;
-    assert.equal(body.system, "sys A\n\nsys B");
+    // Prompt caching (on by default): the stable system text carries a cache breakpoint.
+    assert.deepEqual(body.system, [{ type: "text", text: "sys A\n\nsys B", cache_control: { type: "ephemeral" } }]);
     assert.deepEqual(body.tool_choice, { type: "none" });
     assert.equal((body.tools as { input_schema: unknown }[])[0]!.input_schema !== undefined, true);
   } finally {

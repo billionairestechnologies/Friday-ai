@@ -2,6 +2,13 @@ import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { mergeSystemMessages, safeErrorMessage, toOpenAiStyleMessages } from "./types.js";
 import { streamOpenAiToolTurn } from "./toolCalling.js";
+import { cachingEnabled, promptCacheKeyFor, splitSystemBlocks } from "./promptCache.js";
+
+/** OpenAI caches automatically on a stable prefix — this key just nudges the request toward the
+ *  same backend cache shard as a previous call with the same stable system text. */
+function cacheKeyField(messages: ChatMessage[]): Record<string, unknown> {
+  return cachingEnabled() ? { prompt_cache_key: promptCacheKeyFor(splitSystemBlocks(messages).stable) } : {};
+}
 
 const BASE_URL = "https://api.openai.com/v1";
 
@@ -31,7 +38,7 @@ export const openaiAdapter: ProviderAdapter = {
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) }),
+      body: JSON.stringify({ model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)), ...cacheKeyField(messages) }),
     });
     if (!res.ok) throw new Error(`OpenAI chat failed: ${res.status} ${await res.text()}`);
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
@@ -52,7 +59,7 @@ export const openaiAdapter: ProviderAdapter = {
     return streamOpenAiCompatibleChat(
       `${BASE_URL}/chat/completions`,
       { Authorization: `Bearer ${apiKey}` },
-      { model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)) },
+      { model, messages: toOpenAiStyleMessages(mergeSystemMessages(messages)), ...cacheKeyField(messages) },
       onDelta,
       signal,
       onThink,

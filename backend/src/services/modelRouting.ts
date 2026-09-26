@@ -40,7 +40,7 @@ const CODE_HINTS = /```|`[^`]+`|\b(function|const |let |class |def |import |sele
 const REASONING_HINTS = /\b(solve|prove|calculate|step by step|equation|derivative|integral|algorithm|why does|explain how)\b/i;
 const LONG_INPUT_CHARS = 4000;
 
-function detectTags(message: string): ModelTag[] {
+export function detectTags(message: string): ModelTag[] {
   const tags: ModelTag[] = [];
   if (INDIC_SCRIPT.test(message)) tags.push("multilingual");
   if (CODE_HINTS.test(message)) tags.push("code");

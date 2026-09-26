@@ -1,7 +1,22 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { base64PayloadOf, safeErrorMessage, splitSystemPrompt } from "./types.js";
+import { base64PayloadOf, safeErrorMessage } from "./types.js";
 import { streamGeminiToolTurn } from "./toolCalling.js";
+import { splitSystemBlocks } from "./promptCache.js";
+
+/**
+ * Gemini's systemInstruction takes a `parts` array — this keeps the stable text (identical every
+ * turn) as its own leading part and the volatile text (search results, canvas snapshot,
+ * attachment focus) as a trailing part, instead of one joined string. Gemini 2.x's implicit
+ * caching reuses the longest matching prefix of a request automatically (no explicit cache
+ * config, unlike Anthropic), so keeping the stable text first and byte-identical maximises how
+ * much of the request that implicit cache actually covers — this is a pure request-shape change,
+ * `systemInstruction.parts` already accepted an array before this.
+ */
+function systemInstructionFor(stable: string, volatile: string): { parts: { text: string }[] } | undefined {
+  const parts = [...(stable ? [{ text: stable }] : []), ...(volatile ? [{ text: volatile }] : [])];
+  return parts.length > 0 ? { parts } : undefined;
+}
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -39,8 +54,9 @@ export const geminiAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const { system, conversation } = splitSystemPrompt(messages);
+    const { stable, volatile, conversation } = splitSystemBlocks(messages);
     const contents = toGeminiContents(conversation);
+    const systemInstruction = systemInstructionFor(stable, volatile);
 
     const res = await fetch(
       `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -49,7 +65,7 @@ export const geminiAdapter: ProviderAdapter = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,
-          ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+          ...(systemInstruction ? { systemInstruction } : {}),
         }),
       },
     );
@@ -71,8 +87,9 @@ export const geminiAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
-    const { system, conversation } = splitSystemPrompt(messages);
+    const { stable, volatile, conversation } = splitSystemBlocks(messages);
     const contents = toGeminiContents(conversation);
+    const systemInstruction = systemInstructionFor(stable, volatile);
 
     const res = await fetch(
       `${BASE_URL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`,
@@ -81,7 +98,7 @@ export const geminiAdapter: ProviderAdapter = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,
-          ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+          ...(systemInstruction ? { systemInstruction } : {}),
         }),
         signal,
       },
@@ -98,9 +115,13 @@ export const geminiAdapter: ProviderAdapter = {
           promptTokenCount?: number;
           candidatesTokenCount?: number;
           totalTokenCount?: number;
+          /** Gemini's IMPLICIT caching (2.x models, automatic — no explicit cache resource needed)
+           *  reports the cached portion here. */
+          cachedContentTokenCount?: number;
         };
       };
       if (body.usageMetadata && onUsage) {
+        const cachedTokens = Number(body.usageMetadata.cachedContentTokenCount ?? 0);
         onUsage({
           promptTokens: Number(body.usageMetadata.promptTokenCount ?? 0),
           completionTokens: Number(body.usageMetadata.candidatesTokenCount ?? 0),
@@ -109,6 +130,7 @@ export const geminiAdapter: ProviderAdapter = {
               Number(body.usageMetadata.promptTokenCount ?? 0) +
                 Number(body.usageMetadata.candidatesTokenCount ?? 0),
           ),
+          ...(cachedTokens > 0 ? { cachedTokens } : {}),
         });
       }
       const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";

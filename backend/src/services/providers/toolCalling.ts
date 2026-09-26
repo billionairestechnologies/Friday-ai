@@ -2,6 +2,7 @@ import type { TokenUsage } from "../tokenUsage.js";
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage } from "./types.js";
 import { base64PayloadOf, toAnthropicStyleMessages, toOpenAiStyleMessages } from "./types.js";
+import { AnthropicUsageTracker, cachingEnabled, promptCacheKeyFor, splitSystemBlocks, withAnthropicCacheBreakpoints } from "./promptCache.js";
 
 /**
  * Native (structured) tool calling, shared by every adapter whose API supports it. Three wire
@@ -100,7 +101,12 @@ type OpenAiToolChunk = {
       tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[];
     };
   }[];
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number };
+  };
 };
 
 export async function streamOpenAiToolTurn(
@@ -112,11 +118,16 @@ export async function streamOpenAiToolTurn(
   onDelta: (text: string) => void,
   extraBody: Record<string, unknown> = {},
 ): Promise<ToolTurnResult> {
+  // OpenAI-compatible APIs cache automatically on a stable-enough prefix (no explicit breakpoint
+  // needed); prompt_cache_key just improves the odds this request lands on the same cache shard as
+  // the previous round of the same tool loop. A key derived from an empty system prefix (a request
+  // with no system messages at all) is a harmless shared default, not a bug.
   const body: Record<string, unknown> = {
     model,
     messages: toOpenAiToolMessages(messages),
     stream: true,
     stream_options: { include_usage: true },
+    ...(cachingEnabled() ? { prompt_cache_key: promptCacheKeyFor(joinedSystem(messages) ?? "") } : {}),
     ...extraBody,
   };
   if (opts.tools.length) {
@@ -142,7 +153,13 @@ export async function streamOpenAiToolTurn(
     if (chunk.usage) {
       const promptTokens = Number(chunk.usage.prompt_tokens ?? 0);
       const completionTokens = Number(chunk.usage.completion_tokens ?? 0);
-      usage = { promptTokens, completionTokens, totalTokens: Number(chunk.usage.total_tokens ?? promptTokens + completionTokens) };
+      const cachedTokens = Number(chunk.usage.prompt_tokens_details?.cached_tokens ?? 0);
+      usage = {
+        promptTokens,
+        completionTokens,
+        totalTokens: Number(chunk.usage.total_tokens ?? promptTokens + completionTokens),
+        ...(cachedTokens > 0 ? { cachedTokens } : {}),
+      };
     }
     const delta = chunk.choices?.[0]?.delta;
     if (delta?.content) {
@@ -201,13 +218,25 @@ export async function streamAnthropicToolTurn(
   messages: AgentMessage[],
   opts: ToolTurnOptions,
   onDelta: (text: string) => void,
+  cacheEnabled: boolean = cachingEnabled(),
 ): Promise<ToolTurnResult> {
-  const system = joinedSystem(messages);
+  // Same stable/volatile split as the plain chat path (promptCache.ts): the tool-use guidance and
+  // every other stable system message get one cache breakpoint; the growing message history below
+  // gets its own rolling breakpoint via withAnthropicCacheBreakpoints — the bigger win here, since
+  // the tool loop resends this same, only-growing transcript once per round.
+  const { stable, volatile } = splitSystemBlocks(messages);
+  const system =
+    stable || volatile
+      ? [
+          ...(stable ? [{ type: "text", text: stable, ...(cacheEnabled ? { cache_control: { type: "ephemeral" as const } } : {}) }] : []),
+          ...(volatile ? [{ type: "text", text: volatile }] : []),
+        ]
+      : undefined;
   const body: Record<string, unknown> = {
     model,
     max_tokens: opts.maxTokens ?? 8192,
     stream: true,
-    messages: toAnthropicToolMessages(messages),
+    messages: withAnthropicCacheBreakpoints(toAnthropicToolMessages(messages), cacheEnabled),
     ...(system ? { system } : {}),
   };
   if (opts.tools.length) {
@@ -223,25 +252,14 @@ export async function streamAnthropicToolTurn(
   if (!res.ok || !res.body) throw new Error(`Tool chat failed: ${res.status} ${res.body ? await res.text() : ""}`);
 
   let text = "";
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let sawUsage = false;
+  const tracker = new AnthropicUsageTracker();
   const blocks = new Map<number, { id: string; name: string; json: string }>();
   await readSseStream(res.body, (data) => {
     const type = data.type;
     if (type === "message_start") {
-      const usage = (data.message as { usage?: { input_tokens?: number } } | undefined)?.usage;
-      if (usage?.input_tokens != null) {
-        inputTokens = Number(usage.input_tokens);
-        sawUsage = true;
-      }
+      tracker.ingest((data.message as { usage?: Record<string, unknown> } | undefined)?.usage);
     } else if (type === "message_delta") {
-      const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
-      if (usage) {
-        if (usage.input_tokens != null) inputTokens = Number(usage.input_tokens);
-        if (usage.output_tokens != null) outputTokens = Number(usage.output_tokens);
-        sawUsage = true;
-      }
+      tracker.ingest(data.usage as Record<string, unknown> | undefined);
     } else if (type === "content_block_start") {
       const block = data.content_block as { type?: string; id?: string; name?: string } | undefined;
       if (block?.type === "tool_use") blocks.set(Number(data.index ?? 0), { id: block.id ?? "", name: block.name ?? "", json: "" });
@@ -260,8 +278,7 @@ export async function streamAnthropicToolTurn(
     .sort(([a], [b]) => a - b)
     .filter(([, b]) => b.name)
     .map(([i, b]) => ({ id: b.id || `toolu_${i}`, name: b.name, args: parseArgs(b.json) }));
-  const usage = sawUsage ? { promptTokens: inputTokens, completionTokens: outputTokens, totalTokens: inputTokens + outputTokens } : null;
-  return { text, toolCalls, usage };
+  return { text, toolCalls, usage: tracker.snapshot() };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -299,7 +316,7 @@ type GeminiToolChunk = {
       parts?: { text?: string; thought?: boolean; functionCall?: { name?: string; args?: Record<string, unknown>; id?: string }; thoughtSignature?: string }[];
     };
   }[];
-  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number; cachedContentTokenCount?: number };
 };
 
 export async function streamGeminiToolTurn(
@@ -310,10 +327,13 @@ export async function streamGeminiToolTurn(
   opts: ToolTurnOptions,
   onDelta: (text: string) => void,
 ): Promise<ToolTurnResult> {
-  const system = joinedSystem(messages);
+  // Stable text (tool guidance, focus/honesty/format prompts) as its own leading part, volatile
+  // text trailing — see gemini.ts's systemInstructionFor for why the split helps implicit caching.
+  const { stable, volatile } = splitSystemBlocks(messages);
+  const systemParts = [...(stable ? [{ text: stable }] : []), ...(volatile ? [{ text: volatile }] : [])];
   const body: Record<string, unknown> = {
     contents: toGeminiToolContents(messages),
-    ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+    ...(systemParts.length > 0 ? { systemInstruction: { parts: systemParts } } : {}),
   };
   if (opts.tools.length) {
     // Gemini rejects an OBJECT schema with empty `properties` — a no-argument tool omits `parameters`.
@@ -342,7 +362,13 @@ export async function streamGeminiToolTurn(
     if (chunk.usageMetadata) {
       const promptTokens = Number(chunk.usageMetadata.promptTokenCount ?? 0);
       const completionTokens = Number(chunk.usageMetadata.candidatesTokenCount ?? 0);
-      usage = { promptTokens, completionTokens, totalTokens: Number(chunk.usageMetadata.totalTokenCount ?? promptTokens + completionTokens) };
+      const cachedTokens = Number(chunk.usageMetadata.cachedContentTokenCount ?? 0);
+      usage = {
+        promptTokens,
+        completionTokens,
+        totalTokens: Number(chunk.usageMetadata.totalTokenCount ?? promptTokens + completionTokens),
+        ...(cachedTokens > 0 ? { cachedTokens } : {}),
+      };
     }
     for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
       if (part.functionCall?.name) {

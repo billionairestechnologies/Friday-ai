@@ -1,7 +1,8 @@
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
-import { safeErrorMessage, splitSystemPrompt, toAnthropicStyleMessages } from "./types.js";
+import { safeErrorMessage } from "./types.js";
 import { streamAnthropicToolTurn } from "./toolCalling.js";
+import { AnthropicUsageTracker, cachingEnabled, toAnthropicCachedRequest } from "./promptCache.js";
 
 // ScaleMax (api.scalemax.pro) proxies Claude AND GPT models (confirmed directly against the
 // real API 2026-09-18 — its catalog grew well past the Claude-only set this adapter used to
@@ -48,7 +49,7 @@ export const scalemaxAdapter: ProviderAdapter = {
   },
 
   async chat(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-    const { system, conversation } = splitSystemPrompt(messages);
+    const { system, messages: cached } = toAnthropicCachedRequest(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -64,7 +65,7 @@ export const scalemaxAdapter: ProviderAdapter = {
         // long-context/reasoning replies were done.
         max_tokens: 8192,
         system,
-        messages: toAnthropicStyleMessages(conversation),
+        messages: cached,
       }),
     });
     if (!res.ok) throw new Error(`ScaleMax chat failed: ${res.status} ${await res.text()}`);
@@ -85,7 +86,7 @@ export const scalemaxAdapter: ProviderAdapter = {
   },
 
   async chatStream(apiKey, model, messages, onDelta, signal, _onThink, onUsage): Promise<string> {
-    const { system, conversation } = splitSystemPrompt(messages);
+    const { system, messages: cached } = toAnthropicCachedRequest(messages);
 
     const res = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
@@ -99,7 +100,7 @@ export const scalemaxAdapter: ProviderAdapter = {
         max_tokens: 8192,
         system,
         stream: true,
-        messages: toAnthropicStyleMessages(conversation),
+        messages: cached,
       }),
       signal,
     });
@@ -108,16 +109,16 @@ export const scalemaxAdapter: ProviderAdapter = {
     }
 
     let full = "";
+    const tracker = new AnthropicUsageTracker();
     await readSseStream(res.body, (data) => {
+      if (data.type === "message_start") {
+        tracker.ingest((data.message as { usage?: Record<string, unknown> } | undefined)?.usage);
+        return;
+      }
       if (data.type === "message_delta") {
-        const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
-        if (usage && onUsage) {
-          onUsage({
-            promptTokens: Number(usage.input_tokens ?? 0),
-            completionTokens: Number(usage.output_tokens ?? 0),
-            totalTokens: Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0),
-          });
-        }
+        tracker.ingest(data.usage as Record<string, unknown> | undefined);
+        const usage = tracker.snapshot();
+        if (usage && onUsage) onUsage(usage);
         return;
       }
       if (data.type !== "content_block_delta") return;
@@ -138,6 +139,7 @@ export const scalemaxAdapter: ProviderAdapter = {
       messages,
       opts,
       onDelta,
+      cachingEnabled(),
     );
   },
 };

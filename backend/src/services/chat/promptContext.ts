@@ -139,8 +139,10 @@ export function findLastCanvasArtifact(history: ChatMessage[]): { lang: string; 
 }
 
 function canvasArtifactSystemMessage(artifact: { lang: string; code: string }): ChatMessage {
+  // Changes every time the artifact is rebuilt/edited — never stable across turns.
   return {
     role: "system",
+    volatile: true,
     content:
       `Here is the complete, current Canvas artifact (${artifact.lang}) exactly as last built. If the user is asking for a change to it, start from this exact file and return the ENTIRE updated file (per the Canvas instructions above) — do not return only the changed lines.\n\n` +
       "```" +
@@ -152,9 +154,11 @@ function canvasArtifactSystemMessage(artifact: { lang: string; code: string }): 
 }
 
 export function searchResultsToSystemMessage(results: WebSearchResult[]): ChatMessage {
+  // Different every query — never a candidate for the cacheable stable prefix (see promptCache.ts).
   if (results.length === 0) {
     return {
       role: "system",
+      volatile: true,
       content:
         "A live web search was run for this message but returned no results. Tell the user the search came back empty rather than claiming you have no web access at all.",
     };
@@ -162,6 +166,7 @@ export function searchResultsToSystemMessage(results: WebSearchResult[]): ChatMe
   const body = results.map((r, i) => `${i + 1}. ${r.title} (${r.url})\n${r.snippet}`).join("\n\n");
   return {
     role: "system",
+    volatile: true,
     content:
       "You DO have live web access for THIS message: a real-time web search already ran and returned the results " +
       "below. You are not restricted to your training data here — treat these as current, authoritative " +
@@ -246,7 +251,9 @@ export function withSystemPreamble(
     const lastArtifact = findLastCanvasArtifact(history);
     if (lastArtifact) preamble.push(canvasArtifactSystemMessage(lastArtifact));
   }
-  if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT });
+  // Present only on turns with a fresh attachment — its presence itself varies turn to turn, so it
+  // can never be part of the stable cached prefix even though its text is static.
+  if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT, volatile: true });
   return preamble.length ? [...preamble, ...history] : history;
 }
 
