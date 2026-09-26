@@ -1,56 +1,64 @@
 flowchart TB
   subgraph clients [Clients]
     Browser[Web app - React Vite]
+    Android[Android - Kotlin Compose]
+    IOS[iOS - SwiftUI]
+    Public[Public share page /share/token]
   end
 
   subgraph api [Friday API - Express TypeScript]
-    MW[Helmet CORS request ID rate limits]
+    MW[Helmet CORS request ID rate limits quota]
     AuthR["/api/auth"]
-    ChatR["/api/chat SSE"]
+    ChatR["/api/chat SSE + search + share"]
+    Agent[Agent tool loop - native tool calling]
+    BuildR["/api/build - Build Mode coding agent"]
+    AutoR["/api/automations + scheduler"]
+    MemR["/api/memory"]
+    McpR["/api/mcp"]
     BillR["/api/billing"]
     ConnR["/api/connectors"]
-    OrgR["/api/organizations"]
-    UseR["/api/usage /projects /voice /sandbox"]
+    OrgR["/api/organizations /usage /projects /voice"]
     Health["/api/health live+ready"]
   end
 
   subgraph data [Data plane]
-    SB[(Supabase Postgres + Auth)]
-    Store[Supabase Storage message-attachments]
+    SB[(Supabase Postgres + Auth + Realtime)]
+    Store[Supabase Storage attachments]
     Redis[(Redis optional)]
   end
 
-  subgraph vendors [External vendors]
-    Models[OpenAI Anthropic Gemini OpenRouter Sarvam ScaleMax Ollama]
-    Pay[Razorpay]
-    Mail[Resend OTP email]
+  subgraph vendors [External services]
+    Models[OpenAI Anthropic Gemini OpenRouter ScaleMax Sarvam Ollama]
+    E2B[E2B sandboxes - code + builds]
+    Web[Web search + page fetch - SSRF guarded]
     GH[GitHub]
-    G[Google]
-    Other[Notion Vercel Railway Box Canva]
+    G[Google Gmail Drive Calendar]
+    Other[Notion Vercel Railway Supabase Razorpay]
+    MCP[User MCP servers]
+    Pay[Razorpay billing]
+    Mail[Resend OTP email]
   end
 
   Browser --> MW
-  MW --> AuthR
-  MW --> ChatR
-  MW --> BillR
-  MW --> ConnR
-  MW --> OrgR
-  MW --> UseR
-  MW --> Health
-  AuthR --> SB
-  AuthR --> Mail
-  AuthR --> G
+  Android --> MW
+  IOS --> MW
+  Public --> ChatR
+  MW --> AuthR & ChatR & BuildR & AutoR & MemR & McpR & BillR & ConnR & OrgR & Health
+  ChatR --> Agent
+  AutoR --> ChatR
+  Agent --> Models
+  Agent --> Web
+  Agent --> E2B
+  Agent --> GH & G & Other & MCP
+  BuildR --> E2B
+  BuildR --> GH
   ChatR --> SB
   ChatR --> Store
-  ChatR --> Models
+  AuthR --> SB
+  AuthR --> Mail
   BillR --> Pay
-  BillR --> SB
-  ConnR --> GH
-  ConnR --> G
-  ConnR --> Other
   ConnR --> SB
-  OrgR --> SB
-  UseR --> SB
+  MemR --> SB
+  AutoR --> SB
   Health --> SB
-  Health --> Redis
   MW -.-> Redis

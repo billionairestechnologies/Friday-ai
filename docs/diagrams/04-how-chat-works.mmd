@@ -1,23 +1,29 @@
 sequenceDiagram
   actor U as User
-  participant FE as Web app
+  participant FE as App
   participant API as Friday API
-  participant RL as Rate limiter
   participant DB as Supabase
-  participant ST as File storage
   participant M as AI model
+  participant T as Tools
 
-  U->>FE: Type message and attach files
-  FE->>API: POST /api/chat with JWT
-  API->>RL: Check per-user limit
-  alt Over limit
-    API-->>FE: 429 Too many requests
-  else Allowed
-    API->>DB: Save user message
-    API->>ST: Store attachments
-    API->>M: Stream the prompt
-    M-->>API: Tokens plus usage
-    API->>DB: Save reply and token cost
-    API-->>FE: Live SSE text Think cites
-    FE-->>U: Answer appears as it is written
+  U->>FE: Message (+ files, Search / Deep Research)
+  FE->>API: POST /api/chat/.../stream with JWT
+  API->>API: Rate limit + token quota reservation
+  API->>DB: Save message, load history + memory + project
+  API->>API: Intent probes (search / build / image) in parallel
+  alt Build request
+    API->>API: Build Mode coding agent (see diagram 12)
+  else Model supports tools
+    loop up to 8 rounds (16 for Deep Research)
+      API->>M: Stream turn with tool list
+      M-->>API: Text and/or tool calls
+      API->>T: Run tools in parallel (web, code, GitHub, Gmail, MCP...)
+      T-->>API: Results (treated as untrusted data)
+      API-->>FE: SSE text + step rows + citations
+    end
+  else No tool support
+    API->>M: Plain streaming with failover + hedging
+    M-->>API: Tokens
   end
+  API->>DB: Save reply, steps, citations, token usage
+  API-->>FE: done

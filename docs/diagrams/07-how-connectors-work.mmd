@@ -1,7 +1,7 @@
 flowchart LR
   subgraph oauth [OAuth connectors]
     GH[GitHub]
-    GG[Google Calendar Gmail Drive]
+    GG[Google Gmail Drive Calendar - token auto-refresh]
   end
 
   subgraph token [Token connectors - verified then encrypted]
@@ -10,18 +10,22 @@ flowchart LR
     R[Railway]
     V[Vercel]
     RZ[Razorpay keys]
-    B[Box]
-    C[Canva]
-    F[Finance]
+    B[Box Canva Finance]
   end
 
-  User[Signed-in user] --> Drawer[Plugins drawer]
-  Drawer --> oauth
-  Drawer --> token
+  subgraph mcp [MCP servers]
+    M[Any remote MCP server - https + optional auth]
+  end
+
+  User[Signed-in user] --> Drawer[Plugins drawer / Settings]
+  Drawer --> oauth & token & mcp
   oauth --> API[Friday API encrypts secrets]
   token --> API
-  API --> DB[(connector_accounts)]
-  GH --> Repos[Search repos]
-  GG --> GoogleAPIs[Calendar Gmail Drive]
-  N --> NotionAPI[Search pages]
-  V --> VercelAPI[List projects]
+  mcp --> API
+  API --> DB[(connector_accounts / mcp_servers)]
+  API --> Tools[Agent tools in chat]
+  Tools --> T1[github_* read files, search code, issues]
+  Tools --> T2[gmail_* drive_* calendar_events]
+  Tools --> T3[notion_* vercel_deployments railway_projects supabase_query razorpay_payments]
+  Tools --> T4[mcp_server_tool]
+  Tools --> Audit[(admin_audit_logs)]

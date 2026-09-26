@@ -1,0 +1,17 @@
+flowchart LR
+  User[User] --> Page[Automations page]
+  Page --> Api["/api/automations"]
+  Api --> T[(automations table)]
+  subgraph Every API instance
+    Tick[Scheduler tick every 60s] --> Due[Select due rows]
+    Due --> Claim[Atomic lease UPDATE running_until]
+  end
+  T --> Due
+  Claim -->|won the lease| Quota{Token quota OK?}
+  Quota -->|No| Fail[Record error, reschedule]
+  Quota -->|Yes| Chat[Normal chat pipeline with tools + memory]
+  Chat --> Conv[(Automation's own chat thread)]
+  Chat --> Push[Push notification]
+  Chat --> Next[Compute next run in user time zone - DST safe]
+  Next --> T
+  Fail --> T

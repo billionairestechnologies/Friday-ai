@@ -1,0 +1,25 @@
+flowchart TD
+  In[User turn] --> Pre[History + memory + project + current date + tool guidance]
+  Pre --> Pick{First candidate model supports tools?}
+  Pick -->|No| Plain[Plain streaming with failover + hedging]
+  Pick -->|Yes| Round[Stream a model turn with the toolset]
+  Round --> Calls{Tool calls?}
+  Calls -->|No| Done[Save reply, steps, citations, usage]
+  Calls -->|Yes| Run[Run tools in parallel, 45s timeout each]
+  Run --> Feed[Append results as untrusted tool messages]
+  Feed --> Compact[Compact old results beyond 180k chars]
+  Compact --> Last{Last round?}
+  Last -->|No| Round
+  Last -->|Yes| Force[tool_choice none: force final answer]
+  Force --> Done
+  Round -. model rejects tools before any output .-> Plain
+  Plain --> Done
+
+  subgraph Toolset
+    W[web_search / fetch_url - SSRF guarded]
+    X[run_code - E2B]
+    Mem[remember / forget]
+    Con[GitHub Google Notion Vercel Railway Supabase Razorpay]
+    Mc[MCP server tools]
+  end
+  Run --- Toolset

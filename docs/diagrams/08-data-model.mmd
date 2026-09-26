@@ -3,37 +3,54 @@ erDiagram
   profiles ||--o{ organization_memberships : joins
   profiles ||--o{ connector_accounts : connects
   profiles ||--o{ usage_events : meters
+  profiles ||--o{ user_memories : remembers
+  profiles ||--o{ automations : schedules
+  profiles ||--o{ mcp_servers : adds
   organizations ||--o{ organization_memberships : has
-  organizations ||--o{ organization_invites : invites
   conversations ||--o{ messages : contains
+  conversations ||--o| build_projects : builds
   messages ||--o{ message_attachments : files
   assistant_projects ||--o{ conversations : context
+  automations }o--o| conversations : writes_to
 
-  profiles {
-    uuid id
-    text role
-    text full_name
-  }
   conversations {
     uuid id
     uuid user_id
     text mode
+    text share_token
   }
   messages {
     uuid id
     text role
     text content
+    jsonb build
+    tsvector search_tsv
   }
-  message_attachments {
+  user_memories {
     uuid id
-    text storage_path
+    text content
+  }
+  automations {
+    uuid id
+    text frequency
+    text time_of_day
+    text timezone
+    timestamptz next_run_at
+    timestamptz running_until
+  }
+  build_projects {
+    uuid conversation_id
+    jsonb files
+    text repo
+    text repo_branch
+  }
+  mcp_servers {
+    uuid id
+    text url
+    text auth_header_encrypted
   }
   connector_accounts {
     uuid id
     text provider
     text access_token_encrypted
-  }
-  usage_events {
-    text event_type
-    numeric estimated_cost_cents
   }
