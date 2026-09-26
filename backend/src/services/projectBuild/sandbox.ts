@@ -4,7 +4,9 @@ import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 
 export const PROJECT_DIR = "/home/user/app";
-const SANDBOX_TTL_MS = 30 * 60 * 1000;
+// E2B kills (never pauses) a sandbox when this expires, so nothing lingers there. Project files live
+// in our own database (build_projects.files); a sandbox only exists while a build or preview needs it.
+const SANDBOX_TTL_MS = 15 * 60 * 1000;
 const SNAPSHOT_MAX_FILES = 300;
 const SNAPSHOT_MAX_FILE_BYTES = 200_000;
 const SNAPSHOT_MAX_TOTAL_BYTES = 3_000_000;
@@ -86,6 +88,12 @@ export class BuildSandbox {
     return new BuildSandbox(sandbox, userId, conversationId, true);
   }
 
+  /** Destroys the sandbox for good (kill, not pause) and forgets it — the files stay in our database. */
+  async kill(): Promise<void> {
+    await this.sandbox.kill().catch(() => {});
+    await saveProject(this.userId, this.conversationId, { sandbox_id: null });
+  }
+
   private touch() {
     void this.sandbox.setTimeout(SANDBOX_TTL_MS).catch(() => {});
   }
@@ -116,6 +124,33 @@ export class BuildSandbox {
     }
   }
 
+  /**
+   * Vite rejects Host headers it doesn't know ("Blocked request. This host is not allowed"), and the
+   * preview is served from a random *.e2b.app host per sandbox. Env vars alone proved unreliable, so
+   * patch the project's vite config to set server/preview.allowedHosts = true before every start.
+   */
+  private async allowPreviewHosts(): Promise<void> {
+    for (const name of ["vite.config.ts", "vite.config.js", "vite.config.mjs", "vite.config.mts"]) {
+      const path = `${PROJECT_DIR}/${name}`;
+      const src = await this.sandbox.files.read(path).catch(() => null);
+      if (src == null) continue;
+      let out = src;
+      for (const key of ["server", "preview"]) {
+        if (new RegExp(`\\b${key}\\s*:\\s*\\{[^}]*allowedHosts\\s*:`).test(out)) {
+          out = out.replace(new RegExp(`(\\b${key}\\s*:\\s*\\{[^}]*?allowedHosts\\s*:\\s*)(\\[[^\\]]*\\]|[^,}\\n]+)`), "$1true");
+        } else if (new RegExp(`\\b${key}\\s*:\\s*\\{`).test(out)) {
+          out = out.replace(new RegExp(`(\\b${key}\\s*:\\s*\\{)`), "$1 allowedHosts: true,");
+        } else if (/defineConfig\(\s*\{/.test(out)) {
+          out = out.replace(/defineConfig\(\s*\{/, `defineConfig({ ${key}: { allowedHosts: true },`);
+        } else if (/export\s+default\s*\{/.test(out)) {
+          out = out.replace(/export\s+default\s*\{/, `export default { ${key}: { allowedHosts: true },`);
+        }
+      }
+      if (out !== src) await this.sandbox.files.write(path, out);
+      return;
+    }
+  }
+
   /** Starts a long-running server in the background and waits until it answers on `port`. */
   async start(cmd: string, port: number): Promise<{ ready: boolean; url: string | null; log: string }> {
     this.touch();
@@ -127,6 +162,7 @@ export class BuildSandbox {
     await this.sandbox.commands
       .run(`test -f ${pidFile} && kill -TERM -$(cat ${pidFile}) 2>/dev/null; sleep 0.5; fuser -k ${port}/tcp >/dev/null 2>&1; true`)
       .catch(() => {});
+    await this.allowPreviewHosts().catch(() => {});
     const script = `echo $$ > ${pidFile}; cd ${PROJECT_DIR} && exec bash -lc ${JSON.stringify(cmd)} > ${logFile} 2>&1`;
     await this.sandbox.commands.run(`setsid bash -c ${JSON.stringify(script)}`, {
       background: true,

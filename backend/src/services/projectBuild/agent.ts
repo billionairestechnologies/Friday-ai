@@ -524,6 +524,10 @@ export async function runBuildAgent(opts: {
     console.error("[build] snapshot failed:", err instanceof Error ? err.message : err);
   }
 
+  // Nothing left running to preview → destroy the sandbox now. The files are safe in our database;
+  // a sandbox that IS serving a preview expires (is killed, not paused) on its own TTL.
+  if (!last.start) await box.kill();
+
   build.elapsedMs = Date.now() - started;
   return { text: visibleText, build, usage, candidate: usedCandidate };
 }
