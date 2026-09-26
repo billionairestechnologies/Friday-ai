@@ -209,6 +209,13 @@ export function trimHistoryToBudget(history: ChatMessage[]): ChatMessage[] {
   return history.slice(cutoff);
 }
 
+/** Models don't know today's date; without it "latest"/"this year"/"how old is" answers silently use their training cutoff. */
+export function currentDateSystemPrompt(now: Date = new Date()): string {
+  const date = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+  const time = now.toISOString().slice(11, 16);
+  return `Current date: ${date} (${time} UTC). Use it for anything time-relative; your training data may be older than this.`;
+}
+
 /** Prepends web search results, a persona/behavior instruction, and/or the Think/Canvas/attachment nudges, in that order. */
 export function withSystemPreamble(
   history: ChatMessage[],
@@ -220,6 +227,7 @@ export function withSystemPreamble(
   hasAttachments: boolean = false,
 ): ChatMessage[] {
   const preamble: ChatMessage[] = [
+    { role: "system", content: currentDateSystemPrompt() },
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
     { role: "system", content: HONESTY_SYSTEM_PROMPT },
     { role: "system", content: EXECUTION_HONESTY_SYSTEM_PROMPT },

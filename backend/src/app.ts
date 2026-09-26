@@ -16,6 +16,7 @@ import { chatRouter } from "./routes/chat.js";
 import { pushRouter } from "./routes/push.js";
 import { libraryRouter } from "./routes/library.js";
 import { memoryRouter } from "./routes/memory.js";
+import { automationsRouter } from "./routes/automations.js";
 import { buildRouter } from "./routes/build.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
@@ -77,6 +78,7 @@ export function createApp() {
   app.use("/api/push", pushRouter);
   app.use("/api/library", libraryRouter);
   app.use("/api/memory", memoryRouter);
+  app.use("/api/automations", automationsRouter);
   app.use("/api/build", buildRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/sandbox", sandboxRouter);
