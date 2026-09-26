@@ -64,7 +64,9 @@ enum ArtifactDetect {
             return DetectedArtifact(kind: .runnable(language: b.lang), language: b.lang, code: b.body, complete: b.complete)
         }
         // Everything else (css, go, sql, php, json, unlabeled…) has nothing to execute — show it as code.
-        let first = blocks.first(where: { $0.lang == "css" }) ?? blocks[0]
+        // Diagrams and copy-paste text stay in the chat bubble (own diagram / copy-box rendering).
+        let chatOnly: Set<String> = ["mermaid", "text", "plaintext", "txt", "markdown", "md"]
+        guard let first = blocks.first(where: { $0.lang == "css" }) ?? blocks.first(where: { !chatOnly.contains($0.lang) }) else { return nil }
         if first.lang != "css" && text.count <= 120 { return nil }
         return DetectedArtifact(kind: .code, language: first.lang.isEmpty ? "text" : first.lang, code: first.body, complete: first.complete)
     }

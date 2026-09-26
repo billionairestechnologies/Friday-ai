@@ -44,6 +44,8 @@ function looksLikeReactComponent(body: string): boolean {
   return hasJsxTag || hasReactApi;
 }
 
+const CHAT_ONLY_LANGS = new Set(["mermaid", "text", "plaintext", "txt", "markdown", "md"]);
+
 export function extractArtifact(content: string): Artifact | null {
   const text = content.trim();
   if (!text) return null;
@@ -80,11 +82,14 @@ export function extractArtifact(content: string): Artifact | null {
       title: code[1] ? `${code[1]} canvas` : "Canvas",
     };
   }
-  if (blocks[0]?.[2]?.trim() && text.length > 120) {
+  // Diagrams and copy-paste text (emails, prompts, templates) belong in the chat bubble — they have
+  // their own diagram / copy-box rendering there — so they never become a Canvas artifact.
+  const first = blocks.find((b) => !CHAT_ONLY_LANGS.has((b[1] ?? "").toLowerCase()));
+  if (first?.[2]?.trim() && text.length > 120) {
     return {
       kind: "code",
-      body: blocks[0][2].trim(),
-      lang: blocks[0][1],
+      body: first[2].trim(),
+      lang: first[1],
       title: "Canvas",
     };
   }

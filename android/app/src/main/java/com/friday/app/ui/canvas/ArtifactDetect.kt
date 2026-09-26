@@ -73,7 +73,9 @@ fun detectArtifact(content: String): DetectedArtifact? {
         return DetectedArtifact(ArtifactKind.Runnable, it.lang, it.body, it.complete)
     }
     // Everything else (css, go, sql, php, json, unlabeled…) has nothing to execute — show it as code.
-    val first = blocks.firstOrNull { it.lang == "css" } ?: blocks.first()
+    // Diagrams and copy-paste text stay in the chat bubble (own diagram / copy-box rendering).
+    val chatOnly = setOf("mermaid", "text", "plaintext", "txt", "markdown", "md")
+    val first = blocks.firstOrNull { it.lang == "css" } ?: blocks.firstOrNull { it.lang !in chatOnly } ?: return null
     if (first.lang != "css" && content.length <= 120) return null
     return DetectedArtifact(ArtifactKind.Code, first.lang.ifBlank { "text" }, first.body, first.complete)
 }
