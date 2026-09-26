@@ -12,7 +12,7 @@ import {
 } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
 import { searchWeb } from "../webSearch.js";
-import { recordTokenUsage, recordUsageEvent } from "../usageService.js";
+import { recordAdminAuditLog, recordTokenUsage, recordUsageEvent } from "../usageService.js";
 import {
   emptyTokenUsage,
   estimateTokenUsageFromText,
@@ -130,6 +130,8 @@ async function tryGenerateOrEditImage(
     return null;
   }
 }
+
+const CONNECTOR_TOOL_PREFIX = /^(github|gmail|drive|calendar|notion|vercel|railway|supabase|razorpay|mcp)_/;
 
 /**
  * Streams a reply token-by-token via `onEvent`. Single/Auto stream one model's answer directly;
@@ -622,6 +624,11 @@ export async function streamMessage(
         lastError = toolRun.error;
         const webCalls = toolRun.toolNames.filter((name) => name === "web_search" || name === "fetch_url").length;
         if (webCalls > 0) void recordUsageEvent(userId, "web_search", webCalls, { viaTools: true });
+        // Audit trail for anything that touched the user's connected accounts (compliance / "what did Friday read?").
+        const connectorCalls = toolRun.toolNames.filter((name) => CONNECTOR_TOOL_PREFIX.test(name));
+        if (connectorCalls.length > 0) {
+          void recordAdminAuditLog(userId, "agent.connector_tools", "conversation", conversationId, { tools: connectorCalls }).catch(() => {});
+        }
       }
     }
 

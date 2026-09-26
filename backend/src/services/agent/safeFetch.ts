@@ -96,31 +96,60 @@ const guardedLookup: net.LookupFunction = (hostname, options, callback) => {
   });
 };
 
-export type SafeResponse = { url: string; status: number; contentType: string; body: Buffer; truncated: boolean };
+export type SafeResponse = {
+  url: string;
+  status: number;
+  contentType: string;
+  body: Buffer;
+  truncated: boolean;
+  headers: Record<string, string>;
+};
 
-function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: AbortSignal, extraHeaders: Record<string, string> = {}): Promise<SafeResponse & { location?: string }> {
+export type SafeFetchOptions = {
+  timeoutMs?: number;
+  maxBytes?: number;
+  signal?: AbortSignal;
+  headers?: Record<string, string>;
+  method?: "GET" | "POST";
+  body?: string;
+  /** Resolve early (and close the connection) once the body read so far satisfies this — for SSE
+   *  responses that may stay open after the message we need has arrived. */
+  stopWhen?: (bodySoFar: string) => boolean;
+};
+
+function flatHeaders(raw: http.IncomingHttpHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) if (v !== undefined) out[k.toLowerCase()] = Array.isArray(v) ? v.join(", ") : v;
+  return out;
+}
+
+function requestOnce(url: URL, opts: SafeFetchOptions): Promise<SafeResponse & { location?: string }> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
   return new Promise((resolve, reject) => {
     const mod = url.protocol === "https:" ? https : http;
     const req = mod.request(
       url,
       {
-        method: "GET",
+        method: opts.method ?? "GET",
         lookup: guardedLookup,
         timeout: timeoutMs,
-        signal,
+        signal: opts.signal,
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; FridayAI/1.0; +https://friday.ai)",
           Accept: "text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5",
           "Accept-Encoding": "gzip, deflate, br",
-          ...extraHeaders,
+          ...(opts.body !== undefined ? { "Content-Length": String(Buffer.byteLength(opts.body)) } : {}),
+          ...opts.headers,
         },
       },
       (res) => {
         const status = res.statusCode ?? 0;
         const location = res.headers.location;
+        const headers = flatHeaders(res.headers);
         if (status >= 300 && status < 400 && location) {
           res.resume();
-          resolve({ url: url.toString(), status, contentType: "", body: Buffer.alloc(0), truncated: false, location });
+          resolve({ url: url.toString(), status, contentType: "", body: Buffer.alloc(0), truncated: false, headers, location });
           return;
         }
         const encoding = String(res.headers["content-encoding"] ?? "").toLowerCase();
@@ -132,7 +161,7 @@ function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: Abo
         let size = 0;
         let truncated = false;
         stream.on("data", (chunk: Buffer) => {
-          if (truncated) return;
+          if (truncated || settled) return;
           size += chunk.length;
           if (size > maxBytes) {
             truncated = true;
@@ -142,6 +171,10 @@ function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: Abo
             return;
           }
           chunks.push(chunk);
+          if (opts.stopWhen?.(Buffer.concat(chunks).toString("utf8"))) {
+            finish();
+            res.destroy();
+          }
         });
         let settled = false;
         const finish = () => {
@@ -153,6 +186,7 @@ function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: Abo
             contentType: String(res.headers["content-type"] ?? ""),
             body: Buffer.concat(chunks),
             truncated,
+            headers,
           });
         };
         stream.on("end", finish);
@@ -161,18 +195,17 @@ function requestOnce(url: URL, timeoutMs: number, maxBytes: number, signal?: Abo
     );
     req.on("timeout", () => req.destroy(new Error("The page took too long to respond")));
     req.on("error", reject);
-    req.end();
+    req.end(opts.body);
   });
 }
 
-export async function safeFetch(
-  raw: string,
-  opts: { timeoutMs?: number; maxBytes?: number; signal?: AbortSignal; headers?: Record<string, string> } = {},
-): Promise<SafeResponse> {
+export async function safeFetch(raw: string, opts: SafeFetchOptions = {}): Promise<SafeResponse> {
   let url = assertFetchableUrl(raw);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await requestOnce(url, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, opts.maxBytes ?? DEFAULT_MAX_BYTES, opts.signal, opts.headers);
+    const res = await requestOnce(url, opts);
     if (!res.location) return res;
+    // A POST is never replayed across a redirect (its body/credentials were meant for this URL).
+    if (opts.method === "POST") return res;
     const next = assertFetchableUrl(new URL(res.location, url).toString());
     // Credentials never follow a redirect to a different host.
     if (opts.headers && next.host !== url.host) throw new BlockedUrlError("Refusing to follow a cross-host redirect with credentials");

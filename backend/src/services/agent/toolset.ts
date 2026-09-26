@@ -3,6 +3,7 @@ import { isTokenConnector } from "../tokenConnectors.js";
 import { codeTools } from "./tools/code.js";
 import { TOKEN_CONNECTOR_TOOLS } from "./tools/connectors.js";
 import { GITHUB_TOOLS } from "./tools/github.js";
+import { loadMcpTools } from "./mcpService.js";
 import { googleToolsForScopes } from "./tools/google.js";
 import { MEMORY_TOOLS } from "./tools/memory.js";
 import type { FridayTool } from "./tools/types.js";
@@ -18,6 +19,9 @@ export async function buildToolset(userId: string): Promise<FridayTool[]> {
   for (const provider of connected.keys()) {
     if (isTokenConnector(provider)) tools.push(...(TOKEN_CONNECTOR_TOOLS[provider] ?? []));
   }
+  // Tools from the user's own MCP servers; names never shadow a built-in tool.
+  const taken = new Set(tools.map((t) => t.spec.name));
+  tools.push(...(await loadMcpTools(userId).catch(() => [])).filter((t) => !taken.has(t.spec.name)));
   return tools;
 }
 
@@ -44,6 +48,7 @@ export function toolUsePrompt(tools: FridayTool[]): string {
     names.includes("railway_projects") ? "Railway" : null,
     names.includes("supabase_query") ? "Supabase" : null,
     names.includes("razorpay_payments") ? "Razorpay" : null,
+    names.some((n) => n.startsWith("mcp_")) ? "their own MCP servers (tools prefixed mcp_)" : null,
   ].filter(Boolean);
   return [
     "You have tools. Use them whenever they make the answer more accurate or current, instead of guessing — search the web " +

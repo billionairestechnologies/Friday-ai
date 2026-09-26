@@ -9,6 +9,7 @@ import {
   CreditCard,
   Lock,
   Palette,
+  Plug,
   Shield,
   SlidersHorizontal,
   Trash2,
@@ -57,6 +58,7 @@ const NAV = [
     group: "Data & Information",
     items: [
       { id: "memory", label: "Memory", icon: Brain },
+      { id: "mcp", label: "MCP servers", icon: Plug },
       { id: "data", label: "Data Controls", icon: Shield },
     ],
   },
@@ -133,6 +135,7 @@ export function SettingsModal() {
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
               {tab === "memory" && <MemoryPane />}
+              {tab === "mcp" && <McpPane />}
               {tab === "data" && <DataPane />}
             </div>
           </div>
@@ -877,6 +880,143 @@ function MemoryPane() {
               Clear all memories
             </button>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+type McpServer = { id: string; name: string; url: string; hasAuth: boolean; enabled: boolean; createdAt: string };
+
+/** Remote MCP servers (Model Context Protocol) whose tools Friday can use in chat. */
+function McpPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [servers, setServers] = useState<McpServer[] | null>(null);
+  const [form, setForm] = useState({ name: "", url: "", authorization: "" });
+  const [tools, setTools] = useState<Record<string, string[]>>({});
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ servers: McpServer[] }>("/mcp")
+      .then((r) => setServers(r.servers))
+      .catch((err) => setNotice(err instanceof Error ? err.message : "Couldn't load servers"));
+  }, [signedIn]);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await action();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () =>
+    run(async () => {
+      const res = await api.post<{ server: McpServer; tools: string[] }>("/mcp", {
+        name: form.name.trim(),
+        url: form.url.trim(),
+        ...(form.authorization.trim() ? { authorization: form.authorization.trim() } : {}),
+      });
+      setServers((s) => [...(s ?? []), res.server]);
+      setTools((t) => ({ ...t, [res.server.id]: res.tools }));
+      setForm({ name: "", url: "", authorization: "" });
+      setNotice(`Connected — ${res.tools.length} tool${res.tools.length === 1 ? "" : "s"} available in chat.`);
+    });
+  const toggle = (s: McpServer) =>
+    run(async () => {
+      const { server } = await api.patch<{ server: McpServer }>(`/mcp/${s.id}`, { enabled: !s.enabled });
+      setServers((list) => (list ?? []).map((x) => (x.id === s.id ? server : x)));
+    });
+  const remove = (s: McpServer) =>
+    run(async () => {
+      await api.delete(`/mcp/${s.id}`);
+      setServers((list) => (list ?? []).filter((x) => x.id !== s.id));
+    });
+  const inspect = (s: McpServer) =>
+    run(async () => {
+      const res = await api.get<{ tools: { name: string }[] }>(`/mcp/${s.id}/tools`);
+      setTools((t) => ({ ...t, [s.id]: res.tools.map((x) => x.name) }));
+    });
+
+  const input = "h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-foreground/40";
+  return (
+    <div>
+      <h2 className="mb-2 text-lg font-semibold">MCP servers</h2>
+      <p className="mb-4 text-sm text-muted">
+        Connect any remote <span className="font-medium text-foreground">Model Context Protocol</span> server (Streamable HTTP) and
+        Friday can use its tools in chat — Linear, Sentry, Stripe, your own internal tools, and more.
+      </p>
+      {!signedIn ? (
+        <p className="text-sm text-muted">Sign in to add MCP servers.</p>
+      ) : (
+        <>
+          {notice && <p className="mb-3 text-sm text-muted">{notice}</p>}
+          <form
+            className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void add();
+            }}
+          >
+            <input className={input} placeholder="Name (e.g. Linear)" maxLength={40} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className={input} placeholder="https://…/mcp" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+            <input
+              className={cn(input, "sm:col-span-2")}
+              placeholder="Authorization (optional) — token or “Bearer …”"
+              type="password"
+              value={form.authorization}
+              onChange={(e) => setForm({ ...form, authorization: e.target.value })}
+            />
+            <button
+              type="submit"
+              disabled={busy || !form.name.trim() || !form.url.trim()}
+              className="h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background disabled:opacity-40 sm:col-span-2 sm:justify-self-start"
+            >
+              {busy ? "Connecting…" : "Add server"}
+            </button>
+          </form>
+          {servers && servers.length === 0 && <p className="text-sm text-muted">No servers yet.</p>}
+          <ul className="flex flex-col gap-2">
+            {(servers ?? []).map((s) => (
+              <li key={s.id} className={cn("rounded-xl border border-border px-4 py-3 text-sm", !s.enabled && "opacity-60")}>
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{s.name}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {s.url}
+                      {s.hasAuth ? " · auth set" : ""}
+                    </span>
+                  </span>
+                  <button type="button" disabled={busy} onClick={() => void inspect(s)} className="rounded-full border border-border px-2.5 py-1 text-xs hover:bg-chip">
+                    Tools
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => void toggle(s)} className="rounded-full border border-border px-2.5 py-1 text-xs hover:bg-chip">
+                    {s.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(s)}
+                    aria-label="Remove server"
+                    className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-danger"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+                {tools[s.id] && (
+                  <p className="mt-2 text-xs text-muted">{tools[s.id]!.length ? tools[s.id]!.join(", ") : "This server exposes no tools."}</p>
+                )}
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </div>
