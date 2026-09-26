@@ -85,7 +85,7 @@
 <body>
   <header>
     <h1>Friday AI — what we built</h1>
-    <p class="meta">Leadership pack · branch <code>cursor/cloud-agent-1789643679414-qaev6</code> · PR #2 · folder <code>docs/diagrams/</code></p>
+    <p class="meta">Leadership pack · branch <code>claude/architecture-analysis-p7x2lr</code> · folder <code>docs/diagrams/</code></p>
     <p>Open this file in a browser. Download SVG or PNG under each diagram, or use Print → Save as PDF for the whole pack.</p>
     <p><button class="print" onclick="window.print()">Print / Save as PDF</button></p>
   </header>
@@ -93,9 +93,10 @@
     <section>
       <h2>Share with leadership</h2>
       <ul class="share">
-        <li><strong>Friday is now a full assistant platform:</strong> secure login, saved chats and files, teams, Razorpay billing, connectors, and usage/cost tracking.</li>
-        <li><strong>Users can:</strong> sign in, chat, attach files, use Search/Think/Canvas/voice, create Work/Developer projects, connect apps, pay, export or delete data.</li>
-        <li><strong>To go live:</strong> apply Supabase migrations 0001–0014, set production secrets, deploy, then check <code>/api/health/ready</code>.</li>
+        <li><strong>Friday is now an agent platform:</strong> models use real tools — web search and page reading, code execution, the user's GitHub/Gmail/Drive/Calendar/Notion/Vercel/Railway/Supabase/Razorpay, and any MCP server.</li>
+        <li><strong>Coding agent:</strong> Build Mode plans, edits, searches code, imports a GitHub repo and opens a pull request.</li>
+        <li><strong>New for users:</strong> long-term memory, Deep Research reports, scheduled Automations with push, search across all chats, shareable chat links.</li>
+        <li><strong>To go live:</strong> apply Supabase migrations 0001–0027, set production secrets, deploy, then check <code>/api/health/ready</code>.</li>
       </ul>
     </section>
 
@@ -109,47 +110,67 @@
 flowchart TB
   subgraph clients [Clients]
     Browser[Web app - React Vite]
+    Android[Android - Kotlin Compose]
+    IOS[iOS - SwiftUI]
+    Public[Public share page /share/token]
   end
+
   subgraph api [Friday API - Express TypeScript]
-    MW[Helmet CORS request ID rate limits]
-    AuthR["/api/auth"]
-    ChatR["/api/chat SSE"]
-    BillR["/api/billing"]
-    ConnR["/api/connectors"]
-    OrgR["/api/organizations"]
-    UseR["/api/usage /projects /voice /sandbox"]
-    Health["/api/health live+ready"]
+    MW[Helmet CORS request ID rate limits quota]
+    AuthR[&quot;/api/auth&quot;]
+    ChatR[&quot;/api/chat SSE + search + share&quot;]
+    Agent[Agent tool loop - native tool calling]
+    BuildR[&quot;/api/build - Build Mode coding agent&quot;]
+    AutoR[&quot;/api/automations + scheduler&quot;]
+    MemR[&quot;/api/memory&quot;]
+    McpR[&quot;/api/mcp&quot;]
+    BillR[&quot;/api/billing&quot;]
+    ConnR[&quot;/api/connectors&quot;]
+    OrgR[&quot;/api/organizations /usage /projects /voice&quot;]
+    Health[&quot;/api/health live+ready&quot;]
   end
+
   subgraph data [Data plane]
-    SB[(Supabase Postgres + Auth)]
-    Store[Supabase Storage]
+    SB[(Supabase Postgres + Auth + Realtime)]
+    Store[Supabase Storage attachments]
     Redis[(Redis optional)]
   end
-  subgraph vendors [External vendors]
-    Models[AI model providers]
-    Pay[Razorpay]
+
+  subgraph vendors [External services]
+    Models[OpenAI Anthropic Gemini OpenRouter ScaleMax Sarvam Ollama]
+    E2B[E2B sandboxes - code + builds]
+    Web[Web search + page fetch - SSRF guarded]
+    GH[GitHub]
+    G[Google Gmail Drive Calendar]
+    Other[Notion Vercel Railway Supabase Razorpay]
+    MCP[User MCP servers]
+    Pay[Razorpay billing]
     Mail[Resend OTP email]
-    Apps[GitHub Google Notion Vercel ...]
   end
-  Browser --> MW
-  MW --> AuthR
-  MW --> ChatR
-  MW --> BillR
-  MW --> ConnR
-  MW --> OrgR
-  MW --> UseR
-  MW --> Health
-  AuthR --> SB
-  AuthR --> Mail
-  ChatR --> SB
-  ChatR --> Store
-  ChatR --> Models
-  BillR --> Pay
-  ConnR --> Apps
-  OrgR --> SB
-  UseR --> SB
-  Health --> SB
-  MW -.-> Redis
+
+  Browser --&gt; MW
+  Android --&gt; MW
+  IOS --&gt; MW
+  Public --&gt; ChatR
+  MW --&gt; AuthR &amp; ChatR &amp; BuildR &amp; AutoR &amp; MemR &amp; McpR &amp; BillR &amp; ConnR &amp; OrgR &amp; Health
+  ChatR --&gt; Agent
+  AutoR --&gt; ChatR
+  Agent --&gt; Models
+  Agent --&gt; Web
+  Agent --&gt; E2B
+  Agent --&gt; GH &amp; G &amp; Other &amp; MCP
+  BuildR --&gt; E2B
+  BuildR --&gt; GH
+  ChatR --&gt; SB
+  ChatR --&gt; Store
+  AuthR --&gt; SB
+  AuthR --&gt; Mail
+  BillR --&gt; Pay
+  ConnR --&gt; SB
+  MemR --&gt; SB
+  AutoR --&gt; SB
+  Health --&gt; SB
+  MW -.-&gt; Redis
       </pre>
       <div class="diagram" id="render-01"></div>
     </section>
@@ -163,26 +184,41 @@ flowchart TB
       <pre class="mermaid-src" data-id="02">
 mindmap
   root((Friday AI can now))
-    Secure access
-      Email plus OTP
-      Google sign-in
-      Company SSO button
-    Conversations
-      Streamed chat
-      Think Search Canvas
-      Voice and sandbox
+    Agent
+      Native tool calling
+      Web search and full page reading
+      Run code in a sandbox
+      Deep Research cited reports
+      MCP server tools
+    Your data
+      GitHub repos files issues
+      Gmail Drive Calendar
+      Notion Vercel Railway
+      Supabase Razorpay
+    Coding agent
+      Plan and live checklist
+      Exact file edits
+      Grep and list files
+      Import a GitHub repo
+      Open a pull request
+      Browser screenshot QA
     Memory
-      History files export delete
-    Work modes
-      Personal Work Developer
-    Teams and money
-      Orgs invites budgets
-      Razorpay and usage cost
-    Connectors
-      GitHub Google Notion
-      Supabase Railway Vercel
-    Operations
-      Rate limits Redis health CI
+      Long-term user memory
+      Search all chats
+      Project instructions pinned
+    Automations
+      Hourly daily weekly runs
+      Push notifications
+    Conversations
+      Single Auto Team Up
+      Canvas and Mermaid
+      Voice in and out
+      Share read-only links
+    Business
+      Teams roles budgets
+      Token quota incl Team Up
+      Razorpay checkout
+      Audit log of connector use
       </pre>
       <div class="diagram" id="render-02"></div>
     </section>
@@ -195,30 +231,39 @@ mindmap
       </div>
       <pre class="mermaid-src" data-id="03">
 flowchart TB
-  Guest[Visitor] --> SignIn{Sign in}
-  SignIn --> Email[Email + OTP]
-  SignIn --> Google[Google]
-  SignIn --> SSO[Company SSO]
-  Email --> User[Signed-in user]
-  Google --> User
-  SSO --> User
-  User --> Chat[Chat with Friday]
-  User --> Files[Attach files]
-  User --> Tools[Search Think Canvas]
-  User --> Voice[Voice mode]
-  User --> Projects[Work or Developer project]
-  User --> Plugins[Connect apps]
-  User --> Settings[Settings]
-  User --> Team[Team org invite budget]
-  User --> Pay[Pay via Razorpay]
-  User --> Data[Download or delete data]
-  User --> Usage[See usage and cost]
+  Guest[Visitor] --&gt; SignIn{Sign in}
+  SignIn --&gt; Email[Email + OTP]
+  SignIn --&gt; Google[Google]
+  SignIn --&gt; SSO[Company SSO]
+  Email --&gt; User[Signed-in user]
+  Google --&gt; User
+  SSO --&gt; User
+
+  User --&gt; Chat[Chat with Friday]
+  User --&gt; Files[Attach files]
+  User --&gt; Tools[Toggle Search Think Canvas]
+  User --&gt; Voice[Voice mode]
+  User --&gt; Projects[Create Work or Developer project]
+  User --&gt; Plugins[Connect GitHub Google Notion etc]
+  User --&gt; Settings[Settings]
+  User --&gt; Team[Team org invite budget]
+  User --&gt; Pay[Pay Pro or Business via Razorpay]
+  User --&gt; Data[Download or delete my data]
+  User --&gt; Usage[See usage and estimated cost]
+
+  Settings --&gt; Account[Account profile]
+  Settings --&gt; Appearance[Appearance]
+  Settings --&gt; VoiceSet[Voice picker]
+  Settings --&gt; Billing[Billing]
+  Settings --&gt; Data
+  Settings --&gt; Team
+  Settings --&gt; Usage
       </pre>
       <div class="diagram" id="render-03"></div>
     </section>
 
     <section>
-      <h2>4. How chat works</h2>
+      <h2>4. How chat works (agent loop)</h2>
       <div class="actions">
         <button onclick="downloadSvg('04','04-how-chat-works.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('04','04-how-chat-works.png')">Download PNG</button>
@@ -226,18 +271,33 @@ flowchart TB
       <pre class="mermaid-src" data-id="04">
 sequenceDiagram
   actor U as User
-  participant FE as Web app
+  participant FE as App
   participant API as Friday API
   participant DB as Supabase
   participant M as AI model
-  U->>FE: Message and files
-  FE->>API: POST /api/chat with JWT
-  API->>DB: Save user message
-  API->>M: Stream prompt
-  M-->>API: Tokens plus usage
-  API->>DB: Save reply and cost
-  API-->>FE: Live SSE
-  FE-->>U: Answer appears live
+  participant T as Tools
+
+  U-&gt;&gt;FE: Message (+ files, Search / Deep Research)
+  FE-&gt;&gt;API: POST /api/chat/.../stream with JWT
+  API-&gt;&gt;API: Rate limit + token quota reservation
+  API-&gt;&gt;DB: Save message, load history + memory + project
+  API-&gt;&gt;API: Intent probes (search / build / image) in parallel
+  alt Build request
+    API-&gt;&gt;API: Build Mode coding agent (see diagram 12)
+  else Model supports tools
+    loop up to 8 rounds (16 for Deep Research)
+      API-&gt;&gt;M: Stream turn with tool list
+      M--&gt;&gt;API: Text and/or tool calls
+      API-&gt;&gt;T: Run tools in parallel (web, code, GitHub, Gmail, MCP...)
+      T--&gt;&gt;API: Results (treated as untrusted data)
+      API--&gt;&gt;FE: SSE text + step rows + citations
+    end
+  else No tool support
+    API-&gt;&gt;M: Plain streaming with failover + hedging
+    M--&gt;&gt;API: Tokens
+  end
+  API-&gt;&gt;DB: Save reply, steps, citations, token usage
+  API--&gt;&gt;FE: done
       </pre>
       <div class="diagram" id="render-04"></div>
     </section>
@@ -249,14 +309,34 @@ sequenceDiagram
         <button class="secondary" onclick="downloadPng('05','05-how-login-works.png')">Download PNG</button>
       </div>
       <pre class="mermaid-src" data-id="05">
-flowchart LR
-  A[Email + password] --> B[6-digit OTP email]
-  B --> C[Session JWT]
-  D[Google OAuth] --> E[Create or reuse user]
-  E --> C
-  F[Company SSO button] --> G[Supabase IdP URL]
-  G --> C
-  C --> H[Chat Settings Billing Connectors]
+sequenceDiagram
+  actor U as User
+  participant FE as Login dialog
+  participant API as /api/auth
+  participant Mail as Resend
+  participant G as Google
+  participant DB as Supabase Auth
+
+  alt Email and password
+    U-&gt;&gt;FE: Email + password
+    FE-&gt;&gt;API: POST /login
+    API-&gt;&gt;DB: Check password
+    API-&gt;&gt;Mail: Send 6-digit OTP
+    U-&gt;&gt;FE: Enter OTP
+    FE-&gt;&gt;API: POST /verify-otp
+    API--&gt;&gt;FE: Session JWT
+  else Google
+    U-&gt;&gt;FE: Continue with Google
+    FE-&gt;&gt;API: GET /auth/google/start
+    API-&gt;&gt;G: OAuth consent
+    G--&gt;&gt;API: Code
+    API-&gt;&gt;DB: Create or reuse user
+    API--&gt;&gt;FE: Hash friday_session
+    FE-&gt;&gt;FE: Store JWT locally
+  else Company SSO
+    U-&gt;&gt;FE: Continue with Company SSO
+    FE-&gt;&gt;SSO: SSO_ENTRY_URL
+  end
       </pre>
       <div class="diagram" id="render-05"></div>
     </section>
@@ -271,35 +351,63 @@ flowchart LR
 sequenceDiagram
   actor U as User
   participant FE as Settings Billing
-  participant API as Friday API
+  participant API as /api/billing
   participant RZ as Razorpay
-  U->>FE: Pay Pro or Business
-  FE->>API: Create order
-  API->>RZ: Create order
-  API-->>FE: orderId
-  FE->>RZ: Checkout
-  U->>RZ: Pay
-  RZ-->>API: Signed webhook
-  API->>API: Verify signature
-  API-->>FE: Plan paid
+  participant DB as billing_orders
+
+  U-&gt;&gt;FE: Choose Pro or Business
+  FE-&gt;&gt;API: POST /billing/orders
+  API-&gt;&gt;RZ: Create order
+  RZ--&gt;&gt;API: order_id
+  API-&gt;&gt;DB: Save created order
+  API--&gt;&gt;FE: key and orderId
+  FE-&gt;&gt;RZ: Open Checkout
+  U-&gt;&gt;RZ: Pay
+  RZ--&gt;&gt;API: Webhook with signature
+  API-&gt;&gt;API: Verify HMAC
+  API-&gt;&gt;DB: Mark paid and update plan
       </pre>
       <div class="diagram" id="render-06"></div>
     </section>
 
     <section>
-      <h2>7. How connectors work</h2>
+      <h2>7. How connectors and MCP tools work</h2>
       <div class="actions">
         <button onclick="downloadSvg('07','07-how-connectors-work.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('07','07-how-connectors-work.png')">Download PNG</button>
       </div>
       <pre class="mermaid-src" data-id="07">
 flowchart LR
-  User[Signed-in user] --> Drawer[Plugins]
-  Drawer --> OAuth[GitHub and Google OAuth]
-  Drawer --> Token[Notion Supabase Railway Vercel Razorpay Box Canva Finance]
-  OAuth --> API[API verifies then encrypts]
-  Token --> API
-  API --> DB[(connector_accounts)]
+  subgraph oauth [OAuth connectors]
+    GH[GitHub]
+    GG[Google Gmail Drive Calendar - token auto-refresh]
+  end
+
+  subgraph token [Token connectors - verified then encrypted]
+    N[Notion]
+    S[Supabase]
+    R[Railway]
+    V[Vercel]
+    RZ[Razorpay keys]
+    B[Box Canva Finance]
+  end
+
+  subgraph mcp [MCP servers]
+    M[Any remote MCP server - https + optional auth]
+  end
+
+  User[Signed-in user] --&gt; Drawer[Plugins drawer / Settings]
+  Drawer --&gt; oauth &amp; token &amp; mcp
+  oauth --&gt; API[Friday API encrypts secrets]
+  token --&gt; API
+  mcp --&gt; API
+  API --&gt; DB[(connector_accounts / mcp_servers)]
+  API --&gt; Tools[Agent tools in chat]
+  Tools --&gt; T1[github_* read files, search code, issues]
+  Tools --&gt; T2[gmail_* drive_* calendar_events]
+  Tools --&gt; T3[notion_* vercel_deployments railway_projects supabase_query razorpay_payments]
+  Tools --&gt; T4[mcp_server_tool]
+  Tools --&gt; Audit[(admin_audit_logs)]
       </pre>
       <div class="diagram" id="render-07"></div>
     </section>
@@ -315,9 +423,58 @@ erDiagram
   profiles ||--o{ conversations : owns
   profiles ||--o{ organization_memberships : joins
   profiles ||--o{ connector_accounts : connects
+  profiles ||--o{ usage_events : meters
+  profiles ||--o{ user_memories : remembers
+  profiles ||--o{ automations : schedules
+  profiles ||--o{ mcp_servers : adds
   organizations ||--o{ organization_memberships : has
   conversations ||--o{ messages : contains
+  conversations ||--o| build_projects : builds
   messages ||--o{ message_attachments : files
+  assistant_projects ||--o{ conversations : context
+  automations }o--o| conversations : writes_to
+
+  conversations {
+    uuid id
+    uuid user_id
+    text mode
+    text share_token
+  }
+  messages {
+    uuid id
+    text role
+    text content
+    jsonb build
+    tsvector search_tsv
+  }
+  user_memories {
+    uuid id
+    text content
+  }
+  automations {
+    uuid id
+    text frequency
+    text time_of_day
+    text timezone
+    timestamptz next_run_at
+    timestamptz running_until
+  }
+  build_projects {
+    uuid conversation_id
+    jsonb files
+    text repo
+    text repo_branch
+  }
+  mcp_servers {
+    uuid id
+    text url
+    text auth_header_encrypted
+  }
+  connector_accounts {
+    uuid id
+    text provider
+    text access_token_encrypted
+  }
       </pre>
       <div class="diagram" id="render-08"></div>
     </section>
@@ -330,12 +487,28 @@ erDiagram
       </div>
       <pre class="mermaid-src" data-id="09">
 flowchart LR
-  Email[Email OTP] --> Users[Supabase users]
-  Google[Google] --> Users
-  SSO[Company SSO] --> Users
-  Users --> JWT[JWT]
-  JWT --> Profile[profiles]
-  Profile --> Orgs[organizations]
+  subgraph login [Sign-in options]
+    Email[Email + password then OTP]
+    Google[Google OAuth]
+    SSO[Company SSO button]
+  end
+
+  subgraph supabaseAuth [Supabase Auth]
+    Users[auth.users]
+    JWT[Access and refresh JWT]
+  end
+
+  subgraph app [App]
+    Profile[profiles role user or admin]
+    Orgs[organizations and memberships]
+  end
+
+  Email --&gt; Users
+  Google --&gt; Users
+  SSO --&gt; Users
+  Users --&gt; JWT
+  JWT --&gt; Profile
+  Profile --&gt; Orgs
       </pre>
       <div class="diagram" id="render-09"></div>
     </section>
@@ -348,17 +521,149 @@ flowchart LR
       </div>
       <pre class="mermaid-src" data-id="10">
 flowchart TD
-  A[Create Supabase project] --> B[Apply migrations 0001 to 0014]
-  B --> C[Set required env secrets]
-  C --> D[Deploy API plus frontend]
-  D --> E[Check /api/health/ready]
-  E --> F{Ready?}
-  F -->|No| C
-  F -->|Yes| G[Smoke test signup OTP chat file]
-  G --> H[Optional Google GitHub Razorpay SSO]
-  H --> I[Production live]
+  A[Create Supabase project] --&gt; B[Apply migrations 0001 to 0027 in order]
+  B --&gt; C[Set env secrets - Supabase, KEY_ENCRYPTION_SECRET, Resend]
+  C --&gt; C2[Optional: E2B, Google, GitHub, Razorpay, TinyFish, Redis]
+  C2 --&gt; D[Deploy API plus frontend - one Docker image]
+  D --&gt; E[Check /api/health/ready]
+  E --&gt; F{Ready?}
+  F --&gt;|No| C
+  F --&gt;|Yes| G[Smoke test: signup OTP, chat, tool call, file]
+  G --&gt; H[Smoke test: memory, automation run now, share link, MCP add]
+  H --&gt; I[Build Mode: small app + GitHub import PR]
+  I --&gt; J[Production live]
       </pre>
       <div class="diagram" id="render-10"></div>
+    </section>
+
+    <section>
+      <h2>11. Agent tool loop</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('11','11-agent-tool-loop.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('11','11-agent-tool-loop.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="11">
+flowchart TD
+  In[User turn] --&gt; Pre[History + memory + project + current date + tool guidance]
+  Pre --&gt; Pick{First candidate model supports tools?}
+  Pick --&gt;|No| Plain[Plain streaming with failover + hedging]
+  Pick --&gt;|Yes| Round[Stream a model turn with the toolset]
+  Round --&gt; Calls{Tool calls?}
+  Calls --&gt;|No| Done[Save reply, steps, citations, usage]
+  Calls --&gt;|Yes| Run[Run tools in parallel, 45s timeout each]
+  Run --&gt; Feed[Append results as untrusted tool messages]
+  Feed --&gt; Compact[Compact old results beyond 180k chars]
+  Compact --&gt; Last{Last round?}
+  Last --&gt;|No| Round
+  Last --&gt;|Yes| Force[tool_choice none: force final answer]
+  Force --&gt; Done
+  Round -. model rejects tools before any output .-&gt; Plain
+  Plain --&gt; Done
+
+  subgraph Toolset
+    W[web_search / fetch_url - SSRF guarded]
+    X[run_code - E2B]
+    Mem[remember / forget]
+    Con[GitHub Google Notion Vercel Railway Supabase Razorpay]
+    Mc[MCP server tools]
+  end
+  Run --- Toolset
+      </pre>
+      <div class="diagram" id="render-11"></div>
+    </section>
+
+    <section>
+      <h2>12. Build Mode coding agent + GitHub PRs</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('12','12-build-mode-coding-agent.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('12','12-build-mode-coding-agent.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="12">
+sequenceDiagram
+  actor U as User
+  participant API as Friday API
+  participant M as AI model
+  participant SB as E2B sandbox
+  participant GH as GitHub
+
+  U-&gt;&gt;API: &quot;Fix the login bug in github.com/acme/app&quot;
+  API-&gt;&gt;SB: Open sandbox (restore snapshot if expired)
+  API-&gt;&gt;SB: git clone (token as one-off header, redacted)
+  API-&gt;&gt;API: Read AGENTS.md / FRIDAY.md / CLAUDE.md
+  API-&gt;&gt;M: Plan: architecture + todo checklist
+  loop up to 45 iterations / 18 min
+    M--&gt;&gt;API: friday-ls / grep / read / edit / write / run / start
+    API-&gt;&gt;SB: Execute action
+    SB--&gt;&gt;API: Output, errors, server logs
+    API--&gt;&gt;U: Live steps + checklist progress
+  end
+  API-&gt;&gt;SB: Probe app + browser screenshot
+  API-&gt;&gt;M: Vision review of the page
+  U-&gt;&gt;API: &quot;Open a PR&quot;
+  M--&gt;&gt;API: friday-pr title branch body
+  API-&gt;&gt;SB: Fresh clone of base, overlay changes, commit, push
+  API-&gt;&gt;GH: Create pull request
+  API--&gt;&gt;U: View pull request link
+      </pre>
+      <div class="diagram" id="render-12"></div>
+    </section>
+
+    <section>
+      <h2>13. Automations scheduler</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('13','13-automations.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('13','13-automations.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="13">
+flowchart LR
+  User[User] --&gt; Page[Automations page]
+  Page --&gt; Api[&quot;/api/automations&quot;]
+  Api --&gt; T[(automations table)]
+  subgraph Every API instance
+    Tick[Scheduler tick every 60s] --&gt; Due[Select due rows]
+    Due --&gt; Claim[Atomic lease UPDATE running_until]
+  end
+  T --&gt; Due
+  Claim --&gt;|won the lease| Quota{Token quota OK?}
+  Quota --&gt;|No| Fail[Record error, reschedule]
+  Quota --&gt;|Yes| Chat[Normal chat pipeline with tools + memory]
+  Chat --&gt; Conv[(Automation&#x27;s own chat thread)]
+  Chat --&gt; Push[Push notification]
+  Chat --&gt; Next[Compute next run in user time zone - DST safe]
+  Next --&gt; T
+  Fail --&gt; T
+      </pre>
+      <div class="diagram" id="render-13"></div>
+    </section>
+
+    <section>
+      <h2>14. MCP servers</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('14','14-mcp-servers.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('14','14-mcp-servers.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="14">
+sequenceDiagram
+  actor U as User
+  participant API as Friday API
+  participant S as MCP server
+  participant M as AI model
+
+  U-&gt;&gt;API: Settings: add name + https URL + auth
+  API-&gt;&gt;S: initialize → Mcp-Session-Id
+  API-&gt;&gt;S: tools/list
+  S--&gt;&gt;API: Tools + JSON schemas
+  API-&gt;&gt;API: Save (auth encrypted), sanitize schemas
+  U-&gt;&gt;API: Chat message
+  API-&gt;&gt;M: Tools incl. mcp_server_tool
+  M--&gt;&gt;API: Call mcp_server_tool(args)
+  API-&gt;&gt;S: tools/call (SSRF guarded POST, JSON or SSE reply)
+  S--&gt;&gt;API: content / isError
+  API-&gt;&gt;M: Result as untrusted data
+  M--&gt;&gt;U: Answer
+  API-&gt;&gt;API: Audit log entry
+      </pre>
+      <div class="diagram" id="render-14"></div>
     </section>
   </main>
 </body>

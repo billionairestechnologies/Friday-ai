@@ -29,6 +29,14 @@ Production must set:
 - `PUBLIC_APP_URL` / `PUBLIC_API_URL` for OAuth redirects
 - Razorpay + GitHub connector secrets when those features are enabled
 
+Optional:
+
+- `E2B_API_KEY` — Build Mode sandboxes and the chat `run_code` tool
+- `TINYFISH_API_KEY` — primary web search (DuckDuckGo is the fallback)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google login + connector (also refreshes connector tokens)
+- `FRIDAY_DISABLE_TOOLS=1` — kill switch: chat skips the agent tool loop (plain streaming)
+- `FRIDAY_DISABLE_AUTOMATIONS=1` — stop the in-process automation scheduler on this instance
+
 Optional provider keys are managed through the admin panel. Missing provider keys should degrade
 model availability, not process startup.
 

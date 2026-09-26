@@ -1,0 +1,25 @@
+sequenceDiagram
+  actor U as User
+  participant API as Friday API
+  participant M as AI model
+  participant SB as E2B sandbox
+  participant GH as GitHub
+
+  U->>API: "Fix the login bug in github.com/acme/app"
+  API->>SB: Open sandbox (restore snapshot if expired)
+  API->>SB: git clone (token as one-off header, redacted)
+  API->>API: Read AGENTS.md / FRIDAY.md / CLAUDE.md
+  API->>M: Plan: architecture + todo checklist
+  loop up to 45 iterations / 18 min
+    M-->>API: friday-ls / grep / read / edit / write / run / start
+    API->>SB: Execute action
+    SB-->>API: Output, errors, server logs
+    API-->>U: Live steps + checklist progress
+  end
+  API->>SB: Probe app + browser screenshot
+  API->>M: Vision review of the page
+  U->>API: "Open a PR"
+  M-->>API: friday-pr title branch body
+  API->>SB: Fresh clone of base, overlay changes, commit, push
+  API->>GH: Create pull request
+  API-->>U: View pull request link

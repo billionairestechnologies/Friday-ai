@@ -1,0 +1,19 @@
+sequenceDiagram
+  actor U as User
+  participant API as Friday API
+  participant S as MCP server
+  participant M as AI model
+
+  U->>API: Settings: add name + https URL + auth
+  API->>S: initialize → Mcp-Session-Id
+  API->>S: tools/list
+  S-->>API: Tools + JSON schemas
+  API->>API: Save (auth encrypted), sanitize schemas
+  U->>API: Chat message
+  API->>M: Tools incl. mcp_server_tool
+  M-->>API: Call mcp_server_tool(args)
+  API->>S: tools/call (SSRF guarded POST, JSON or SSE reply)
+  S-->>API: content / isError
+  API->>M: Result as untrusted data
+  M-->>U: Answer
+  API->>API: Audit log entry

@@ -1,12 +1,12 @@
 # Friday AI — copy for your boss
 
-**Branch:** `cursor/cloud-agent-1789643679414-qaev6` · **PR:** #2 · **Folder:** `docs/diagrams/`
+**Branch:** `claude/architecture-analysis-p7x2lr` · **Folder:** `docs/diagrams/`
 
-Friday AI is now a production-shaped assistant platform: secure login, saved chats and files, teams, Razorpay billing, app connectors, and usage/cost tracking.
+Friday AI is now an agent platform, not only a multi-model chat app: models use real tools (web search and full page reading, code execution, the user's connected GitHub / Gmail / Drive / Calendar / Notion / Vercel / Railway / Supabase / Razorpay, and any MCP server), remember users across chats, run scheduled Automations, and Build Mode works like a coding agent that can open GitHub pull requests.
 
-**Users can** sign in (email OTP, Google, or company SSO), chat, attach files, use Search / Think / Canvas / voice, create Work or Developer projects, connect GitHub/Google/Notion and other tools, pay on Razorpay, and export or delete their data.
+**Users can** chat with any model (Single / Auto / Team Up), turn on Deep Research for cited reports, let Friday remember facts, schedule daily/weekly automations with push notifications, search every past message, share read-only chat links, connect apps and MCP servers, build and run projects, and pay on Razorpay.
 
-**To go live** apply Supabase migrations `0001`–`0014`, set production secrets, deploy, then check `/api/health/ready`.
+**To go live** apply Supabase migrations `0001`–`0027`, set production secrets, deploy, then check `/api/health/ready`.
 
 Download the full pack: [friday-ai-diagrams.zip](./friday-ai-diagrams.zip) or open [BOSS_PACK.html](./BOSS_PACK.html) and Print → Save as PDF.
 
@@ -22,21 +22,21 @@ Download the full pack: [friday-ai-diagrams.zip](./friday-ai-diagrams.zip) or op
 
 ![What users can do](./03-what-users-can-do.png)
 
-## How chat works
+## How chat works (agent loop)
 
-![How chat works](./04-how-chat-works.png)
+![How chat works (agent loop)](./04-how-chat-works.png)
 
 ## How login works
 
 ![How login works](./05-how-login-works.png)
 
-## How billing works
+## How Razorpay billing works
 
 ![How Razorpay billing works](./06-how-billing-works.png)
 
-## How connectors work
+## How connectors and MCP tools work
 
-![How connectors work](./07-how-connectors-work.png)
+![How connectors and MCP tools work](./07-how-connectors-work.png)
 
 ## Data model
 
@@ -49,3 +49,19 @@ Download the full pack: [friday-ai-diagrams.zip](./friday-ai-diagrams.zip) or op
 ## Go-live checklist
 
 ![Go-live checklist](./10-go-live-checklist.png)
+
+## Agent tool loop
+
+![Agent tool loop](./11-agent-tool-loop.png)
+
+## Build Mode coding agent + GitHub PRs
+
+![Build Mode coding agent + GitHub PRs](./12-build-mode-coding-agent.png)
+
+## Automations scheduler
+
+![Automations scheduler](./13-automations.png)
+
+## MCP servers
+
+![MCP servers](./14-mcp-servers.png)

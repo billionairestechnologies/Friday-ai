@@ -1,5 +1,11 @@
 # Friday AI — Platform briefing
 
+> **Update (branch `claude/architecture-analysis-p7x2lr`):** Friday is now an agent platform — native tool
+> calling, connector + MCP tools, code execution, Deep Research, long-term memory, Automations, chat search,
+> share links, and a Build Mode coding agent that opens GitHub PRs. Migrations now run to `0027`. See
+> [`UPGRADE_ROADMAP.md`](./UPGRADE_ROADMAP.md) and diagrams 11–14 in [`diagrams/`](./diagrams/README.md);
+> the sections below describe the platform as of PR #2.
+
 **Audience:** leadership and engineering  
 **Branch:** `cursor/cloud-agent-1789643679414-qaev6`  
 **PR:** https://github.com/billionairestechnologies/Friday-ai/pull/2  

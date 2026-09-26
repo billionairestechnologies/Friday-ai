@@ -1,10 +1,12 @@
 flowchart TD
-  A[Create Supabase project] --> B[Apply migrations 0001 to 0014]
-  B --> C[Set required env secrets]
-  C --> D[Deploy API plus frontend]
+  A[Create Supabase project] --> B[Apply migrations 0001 to 0027 in order]
+  B --> C[Set env secrets - Supabase, KEY_ENCRYPTION_SECRET, Resend]
+  C --> C2[Optional: E2B, Google, GitHub, Razorpay, TinyFish, Redis]
+  C2 --> D[Deploy API plus frontend - one Docker image]
   D --> E[Check /api/health/ready]
   E --> F{Ready?}
   F -->|No| C
-  F -->|Yes| G[Smoke test signup OTP chat file]
-  G --> H[Optional: Google GitHub Razorpay SSO keys]
-  H --> I[Production live]
+  F -->|Yes| G[Smoke test: signup OTP, chat, tool call, file]
+  G --> H[Smoke test: memory, automation run now, share link, MCP add]
+  H --> I[Build Mode: small app + GitHub import PR]
+  I --> J[Production live]
