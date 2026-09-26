@@ -544,7 +544,7 @@ export async function streamMessage(
           reservation?.reserveTokens ?? 0,
         );
       }
-      onEvent({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName });
+      onEvent({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl });
       const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
       await insertAssistantMessage(conversationId, built.text || "Done.", buildLabel, {
         usedCanvas: false,

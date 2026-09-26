@@ -14,7 +14,7 @@ export type LiveSnapshot = {
   canvasOn: boolean;
   steps: BuildStep[];
   preview?: { url: string; port: number };
-  meta?: { elapsedMs?: number; zipBytes?: number; zipName?: string };
+  meta?: { elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string };
   /** True once the server announced Build Mode (status "building") — keeps the start-up banner up
    *  until the first step exists, even though narration text flips status to "writing" meanwhile. */
   buildStarted?: boolean;
@@ -132,7 +132,7 @@ export function setLivePlan(chatId: string, plan: BuildPlan) {
   emit(chatId);
 }
 
-export function setLiveBuildMeta(chatId: string, meta: { elapsedMs?: number; zipBytes?: number; zipName?: string }) {
+export function setLiveBuildMeta(chatId: string, meta: { elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }) {
   const draft = drafts.get(chatId);
   if (!draft) return;
   draft.meta = meta;

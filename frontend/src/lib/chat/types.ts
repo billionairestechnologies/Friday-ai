@@ -56,6 +56,8 @@ export type BuildInfo = {
   elapsedMs?: number;
   zipBytes?: number;
   zipName?: string;
+  /** Pull request Build Mode opened (GitHub-imported projects). */
+  prUrl?: string;
 };
 
 export type ChatMessage = {
@@ -108,7 +110,7 @@ export type StreamEvent =
   | { t: "cite"; u: string; title?: string }
   | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string }
   | { t: "preview"; url: string; port: number }
-  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string }
+  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[] }
   | { t: "err"; c: string }

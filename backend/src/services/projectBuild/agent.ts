@@ -3,9 +3,10 @@ import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
 import type { BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
-import { ActionParser, compactAssistantTurn, type BuildAction } from "./protocol.js";
+import { ActionParser, applySearchReplace, compactAssistantTurn, type BuildAction } from "./protocol.js";
+import { findGitHubRepoUrl, importRepo, openPullRequest } from "./github.js";
 import JSZip from "jszip";
-import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, tail } from "./sandbox.js";
+import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, saveProject, tail } from "./sandbox.js";
 
 const MAX_ITERATIONS = 45;
 const MAX_WALL_MS = 18 * 60_000;
@@ -40,6 +41,16 @@ full file contents (no markdown fences inside)
 <friday-run desc="Short user-facing label">shell command (waits for it to finish; use for npm install, builds, scripts, tests)</friday-run>
 <friday-start port="5173" desc="Start the dev server">command that runs a long-lived server</friday-start>
 <friday-read path="relative/path.ext"/>
+<friday-edit path="relative/path.ext">
+<<<<<<< SEARCH
+exact lines currently in the file (copied verbatim, enough to be unique)
+=======
+the new lines
+>>>>>>> REPLACE
+</friday-edit>   (one or more SEARCH/REPLACE blocks; use this for changes to EXISTING files instead of rewriting them)
+<friday-grep pattern="regex" path="src"/>   (search file contents, like grep -rnE)
+<friday-ls path="src"/>   (list files, 3 levels deep, without node_modules)
+<friday-pr title="Short PR title" branch="friday/short-name">What changed and why</friday-pr>   (ONLY for a project imported from GitHub, and ONLY when the user asked for a pull request: commits your changes to a new branch and opens a PR)
 <friday-done>Short summary for the user: what you built, how it is organised, how to use it.</friday-done>
 
 RULES
@@ -55,7 +66,8 @@ RULES
 - Make the result genuinely polished: modern responsive UI, real content (no lorem ipsum / placeholder TODOs), sensible structure.
 - When the project runs correctly, finish with exactly one <friday-done>…</friday-done>. Never claim it works if you did not see it run.
 - NEVER tell the user to run commands themselves ("run npm install", "then npm start"). You run them, with <friday-run>/<friday-start>, and you only say it works after you saw it work.
-- If the user asks to change/fix/extend an existing project, edit the existing files (read them first if needed) instead of starting over.`;
+- If the user asks to change/fix/extend an existing project, edit the existing files (read them first if needed) instead of starting over. Prefer <friday-edit> for small or medium changes to an existing file; use <friday-write> for new files or full rewrites. In an unfamiliar codebase, look around first with <friday-ls> and <friday-grep>.
+- Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below — it describes that repo's conventions, commands and tests. Run the project's tests/linters when they exist before finishing.`;
 
 type Iteration = { assistantText: string; results: string[]; done: string | null; anyAction: boolean; doneLead?: string; plainReply?: string };
 
@@ -78,6 +90,14 @@ function describe(action: BuildAction): { kind: BuildStep["kind"]; label: string
       return { kind: "start", label: action.desc };
     case "read":
       return { kind: "read", label: `Read ${action.path}` };
+    case "edit":
+      return { kind: "write", label: `Edited ${action.path}` };
+    case "grep":
+      return { kind: "read", label: `Searched for "${action.pattern.slice(0, 60)}"` };
+    case "ls":
+      return { kind: "read", label: `Listed ${action.path === "." ? "project files" : action.path}` };
+    case "pr":
+      return { kind: "run", label: `Open pull request · ${action.title.slice(0, 80)}` };
     default:
       return null;
   }
@@ -125,15 +145,48 @@ export async function runBuildAgent(opts: {
     return { text: "", build, usage, candidate: null, error: err instanceof Error ? err.message : "Couldn't start the sandbox" };
   }
 
-  const project = await getProject(conversationId);
+  let project = await getProject(conversationId);
+  const userRequestText = [...opts.history].reverse().find((m) => m.role === "user")?.content ?? "";
+
+  // "Work on github.com/owner/repo": a brand-new project whose request links a GitHub repo starts
+  // from a clone of that repo instead of an empty folder.
+  const repoRef = Object.keys(project?.files ?? {}).length === 0 && !project?.repo ? findGitHubRepoUrl(userRequestText) : null;
+  if (repoRef) {
+    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: `Import ${repoRef.repo} from GitHub`, state: "running" };
+    steps.push(step);
+    onEvent({ t: "step", ...step });
+    const imported = await importRepo(box, userId, repoRef);
+    step.state = imported.ok ? "ok" : "error";
+    step.detail = imported.message;
+    onEvent({ t: "step", ...step });
+    if (imported.ok) {
+      await saveProject(userId, conversationId, { repo: repoRef.repo, repo_branch: imported.branch });
+      await box.snapshot().catch(() => ({}));
+      project = await getProject(conversationId);
+    }
+  }
   const existingFiles = Object.keys(project?.files ?? {});
+
+  // Repo conventions for the agent, like Claude Code's CLAUDE.md / Codex's AGENTS.md.
+  let instructionFile = "";
+  for (const name of ["AGENTS.md", "FRIDAY.md", "CLAUDE.md"]) {
+    const content = project?.files?.[name] ?? (existingFiles.length ? await box.read(name).catch(() => null) : null);
+    if (content) {
+      instructionFile = `\n\nPROJECT INSTRUCTIONS (${name}):\n${tail(content, 4000)}`;
+      break;
+    }
+  }
   const stateNote =
     existingFiles.length > 0
       ? `EXISTING PROJECT in ${PROJECT_DIR} (${existingFiles.length} files): ${existingFiles.slice(0, 60).join(", ")}${existingFiles.length > 60 ? ", …" : ""}.\n` +
         (box.fresh
           ? "The sandbox was just restored from a snapshot: node_modules is NOT installed and no server is running — reinstall and restart if you need to run it.\n"
           : "The sandbox is still alive: dependencies are probably installed and the dev server may still be running (restarting is fine).\n") +
-        (project?.start_cmd ? `Last start command: ${project.start_cmd} (port ${project.port}).` : "")
+        (project?.start_cmd ? `Last start command: ${project.start_cmd} (port ${project.port}).` : "") +
+        (project?.repo
+          ? `\nThis project is the GitHub repository ${project.repo} (base branch ${project.repo_branch ?? "main"}). It is an existing codebase: explore it before changing it, keep its conventions, and when the user asks for a pull request finish with <friday-pr>.`
+          : "") +
+        instructionFile
       : "This is a new, empty project directory.";
 
   const conversation: ChatMessage[] = [
@@ -141,7 +194,7 @@ export async function runBuildAgent(opts: {
     ...opts.history.filter((m) => m.role !== "system"),
   ];
 
-  const userRequest = [...opts.history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const userRequest = userRequestText;
   let visualRounds = 0;
 
   /** Sends the rendered page to a vision-capable model that acts as a strict UI reviewer. */
@@ -345,6 +398,69 @@ export async function runBuildAgent(opts: {
           finish("ok");
           if (++writesSinceSnapshot >= 6) void saveProgress();
           turn.results.push(`[write ${path}] ok (${action.content.length} chars)`);
+        } else if (action.kind === "edit") {
+          const path = safeProjectPath(action.path);
+          const current = path ? await box.read(path).catch(() => null) : null;
+          if (!path || current == null) {
+            finish("error", path ? "File not found" : "Path is outside the project");
+            turn.results.push(`[edit ${action.path}] failed: ${path ? "file not found — use <friday-write> to create it" : "path must be inside the project"}`);
+            return;
+          }
+          const applied = applySearchReplace(current, action.edits);
+          if (!applied.ok) {
+            finish("error", applied.error);
+            turn.results.push(`[edit ${path}] failed: ${applied.error}. Nothing was changed.`);
+            return;
+          }
+          await box.write(path, applied.content);
+          finish("ok");
+          if (++writesSinceSnapshot >= 6) void saveProgress();
+          turn.results.push(`[edit ${path}] ok (${action.edits.length} change${action.edits.length === 1 ? "" : "s"} applied)`);
+        } else if (action.kind === "grep") {
+          const path = action.path === "." ? "." : safeProjectPath(action.path);
+          if (!path) {
+            finish("error", "Path is outside the project");
+            turn.results.push(`[grep] path must be inside the project`);
+            return;
+          }
+          // Pattern/path travel as env vars through a script file: no shell quoting can break them.
+          const out = await box.runScript(
+            'grep -rnIE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next -e "$FRIDAY_PATTERN" -- "$FRIDAY_PATH" | head -150',
+            60_000,
+            { FRIDAY_PATTERN: action.pattern, FRIDAY_PATH: path },
+          );
+          finish("ok");
+          turn.results.push(`[grep ${JSON.stringify(action.pattern)} in ${path}]\n${tail(out.output.trim() || "(no matches)", 6000)}`);
+        } else if (action.kind === "ls") {
+          const path = action.path === "." ? "." : safeProjectPath(action.path);
+          if (!path) {
+            finish("error", "Path is outside the project");
+            turn.results.push(`[ls] path must be inside the project`);
+            return;
+          }
+          const out = await box.runScript(
+            'find "$FRIDAY_PATH" -maxdepth 3 -not -path "*/node_modules*" -not -path "*/.git/*" -not -path "*/.git" -not -path "*/dist/*" | sort | head -400',
+            30_000,
+            { FRIDAY_PATH: path },
+          );
+          finish(out.ok ? "ok" : "error");
+          turn.results.push(`[ls ${path}]\n${tail(out.output.trim() || "(empty)", 6000)}`);
+        } else if (action.kind === "pr") {
+          if (!project?.repo) {
+            finish("error", "Not a GitHub project");
+            turn.results.push("[pr] failed: this project was not imported from GitHub, so there is no repository to open a pull request against.");
+            return;
+          }
+          const pr = await openPullRequest(box, userId, {
+            repo: project.repo,
+            base: project.repo_branch || "main",
+            title: action.title,
+            branch: action.branch,
+            body: action.body,
+          });
+          finish(pr.ok ? "ok" : "error", pr.message);
+          turn.results.push(`[pr] ${pr.ok ? "ok" : "failed"}: ${pr.message}`);
+          if (pr.url) build.prUrl = pr.url;
         } else if (action.kind === "read") {
           const path = safeProjectPath(action.path);
           const content = path ? await box.read(path).catch(() => null) : null;

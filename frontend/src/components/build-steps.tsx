@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, Terminal, Wrench } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, GitPullRequest, Terminal, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildInfo, BuildStep } from "@/lib/chat/types";
 import { useChat } from "@/lib/chat/store";
@@ -227,6 +227,16 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
         <ChevronRight className={cn("size-3.5 transition-transform", expanded && "rotate-90")} />
       </button>
       {expanded && <div className="mt-2">{rows}</div>}
+      {build.prUrl && (
+        <a
+          href={build.prUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-2 rounded-full bg-chip px-3 py-1.5 text-xs text-foreground hover:bg-chip/70"
+        >
+          <GitPullRequest className="size-3.5" /> View pull request
+        </a>
+      )}
       {build.previewUrl && (
         <button
           type="button"

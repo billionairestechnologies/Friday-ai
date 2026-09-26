@@ -285,7 +285,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         else if (ev.t === "step") applyLiveStep(chatId, { id: ev.id, kind: ev.kind, label: ev.label, state: ev.state, detail: ev.detail });
         else if (ev.t === "ask") askQuestions = ev.questions;
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
-        else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName });
+        else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });
         else if (ev.t === "preview") {
           setLivePreview(chatId, ev.url, ev.port);
           // Build Mode produced a running app — open the panel on it, same as an auto-opened artifact.
