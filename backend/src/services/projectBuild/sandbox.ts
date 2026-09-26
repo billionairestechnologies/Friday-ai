@@ -20,6 +20,9 @@ export type ProjectRow = {
   start_cmd: string | null;
   port: number | null;
   files: ProjectFiles;
+  /** "owner/name" when the project was imported from GitHub. */
+  repo?: string | null;
+  repo_branch?: string | null;
 };
 
 export type RunOutcome = { ok: boolean; exitCode: number; output: string };
@@ -39,13 +42,13 @@ export function safeProjectPath(path: string): string | null {
 export async function getProject(conversationId: string): Promise<ProjectRow | null> {
   const { data } = await supabaseAdmin
     .from("build_projects")
-    .select("conversation_id, sandbox_id, start_cmd, port, files")
+    .select("conversation_id, sandbox_id, start_cmd, port, files, repo, repo_branch")
     .eq("conversation_id", conversationId)
     .maybeSingle();
   return (data as ProjectRow | null) ?? null;
 }
 
-async function saveProject(userId: string, conversationId: string, patch: Partial<Omit<ProjectRow, "conversation_id">>) {
+export async function saveProject(userId: string, conversationId: string, patch: Partial<Omit<ProjectRow, "conversation_id">>) {
   const { error } = await supabaseAdmin
     .from("build_projects")
     .upsert({ conversation_id: conversationId, user_id: userId, ...patch, updated_at: new Date().toISOString() });
@@ -121,6 +124,27 @@ export class BuildSandbox {
       const e = err as { exitCode?: number; stdout?: string; stderr?: string; message?: string };
       const output = [e.stdout, e.stderr].filter(Boolean).join("\n") || e.message || "command failed";
       return { ok: false, exitCode: typeof e.exitCode === "number" ? e.exitCode : 1, output };
+    }
+  }
+
+  /**
+   * Runs a trusted, server-built script from a file (not an inline command string), so environment
+   * values such as a PR title or an access token are only ever expanded as variables — never
+   * re-parsed as shell code. Used for the git operations that carry the user's GitHub token.
+   */
+  async runScript(script: string, timeoutMs: number, envs: Record<string, string>): Promise<RunOutcome> {
+    this.touch();
+    const file = `/tmp/friday-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.sh`;
+    await this.sandbox.files.write(file, `cd ${PROJECT_DIR}\n${script}\n`);
+    try {
+      const result = await this.sandbox.commands.run(`bash ${file}`, { timeoutMs, envs: { CI: "true", ...envs } });
+      return { ok: true, exitCode: 0, output: [result.stdout, result.stderr].filter(Boolean).join("\n") };
+    } catch (err) {
+      const e = err as { exitCode?: number; stdout?: string; stderr?: string; message?: string };
+      const output = [e.stdout, e.stderr].filter(Boolean).join("\n") || e.message || "command failed";
+      return { ok: false, exitCode: typeof e.exitCode === "number" ? e.exitCode : 1, output };
+    } finally {
+      void this.sandbox.commands.run(`rm -f ${file}`).catch(() => {});
     }
   }
 

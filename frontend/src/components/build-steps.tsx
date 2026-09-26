@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, Terminal } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, GitPullRequest, Terminal, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildInfo, BuildStep } from "@/lib/chat/types";
 import { useChat } from "@/lib/chat/store";
@@ -8,7 +8,8 @@ import { downloadProjectZip } from "@/components/build-preview";
 function StepIcon({ step }: { step: BuildStep }) {
   if (step.state === "running") return <span className="build-orb" aria-hidden />;
   if (step.state === "error") return <AlertCircle className="size-3.5 text-danger" />;
-  const Icon = step.kind === "write" || step.kind === "read" ? FilePen : step.kind === "start" ? Play : Terminal;
+  const Icon =
+    step.kind === "tool" ? Wrench : step.kind === "write" || step.kind === "read" ? FilePen : step.kind === "start" ? Play : Terminal;
   return <Icon className="size-3.5 text-muted" />;
 }
 
@@ -193,10 +194,13 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
     </div>
   );
 
+  // A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
+  const toolsOnly = build.steps.length > 0 && build.steps.every((st) => st.kind === "tool") && !build.plan;
+
   if (streaming) {
     return (
       <div className="w-full">
-        <BuildBanner compact />
+        {!toolsOnly && <BuildBanner compact />}
         {build.plan && <PlanCard plan={build.plan} />}
         {rows}
         <div className="flex items-center gap-2 pt-2 text-sm text-muted">
@@ -215,10 +219,24 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
         onClick={() => setExpanded((v) => !v)}
         className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
       >
-        {seconds > 0 ? `Worked for ${formatDuration(seconds)}` : `${build.steps.length} steps`}
+        {toolsOnly
+          ? `Used ${build.steps.length} tool${build.steps.length === 1 ? "" : "s"}`
+          : seconds > 0
+            ? `Worked for ${formatDuration(seconds)}`
+            : `${build.steps.length} steps`}
         <ChevronRight className={cn("size-3.5 transition-transform", expanded && "rotate-90")} />
       </button>
       {expanded && <div className="mt-2">{rows}</div>}
+      {build.prUrl && (
+        <a
+          href={build.prUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-2 rounded-full bg-chip px-3 py-1.5 text-xs text-foreground hover:bg-chip/70"
+        >
+          <GitPullRequest className="size-3.5" /> View pull request
+        </a>
+      )}
       {build.previewUrl && (
         <button
           type="button"

@@ -23,6 +23,8 @@ import { usePlan } from "@/lib/usage/planStore";
 import type { AssistantProject } from "@/routes/projects";
 import { cn } from "@/lib/utils";
 
+type SearchHit = { conversationId: string; title: string; messageId: string; role: string; snippet: string; createdAt: string };
+
 /** Top-level nav rows above Projects/Chats — Chat is the only one with a real destination today;
  *  Library/Automations are placeholder pages (see routes/library.tsx, routes/automations.tsx)
  *  until those features actually exist, per explicit product decision. */
@@ -58,6 +60,7 @@ export function Sidebar() {
   const signedIn = Boolean(user && !user.isDevFallback);
 
   const [searchOpen, setSearchOpen] = useState(false);
+  const [hits, setHits] = useState<SearchHit[]>([]);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [projects, setProjects] = useState<AssistantProject[]>([]);
 
@@ -72,6 +75,22 @@ export function Sidebar() {
   useEffect(() => {
     void loadPlan();
   }, [loadPlan]);
+
+  // Full-text search across every message on the server (not just chats loaded in this browser).
+  useEffect(() => {
+    const q = query.trim();
+    if (!signedIn || !searchOpen || q.length < 2) {
+      setHits([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      api
+        .get<{ results: SearchHit[] }>(`/chat/search?q=${encodeURIComponent(q)}`)
+        .then((res) => setHits(res.results))
+        .catch(() => setHits([]));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query, signedIn, searchOpen]);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -160,6 +179,30 @@ export function Sidebar() {
         )}
 
         <div className="scroll-thin flex-1 overflow-y-auto px-2 pb-4">
+          {searchOpen && hits.length > 0 && (
+            <div className="mb-3 px-1">
+              <p className="px-1.5 pb-1 text-xs font-semibold text-subtle">In messages</p>
+              <ul className="flex flex-col gap-0.5">
+                {hits.map((h) => (
+                  <li key={h.messageId}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const local = chats.find((c) => c.conversationId === h.conversationId);
+                        if (local) selectChat(local.id);
+                        void navigate({ to: "/c/$conversationId", params: { conversationId: h.conversationId } });
+                        if (window.innerWidth < 768) setOpen(false);
+                      }}
+                      className="premium-control flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left hover:bg-chip-on"
+                    >
+                      <span className="truncate text-sm font-medium text-foreground">{h.title}</span>
+                      <span className="line-clamp-2 text-xs text-muted">{h.snippet}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* Top-level nav: Chat is a real destination (new chat); Library/Automations are
               placeholder pages until those are real features — see NavRow's note above. */}
           <div className="flex flex-col gap-0.5 px-1 pt-1">

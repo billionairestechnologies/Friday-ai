@@ -7,6 +7,7 @@ import { logger } from "./utils/logger.js";
 assertEnvironmentConfigured();
 
 const { createApp } = await import("./app.js");
+const { startAutomationScheduler, stopAutomationScheduler } = await import("./services/automations/automationService.js");
 const app = createApp();
 const sockets = new Set<Socket>();
 
@@ -15,6 +16,7 @@ const server = app.listen(env.port, () => {
     port: env.port,
     redis: env.redisUrl ? "configured" : "disabled",
   });
+  startAutomationScheduler();
 });
 
 server.on("connection", (socket) => {
@@ -27,6 +29,7 @@ async function shutdown(reason: string, exitCode = 0) {
   if (shutdownStarted) return;
   shutdownStarted = true;
   beginShutdown();
+  stopAutomationScheduler();
   process.exitCode = exitCode;
   logger.info("server_shutdown_started", { reason });
 

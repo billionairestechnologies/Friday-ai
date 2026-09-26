@@ -8,6 +8,14 @@ import { quotaLimit } from "../middleware/quotaLimit.js";
 
 export const chatRouter = Router();
 
+/** Public, unauthenticated read-only view of a shared chat (rate limited per IP). */
+export const shareRouter = Router();
+shareRouter.get(
+  "/:token",
+  rateLimit({ name: "share-view", limit: 120, windowMs: 60_000 }),
+  asyncHandler(controller.getShared),
+);
+
 chatRouter.use(requireAuth);
 
 const chatBurstLimit = rateLimit({
@@ -28,6 +36,9 @@ chatRouter.get("/conversations", asyncHandler(controller.listConversations));
 chatRouter.delete("/conversations", asyncHandler(controller.deleteAllConversations));
 chatRouter.delete("/conversations/:id", asyncHandler(controller.deleteConversation));
 chatRouter.get("/conversations/:id/messages", asyncHandler(controller.listMessages));
+chatRouter.get("/search", asyncHandler(controller.search));
+chatRouter.post("/conversations/:id/share", asyncHandler(controller.share));
+chatRouter.delete("/conversations/:id/share", asyncHandler(controller.unshare));
 chatRouter.post(
   "/conversations/:id/messages/stream",
   chatBurstLimit,

@@ -1,6 +1,7 @@
 import { streamOpenAiCompatibleChat } from "./sse-helpers.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { mergeSystemMessages, safeErrorMessage, toOpenAiStyleMessages } from "./types.js";
+import { streamOpenAiToolTurn } from "./toolCalling.js";
 
 const BASE_URL = "https://api.openai.com/v1";
 
@@ -57,6 +58,10 @@ export const openaiAdapter: ProviderAdapter = {
       onThink,
       onUsage,
     );
+  },
+
+  async chatStreamWithTools(apiKey, model, messages, opts, onDelta) {
+    return streamOpenAiToolTurn(`${BASE_URL}/chat/completions`, { Authorization: `Bearer ${apiKey}` }, model, messages, opts, onDelta);
   },
 };
 

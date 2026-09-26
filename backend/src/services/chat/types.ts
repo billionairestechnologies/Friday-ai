@@ -6,7 +6,7 @@ export type StreamEvent =
   | { t: "cite"; u: string; title?: string }
   | { t: "step"; id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string }
   | { t: "preview"; url: string; port: number }
-  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string }
+  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[] }
   | { t: "err"; c: string }
@@ -14,7 +14,7 @@ export type StreamEvent =
 
 export type ConversationMode = "single" | "auto" | "teamup";
 
-export type BuildStepKind = "write" | "run" | "start" | "read" | "note";
+export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
 
 /** What a Build Mode turn did — persisted on the message (`messages.build`) so it survives reloads. */
 export type BuildStep = { id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string };
@@ -40,4 +40,6 @@ export type BuildMeta = {
   /** Size + suggested name of the downloadable project zip (rendered as a file card in chat). */
   zipBytes?: number;
   zipName?: string;
+  /** Pull request opened by the agent (GitHub-imported projects). */
+  prUrl?: string;
 };

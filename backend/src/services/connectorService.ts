@@ -362,6 +362,56 @@ export async function getGitHubAccessToken(userId: string): Promise<string | nul
   return decryptSecret(data.access_token_encrypted as string);
 }
 
+export async function getGoogleAccessToken(userId: string): Promise<{ token: string; scopes: string[] } | null> {
+  const { data, error } = await supabaseAdmin
+    .from("connector_accounts")
+    .select("access_token_encrypted, scopes")
+    .eq("user_id", userId)
+    .eq("provider", "google")
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!data?.access_token_encrypted) return null;
+  return { token: decryptSecret(data.access_token_encrypted as string), scopes: (data.scopes as string[] | null) ?? [] };
+}
+
+/** Google access tokens live ~1 hour. Exchanges the stored refresh token for a new access token,
+ *  saves it, and returns it — or null when there is no refresh token (the user must reconnect). */
+export async function refreshGoogleAccessToken(userId: string): Promise<string | null> {
+  if (!env.googleClientId || !env.googleClientSecret) return null;
+  const { data } = await supabaseAdmin
+    .from("connector_accounts")
+    .select("refresh_token_encrypted")
+    .eq("user_id", userId)
+    .eq("provider", "google")
+    .maybeSingle();
+  if (!data?.refresh_token_encrypted) return null;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.googleClientId,
+      client_secret: env.googleClientSecret,
+      refresh_token: decryptSecret(data.refresh_token_encrypted as string),
+      grant_type: "refresh_token",
+    }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { access_token?: string };
+  if (!res.ok || !body.access_token) return null;
+  await supabaseAdmin
+    .from("connector_accounts")
+    .update({ access_token_encrypted: encryptSecret(body.access_token), updated_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("provider", "google");
+  return body.access_token;
+}
+
+/** Which connectors a user has linked (provider → granted scopes) — decides which tools a chat turn gets. */
+export async function listConnectedProviders(userId: string): Promise<Map<string, string[]>> {
+  const { data, error } = await supabaseAdmin.from("connector_accounts").select("provider, scopes").eq("user_id", userId);
+  if (error) return new Map();
+  return new Map((data ?? []).map((row) => [row.provider as string, (row.scopes as string[] | null) ?? []]));
+}
+
 export async function searchGitHubRepositories(userId: string, query: string) {
   const token = await getGitHubAccessToken(userId);
   if (!token) throw new HttpError(400, "Connect GitHub before searching repositories");
@@ -394,7 +444,7 @@ export async function searchGitHubRepositories(userId: string, query: string) {
   }));
 }
 
-async function loadTokenCredentials(userId: string, provider: TokenConnectorId) {
+export async function loadTokenCredentials(userId: string, provider: TokenConnectorId) {
   const { data, error } = await supabaseAdmin
     .from("connector_accounts")
     .select("access_token_encrypted, refresh_token_encrypted, metadata")

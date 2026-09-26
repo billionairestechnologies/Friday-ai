@@ -51,6 +51,8 @@ export function PluginsDrawer() {
   const setWebSearch = useChat((s) => s.setWebSearch);
   const canvas = useChat((s) => s.canvas);
   const setCanvas = useChat((s) => s.setCanvas);
+  const research = useChat((s) => s.research);
+  const setResearch = useChat((s) => s.setResearch);
   const { user } = useCurrentUserState();
   const signedIn = Boolean(user && !user.isDevFallback);
   const [tab, setTab] = useState<"connectors" | "skills">("connectors");
@@ -63,8 +65,8 @@ export function PluginsDrawer() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const on = { search: webSearch, think, canvas };
-  const toggle = { search: setWebSearch, think: setThink, canvas: setCanvas };
+  const on = { search: webSearch, think, canvas, research };
+  const toggle = { search: setWebSearch, think: setThink, canvas: setCanvas, research: setResearch };
 
   const pluginProvider = useMemo(() => {
     const map = new Map<string, ConnectorProvider>();
@@ -309,7 +311,7 @@ export function PluginsDrawer() {
               ) : (
                 <div className="text-sm text-muted">
                   <p className="mb-2 font-semibold text-foreground">Skills</p>
-                  <p>Think, Search, and Canvas are Friday’s built-in skills. Turn them on from Connectors or the composer.</p>
+                  <p>Think, Search, Canvas and Deep Research are Friday’s built-in skills. Turn them on from Connectors or the composer.</p>
                 </div>
               )}
             </div>

@@ -2,6 +2,7 @@ import { getProviderAdapter } from "../providers/registry.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, listChatCandidates } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
+import { findGitHubRepoUrl } from "./github.js";
 
 /**
  * Decides whether a message should start the Build agent (real sandbox: write files, install, run,
@@ -37,6 +38,10 @@ export async function detectBuildIntent(content: string, hasProject: boolean): P
   const text = content.trim();
   if (!text) return false;
   if (hasProject && PROJECT_FOLLOWUP.test(text)) return true;
+  // "Fix the login bug in github.com/acme/app", "add tests to https://github.com/x/y" — work on a real repo.
+  if (findGitHubRepoUrl(text) && ACTION_WORDS.test(text) && !/\b(explain|what is|what does|summari[sz]e|review)\b/i.test(text)) return true;
+  // "Open a PR with these changes" on an existing (imported) project.
+  if (hasProject && /\b(open|create|raise|make|send)\b[^.?!\n]{0,20}\b(pr|pull request)\b/i.test(text)) return true;
   if (CLEAR_BUILD.test(text) && !/\b(explain|what is|how (do|does|to)|difference between|why)\b/i.test(text)) return true;
   const gated = ACTION_WORDS.test(text) && (PROJECT_WORDS.test(text) || (hasProject && text.length < 300));
   if (!gated) return false;

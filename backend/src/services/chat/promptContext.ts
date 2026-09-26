@@ -209,6 +209,13 @@ export function trimHistoryToBudget(history: ChatMessage[]): ChatMessage[] {
   return history.slice(cutoff);
 }
 
+/** Models don't know today's date; without it "latest"/"this year"/"how old is" answers silently use their training cutoff. */
+export function currentDateSystemPrompt(now: Date = new Date()): string {
+  const date = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+  const time = now.toISOString().slice(11, 16);
+  return `Current date: ${date} (${time} UTC). Use it for anything time-relative; your training data may be older than this.`;
+}
+
 /** Prepends web search results, a persona/behavior instruction, and/or the Think/Canvas/attachment nudges, in that order. */
 export function withSystemPreamble(
   history: ChatMessage[],
@@ -220,6 +227,7 @@ export function withSystemPreamble(
   hasAttachments: boolean = false,
 ): ChatMessage[] {
   const preamble: ChatMessage[] = [
+    { role: "system", content: currentDateSystemPrompt() },
     { role: "system", content: FOCUS_SYSTEM_PROMPT },
     { role: "system", content: HONESTY_SYSTEM_PROMPT },
     { role: "system", content: EXECUTION_HONESTY_SYSTEM_PROMPT },
@@ -240,6 +248,26 @@ export function withSystemPreamble(
   }
   if (hasAttachments) preamble.push({ role: "system", content: ATTACHMENT_FOCUS_SYSTEM_PROMPT });
   return preamble.length ? [...preamble, ...history] : history;
+}
+
+/** Tool-aware replacement for EXECUTION_HONESTY_SYSTEM_PROMPT, used on turns where real tools are attached. */
+const TOOL_EXECUTION_HONESTY_SYSTEM_PROMPT =
+  "You can use ONLY the tools attached to this request — nothing else. Never claim you ran code, opened a page, read " +
+  "an email or file, or performed an action unless a tool result in this conversation shows it, and never invent tool " +
+  "output. If no run_code tool is attached you cannot execute code: for python/javascript in Canvas, tell the user to " +
+  "click the Run button in the Canvas panel to see the real output.";
+
+/**
+ * Turns a normal preamble into a tool-enabled one: swaps the "you have no tools" honesty prompt for a
+ * tool-aware one and appends the tool-use guidance right after the other system messages.
+ */
+export function withToolPreamble(history: ChatMessage[], toolGuidance: string): ChatMessage[] {
+  const swapped = history.map((m) =>
+    m.role === "system" && m.content === EXECUTION_HONESTY_SYSTEM_PROMPT ? { ...m, content: TOOL_EXECUTION_HONESTY_SYSTEM_PROMPT } : m,
+  );
+  const firstNonSystem = swapped.findIndex((m) => m.role !== "system");
+  const at = firstNonSystem === -1 ? swapped.length : firstNonSystem;
+  return [...swapped.slice(0, at), { role: "system", content: toolGuidance }, ...swapped.slice(at)];
 }
 
 // Images ride along as base64 data URLs in the request body (no upload endpoint/storage yet), so

@@ -4,12 +4,15 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   AudioLines,
   Bell,
+  Brain,
   Check,
   CreditCard,
   Lock,
   Palette,
+  Plug,
   Shield,
   SlidersHorizontal,
+  Trash2,
   UserRound,
   X,
   Zap,
@@ -53,7 +56,11 @@ const NAV = [
   },
   {
     group: "Data & Information",
-    items: [{ id: "data", label: "Data Controls", icon: Shield }],
+    items: [
+      { id: "memory", label: "Memory", icon: Brain },
+      { id: "mcp", label: "MCP servers", icon: Plug },
+      { id: "data", label: "Data Controls", icon: Shield },
+    ],
   },
 ];
 
@@ -127,6 +134,8 @@ export function SettingsModal() {
               {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
+              {tab === "memory" && <MemoryPane />}
+              {tab === "mcp" && <McpPane />}
               {tab === "data" && <DataPane />}
             </div>
           </div>
@@ -750,6 +759,266 @@ function DataPane() {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+type Memory = { id: string; content: string; createdAt: string };
+
+/** What Friday remembers about the user across chats (saved when they ask it to remember something). */
+function MemoryPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [memories, setMemories] = useState<Memory[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ memories: Memory[] }>("/memory")
+      .then((r) => setMemories(r.memories))
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load memory"));
+  }, [signedIn]);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () =>
+    run(async () => {
+      const content = draft.trim();
+      if (!content) return;
+      const { memory } = await api.post<{ memory: Memory }>("/memory", { content });
+      setMemories((m) => [...(m ?? []).filter((x) => x.id !== memory.id), memory]);
+      setDraft("");
+    });
+  const remove = (id: string) =>
+    run(async () => {
+      await api.delete(`/memory/${id}`);
+      setMemories((m) => (m ?? []).filter((x) => x.id !== id));
+    });
+  const clearAll = () =>
+    run(async () => {
+      if (!window.confirm("Delete everything Friday remembers about you?")) return;
+      await api.delete("/memory");
+      setMemories([]);
+    });
+
+  return (
+    <div>
+      <h2 className="mb-2 text-lg font-semibold">Memory</h2>
+      <p className="mb-4 text-sm text-muted">
+        Friday remembers things you ask it to (“remember that I prefer TypeScript”) and uses them in every new chat. You can
+        add, review and delete memories here.
+      </p>
+      {!signedIn ? (
+        <p className="text-sm text-muted">Sign in to use memory.</p>
+      ) : (
+        <>
+          {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+          <form
+            className="mb-4 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void add();
+            }}
+          >
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={500}
+              placeholder="Add something for Friday to remember…"
+              className="h-10 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground/40"
+            />
+            <button
+              type="submit"
+              disabled={busy || !draft.trim()}
+              className="h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background disabled:opacity-40"
+            >
+              Add
+            </button>
+          </form>
+          {memories === null ? (
+            <p className="text-sm text-muted">Loading…</p>
+          ) : memories.length === 0 ? (
+            <p className="text-sm text-muted">Nothing saved yet.</p>
+          ) : (
+            <ul className="mb-4 divide-y divide-border rounded-xl border border-border">
+              {memories.map((m) => (
+                <li key={m.id} className="flex items-start gap-3 px-4 py-3 text-sm">
+                  <span className="min-w-0 flex-1 break-words">{m.content}</span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(m.id)}
+                    aria-label="Delete memory"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-danger disabled:opacity-40"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {memories && memories.length > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void clearAll()}
+              className="h-10 rounded-full border border-danger/60 px-4 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
+            >
+              Clear all memories
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+type McpServer = { id: string; name: string; url: string; hasAuth: boolean; enabled: boolean; createdAt: string };
+
+/** Remote MCP servers (Model Context Protocol) whose tools Friday can use in chat. */
+function McpPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [servers, setServers] = useState<McpServer[] | null>(null);
+  const [form, setForm] = useState({ name: "", url: "", authorization: "" });
+  const [tools, setTools] = useState<Record<string, string[]>>({});
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ servers: McpServer[] }>("/mcp")
+      .then((r) => setServers(r.servers))
+      .catch((err) => setNotice(err instanceof Error ? err.message : "Couldn't load servers"));
+  }, [signedIn]);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await action();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () =>
+    run(async () => {
+      const res = await api.post<{ server: McpServer; tools: string[] }>("/mcp", {
+        name: form.name.trim(),
+        url: form.url.trim(),
+        ...(form.authorization.trim() ? { authorization: form.authorization.trim() } : {}),
+      });
+      setServers((s) => [...(s ?? []), res.server]);
+      setTools((t) => ({ ...t, [res.server.id]: res.tools }));
+      setForm({ name: "", url: "", authorization: "" });
+      setNotice(`Connected — ${res.tools.length} tool${res.tools.length === 1 ? "" : "s"} available in chat.`);
+    });
+  const toggle = (s: McpServer) =>
+    run(async () => {
+      const { server } = await api.patch<{ server: McpServer }>(`/mcp/${s.id}`, { enabled: !s.enabled });
+      setServers((list) => (list ?? []).map((x) => (x.id === s.id ? server : x)));
+    });
+  const remove = (s: McpServer) =>
+    run(async () => {
+      await api.delete(`/mcp/${s.id}`);
+      setServers((list) => (list ?? []).filter((x) => x.id !== s.id));
+    });
+  const inspect = (s: McpServer) =>
+    run(async () => {
+      const res = await api.get<{ tools: { name: string }[] }>(`/mcp/${s.id}/tools`);
+      setTools((t) => ({ ...t, [s.id]: res.tools.map((x) => x.name) }));
+    });
+
+  const input = "h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-foreground/40";
+  return (
+    <div>
+      <h2 className="mb-2 text-lg font-semibold">MCP servers</h2>
+      <p className="mb-4 text-sm text-muted">
+        Connect any remote <span className="font-medium text-foreground">Model Context Protocol</span> server (Streamable HTTP) and
+        Friday can use its tools in chat — Linear, Sentry, Stripe, your own internal tools, and more.
+      </p>
+      {!signedIn ? (
+        <p className="text-sm text-muted">Sign in to add MCP servers.</p>
+      ) : (
+        <>
+          {notice && <p className="mb-3 text-sm text-muted">{notice}</p>}
+          <form
+            className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void add();
+            }}
+          >
+            <input className={input} placeholder="Name (e.g. Linear)" maxLength={40} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className={input} placeholder="https://…/mcp" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+            <input
+              className={cn(input, "sm:col-span-2")}
+              placeholder="Authorization (optional) — token or “Bearer …”"
+              type="password"
+              value={form.authorization}
+              onChange={(e) => setForm({ ...form, authorization: e.target.value })}
+            />
+            <button
+              type="submit"
+              disabled={busy || !form.name.trim() || !form.url.trim()}
+              className="h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background disabled:opacity-40 sm:col-span-2 sm:justify-self-start"
+            >
+              {busy ? "Connecting…" : "Add server"}
+            </button>
+          </form>
+          {servers && servers.length === 0 && <p className="text-sm text-muted">No servers yet.</p>}
+          <ul className="flex flex-col gap-2">
+            {(servers ?? []).map((s) => (
+              <li key={s.id} className={cn("rounded-xl border border-border px-4 py-3 text-sm", !s.enabled && "opacity-60")}>
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{s.name}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {s.url}
+                      {s.hasAuth ? " · auth set" : ""}
+                    </span>
+                  </span>
+                  <button type="button" disabled={busy} onClick={() => void inspect(s)} className="rounded-full border border-border px-2.5 py-1 text-xs hover:bg-chip">
+                    Tools
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => void toggle(s)} className="rounded-full border border-border px-2.5 py-1 text-xs hover:bg-chip">
+                    {s.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(s)}
+                    aria-label="Remove server"
+                    className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-danger"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+                {tools[s.id] && (
+                  <p className="mt-2 text-xs text-muted">{tools[s.id]!.length ? tools[s.id]!.join(", ") : "This server exposes no tools."}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

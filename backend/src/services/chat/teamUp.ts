@@ -8,6 +8,10 @@ import { insertAssistantMessage } from "./conversations.js";
 import { searchResultsToSystemMessage } from "./promptContext.js";
 import type { StreamEvent } from "./types.js";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { estimateTokenUsageFromText, type TokenUsage } from "../tokenUsage.js";
+
+/** What each model in a Team Up turn spent — recorded and charged against the quota by the caller. */
+export type TeamUpUsage = { candidate: ChatCandidate; usage: TokenUsage }[];
 
 const SYNTHESIS_SYSTEM_PROMPT =
   "You are given the original request and several draft answers from different AI models. Write ONE final " +
@@ -48,7 +52,9 @@ export async function streamTeamUp(
   onEvent: (ev: StreamEvent) => void,
   signal?: AbortSignal,
   options: { think?: boolean; canvas?: boolean; images?: ChatImage[]; requiresVision?: boolean } = {},
-): Promise<void> {
+): Promise<TeamUpUsage> {
+  const spent: TeamUpUsage = [];
+  const historyChars = history.reduce((n, m) => n + m.content.length, 0);
   const requiresVision = options.requiresVision ?? false;
   const images = options.images ?? [];
   const pool = await listChatCandidates();
@@ -61,7 +67,7 @@ export async function streamTeamUp(
         : "No chat models are enabled yet",
     });
     onEvent({ t: "done" });
-    return;
+    return spent;
   }
 
   onEvent({ t: "status", s: "thinking" });
@@ -74,6 +80,7 @@ export async function streamTeamUp(
       onEvent({ t: "agent", ...started });
       try {
         const text = await callCandidate(candidate, history);
+        spent.push({ candidate, usage: estimateTokenUsageFromText(historyChars, text.length) });
         const done = { slug: candidate.slug, model: candidate.displayName, state: "done" as const };
         agents.push(done);
         onEvent({ t: "agent", ...done });
@@ -96,7 +103,7 @@ export async function streamTeamUp(
   if (drafts.length === 0) {
     onEvent({ t: "err", c: "Every model in the team failed to respond" });
     onEvent({ t: "done" });
-    return;
+    return spent;
   }
 
   let finalCandidate: ChatCandidate;
@@ -115,6 +122,7 @@ export async function streamTeamUp(
     const synthMessages = buildSynthesisMessages(content, drafts, grounding, images);
     const adapter = getProviderAdapter(finalCandidate.slug);
     const apiKey = await getWorkingKeyForProvider(finalCandidate.slug);
+    let synthUsage: TokenUsage | null = null;
     if (adapter.chatStream) {
       full = await adapter.chatStream(
         apiKey,
@@ -126,11 +134,16 @@ export async function streamTeamUp(
           thinking += think;
           onEvent({ t: "think", c: think });
         },
+        (usage) => {
+          synthUsage = usage;
+        },
       );
     } else {
       full = await adapter.chat(apiKey, finalCandidate.modelId, synthMessages);
       onEvent({ t: "text", c: full });
     }
+    const synthChars = synthMessages.reduce((n, m) => n + m.content.length, 0);
+    spent.push({ candidate: finalCandidate, usage: synthUsage ?? estimateTokenUsageFromText(synthChars, full.length + thinking.length) });
   }
 
   const label = drafts.length > 1 ? `Team → ${finalCandidate.displayName}` : finalCandidate.displayName;
@@ -144,4 +157,5 @@ export async function streamTeamUp(
   });
   await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
   onEvent({ t: "done" });
+  return spent;
 }

@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { LayoutDashboard, X } from "lucide-react";
+import { Check, LayoutDashboard, Link2, Share2, X } from "lucide-react";
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
@@ -423,11 +423,92 @@ function HelpPopout() {
 // two buttons were a redundant second entry point. Replaced with a direct Canvas opener now that
 // the composer's own Canvas toggle is gone, so there's still a manual way to bring the panel up
 // (auto-open on a detected artifact still works independently of this).
+/** Share the current chat as a read-only public link (copy / turn off). */
+function ShareButton() {
+  const conversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
+  const [open, setOpen] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setOpen(false);
+    setLink(null);
+  }, [conversationId]);
+  if (!conversationId) return null;
+
+  async function create() {
+    setError(null);
+    try {
+      const { token } = await api.post<{ token: string }>(`/chat/conversations/${conversationId}/share`);
+      const url = `${window.location.origin}/share/${token}`;
+      setLink(url);
+      await navigator.clipboard?.writeText(url).then(() => setCopied(true)).catch(() => {});
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create a link");
+    }
+  }
+  async function revoke() {
+    setError(null);
+    try {
+      await api.delete(`/chat/conversations/${conversationId}/share`);
+      setLink(null);
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't turn off the link");
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Share chat"
+        onClick={() => {
+          setOpen((v) => !v);
+          if (!open && !link) void create();
+        }}
+        className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-chip hover:text-foreground"
+      >
+        <Share2 className="size-4" />
+      </button>
+      {open && (
+        <div className="absolute top-11 right-0 z-50 w-72 rounded-2xl border border-border bg-elevated p-3 text-sm shadow-[var(--shadow-composer)]">
+          <p className="mb-2 font-medium">Share this chat</p>
+          <p className="mb-3 text-xs text-muted">Anyone with the link can read this conversation (text only). New messages appear too.</p>
+          {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+          {link ? (
+            <>
+              <div className="mb-2 flex items-center gap-2 rounded-xl border border-border px-2 py-1.5">
+                <Link2 className="size-3.5 shrink-0 text-muted" />
+                <span className="min-w-0 flex-1 truncate text-xs">{link}</span>
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard?.writeText(link).then(() => setCopied(true))}
+                  className="shrink-0 rounded-full bg-chip px-2 py-0.5 text-xs"
+                >
+                  {copied ? <Check className="size-3.5" /> : "Copy"}
+                </button>
+              </div>
+              <button type="button" onClick={() => void revoke()} className="text-xs text-danger hover:underline">
+                Stop sharing (the link stops working)
+              </button>
+            </>
+          ) : (
+            !error && <p className="text-xs text-muted">Creating link…</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HeaderActions() {
   const canvasOpen = useChat((s) => s.canvasOpen);
   const setCanvasOpen = useChat((s) => s.setCanvasOpen);
   return (
     <div className="flex items-center gap-0.5">
+      <ShareButton />
       <button
         type="button"
         aria-label={canvasOpen ? "Close canvas" : "Open canvas"}

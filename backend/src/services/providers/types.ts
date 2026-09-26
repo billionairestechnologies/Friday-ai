@@ -64,6 +64,18 @@ export interface ProviderAdapter {
     onThink?: (text: string) => void,
     onUsage?: (usage: import("../tokenUsage.js").TokenUsage) => void,
   ): Promise<string>;
+  /**
+   * Optional native tool calling (see toolCalling.ts): one streamed model turn that may end in tool
+   * calls instead of (or after) text. Only adapters whose API supports structured tools implement
+   * it; chat falls back to plain `chatStream` for the rest.
+   */
+  chatStreamWithTools?(
+    apiKey: string,
+    model: string,
+    messages: import("./toolCalling.js").AgentMessage[],
+    opts: import("./toolCalling.js").ToolTurnOptions,
+    onDelta: (text: string) => void,
+  ): Promise<import("./toolCalling.js").ToolTurnResult>;
 }
 
 export function safeErrorMessage(err: unknown): string {
