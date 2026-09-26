@@ -515,6 +515,13 @@ export async function runBuildAgent(opts: {
         const message = err instanceof Error ? err.message : "action failed";
         finish("error", message);
         turn.results.push(`[${action.kind}] failed: ${message}`);
+        // write/edit/read/grep/ls/pr failures used to never reach seenErrors (only run/start did),
+        // so a broken sandbox connection could fail every single write in a turn — 15 in a row,
+        // confirmed in production 2026-09-26 — with no "step back" reflection and no early stop.
+        // Sandbox.ts now auto-reconnects once on that specific error; this is the fallback for
+        // anything that still fails repeatedly (e.g. E2B itself unreachable).
+        const key = `${action.kind}::${"path" in action ? action.path : ""}::${tail(message, 200)}`;
+        seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
       }
     };
 
