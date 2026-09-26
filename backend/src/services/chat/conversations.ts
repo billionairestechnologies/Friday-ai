@@ -189,7 +189,7 @@ export async function listMessages(userId: string, conversationId: string, page:
   await getOwnedConversation(userId, conversationId);
   let query = supabaseAdmin
     .from("messages")
-    .select("*, message_attachments(*)")
+    .select(`${MESSAGE_COLUMNS}, message_attachments(*)`)
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
     .limit(pageSize(page.limit));
@@ -197,6 +197,29 @@ export async function listMessages(userId: string, conversationId: string, page:
   const { data, error } = await query;
   if (error) throw new HttpError(500, error.message);
   return withResolvedAttachments([...(data ?? [])].reverse());
+}
+
+/**
+ * Explicit column list for message reads. Never `select("*")`: `messages.search_tsv` is a generated
+ * full-text column (migration 0026) that can be as large as the message itself — returning it made
+ * every history load huge and chats open blank on the clients.
+ */
+export const MESSAGE_COLUMNS =
+  "id, conversation_id, role, content, input_mode, created_at, model_label, thinking, citations, agents, used_think, used_search, used_canvas, error, extracted_text, build";
+
+const DEFAULT_TITLES = ["New chat", "Auto chat", "Team Up chat"];
+
+/** Gives a still-default-titled conversation a title from its first message (clients only ever set it locally). */
+function titleFromMessage(content: string): string {
+  const clean = content.replace(/\s+/g, " ").trim();
+  return clean.length > 48 ? clean.slice(0, 48).trimEnd() + "…" : clean;
+}
+
+async function titleConversationFromFirstMessage(conversationId: string, content: string) {
+  const title = titleFromMessage(content);
+  if (!title) return;
+  const { error } = await supabaseAdmin.from("conversations").update({ title }).eq("id", conversationId).in("title", DEFAULT_TITLES);
+  if (error) console.error("[chat] failed to set conversation title:", error.message);
 }
 
 export async function insertUserMessage(
@@ -209,9 +232,10 @@ export async function insertUserMessage(
   const { data, error } = await supabaseAdmin
     .from("messages")
     .insert({ conversation_id: conversationId, role: "user", content, input_mode: inputMode })
-    .select()
+    .select(MESSAGE_COLUMNS)
     .single();
   if (error || !data) throw new HttpError(500, error?.message ?? "Failed to save message");
+  void titleConversationFromFirstMessage(conversationId, content);
 
   if (attachments.length > 0) {
     const ownerId = userId ?? "anonymous";
@@ -256,7 +280,7 @@ export async function insertAssistantMessage(
       error: metadata.error ?? null,
       build: metadata.build ?? null,
     })
-    .select()
+    .select(MESSAGE_COLUMNS)
     .single();
   if (error || !data) throw new HttpError(500, error?.message ?? "Failed to save reply");
   // Auto-save any code / pages / images in the reply to the user's Library (fire-and-forget).

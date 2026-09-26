@@ -1,3 +1,4 @@
+import { MESSAGE_COLUMNS } from "../services/chat/conversations.js";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { supabaseAdmin } from "../config/supabase.js";
@@ -299,7 +300,7 @@ export async function exportAccount(req: Request, res: Response) {
 
   const { data: conversations, error: conversationsError } = await supabaseAdmin
     .from("conversations")
-    .select("*, providers(slug, display_name), messages(*, message_attachments(*))")
+    .select(`*, providers(slug, display_name), messages(${MESSAGE_COLUMNS}, message_attachments(*))`)
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
   if (conversationsError) throw new HttpError(500, conversationsError.message);
