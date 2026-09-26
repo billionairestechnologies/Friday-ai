@@ -150,3 +150,12 @@ test("compactToolResults shortens the oldest tool results first until the budget
   assert.equal(messages[2]!.content.length, 5000, "newest result kept intact once under budget");
   assert.match(messages[1]!.content, /shortened/);
 });
+
+test("search snippets centre on the first matching term", async () => {
+  const { snippetAround } = await import("../src/services/chat/searchAndShare.js");
+  const text = `${"lorem ipsum ".repeat(40)}the Razorpay webhook signature failed ${"dolor sit ".repeat(40)}`;
+  const snip = snippetAround(text, "razorpay webhook");
+  assert.match(snip, /Razorpay webhook signature failed/);
+  assert.ok(snip.startsWith("…") && snip.endsWith("…"));
+  assert.equal(snippetAround("short text", "zzz"), "short text");
+});

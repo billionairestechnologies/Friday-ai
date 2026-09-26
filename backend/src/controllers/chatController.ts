@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import * as chatService from "../services/chat/index.js";
+import * as searchAndShare from "../services/chat/searchAndShare.js";
 import { finishGeneration, registerGeneration, stopGeneration } from "../services/chat/activeGenerations.js";
 import { notifyUser } from "../services/pushService.js";
 
@@ -178,4 +179,23 @@ export async function streamMessage(req: Request, res: Response) {
 export async function stopMessage(req: Request, res: Response) {
   stopGeneration(req.params.id, req.user!.id);
   res.status(204).end();
+}
+
+export async function search(req: Request, res: Response) {
+  const { q } = z.object({ q: z.string().max(200).default("") }).parse(req.query);
+  res.json({ results: await searchAndShare.searchMessages(req.user!.id, q) });
+}
+
+export async function share(req: Request, res: Response) {
+  res.json(await searchAndShare.shareConversation(req.user!.id, req.params.id));
+}
+
+export async function unshare(req: Request, res: Response) {
+  await searchAndShare.unshareConversation(req.user!.id, req.params.id);
+  res.status(204).end();
+}
+
+export async function getShared(req: Request, res: Response) {
+  res.setHeader("Cache-Control", "private, max-age=60");
+  res.json(await searchAndShare.getSharedConversation(req.params.token));
 }

@@ -12,7 +12,7 @@ import { authRouter } from "./routes/auth.js";
 import { adminProvidersRouter } from "./routes/adminProviders.js";
 import { adminQuotaRouter } from "./routes/adminQuota.js";
 import { modelsRouter } from "./routes/models.js";
-import { chatRouter } from "./routes/chat.js";
+import { chatRouter, shareRouter } from "./routes/chat.js";
 import { pushRouter } from "./routes/push.js";
 import { libraryRouter } from "./routes/library.js";
 import { memoryRouter } from "./routes/memory.js";
@@ -75,6 +75,7 @@ export function createApp() {
   app.use("/api/admin/quota", adminQuotaRouter);
   app.use("/api/models", modelsRouter);
   app.use("/api/chat", chatRouter);
+  app.use("/api/share", shareRouter);
   app.use("/api/push", pushRouter);
   app.use("/api/library", libraryRouter);
   app.use("/api/memory", memoryRouter);

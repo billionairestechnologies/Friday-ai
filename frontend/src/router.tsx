@@ -7,6 +7,7 @@ import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
 import { TeamPage } from "@/routes/team";
 import { LibraryPage } from "@/routes/library";
 import { AutomationsPage } from "@/routes/automations";
+import { SharePage } from "@/routes/share";
 import { MobileAuthBridge } from "@/routes/mobile-auth-bridge";
 import { AppErrorComponent } from "@/lib/error-component";
 
@@ -105,6 +106,17 @@ const automationsRoute = createRoute({
   component: AutomationsPage,
 });
 
+function ShareRoute() {
+  const { token } = useParams({ strict: false }) as { token: string };
+  return <SharePage token={token} />;
+}
+
+const shareRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/share/$token",
+  component: ShareRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   conversationRoute,
@@ -116,6 +128,7 @@ const routeTree = rootRoute.addChildren([
   mobileAuthBridgeRoute,
   libraryRoute,
   automationsRoute,
+  shareRoute,
 ]);
 
 export const router = createRouter({ routeTree });
