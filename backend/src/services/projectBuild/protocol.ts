@@ -54,10 +54,13 @@ function partialOpenLength(text: string): number {
  */
 export class ActionParser {
   private buf = "";
+  private announced = false;
 
   constructor(
     private readonly onText: (text: string) => void,
     private readonly onAction: (action: BuildAction) => void,
+    /** Fires once as soon as a write/run/start tag OPENS (before its body finishes streaming), so the UI can show live activity. */
+    private readonly onOpenTag?: (name: string, attrs: Record<string, string>) => void,
   ) {}
 
   feed(chunk: string) {
@@ -107,15 +110,21 @@ export class ActionParser {
       }
       const closeTag = `</friday-${name}>`;
       const close = this.buf.indexOf(closeTag, gt + 1);
+      if (!this.announced && (name === "write" || name === "run" || name === "start")) {
+        this.announced = true;
+        this.onOpenTag?.(name, a);
+      }
       if (close === -1) {
         if (final) {
           this.onAction({ kind: "malformed", reason: `your <friday-${name}> block was cut off before its closing tag` });
           this.buf = "";
+          this.announced = false;
         }
         return;
       }
       const body = this.buf.slice(gt + 1, close);
       this.buf = this.buf.slice(close + closeTag.length);
+      this.announced = false;
       this.emit(name, a, body);
     }
   }

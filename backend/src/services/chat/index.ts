@@ -36,6 +36,7 @@ import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
+import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
@@ -486,6 +487,18 @@ export async function streamMessage(
     if (await buildIntentPromise) {
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
       onEvent({ t: "status", s: "building" });
+      // A brand-new project (no files yet, no question round yet) may be missing details that change
+      // what gets built — ask first, with a recommended option per question, instead of guessing.
+      if (!alreadyAsked(history) && Object.keys((await getProject(conversationId))?.files ?? {}).length === 0) {
+        const questions = await clarifyRequest(history, candidates);
+        if (questions.length > 0 && !signal?.aborted) {
+          onEvent({ t: "ask", questions });
+          await insertAssistantMessage(conversationId, ASK_MARKER, "Build", { usedCanvas: false, usedSearch: false, usedThink: false, build: { steps: [], ask: questions } });
+          await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+          onEvent({ t: "done" });
+          return;
+        }
+      }
       const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });

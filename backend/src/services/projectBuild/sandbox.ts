@@ -319,7 +319,7 @@ console.log(JSON.stringify({ errors: errors.slice(0, 8), len }));`,
 export async function ensurePreview(userId: string, conversationId: string): Promise<{ url: string | null; port: number | null; message?: string }> {
   const project = await getProject(conversationId);
   if (!project || !project.start_cmd || !project.port) {
-    return { url: null, port: null, message: "This project has no runnable server yet." };
+    return { url: null, port: null, message: "Nothing has been built here yet — send “build it” in the chat to start." };
   }
   const box = await BuildSandbox.open(userId, conversationId);
   const { port, start_cmd: startCmd } = project;

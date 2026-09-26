@@ -67,13 +67,13 @@ function WriteGroup({ steps }: { steps: BuildStep[] }) {
       </span>
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 py-1 text-left text-sm hover:text-foreground">
         <span className="text-foreground">{running ? "Editing" : "Edited"} {steps.length} file{steps.length === 1 ? "" : "s"}</span>
-        <span className="min-w-0 flex-1 truncate text-muted">{steps.map((st) => st.label.replace(/^Wrote /, "")).join(", ")}</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{steps.map((st) => st.label.replace(/^(Wrote|Writing) /, "").replace(/…$/, "")).join(", ")}</span>
         <ChevronRight className={cn("size-3.5 text-subtle transition-transform", open && "rotate-90")} />
       </button>
       {open && (
         <div className="mb-1 rounded-lg bg-chip p-2 font-mono text-[11px] leading-relaxed text-muted">
           {steps.map((st) => (
-            <div key={st.id}>{st.label.replace(/^Wrote /, "")}</div>
+            <div key={st.id}>{st.label.replace(/^(Wrote|Writing) /, "").replace(/…$/, "")}</div>
           ))}
         </div>
       )}

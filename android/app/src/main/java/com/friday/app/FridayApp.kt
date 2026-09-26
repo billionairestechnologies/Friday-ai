@@ -650,6 +650,16 @@ private fun ChatShell(
                         )
                     }
                 }
+                val lastMsg = chat?.messages.orEmpty().lastOrNull()
+                val pendingAsk = lastMsg?.takeIf { it.role == com.friday.app.data.Role.Assistant && !it.isStreaming }?.build?.ask.orEmpty()
+                var dismissedAskFor by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+                if (pendingAsk.isNotEmpty() && lastMsg != null && dismissedAskFor != lastMsg.id) {
+                    com.friday.app.ui.chat.AskPanel(
+                        questions = pendingAsk,
+                        onDismiss = { dismissedAskFor = lastMsg.id },
+                        onSubmit = { text -> dismissedAskFor = lastMsg.id; vm.send(text) },
+                    )
+                }
                 ComposerBar(
                     draft = ui.draft,
                     onDraft = vm::setDraft,

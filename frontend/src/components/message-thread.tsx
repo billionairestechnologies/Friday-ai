@@ -9,6 +9,7 @@ import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
+import { AskCard } from "@/components/ask-panel";
 import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
@@ -145,6 +146,7 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
     >
       {message.streaming && message.build && message.build.steps.length === 0 && !message.build.plan && <BuildBanner />}
 
+      {message.build?.ask?.length ? <AskCard questions={message.build.ask} /> : null}
       {message.build && (message.build.steps.length > 0 || message.build.plan) && (
         <BuildSteps build={message.build} streaming={Boolean(message.streaming)} />
       )}

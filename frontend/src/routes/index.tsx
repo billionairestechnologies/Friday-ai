@@ -17,7 +17,8 @@ import { createStreamBatcher } from "@/lib/chat/raf-batch";
 import { streamMessage } from "@/lib/chat/stream";
 import { useChat, type ServerConversation, type ServerMessage } from "@/lib/chat/store";
 import { extractArtifact } from "@/lib/chat/artifact";
-import type { ChatMessage } from "@/lib/chat/types";
+import type { AskQuestion, ChatMessage } from "@/lib/chat/types";
+import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
@@ -64,6 +65,12 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     Boolean(s.chats.find((c) => c.id === s.activeId)?.messages.some((m) => m.streaming)),
   );
   const activeId = useChat((s) => s.activeId);
+  // Build Mode question round: the newest message is an unanswered set of questions.
+  const pendingAsk = useChat((s) => {
+    const last = s.chats.find((c) => c.id === s.activeId)?.messages.at(-1);
+    return last && last.role === "assistant" && !last.streaming && last.build?.ask?.length ? { id: last.id, questions: last.build.ask } : null;
+  });
+  const [dismissedAsk, setDismissedAsk] = useState<string | null>(null);
   const queued = useQueue((s) => (activeId ? s.byChat[activeId] : undefined)) ?? [];
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -263,6 +270,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf" || OFFICE_MIMES.has(a.mime))
       .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl, name: a.name, size: a.size, kind: a.kind }));
 
+    let askQuestions: AskQuestion[] | undefined;
     try {
       await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
         if (ev.t === "status" && ev.s === "building") applyLive(chatId, { text: "", think: "", cites: [], agents: [], status: "building" });
@@ -275,6 +283,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         else if (ev.t === "cite") batch.cite({ url: ev.u, title: ev.title });
         else if (ev.t === "agent") batch.agent({ slug: ev.slug, model: ev.model, state: ev.state, error: ev.error });
         else if (ev.t === "step") applyLiveStep(chatId, { id: ev.id, kind: ev.kind, label: ev.label, state: ev.state, detail: ev.detail });
+        else if (ev.t === "ask") askQuestions = ev.questions;
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName });
         else if (ev.t === "preview") {
@@ -297,7 +306,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       batch.flush();
       const live = peekLive(chatId);
       useChat.getState().commitTurn(chatId, assistantId, {
-        content: live?.text ?? "",
+        content: live?.text || (askQuestions ? ASK_MARKER : ""),
         thinking: live?.think,
         citations: live?.cites,
         agents: live?.agents,
@@ -308,7 +317,9 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         // manual, so the chain-of-thought/sources panel still renders after the turn completes.
         usedSearch: Boolean(live?.cites?.length),
         usedCanvas: live?.canvasOn,
-        build: live && (live.steps.length || live.preview || live.plan)
+        build: askQuestions
+          ? { steps: [], ask: askQuestions }
+          : live && (live.steps.length || live.preview || live.plan)
           ? { plan: live.plan, steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
           : undefined,
       });
@@ -463,6 +474,9 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                         </div>
                       ))}
                     </div>
+                  )}
+                  {pendingAsk && dismissedAsk !== pendingAsk.id && (
+                    <AskPanel questions={pendingAsk.questions} onSubmit={(text) => void send(text)} onDismiss={() => setDismissedAsk(pendingAsk.id)} />
                   )}
                   <Composer
                     onSend={(message, files) => void send(message, files)}

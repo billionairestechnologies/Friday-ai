@@ -224,8 +224,13 @@ export async function runBuildAgent(opts: {
     });
     emitPlan();
   };
+  // A short follow-up on an existing project ("run it", "fix the header") needs no plan card.
+  const smallFollowUp =
+    existingFiles.length > 0 &&
+    userRequest.length <= 160 &&
+    !/\b(build|create|implement|redesign|rewrite|from scratch|integrate|add (a |an )?(new )?(page|feature|module|system|auth|login|dashboard|database))\b/i.test(userRequest);
   try {
-    const planner = opts.candidates[0];
+    const planner = smallFollowUp ? null : opts.candidates[0];
     if (planner) {
       const adapter = getProviderAdapter(planner.slug);
       const apiKey = await getWorkingKeyForProvider(planner.slug);
@@ -251,6 +256,25 @@ export async function runBuildAgent(opts: {
     console.error("[build] planning skipped:", err instanceof Error ? err.message : err);
   }
 
+  // Save the project to our database as work progresses (not only at the end) so a dropped connection
+  // or an early-killed sandbox never loses what was already written.
+  let snapshotting = false;
+  let lastSnapshotAt = 0;
+  let writesSinceSnapshot = 0;
+  const saveProgress = async (force = false) => {
+    if (snapshotting || (!force && Date.now() - lastSnapshotAt < 20_000)) return;
+    snapshotting = true;
+    try {
+      await box.snapshot(last.start?.cmd, last.start?.port);
+      lastSnapshotAt = Date.now();
+      writesSinceSnapshot = 0;
+    } catch {
+      /* best-effort */
+    } finally {
+      snapshotting = false;
+    }
+  };
+
   const seenErrors = new Map<string, number>();
   const reflected = new Set<string>();
   let finalDone: string | null = null;
@@ -270,6 +294,7 @@ export async function runBuildAgent(opts: {
     const turn: Iteration = { assistantText: "", results: [], done: null, anyAction: false };
     let chain: Promise<void> = Promise.resolve();
 
+    let liveStep: BuildStep | null = null;
     const runAction = async (action: BuildAction) => {
       turn.anyAction = true;
       if (action.kind === "done") {
@@ -281,12 +306,26 @@ export async function runBuildAgent(opts: {
         return;
       }
       if (action.kind === "malformed") {
+        if (liveStep) {
+          liveStep.state = "error";
+          liveStep.detail = action.reason;
+          onEvent({ t: "step", ...liveStep });
+          liveStep = null;
+        }
         turn.results.push(`[error] ${action.reason}. Re-send that action correctly (split very large files if needed).`);
         return;
       }
       const meta = describe(action)!;
-      const step: BuildStep = { id: `s${++stepSeq}`, kind: meta.kind, label: meta.label, state: "running" };
-      steps.push(step);
+      // Reuse the row that was already shown live while the model was still writing this action.
+      let step: BuildStep;
+      if (liveStep && liveStep.kind === meta.kind) {
+        step = liveStep;
+        liveStep = null;
+        step.label = meta.label;
+      } else {
+        step = { id: `s${++stepSeq}`, kind: meta.kind, label: meta.label, state: "running" };
+        steps.push(step);
+      }
       onEvent({ t: "step", ...step });
       const finish = (state: "ok" | "error", detail?: string) => {
         step.state = state;
@@ -304,6 +343,7 @@ export async function runBuildAgent(opts: {
           }
           await box.write(path, action.content);
           finish("ok");
+          if (++writesSinceSnapshot >= 6) void saveProgress();
           turn.results.push(`[write ${path}] ok (${action.content.length} chars)`);
         } else if (action.kind === "read") {
           const path = safeProjectPath(action.path);
@@ -318,6 +358,7 @@ export async function runBuildAgent(opts: {
         } else if (action.kind === "run") {
           const out = await box.run(action.cmd, 5 * 60_000, signal);
           lastRunState.set(action.cmd, out.ok ? "ok" : "error");
+          if (out.ok && /\b(install|add|ci)\b/.test(action.cmd)) void saveProgress(true);
           finish(out.ok ? "ok" : "error", out.output);
           turn.results.push(`[run ${JSON.stringify(action.cmd)}] exit ${out.exitCode}\n${tail(out.output)}`);
           if (!out.ok) {
@@ -328,6 +369,7 @@ export async function runBuildAgent(opts: {
           const res = await box.start(action.cmd, action.port);
           if (res.ready && res.url) {
             last.start = { cmd: action.cmd, port: action.port };
+            void saveProgress(true);
             build.previewUrl = res.url;
             build.port = action.port;
             onEvent({ t: "preview", url: res.url, port: action.port });
@@ -379,6 +421,20 @@ export async function runBuildAgent(opts: {
           return runAction(action);
         });
       },
+      (name, a) => {
+        // Show what is happening the moment the model starts it — big files take a while to generate.
+        const narration = pendingText;
+        pendingText = "";
+        chain = chain.then(() => {
+          pushNote(narration);
+          const label =
+            name === "write" ? `Writing ${a.path ?? "file"}…` : name === "start" ? a.desc || "Starting server…" : a.desc || "Running command…";
+          const step: BuildStep = { id: `s${++stepSeq}`, kind: name as BuildStep["kind"], label, state: "running" };
+          steps.push(step);
+          liveStep = step;
+          onEvent({ t: "step", ...step });
+        });
+      },
     );
 
     // Same fall-through the normal chat path uses: first candidate that produces output wins.
@@ -415,6 +471,11 @@ export async function runBuildAgent(opts: {
     }
     parser.end();
     await chain;
+    if (liveStep) {
+      (liveStep as BuildStep).state = "error";
+      onEvent({ t: "step", ...(liveStep as BuildStep) });
+      liveStep = null;
+    }
     if (process.env.FRIDAY_BUILD_DEBUG) console.log(`[build debug] iteration ${iteration} raw (${raw.length} chars):\n${raw.slice(0, 1800)}\n---`);
     // Text after the last action of a turn: narration if the turn did things, otherwise the model is
     // answering directly (a plain reply) and this is final content.

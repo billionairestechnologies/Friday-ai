@@ -12,11 +12,22 @@ enum ChatEvent {
     case step(BuildStep)
     case preview(url: String, port: Int)
     case plan(BuildPlan)
+    case ask([BuildAskQuestion])
     case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
     case done
 }
 
 enum ChatApi {
+    static func parseAsk(_ raw: Any?) -> [BuildAskQuestion] {
+        (raw as? [[String: Any]] ?? []).compactMap { q in
+            guard let text = q["question"] as? String, !text.isEmpty else { return nil }
+            let opts = (q["options"] as? [[String: Any]] ?? []).map {
+                BuildAskOption(label: $0["label"] as? String ?? "", description: $0["description"] as? String ?? "", recommended: $0["recommended"] as? Bool ?? false)
+            }
+            return BuildAskQuestion(id: q["id"] as? String ?? UUID().uuidString, question: text, options: opts)
+        }
+    }
+
     struct StreamAttachment {
         let mime: String
         let dataUrl: String
@@ -141,6 +152,8 @@ enum ChatApi {
                         case "plan":
                             let items = (json["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
                             continuation.yield(.plan(BuildPlan(architecture: json["architecture"] as? String ?? "", items: items)))
+                        case "ask":
+                            continuation.yield(.ask(ChatApi.parseAsk(json["questions"])))
                         case "build":
                             continuation.yield(.buildMeta(elapsedMs: json["elapsedMs"] as? Int, zipBytes: json["zipBytes"] as? Int, zipName: json["zipName"] as? String))
                         case "done":
@@ -220,7 +233,8 @@ enum ConversationsApi {
                         items: (p["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
                     )
                 }
-                build = BuildInfo(plan: plan, steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String)
+                let ask = ChatApi.parseAsk(b["ask"])
+                build = BuildInfo(plan: plan, steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String, ask: ask.isEmpty ? nil : ask)
             }
             return ChatMessage(
                 id: row["id"] as? String ?? UUID().uuidString,

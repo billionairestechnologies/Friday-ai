@@ -62,9 +62,26 @@ data class BuildPlanItem(val text: String, val state: String)
 /** Architecture + todo checklist Build Mode drafts before coding, updated live as items finish. */
 data class BuildPlan(val architecture: String, val items: List<BuildPlanItem>)
 
+data class BuildAskOption(val label: String, val description: String, val recommended: Boolean)
+data class BuildAskQuestion(val id: String, val question: String, val options: List<BuildAskOption>)
+
+fun parseBuildAsk(arr: org.json.JSONArray?): List<BuildAskQuestion> {
+    if (arr == null) return emptyList()
+    return (0 until arr.length()).mapNotNull { i ->
+        val q = arr.optJSONObject(i) ?: return@mapNotNull null
+        val oa = q.optJSONArray("options")
+        val opts = if (oa == null) emptyList() else (0 until oa.length()).mapNotNull { k ->
+            val o = oa.optJSONObject(k) ?: return@mapNotNull null
+            BuildAskOption(o.optString("label"), o.optString("description"), o.optBoolean("recommended", false))
+        }
+        BuildAskQuestion(q.optString("id").ifBlank { "q${i + 1}" }, q.optString("question"), opts)
+    }
+}
+
 /** What Build Mode did for a message: its steps plus the live preview it produced (if any). */
 data class BuildInfo(
     val plan: BuildPlan? = null,
+    val ask: List<BuildAskQuestion> = emptyList(),
     val steps: List<BuildStep> = emptyList(),
     val previewUrl: String? = null,
     val port: Int? = null,
@@ -132,6 +149,7 @@ sealed class ChatEvent {
     /** End-of-build summary: how long it took and the project zip's size/name (from {"t":"build",...}). */
     data class Plan(val plan: BuildPlan) : ChatEvent()
     data class BuildMeta(val elapsedMs: Long?, val zipBytes: Long?, val zipName: String?) : ChatEvent()
+    data class Ask(val questions: List<BuildAskQuestion>) : ChatEvent()
     data object Done : ChatEvent()
 }
 

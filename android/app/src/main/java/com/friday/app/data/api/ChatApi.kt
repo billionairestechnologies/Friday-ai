@@ -192,6 +192,7 @@ object ChatApi {
                                         zipName = json.optString("zipName").ifBlank { null },
                                     ),
                                 )
+                                "ask" -> emit(ChatEvent.Ask(com.friday.app.data.parseBuildAsk(json.optJSONArray("questions"))))
                                 "done" -> done = true
                             }
                         }

@@ -129,6 +129,13 @@ private struct ChatShell: View {
                             }
                     )
 
+                    if let pending = vm.pendingAsk {
+                        BuildAskPanel(messageId: pending.messageId, questions: pending.questions)
+                            .id(pending.messageId)
+                            .padding(.horizontal, 12)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
                     ComposerBar()
                         .padding(.bottom, 8)
                         .opacity(composerIn ? 1 : 0)

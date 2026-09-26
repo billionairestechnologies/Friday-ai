@@ -43,7 +43,12 @@ export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
 export type BuildPlan = { architecture: string; items: BuildPlanItem[] };
 
 /** What Build Mode did for a message: the steps it ran and the live preview it produced. */
+export type AskOption = { label: string; description?: string; recommended?: boolean };
+export type AskQuestion = { id: string; question: string; options: AskOption[] };
+
 export type BuildInfo = {
+  /** Set when Build Mode is asking clarifying questions before it starts building. */
+  ask?: AskQuestion[];
   plan?: BuildPlan;
   steps: BuildStep[];
   previewUrl?: string;
@@ -104,6 +109,7 @@ export type StreamEvent =
   | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string }
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string }
+  | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[] }
   | { t: "err"; c: string }
   | { t: "done" };

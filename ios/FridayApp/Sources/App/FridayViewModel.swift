@@ -55,6 +55,15 @@ final class FridayViewModel: ObservableObject {
     private var conversationModels: [String: String] = [:]
     private let currentVersion = "1.0.0"
 
+    @Published var dismissedAskIds: Set<String> = []
+
+    /// Pending Build Mode questions: the latest message is an assistant ask nobody answered yet.
+    var pendingAsk: (messageId: String, questions: [BuildAskQuestion])? {
+        guard let last = currentChat?.messages.last, last.role == .assistant, !last.isStreaming,
+              let ask = last.build?.ask, !ask.isEmpty, !dismissedAskIds.contains(last.id) else { return nil }
+        return (last.id, ask)
+    }
+
     var currentChat: ChatThread? {
         chats.first { $0.id == currentId }
     }
@@ -326,6 +335,10 @@ final class FridayViewModel: ObservableObject {
         case .plan(let plan):
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.plan = plan
+            chats[ci].messages[mi].build = build
+        case .ask(let questions):
+            var build = chats[ci].messages[mi].build ?? BuildInfo()
+            build.ask = questions
             chats[ci].messages[mi].build = build
         case .buildMeta(let elapsedMs, let zipBytes, let zipName):
             var build = chats[ci].messages[mi].build ?? BuildInfo()

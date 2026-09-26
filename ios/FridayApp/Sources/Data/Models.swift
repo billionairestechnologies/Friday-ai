@@ -58,6 +58,18 @@ struct BuildPlan: Hashable {
     var items: [BuildPlanItem]
 }
 
+struct BuildAskOption: Hashable {
+    let label: String
+    var description: String = ""
+    var recommended: Bool = false
+}
+
+struct BuildAskQuestion: Identifiable, Hashable {
+    let id: String
+    let question: String
+    var options: [BuildAskOption]
+}
+
 /// What Build Mode did for a message: its steps plus the live preview it produced (if any).
 struct BuildInfo: Hashable {
     var plan: BuildPlan?
@@ -67,6 +79,7 @@ struct BuildInfo: Hashable {
     var elapsedMs: Int?
     var zipBytes: Int?
     var zipName: String?
+    var ask: [BuildAskQuestion]?
 }
 
 struct ChatMessage: Identifiable, Hashable {

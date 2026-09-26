@@ -81,6 +81,10 @@ private struct MessageRow: View {
                         .transition(.opacity)
                 }
 
+                if let ask = message.build?.ask, !ask.isEmpty {
+                    BuildAskCard(questions: ask)
+                }
+
                 if !message.isStreaming, let build = message.build, build.zipBytes != nil, let conversationId = vm.currentId {
                     ProjectZipCard(build: build, conversationId: conversationId)
                 }

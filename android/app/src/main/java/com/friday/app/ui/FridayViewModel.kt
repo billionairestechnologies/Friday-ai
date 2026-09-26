@@ -674,6 +674,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         is ChatEvent.BuildMeta -> patchMessage(chatId!!, asstId) { msg ->
                             msg.copy(build = (msg.build ?: BuildInfo()).copy(elapsedMs = event.elapsedMs, zipBytes = event.zipBytes, zipName = event.zipName))
                         }
+                        is ChatEvent.Ask -> patchMessage(chatId!!, asstId) { msg ->
+                            msg.copy(build = (msg.build ?: BuildInfo()).copy(ask = event.questions))
+                        }
                         ChatEvent.Done -> patchMessage(chatId!!, asstId) {
                             it.copy(isStreaming = false)
                         }

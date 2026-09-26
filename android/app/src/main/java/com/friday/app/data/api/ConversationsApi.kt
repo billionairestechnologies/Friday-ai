@@ -67,6 +67,7 @@ object ConversationsApi {
                                 val arr = po.optJSONArray("items") ?: JSONArray()
                                 BuildPlan(po.optString("architecture"), (0 until arr.length()).map { k -> arr.getJSONObject(k).let { BuildPlanItem(it.optString("text"), it.optString("state")) } })
                             },
+                            ask = com.friday.app.data.parseBuildAsk(b.optJSONArray("ask")),
                             steps = (0 until stepArr.length()).map { k ->
                                 val st = stepArr.getJSONObject(k)
                                 BuildStep(
