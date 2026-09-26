@@ -7,7 +7,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { saveFile } from "@/lib/chat/download";
 import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
-import { shouldShowPlan } from "@/lib/chat/planning";
+import { shouldShowPlan, toolOnlySteps } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
 import { AskCard } from "@/components/ask-panel";
 import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
@@ -147,7 +147,7 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
       {message.streaming && message.build && message.build.steps.length === 0 && !message.build.plan && <BuildBanner />}
 
       {message.build?.ask?.length ? <AskCard questions={message.build.ask} /> : null}
-      {message.build && (message.build.steps.length > 0 || message.build.plan) && (
+      {message.build && (message.build.steps.length > 0 || message.build.plan) && toolOnlySteps(message).length === 0 && (
         <BuildSteps build={message.build} streaming={Boolean(message.streaming)} />
       )}
 

@@ -9,6 +9,7 @@ import { ProviderLogo } from "@/components/provider-logos";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useElapsedSeconds, useRotatingThinkingLine, useSimulatedProgress } from "@/lib/chat/thinking-lines";
 import { cn } from "@/lib/utils";
+import { toolOnlySteps } from "@/lib/chat/planning";
 import type { ChatMessage } from "@/lib/chat/types";
 
 function hostOf(url: string) {
@@ -32,6 +33,7 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
   const hasContent = Boolean(message.content.trim());
   const hasThink = Boolean(message.thinking?.trim());
   const hits = hitsFrom(message);
+  const toolSteps = toolOnlySteps(message);
   const searchOn = Boolean(message.usedSearch);
   const thinkOn = Boolean(message.usedThink || hasThink);
   const canvasOn = Boolean(message.usedCanvas);
@@ -82,9 +84,11 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
                   : "Working"
       : hasAgents
         ? `Team of ${agents.length} consulted`
-        : searchOn && hits.length
+        : (searchOn || toolSteps.length > 0) && hits.length
           ? `Searched ${hits.length} source${hits.length === 1 ? "" : "s"}`
-          : thinkOn
+          : toolSteps.length > 0
+            ? `Used ${toolSteps.length} tool${toolSteps.length === 1 ? "" : "s"}`
+            : thinkOn
             ? "Thought"
             : canvasOn
               ? "Plan"
@@ -164,6 +168,14 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
           status={synthesizing ? "active" : hasContent || !live ? "complete" : "pending"}
         />
       )}
+
+      {toolSteps.map((st) => (
+        <ThoughtStep
+          key={st.id}
+          title={st.label}
+          status={st.state === "running" ? "active" : st.state === "error" ? "error" : "complete"}
+        />
+      ))}
 
       {searchOn && (
         <ThoughtStep

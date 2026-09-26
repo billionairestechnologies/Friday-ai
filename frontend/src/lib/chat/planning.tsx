@@ -19,9 +19,17 @@ function hostOf(url: string) {
   }
 }
 
+/** Steps of a chat turn that only used tools (web search, page reads, Gmail…) — no Build Mode work. */
+export function toolOnlySteps(message: ChatMessage) {
+  const build = message.build;
+  if (!build || build.plan || build.steps.length === 0) return [];
+  return build.steps.every((st) => st.kind === "tool") ? build.steps : [];
+}
+
 export function shouldShowPlan(message: ChatMessage) {
   return Boolean(
-    message.usedThink ||
+    toolOnlySteps(message).length ||
+      message.usedThink ||
       message.usedSearch ||
       message.usedCanvas ||
       message.agents?.length ||

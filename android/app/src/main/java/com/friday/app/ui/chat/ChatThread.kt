@@ -161,7 +161,12 @@ private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, con
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (msg.isStreaming && msg.build != null && msg.build.steps.isEmpty() && msg.build.plan == null) BuildBanner()
         msg.build?.takeIf { it.ask.isNotEmpty() }?.let { AskCard(it.ask) }
-        msg.build?.takeIf { it.steps.isNotEmpty() || it.plan != null }?.let { BuildStepsCard(it, msg.isStreaming, onOpenPreview) }
+        // Tool-only turns (web search, page reads…) that already show the Search/Think trail below skip the Build-style tool rows.
+        val hasTrail = Mode.Think in msg.modesUsed || Mode.Search in msg.modesUsed || Mode.Canvas in msg.modesUsed
+        msg.build
+            ?.takeIf { it.steps.isNotEmpty() || it.plan != null }
+            ?.takeUnless { hasTrail && it.plan == null && it.steps.all { s -> s.kind == "tool" } }
+            ?.let { BuildStepsCard(it, msg.isStreaming, onOpenPreview) }
         // Bare pill for as long as there's no actual reply text yet. Gating this on msg.status
         // used to hide it the instant the backend's generic "thinking" status frame landed (it
         // sends one on every reply, mode or no mode — see trailModeActive below) even though the

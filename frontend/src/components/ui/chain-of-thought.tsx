@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,12 @@ export function ThoughtTrail({
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? live);
+  // Fold the trail away once the reply finishes (it stays one tap away); the user can still toggle it either way.
+  const wasLive = useRef(live);
+  useEffect(() => {
+    if (wasLive.current && !live) setOpen(false);
+    wasLive.current = live;
+  }, [live]);
   return (
     <div className="w-full">
       <button

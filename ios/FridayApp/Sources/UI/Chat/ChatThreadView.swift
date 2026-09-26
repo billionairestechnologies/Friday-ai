@@ -65,7 +65,9 @@ private struct MessageRow: View {
                 if message.isStreaming, let build = message.build, build.steps.isEmpty, build.plan == nil {
                     BuildBanner()
                 }
-                if let build = message.build, !build.steps.isEmpty || build.plan != nil {
+                // Tool-only turns (web search, page reads…) that already show the Search/Think trail below skip the Build-style tool rows.
+                if let build = message.build, !build.steps.isEmpty || build.plan != nil,
+                   !(!message.modesUsed.isEmpty && build.plan == nil && build.steps.allSatisfy { $0.kind == "tool" }) {
                     BuildStepsCard(build: build, streaming: message.isStreaming)
                 }
                 if !message.agents.isEmpty {
