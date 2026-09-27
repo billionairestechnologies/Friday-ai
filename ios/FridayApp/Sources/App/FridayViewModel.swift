@@ -122,12 +122,12 @@ final class FridayViewModel: ObservableObject {
     }
 
     private func connectRealtime() async {
-        guard let token = TokenStore.shared.accessToken else { return }
-        // userId isn't exposed by /auth/me in this port; realtime connect is
-        // keyed by whatever id the backend embeds in the JWT server-side —
-        // for the mobile-auth-bridge flow the same token authenticates the
-        // socket regardless, so we pass email as a stable local key.
-        await RealtimeClient.shared.connect(userId: user?.email ?? "", accessToken: token)
+        guard let token = TokenStore.shared.accessToken, let userId = user?.id, !userId.isEmpty else { return }
+        // Must be the Supabase auth.users.id (not email) — it's what the `conversations` table's
+        // user_id column holds, and RealtimeClient filters postgres_changes on `user_id=eq.<userId>`.
+        // Passing email here silently dropped every conversation INSERT/UPDATE event (only
+        // unfiltered DELETE and unfiltered messages events ever matched).
+        await RealtimeClient.shared.connect(userId: userId, accessToken: token)
     }
 
     func syncConversations() async {
@@ -148,9 +148,27 @@ final class FridayViewModel: ObservableObject {
         chats = next
     }
 
+    /// Called when the app returns to the foreground (see FridayAppApp's scenePhase observer).
+    /// Picks up anything that happened while backgrounded — a scheduled automation's reply, a
+    /// message sent from another device — the same gap [selectChat] closes when a screen first
+    /// opens. `refreshMessages` already no-ops while this device has its own stream in flight.
+    func onAppForegrounded() async {
+        guard TokenStore.shared.hasSession() else { return }
+        await syncConversations()
+        guard let id = currentId, let chat = chats.first(where: { $0.id == id }) else { return }
+        guard chat.messages.last?.role == .user else { return }
+        await refreshMessages(id)
+    }
+
     private func refreshMessages(_ conversationId: String) async {
         // Own in-flight write wins over another device's echoed write.
         guard streamJobs[conversationId] == nil else { return }
+        // The conversation may not be in the local list yet (e.g. a brand-new automation chat, or
+        // this realtime event beat the conversations sync) — without this, the lookup below is a
+        // silent no-op and the event is dropped for good.
+        if !chats.contains(where: { $0.id == conversationId }) {
+            await syncConversations()
+        }
         guard let messages = try? await ConversationsApi.messages(conversationId: conversationId) else { return }
         guard let idx = chats.firstIndex(where: { $0.id == conversationId }) else { return }
         chats[idx].messages = messages
@@ -398,6 +416,10 @@ final class FridayViewModel: ObservableObject {
     func selectChat(_ id: String) {
         currentId = id
         drawerOpen = false
+        // Nothing else loads a synced chat's history on open — without this, a chat only ever
+        // gets messages if a realtime event happens to arrive while this screen is on screen.
+        guard UUID(uuidString: id) != nil, streamJobs[id] == nil else { return }
+        Task { await refreshMessages(id) }
     }
 
     func deleteChat(_ id: String) {

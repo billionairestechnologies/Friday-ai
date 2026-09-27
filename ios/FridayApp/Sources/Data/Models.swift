@@ -107,6 +107,9 @@ struct ChatThread: Identifiable, Hashable {
 }
 
 struct FridayUser: Hashable {
+    /// Supabase auth.users.id — required for the Realtime `user_id=eq.<id>` filter. Empty for the
+    /// optimistic cached-identity placeholder set before /auth/me resolves (see FridayViewModel.bootstrap).
+    var id: String = ""
     var name: String
     var email: String
     var phone: String?
