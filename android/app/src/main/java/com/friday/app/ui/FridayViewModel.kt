@@ -205,17 +205,19 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     /** Replaces the drawer's local mock list with the real synced conversations, once logged in. */
     private fun syncConversations() {
         if (!tokenStore.hasSession()) return
-        viewModelScope.launch {
-            val remote = ConversationsApi.list() ?: return@launch
-            _state.update { s ->
-                // Keep any chat that's mid-stream or not yet on the server (local "c-…" ids) —
-                // dropping it would orphan the running reply — and reuse already-loaded messages.
-                val remoteIds = remote.map { it.id }.toSet()
-                val merged = remote.map { r -> s.chats.firstOrNull { it.id == r.id }?.let { old -> r.copy(messages = old.messages) } ?: r }
-                val keep = s.chats.filter { it.id !in remoteIds && (streamJobs[it.id]?.isActive == true || !isServerConversationId(it.id)) && it.id != Seed.SHOWCASE_ID }
-                val chats = keep + merged
-                s.copy(chats = chats, currentId = if (s.currentId == null || chats.any { it.id == s.currentId }) s.currentId else null)
-            }
+        viewModelScope.launch { syncConversationsNow() }
+    }
+
+    private suspend fun syncConversationsNow() {
+        val remote = ConversationsApi.list() ?: return
+        _state.update { s ->
+            // Keep any chat that's mid-stream or not yet on the server (local "c-…" ids) —
+            // dropping it would orphan the running reply — and reuse already-loaded messages.
+            val remoteIds = remote.map { it.id }.toSet()
+            val merged = remote.map { r -> s.chats.firstOrNull { it.id == r.id }?.let { old -> r.copy(messages = old.messages) } ?: r }
+            val keep = s.chats.filter { it.id !in remoteIds && (streamJobs[it.id]?.isActive == true || !isServerConversationId(it.id)) && it.id != Seed.SHOWCASE_ID }
+            val chats = keep + merged
+            s.copy(chats = chats, currentId = if (s.currentId == null || chats.any { it.id == s.currentId }) s.currentId else null)
         }
     }
 
@@ -236,6 +238,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                     syncConversations()
                 } else if (!streamingHere) {
                     viewModelScope.launch {
+                        // The conversation may not be in the local list yet (e.g. a brand-new
+                        // automation chat) — without this, patchChat below is a silent no-op and
+                        // the event is dropped for good.
+                        if (_state.value.chats.none { it.id == conversationId }) syncConversationsNow()
                         val msgs = ConversationsApi.messages(conversationId)
                         if (msgs.isNotEmpty()) patchChat(conversationId) { it.copy(messages = msgs) }
                     }
@@ -474,7 +480,33 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         }
         val chat = _state.value.chats.find { it.id == id }
         // Local synthetic ids ("c-...") never have remote history; anything else is a synced thread.
-        if (tokenStore.hasSession() && chat != null && chat.messages.isEmpty() && !id.startsWith("c-")) {
+        // Besides the empty-history case, also refetch when the chat was left with a trailing user
+        // message and no reply — e.g. a scheduled automation ran while this screen wasn't open and
+        // realtime never delivered the reply here.
+        val needsRefetch = chat != null && (
+            chat.messages.isEmpty() ||
+                (chat.messages.lastOrNull()?.role == Role.User && chat.messages.none { it.isStreaming })
+            )
+        if (tokenStore.hasSession() && needsRefetch && !id.startsWith("c-")) {
+            viewModelScope.launch {
+                val msgs = ConversationsApi.messages(id)
+                if (msgs.isNotEmpty()) patchChat(id) { it.copy(messages = msgs) }
+            }
+        }
+    }
+
+    /** Called when the app returns to the foreground (see FridayApp's ON_START observer). Picks up
+     *  anything that happened while backgrounded — a scheduled automation's reply, a message sent
+     *  from another device. Deliberately does NOT call [openChat]: that cancels this device's own
+     *  in-flight stream, which resuming the app must never do. */
+    fun onAppForegrounded() {
+        if (!tokenStore.hasSession()) return
+        syncConversations()
+        val id = _state.value.currentId ?: return
+        val chat = _state.value.chats.find { it.id == id } ?: return
+        if (id.startsWith("c-") || chat.messages.any { it.isStreaming }) return
+        val needsRefetch = chat.messages.isEmpty() || chat.messages.lastOrNull()?.role == Role.User
+        if (needsRefetch) {
             viewModelScope.launch {
                 val msgs = ConversationsApi.messages(id)
                 if (msgs.isNotEmpty()) patchChat(id) { it.copy(messages = msgs) }

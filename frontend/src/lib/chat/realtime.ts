@@ -20,12 +20,28 @@ function refetchConversations() {
   }, 400);
 }
 
-function refetchMessages(conversationId: string) {
+function refetchMessages(conversationId: string, retriedAfterConversationSync = false) {
   if (messageDebounces.has(conversationId)) return;
   const timer = setTimeout(() => {
     messageDebounces.delete(conversationId);
     const chat = useChat.getState().chats.find((c) => c.conversationId === conversationId);
-    if (!chat) return;
+    if (!chat) {
+      // The conversation itself isn't in the store yet (e.g. a brand-new automation chat, or this
+      // event beat the 400ms conversations debounce). Without this, the event is dropped for good
+      // and the message never shows up until something else happens to refetch. Sync conversations
+      // first, then retry once — if the chat still isn't there, it genuinely isn't ours.
+      if (retriedAfterConversationSync) return;
+      api
+        .get<{ conversations: ServerConversation[] }>("/chat/conversations")
+        .then((res) => {
+          useChat.getState().hydrateFromServer(res.conversations);
+          refetchMessages(conversationId, true);
+        })
+        .catch(() => {
+          /* next change event or opening the chat will retry */
+        });
+      return;
+    }
     // Never clobber a reply this tab is actively streaming — the other device's write already
     // landed server-side, but our own in-flight optimistic message is still more current locally.
     if (chat.messages.some((m) => m.streaming)) return;

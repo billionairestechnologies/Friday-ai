@@ -39,15 +39,32 @@ object ApiClient {
         chain.proceed(request)
     }
 
+    private val refreshLock = Any()
+
+    // Supabase refresh tokens are single-use. OkHttp calls this per failed request, so a burst of
+    // requests that all 401 together (e.g. several rapid deletes right as the access token
+    // expires) would otherwise each try to redeem the same refresh token concurrently — only the
+    // first succeeds, and every other one used to return null here and fail its request outright.
+    // Serialize refreshes, and once inside the lock check whether a sibling call already refreshed
+    // the token (in which case we just retry with it) before spending the single-use token again.
     private val authenticator = Authenticator { _, response ->
         if (!::tokenStore.isInitialized || responseCount(response) >= 2) return@Authenticator null
-        val refreshToken = tokenStore.refreshToken ?: return@Authenticator null
-        val refreshed = AuthApi.refreshBlocking(refreshToken) ?: return@Authenticator null
-        tokenStore.saveSession(refreshed.first, refreshed.second)
-        SupabaseRealtime.updateAuth(refreshed.first)
-        response.request.newBuilder()
-            .header("Authorization", "Bearer ${refreshed.first}")
-            .build()
+        synchronized(refreshLock) {
+            val failedToken = response.request.header("Authorization")?.removePrefix("Bearer ")
+            val currentToken = tokenStore.accessToken
+            if (!currentToken.isNullOrBlank() && currentToken != failedToken) {
+                return@Authenticator response.request.newBuilder()
+                    .header("Authorization", "Bearer $currentToken")
+                    .build()
+            }
+            val refreshToken = tokenStore.refreshToken ?: return@Authenticator null
+            val refreshed = AuthApi.refreshBlocking(refreshToken) ?: return@Authenticator null
+            tokenStore.saveSession(refreshed.first, refreshed.second)
+            SupabaseRealtime.updateAuth(refreshed.first)
+            response.request.newBuilder()
+                .header("Authorization", "Bearer ${refreshed.first}")
+                .build()
+        }
     }
 
     private fun responseCount(response: Response): Int {

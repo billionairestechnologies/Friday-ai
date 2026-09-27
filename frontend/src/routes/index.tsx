@@ -116,6 +116,38 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       .catch((err) => setSyncError(err instanceof Error ? err.message : "Couldn't load messages"));
   }, [activeId, isPending, user]);
 
+  // A chat can be left with a trailing user message and no reply — e.g. a scheduled automation
+  // posted the prompt and generated a reply server-side while this tab was closed/backgrounded, and
+  // the realtime INSERT for it never landed here. beginTurn() always appends [user, assistant] as a
+  // pair for a live in-tab send, so an unpaired trailing user message with nothing streaming means
+  // this tab never saw the reply come in — refetch it whenever the chat becomes visible again.
+  useEffect(() => {
+    if (isPending || !user) return;
+    function checkForMissedReply() {
+      if (document.visibilityState !== "visible") return;
+      const id = useChat.getState().activeId;
+      if (!id) return;
+      const chat = useChat.getState().chats.find((c) => c.id === id);
+      if (!chat?.conversationId) return;
+      const last = chat.messages.at(-1);
+      if (!last || last.role !== "user") return;
+      if (chat.messages.some((m) => m.streaming)) return;
+      api
+        .get<{ messages: ServerMessage[] }>(`/chat/conversations/${chat.conversationId}/messages`)
+        .then((res) => useChat.getState().loadMessagesInto(chat.id, res.messages))
+        .catch(() => {
+          /* next focus, or a realtime event, will retry */
+        });
+    }
+    checkForMissedReply();
+    document.addEventListener("visibilitychange", checkForMissedReply);
+    window.addEventListener("focus", checkForMissedReply);
+    return () => {
+      document.removeEventListener("visibilitychange", checkForMissedReply);
+      window.removeEventListener("focus", checkForMissedReply);
+    };
+  }, [activeId, isPending, user]);
+
   // `chatId` is always an already-existing local chat here — the caller runs `beginTurn()`
   // (which appends the optimistic user+assistant messages) before this, specifically so that
   // when a brand-new conversation is created and we navigate to /c/$id below, the resulting

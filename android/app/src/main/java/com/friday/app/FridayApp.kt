@@ -180,6 +180,18 @@ fun FridayApp(
         vm.setDrawer(drawerState.isOpen)
     }
 
+    // Picks up anything that happened while backgrounded — a scheduled automation's reply, a
+    // message sent from another device — the same class of gap that realtime alone can miss
+    // (socket closed while backgrounded, or the conversation not yet known locally).
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) vm.onAppForegrounded()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     com.friday.app.ui.shell.SwipeDrawer(
         state = drawerState,
         gesturesEnabled = page == "chat",

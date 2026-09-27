@@ -6,6 +6,7 @@ import { notifyUser } from "../pushService.js";
 import { checkAndReserve, estimateReservationTokens, reconcileQuota } from "../quota/tokenQuotaService.js";
 import { createConversation } from "../chat/conversations.js";
 import { streamMessage } from "../chat/index.js";
+import { finishGeneration, registerGeneration } from "../chat/activeGenerations.js";
 import { logger } from "../../utils/logger.js";
 import { isValidTimeZone, nextRunAt, zonedParts, type Frequency } from "./schedule.js";
 
@@ -215,27 +216,34 @@ export async function executeAutomation(row: Row, opts: { keepSchedule?: boolean
     const local = zonedParts(new Date(), row.timezone);
     const stamp = `${local.year}-${String(local.month).padStart(2, "0")}-${String(local.day).padStart(2, "0")} ${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")} (${row.timezone})`;
     const content = `${row.prompt}\n\n_(Scheduled automation “${row.title}” · ${stamp})_`;
-    await streamMessage(
-      row.user_id,
-      conversationId,
-      content,
-      "text",
-      (ev) => {
-        if (ev.t === "text") reply += ev.c;
-        if (ev.t === "err") {
-          status = "error";
-          errorText = ev.c;
-        }
-      },
-      AbortSignal.timeout(RUN_TIMEOUT_MS),
-      false,
-      "",
-      false,
-      false,
-      [],
-      quota.reservation,
-      { research: row.research },
-    );
+    // Register like any live turn: lets Stop cancel it, and keeps this path consistent with
+    // chatController's normal-turn bookkeeping rather than running invisibly to that mechanism.
+    const abortController = registerGeneration(conversationId, row.user_id);
+    try {
+      await streamMessage(
+        row.user_id,
+        conversationId,
+        content,
+        "text",
+        (ev) => {
+          if (ev.t === "text") reply += ev.c;
+          if (ev.t === "err") {
+            status = "error";
+            errorText = ev.c;
+          }
+        },
+        AbortSignal.any([abortController.signal, AbortSignal.timeout(RUN_TIMEOUT_MS)]),
+        false,
+        "",
+        false,
+        false,
+        [],
+        quota.reservation,
+        { research: row.research },
+      );
+    } finally {
+      finishGeneration(conversationId, abortController);
+    }
   } catch (err) {
     status = "error";
     errorText = err instanceof Error ? err.message : "Automation failed";

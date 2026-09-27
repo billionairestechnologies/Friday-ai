@@ -7,6 +7,10 @@ import type { AuthUser, Session } from "@/lib/types";
 
 const STORAGE_KEY = "friday-ai-session";
 
+/** Shared in-flight `/auth/refresh` attempt — see `refresh()` below for why this must be
+ *  single-flighted across concurrent 401s. */
+let inFlightRefresh: Promise<boolean> | null = null;
+
 /** Friday AI always has real (Supabase-backed) auth configured — no dev fallback. */
 export const authEnabled = true;
 
@@ -170,32 +174,42 @@ export const useAuthStore = create<AuthState>((set) => ({
     stopRealtimeSync();
   },
 
-  refresh: async () => {
-    const stored = loadStored();
-    if (!stored) return false;
-    try {
-      // Raw fetch, not the shared `api` client — that client retries 401s through this same
-      // refresh() action, and routing the refresh call itself back through it would recurse.
-      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: stored.session.refresh_token }),
-      });
-      if (!res.ok) throw new Error("refresh failed");
-      const body = (await res.json()) as { user: AuthUser; session: Session };
-      persist(body.session, body.user);
-      set({ user: body.user });
-      setRealtimeAuth(body.session.access_token);
-      return true;
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-      setAccessToken(null);
-      set({ user: null });
-      stopRealtimeSync();
-      return false;
-    }
+  refresh: () => {
+    // Supabase refresh tokens are single-use. Several requests can 401 at once (e.g. a burst of
+    // deletes fired in parallel right as the access token expires) and each independently calling
+    // this would race the same refresh token — only the first succeeds, and every loser used to
+    // treat its own failure as "session dead" and log the user out, even though a sibling call had
+    // just refreshed it successfully. Share one in-flight attempt across all concurrent callers.
+    if (!inFlightRefresh) inFlightRefresh = doRefresh().finally(() => { inFlightRefresh = null; });
+    return inFlightRefresh;
   },
 }));
+
+async function doRefresh(): Promise<boolean> {
+  const stored = loadStored();
+  if (!stored) return false;
+  try {
+    // Raw fetch, not the shared `api` client — that client retries 401s through this same
+    // refresh() action, and routing the refresh call itself back through it would recurse.
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: stored.session.refresh_token }),
+    });
+    if (!res.ok) throw new Error("refresh failed");
+    const body = (await res.json()) as { user: AuthUser; session: Session };
+    persist(body.session, body.user);
+    useAuthStore.setState({ user: body.user });
+    setRealtimeAuth(body.session.access_token);
+    return true;
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    setAccessToken(null);
+    useAuthStore.setState({ user: null });
+    stopRealtimeSync();
+    return false;
+  }
+}
 
 setUnauthorizedHandler(() => useAuthStore.getState().refresh());
 
