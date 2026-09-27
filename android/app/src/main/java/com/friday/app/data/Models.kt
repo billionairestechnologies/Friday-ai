@@ -103,6 +103,10 @@ data class ChatMessage(
     val reasoning: String = "",
     val canvasHtml: String? = null,
     val isStreaming: Boolean = false,
+    /** The local stream dropped mid-reply (network blip, app backgrounded/killed) rather than a
+     *  clean server "done" — the content here may be incomplete or stale. Cleared by whatever
+     *  refetches the real, server-persisted reply (see FridayViewModel.onAppForegrounded/openChat). */
+    val disconnected: Boolean = false,
     val attachments: List<PendingAttachment> = emptyList(),
     /** Modes active on the composer when this message was sent — an assistant message only shows
      *  its full Thought Trail card when Think/Search/Canvas was actually toggled on; a plain reply
@@ -150,6 +154,11 @@ sealed class ChatEvent {
     data class Plan(val plan: BuildPlan) : ChatEvent()
     data class BuildMeta(val elapsedMs: Long?, val zipBytes: Long?, val zipName: String?) : ChatEvent()
     data class Ask(val questions: List<BuildAskQuestion>) : ChatEvent()
+    /** The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a
+     *  server-side failure. The backend keeps generating and persists the full reply regardless
+     *  (see activeGenerations.ts), so this must never overwrite whatever text already streamed in;
+     *  it just flags the message so a later refetch (open/foreground) replaces it with the truth. */
+    data object Disconnected : ChatEvent()
     data object Done : ChatEvent()
 }
 

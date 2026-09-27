@@ -205,7 +205,13 @@ object ChatApi {
                 }
             }
         } catch (e: IOException) {
-            emit(ChatEvent.Token("Connection lost: ${e.message ?: "network error"}"))
+            // The socket dropped locally (network blip, app backgrounded/killed) — the backend
+            // keeps generating and persists the full reply regardless (see CLAUDE.md's
+            // activeGenerations note). Overwriting whatever text already streamed in with an error
+            // string here used to make a perfectly fine in-progress reply look permanently broken
+            // the moment the user closed the app; the flag lets the UI refetch the real answer
+            // instead once it's back.
+            emit(ChatEvent.Disconnected)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {

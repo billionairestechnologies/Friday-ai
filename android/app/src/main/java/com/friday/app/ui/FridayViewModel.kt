@@ -481,11 +481,12 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         val chat = _state.value.chats.find { it.id == id }
         // Local synthetic ids ("c-...") never have remote history; anything else is a synced thread.
         // Besides the empty-history case, also refetch when the chat was left with a trailing user
-        // message and no reply — e.g. a scheduled automation ran while this screen wasn't open and
-        // realtime never delivered the reply here.
-        val needsRefetch = chat != null && (
-            chat.messages.isEmpty() ||
-                (chat.messages.lastOrNull()?.role == Role.User && chat.messages.none { it.isStreaming })
+        // message and no reply (e.g. a scheduled automation ran while this screen wasn't open and
+        // realtime never delivered the reply here), or the last assistant turn was cut off by a
+        // local disconnect (app backgrounded/killed mid-stream) — the server finished it regardless.
+        val last = chat?.messages?.lastOrNull()
+        val needsRefetch = chat != null && chat.messages.none { it.isStreaming } && (
+            chat.messages.isEmpty() || last?.role == Role.User || last?.disconnected == true
             )
         if (tokenStore.hasSession() && needsRefetch && !id.startsWith("c-")) {
             viewModelScope.launch {
@@ -505,7 +506,8 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         val id = _state.value.currentId ?: return
         val chat = _state.value.chats.find { it.id == id } ?: return
         if (id.startsWith("c-") || chat.messages.any { it.isStreaming }) return
-        val needsRefetch = chat.messages.isEmpty() || chat.messages.lastOrNull()?.role == Role.User
+        val last = chat.messages.lastOrNull()
+        val needsRefetch = chat.messages.isEmpty() || last?.role == Role.User || last?.disconnected == true
         if (needsRefetch) {
             viewModelScope.launch {
                 val msgs = ConversationsApi.messages(id)
@@ -708,6 +710,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         is ChatEvent.Ask -> patchMessage(chatId!!, asstId) { msg ->
                             msg.copy(build = (msg.build ?: BuildInfo()).copy(ask = event.questions))
+                        }
+                        ChatEvent.Disconnected -> patchMessage(chatId!!, asstId) {
+                            it.copy(disconnected = true)
                         }
                         ChatEvent.Done -> patchMessage(chatId!!, asstId) {
                             it.copy(isStreaming = false)

@@ -14,6 +14,11 @@ enum ChatEvent {
     case plan(BuildPlan)
     case ask([BuildAskQuestion])
     case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
+    /// The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a server
+    /// failure. The backend keeps generating and persists the full reply regardless (see
+    /// activeGenerations.ts), so this must never overwrite whatever text already streamed in; it
+    /// just flags the message so a later refetch (open/foreground) replaces it with the truth.
+    case disconnected
     case done
 }
 
@@ -183,7 +188,7 @@ enum ChatApi {
                     continuation.finish()
                 } catch {
                     if !Task.isCancelled {
-                        continuation.yield(.text("Connection lost: \(error.localizedDescription)"))
+                        continuation.yield(.disconnected)
                         continuation.yield(.done)
                     }
                     continuation.finish()

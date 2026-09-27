@@ -130,7 +130,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       const chat = useChat.getState().chats.find((c) => c.id === id);
       if (!chat?.conversationId) return;
       const last = chat.messages.at(-1);
-      if (!last || last.role !== "user") return;
+      // An unanswered trailing user message, or an assistant turn that ended in a local error
+      // (network blip closing the tab mid-stream — the backend keeps generating and persists the
+      // full reply regardless, see activeGenerations.ts) — both mean this tab's view is stale.
+      if (!last || !(last.role === "user" || (last.role === "assistant" && last.error))) return;
       if (chat.messages.some((m) => m.streaming)) return;
       api
         .get<{ messages: ServerMessage[] }>(`/chat/conversations/${chat.conversationId}/messages`)

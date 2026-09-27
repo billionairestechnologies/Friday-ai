@@ -93,6 +93,10 @@ struct ChatMessage: Identifiable, Hashable {
     var reasoning: String = ""
     var canvasHtml: String?
     var isStreaming: Bool = false
+    /// The local stream dropped mid-reply (network blip, app backgrounded/killed) rather than a
+    /// clean server "done" — content here may be incomplete or stale. Cleared by whatever refetches
+    /// the real, server-persisted reply (see FridayViewModel.onAppForegrounded/selectChat).
+    var disconnected: Bool = false
     var attachments: [PendingAttachment] = []
     var modesUsed: Set<Mode> = []
     var agents: [AgentStatus] = []

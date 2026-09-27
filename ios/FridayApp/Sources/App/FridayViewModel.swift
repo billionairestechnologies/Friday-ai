@@ -156,7 +156,8 @@ final class FridayViewModel: ObservableObject {
         guard TokenStore.shared.hasSession() else { return }
         await syncConversations()
         guard let id = currentId, let chat = chats.first(where: { $0.id == id }) else { return }
-        guard chat.messages.last?.role == .user else { return }
+        let last = chat.messages.last
+        guard last?.role == .user || last?.disconnected == true else { return }
         await refreshMessages(id)
     }
 
@@ -365,6 +366,8 @@ final class FridayViewModel: ObservableObject {
             build.zipBytes = zipBytes
             build.zipName = zipName
             chats[ci].messages[mi].build = build
+        case .disconnected:
+            chats[ci].messages[mi].disconnected = true
         case .done:
             chats[ci].messages[mi].isStreaming = false
         }
