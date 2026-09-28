@@ -149,12 +149,13 @@ export function PluginsDrawer() {
     else setPreview([]);
   }, [activeAccount?.id, activeProvider]);
 
-  const featured = FEATURED_PLUGINS.filter(
-    (p) =>
-      !q.trim() ||
-      p.name.toLowerCase().includes(q.toLowerCase()) ||
-      p.desc.toLowerCase().includes(q.toLowerCase()),
-  );
+  const connectedProviders = new Set(accounts.map((a) => a.provider));
+  const featured = FEATURED_PLUGINS.filter((p) => {
+    // Already shown once above under "Connected" — don't list it again down here too.
+    const provider = pluginProvider.get(p.id);
+    if (provider && connectedProviders.has(provider)) return false;
+    return !q.trim() || p.name.toLowerCase().includes(q.toLowerCase()) || p.desc.toLowerCase().includes(q.toLowerCase());
+  });
 
   return (
     <Dialog.Root open={dialog === "plugins"} onOpenChange={(v) => !v && setDialog(null)}>
