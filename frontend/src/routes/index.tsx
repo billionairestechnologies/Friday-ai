@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Composer } from "@/components/composer";
@@ -66,10 +66,18 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
   );
   const activeId = useChat((s) => s.activeId);
   // Build Mode question round: the newest message is an unanswered set of questions.
-  const pendingAsk = useChat((s) => {
+  // Select the message itself (a stable reference from the store) rather than building a new
+  // { id, questions } object inline — a selector that returns a fresh object on every call makes
+  // useSyncExternalStore think the store changed on every render, which forces another render,
+  // which builds another fresh object... an infinite loop that surfaces as React error #185.
+  const lastAssistantMessage = useChat((s) => {
     const last = s.chats.find((c) => c.id === s.activeId)?.messages.at(-1);
-    return last && last.role === "assistant" && !last.streaming && last.build?.ask?.length ? { id: last.id, questions: last.build.ask } : null;
+    return last?.role === "assistant" ? last : undefined;
   });
+  const pendingAsk = useMemo(() => {
+    const last = lastAssistantMessage;
+    return last && !last.streaming && last.build?.ask?.length ? { id: last.id, questions: last.build.ask } : null;
+  }, [lastAssistantMessage]);
   const [dismissedAsk, setDismissedAsk] = useState<string | null>(null);
   const queued = useQueue((s) => (activeId ? s.byChat[activeId] : undefined)) ?? [];
   const [sendError, setSendError] = useState<string | null>(null);
