@@ -81,6 +81,12 @@ export function toolUsePrompt(tools: FridayTool[]): string {
       ? "Use run_code for exact arithmetic, data work and checking code — report the real output, never invented output."
       : null,
     "When you rely on a web page, cite it inline as a markdown link.",
+    "Between tool calls, narrate what you're doing in at most one short sentence ('Checking the repo's package.json…') " +
+      "— never multiple paragraphs of running commentary. The user sees every tool call as its own step already, so " +
+      "narrating what a step found is redundant; save your words for the answer. Once you have what you need, STOP " +
+      "calling tools and give one clear, well-organized final answer — headings or bullet points for anything with " +
+      "multiple parts, the concrete conclusion first, not a trailing list of half-finished observations. Don't leave " +
+      "the reply as a string of 'I'm checking X now' updates with no synthesis at the end.",
   ]
     .filter(Boolean)
     .join("\n");
