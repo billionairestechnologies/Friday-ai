@@ -11,6 +11,10 @@ export interface AuthedUser {
   /** ISO date (YYYY-MM-DD), optional — powers the birthday greeting and age-banded thinking lines. */
   birthday: string | null;
   role: "user" | "admin";
+  /** The Privacy Policy/Terms version this account last agreed to, or null if never. Compared
+   *  against POLICY_VERSION (backend/src/services/policyService.ts) by every client to decide
+   *  whether to show the blocking "I agree" gate. */
+  policyVersion: string | null;
 }
 
 declare global {
@@ -28,7 +32,7 @@ async function loadUserForToken(token: string): Promise<AuthedUser> {
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("full_name, phone, birthday, role")
+    .select("full_name, phone, birthday, role, policy_version")
     .eq("id", data.user.id)
     .single();
 
@@ -39,6 +43,7 @@ async function loadUserForToken(token: string): Promise<AuthedUser> {
     phone: profile?.phone ?? null,
     birthday: profile?.birthday ?? null,
     role: (profile?.role as "user" | "admin") ?? "user",
+    policyVersion: profile?.policy_version ?? null,
   };
 }
 

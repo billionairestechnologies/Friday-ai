@@ -263,8 +263,8 @@ fun FridayApp(
                 isSignup = page == "signup",
                 busy = ui.authBusy,
                 error = ui.authError,
-                onSubmit = { email, password, name, phone, birthday ->
-                    vm.submitAuth(email, password, name, phone, birthday, isSignup = page == "signup") { page = "otp" }
+                onSubmit = { email, password, name, phone, birthday, acceptedTerms ->
+                    vm.submitAuth(email, password, name, phone, birthday, isSignup = page == "signup", acceptedTerms = acceptedTerms) { page = "otp" }
                 },
                 onGoogleAuth = { launchOAuth(google = true) },
                 onGithubAuth = { launchOAuth(google = false) },
@@ -310,6 +310,66 @@ fun FridayApp(
             },
             dismissButton = {
                 TextButton(onClick = { updatePopupDismissed = true }) { Text("Later") }
+            },
+        )
+    }
+
+    // Blocking, non-dismissable "I agree" gate — every account whose FridayUser.policyVersion
+    // doesn't match the currently-in-force version (every account created before this shipped,
+    // plus any account that agreed to a materially older version) must accept before continuing.
+    // A brand-new signup already agreed via FullAuthPage's own checkbox, so this never shows it.
+    val gateUser = ui.user
+    if (gateUser != null && gateUser.policyVersion != FridayViewModel.POLICY_VERSION) {
+        var acceptBusy by remember { mutableStateOf(false) }
+        var acceptError by remember { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Updated Terms & Privacy Policy") },
+            text = {
+                Column {
+                    Text(
+                        "Before you continue, please review our Terms of Service and Privacy Policy. " +
+                            "They cover what Friday stores, which AI providers and connectors your messages can reach, and the controls you have over your data.",
+                    )
+                    if (acceptError != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(acceptError!!, color = Color(0xFFDC2626))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row {
+                        Text(
+                            "Read Terms of Service",
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.clickable {
+                                CustomTabsIntent.Builder().build()
+                                    .launchUrl(ctx, Uri.parse("https://friday.billionairestechnologies.com/terms"))
+                            },
+                        )
+                    }
+                    Row {
+                        Text(
+                            "Read Privacy Policy",
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.clickable {
+                                CustomTabsIntent.Builder().build()
+                                    .launchUrl(ctx, Uri.parse("https://friday.billionairestechnologies.com/privacy"))
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !acceptBusy,
+                    onClick = {
+                        acceptBusy = true
+                        acceptError = null
+                        vm.acceptPolicy { ok, message ->
+                            acceptBusy = false
+                            if (!ok) acceptError = message ?: "Couldn't save that — try again"
+                        }
+                    },
+                ) { Text(if (acceptBusy) "Saving…" else "I Agree") }
             },
         )
     }
@@ -811,7 +871,7 @@ private fun FullAuthPage(
     isSignup: Boolean,
     busy: Boolean,
     error: String?,
-    onSubmit: (email: String, password: String, name: String, phone: String, birthday: String) -> Unit,
+    onSubmit: (email: String, password: String, name: String, phone: String, birthday: String, acceptedTerms: Boolean) -> Unit,
     onGoogleAuth: () -> Unit,
     onGithubAuth: () -> Unit,
     onClose: () -> Unit,

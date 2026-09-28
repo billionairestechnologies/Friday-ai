@@ -37,7 +37,11 @@ type AuthState = {
     phone: string,
     birthday: string,
     password: string,
+    acceptedTerms: boolean,
   ) => Promise<{ email: string }>;
+  /** Records agreement to the current Privacy Policy/Terms for the signed-in user — called by
+   *  the blocking "I agree" gate. Updates the stored user in place so the gate closes. */
+  acceptPolicy: () => Promise<void>;
   /** Fills in profile fields missing on an account — phone/birthday (the "complete your profile"
    *  prompt for older accounts) and/or birthday alone (Settings → Account). */
   updateProfile: (patch: { phone?: string; birthday?: string }) => Promise<void>;
@@ -148,15 +152,24 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   /** Creates the account, then sends the same 6-digit OTP flow as login() — signup only
    *  completes once that code is confirmed with verifyOtp(). */
-  signup: async (name, email, phone, birthday, password) => {
+  signup: async (name, email, phone, birthday, password, acceptedTerms) => {
     const res = await api.post<{ otpRequired: true; email: string }>("/auth/signup", {
       name,
       email,
       phone,
       birthday,
       password,
+      acceptedTerms,
+      platform: "web",
     });
     return { email: res.email };
+  },
+
+  acceptPolicy: async () => {
+    const res = await api.post<{ user: AuthUser }>("/auth/accept-policy", { platform: "web" });
+    const stored = loadStored();
+    if (stored) persist(stored.session, res.user);
+    set({ user: res.user });
   },
 
   updateProfile: async (patch) => {

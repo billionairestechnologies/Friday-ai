@@ -11,11 +11,22 @@ struct AuthResult {
 }
 
 enum AuthApi {
-    static func signup(name: String, email: String, password: String, phone: String?, birthday: String?) async throws {
+    // acceptedTerms must be true — the signup screen's own required checkbox is the consent,
+    // sent at account-creation time (see policyService.ts on the backend, which records it
+    // immediately rather than waiting for the blocking gate other, older accounts see).
+    static func signup(name: String, email: String, password: String, phone: String?, birthday: String?, acceptedTerms: Bool) async throws {
         _ = try await ApiClient.shared.requestJSON(path: "auth/signup", method: "POST", body: [
             "name": name, "email": email, "password": password,
             "phone": phone ?? "", "birthday": birthday ?? "",
+            "acceptedTerms": acceptedTerms, "platform": "ios",
         ])
+    }
+
+    /// Called by the blocking "I agree" gate's button — see FridayViewModel.acceptPolicy.
+    static func acceptPolicy() async throws -> FridayUser {
+        let json = try await ApiClient.shared.requestJSON(path: "auth/accept-policy", method: "POST", body: ["platform": "ios"], authed: true)
+        guard let userJson = json["user"] as? [String: Any] else { throw ApiError.decode }
+        return parseUser(userJson)
     }
 
     static func login(email: String, password: String) async throws {
@@ -83,7 +94,8 @@ enum AuthApi {
             email: json["email"] as? String ?? "",
             phone: json["phone"] as? String,
             birthday: json["birthday"] as? String,
-            instructions: (json["instructions"] as? String) ?? (json["customInstructions"] as? String)
+            instructions: (json["instructions"] as? String) ?? (json["customInstructions"] as? String),
+            policyVersion: json["policyVersion"] as? String
         )
     }
 

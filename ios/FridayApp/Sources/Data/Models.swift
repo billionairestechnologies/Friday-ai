@@ -119,6 +119,9 @@ struct FridayUser: Hashable {
     var phone: String?
     var birthday: String?
     var instructions: String?
+    /// The Privacy Policy/Terms version this account last agreed to — compared against
+    /// FridayViewModel.policyVersion to decide whether to show the blocking "I agree" gate.
+    var policyVersion: String?
 }
 
 enum SheetState: Equatable {

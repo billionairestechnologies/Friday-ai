@@ -133,6 +133,8 @@ data class FridayUser(
     val phone: String? = null,
     val birthday: String? = null,
     val instructions: String? = null,
+    // The Privacy Policy/Terms version this account last agreed to — see PolicyConsentDialog.
+    val policyVersion: String? = null,
 )
 
 sealed class ChatEvent {

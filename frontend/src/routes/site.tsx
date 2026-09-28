@@ -86,7 +86,15 @@ export function SiteFooter() {
           </Link>
         </nav>
       </div>
-      <div className="mx-auto max-w-6xl px-4 pb-8 text-xs text-subtle sm:px-6">© {new Date().getFullYear()} Billionaires Technologies</div>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-8 text-xs text-subtle sm:px-6">
+        <span>© {new Date().getFullYear()} Billionaires Technologies</span>
+        <Link to="/privacy" className="hover:text-foreground">
+          Privacy Policy
+        </Link>
+        <Link to="/terms" className="hover:text-foreground">
+          Terms of Service
+        </Link>
+      </div>
     </footer>
   );
 }

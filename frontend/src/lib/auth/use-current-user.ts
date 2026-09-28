@@ -9,6 +9,8 @@ export type AppUser = {
   isDevFallback: boolean;
   /** ISO date (YYYY-MM-DD), optional — powers the birthday greeting and age-banded thinking lines. */
   birthday: string | null;
+  /** The Privacy Policy/Terms version this account last agreed to — see components/consent-gate.tsx. */
+  policyVersion: string | null;
 };
 
 export type CurrentUserState = {
@@ -28,6 +30,7 @@ export function useCurrentUserState(): CurrentUserState {
           profileImageUrl: null,
           isDevFallback: false,
           birthday: user.birthday ?? null,
+          policyVersion: user.policyVersion ?? null,
         }
       : null,
     isPending,

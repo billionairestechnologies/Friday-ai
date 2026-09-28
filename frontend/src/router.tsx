@@ -11,6 +11,7 @@ import { SharePage } from "@/routes/share";
 import { MobileAuthBridge } from "@/routes/mobile-auth-bridge";
 import { AppErrorComponent } from "@/lib/error-component";
 import { SitePage } from "@/routes/site";
+import { PrivacyPage, TermsPage } from "@/routes/legal";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 const rootRoute = createRootRoute({
@@ -141,6 +142,18 @@ const shareRoute = createRoute({
   component: ShareRoute,
 });
 
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy",
+  component: PrivacyPage,
+});
+
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/terms",
+  component: TermsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   conversationRoute,
@@ -154,6 +167,8 @@ const routeTree = rootRoute.addChildren([
   automationsRoute,
   shareRoute,
   plansRoute,
+  privacyRoute,
+  termsRoute,
   ...siteRoutes,
 ]);
 

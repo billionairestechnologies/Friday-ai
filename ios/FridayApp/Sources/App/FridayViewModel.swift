@@ -3,8 +3,15 @@ import SwiftUI
 
 @MainActor
 final class FridayViewModel: ObservableObject {
+    // Must exactly match backend/src/services/policyService.ts's POLICY_VERSION and
+    // frontend/src/lib/site/legal.ts's POLICY_VERSION — compared against the signed-in
+    // account's FridayUser.policyVersion to decide whether PolicyConsentGate blocks the app.
+    static let policyVersion = "2026-09-28"
+
     // Identity / session
     @Published var user: FridayUser?
+    @Published var policyAcceptBusy = false
+    @Published var policyAcceptError: String?
     @Published var authRequired = false
     @Published var authStep: AuthStep = .form
     @Published var authEmail = ""
@@ -459,13 +466,17 @@ final class FridayViewModel: ObservableObject {
         sheet = signup ? .signup : .welcome
     }
 
-    func submitCredentials(name: String, email: String, password: String, phone: String?, birthday: String?) async {
+    func submitCredentials(name: String, email: String, password: String, phone: String?, birthday: String?, acceptedTerms: Bool) async {
+        if isSignupFlow && !acceptedTerms {
+            authError = "You must agree to the Terms of Service and Privacy Policy to continue."
+            return
+        }
         authBusy = true
         authError = nil
         defer { authBusy = false }
         do {
             if isSignupFlow {
-                try await AuthApi.signup(name: name, email: email, password: password, phone: phone, birthday: birthday)
+                try await AuthApi.signup(name: name, email: email, password: password, phone: phone, birthday: birthday, acceptedTerms: acceptedTerms)
             } else {
                 try await AuthApi.login(email: email, password: password)
             }
@@ -473,6 +484,18 @@ final class FridayViewModel: ObservableObject {
             authStep = .otp
         } catch {
             authError = error.localizedDescription
+        }
+    }
+
+    /// PolicyConsentGate's "I Agree" button — records acceptance and closes the gate.
+    func acceptPolicy() async {
+        policyAcceptBusy = true
+        policyAcceptError = nil
+        defer { policyAcceptBusy = false }
+        do {
+            user = try await AuthApi.acceptPolicy()
+        } catch {
+            policyAcceptError = error.localizedDescription
         }
     }
 

@@ -86,6 +86,7 @@ export function LoginPopout() {
   const [phone, setPhone] = useState("");
   const [birthday, setBirthday] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,13 +118,17 @@ export function LoginPopout() {
   async function submitCredentials(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (mode === "signup" && !acceptedTerms) {
+      setError("You must agree to the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     setBusy(true);
     try {
       if (mode === "login") {
         await login(email, password);
         setStep("otp");
       } else {
-        await signup(name, email, phone, birthday, password);
+        await signup(name, email, phone, birthday, password, acceptedTerms);
         setStep("otp");
       }
     } catch (err) {
@@ -314,10 +319,32 @@ export function LoginPopout() {
               minLength={6}
               className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-subtle"
             />
+            {mode === "signup" && (
+              <label className="flex items-start gap-2 text-xs leading-relaxed text-muted">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  required
+                  className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                />
+                <span>
+                  I agree to Friday&rsquo;s{" "}
+                  <a href="/terms" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                    Terms of Service
+                  </a>{" "}
+                  and{" "}
+                  <a href="/privacy" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                    Privacy Policy
+                  </a>
+                  .
+                </span>
+              </label>
+            )}
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || (mode === "signup" && !acceptedTerms)}
               className="h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-transform duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
             >
               {busy ? "Please wait…" : mode === "login" ? "Continue" : "Create account"}

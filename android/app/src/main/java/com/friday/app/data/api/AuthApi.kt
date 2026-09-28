@@ -19,6 +19,10 @@ data class FridayAuthUser(
     val birthday: String?,
     val instructions: String?,
     val role: String,
+    // The Privacy Policy/Terms version this account last agreed to, or null if never. Compared
+    // against POLICY_VERSION in FridayViewModel to decide whether to show the blocking
+    // "I agree" gate — see PolicyConsentDialog.
+    val policyVersion: String?,
 )
 
 data class AuthSuccess(val user: FridayAuthUser, val session: FridaySession)
@@ -78,7 +82,10 @@ object AuthApi {
         }
     }
 
-    suspend fun signup(name: String, email: String, password: String, phone: String, birthday: String): AuthResult<OtpRequired> = runOtpCall {
+    // acceptedTerms must be true — the signup screen's own required checkbox is the consent,
+    // sent at account-creation time (see policyService.ts on the backend, which records it
+    // immediately rather than waiting for the blocking gate other, older accounts see).
+    suspend fun signup(name: String, email: String, password: String, phone: String, birthday: String, acceptedTerms: Boolean): AuthResult<OtpRequired> = runOtpCall {
         post(
             ApiClient.plain,
             "auth/signup",
@@ -88,8 +95,20 @@ object AuthApi {
                 put("password", password)
                 put("phone", phone)
                 put("birthday", birthday)
+                put("acceptedTerms", acceptedTerms)
+                put("platform", "android")
             },
         )
+    }
+
+    /** POST /api/auth/accept-policy — called by PolicyConsentDialog's "I Agree" button. */
+    suspend fun acceptPolicy(): AuthResult<FridayAuthUser> = withContext(Dispatchers.IO) {
+        try {
+            val json = post(ApiClient.authed, "auth/accept-policy", JSONObject().apply { put("platform", "android") })
+            AuthResult.Success(parseUser(json.optJSONObject("user") ?: json))
+        } catch (e: Exception) {
+            AuthResult.Failure(e.message ?: "Couldn't save that — try again")
+        }
     }
 
     suspend fun login(email: String, password: String): AuthResult<OtpRequired> = runOtpCall {
@@ -236,5 +255,6 @@ object AuthApi {
         birthday = json.optString("birthday").ifBlank { null },
         instructions = json.optString("instructions", json.optString("customInstructions")).ifBlank { null },
         role = json.optString("role", "user"),
+        policyVersion = json.optString("policyVersion").ifBlank { null },
     )
 }

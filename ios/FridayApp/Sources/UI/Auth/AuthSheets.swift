@@ -11,6 +11,7 @@ struct AuthFormSheet: View {
     @State private var email = ""
     @State private var password = ""
     @State private var otp = ""
+    @State private var acceptedTerms = false
 
     var body: some View {
         ScrollView {
@@ -48,12 +49,34 @@ struct AuthFormSheet: View {
         field("Email address", text: $email, keyboard: .emailAddress)
         field("Password", text: $password, secure: true)
 
+        if vm.isSignupFlow {
+            HStack(alignment: .top, spacing: 8) {
+                Button { acceptedTerms.toggle() } label: {
+                    Image(systemName: acceptedTerms ? "checkmark.square.fill" : "square")
+                        .foregroundColor(acceptedTerms ? FridayColor.text : FridayColor.muted)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text("I agree to Friday's").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                        Link("Terms of Service", destination: URL(string: "https://friday.billionairestechnologies.com/terms")!)
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    HStack(spacing: 4) {
+                        Text("and").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                        Link("Privacy Policy", destination: URL(string: "https://friday.billionairestechnologies.com/privacy")!)
+                            .font(.system(size: 12, weight: .medium))
+                        Text(".").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                    }
+                }
+            }
+        }
+
         if let error = vm.authError {
             Text(error).font(.system(size: 13)).foregroundColor(FridayColor.error)
         }
 
         Button {
-            Task { await vm.submitCredentials(name: name, email: email, password: password, phone: phone, birthday: birthday) }
+            Task { await vm.submitCredentials(name: name, email: email, password: password, phone: phone, birthday: birthday, acceptedTerms: acceptedTerms) }
         } label: {
             Text(vm.authBusy ? "Please wait…" : "Continue")
                 .font(.system(size: 15, weight: .semibold))
@@ -62,7 +85,7 @@ struct AuthFormSheet: View {
                 .background(FridayColor.text.opacity(vm.authBusy ? 0.55 : 1))
                 .cornerRadius(24)
         }
-        .disabled(vm.authBusy)
+        .disabled(vm.authBusy || (vm.isSignupFlow && !acceptedTerms))
 
         HStack {
             Rectangle().fill(FridayColor.hairline).frame(height: 1)

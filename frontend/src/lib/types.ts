@@ -6,6 +6,10 @@ export interface AuthUser {
   /** ISO date (YYYY-MM-DD), optional — powers the birthday greeting and age-banded thinking lines. */
   birthday?: string | null;
   role?: "user" | "admin";
+  /** The Privacy Policy/Terms version this account last agreed to. Compared against
+   *  POLICY_VERSION (lib/site/legal.ts) by consent-gate.tsx to decide whether to block the app
+   *  behind an "I agree" screen. */
+  policyVersion?: string | null;
 }
 
 export interface Session {

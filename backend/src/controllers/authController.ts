@@ -21,6 +21,9 @@ import {
   parseGoogleLoginState,
 } from "../services/googleAuth.js";
 import { buildGithubLoginUrl, completeGithubLogin, githubLoginConfigured } from "../services/githubAuth.js";
+import { acceptPolicy, POLICY_VERSION, type Platform } from "../services/policyService.js";
+
+const platformSchema = z.enum(["web", "android", "ios"]).default("web");
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
@@ -31,6 +34,10 @@ const signupSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  // The signup form's own required checkbox — the request is rejected outright (not just
+  // ignored) if it's missing or false, so there's no way to create an account without agreeing.
+  acceptedTerms: z.boolean().refine((v) => v === true, "You must agree to the Terms of Service and Privacy Policy"),
+  platform: platformSchema,
 });
 
 const loginSchema = z.object({
@@ -40,12 +47,17 @@ const loginSchema = z.object({
 
 async function getProfileExtras(
   userId: string,
-): Promise<{ role: "user" | "admin"; phone: string | null; birthday: string | null }> {
-  const { data } = await supabaseAdmin.from("profiles").select("role, phone, birthday").eq("id", userId).single();
+): Promise<{ role: "user" | "admin"; phone: string | null; birthday: string | null; policyVersion: string | null }> {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("role, phone, birthday, policy_version")
+    .eq("id", userId)
+    .single();
   return {
     role: data?.role === "admin" ? "admin" : "user",
     phone: data?.phone ?? null,
     birthday: data?.birthday ?? null,
+    policyVersion: data?.policy_version ?? null,
   };
 }
 
@@ -71,7 +83,7 @@ export async function adminLogin(req: Request, res: Response) {
  * for the other.
  */
 export async function signup(req: Request, res: Response) {
-  const { name, email, phone, birthday, password } = signupSchema.parse(req.body);
+  const { name, email, phone, birthday, password, platform } = signupSchema.parse(req.body);
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -90,6 +102,9 @@ export async function signup(req: Request, res: Response) {
   // The handle_new_user trigger only sets full_name/phone from raw_user_meta_data (it predates
   // birthday) — set it directly rather than touching that trigger for one more column.
   await supabaseAdmin.from("profiles").update({ birthday }).eq("id", data.user.id);
+  // acceptedTerms already passed schema validation (must be true) — the signup form's own
+  // checkbox IS the consent, recorded the moment the account exists.
+  await acceptPolicy(data.user.id, platform);
 
   const { data: signInData, error: signInError } = await supabasePublic.auth.signInWithPassword({
     email,
@@ -206,7 +221,7 @@ export async function verifyOtp(req: Request, res: Response) {
   } catch {
     throw new HttpError(400, "That sign-in expired or is invalid. Please log in again.");
   }
-  const { role, phone, birthday } = await getProfileExtras(session.user.id);
+  const { role, phone, birthday, policyVersion } = await getProfileExtras(session.user.id);
   res.json({
     user: {
       id: session.user.id,
@@ -215,6 +230,7 @@ export async function verifyOtp(req: Request, res: Response) {
       phone,
       birthday,
       role,
+      policyVersion,
     },
     session,
   });
@@ -258,7 +274,7 @@ export async function refresh(req: Request, res: Response) {
   const { data, error } = await supabasePublic.auth.refreshSession({ refresh_token: refreshToken });
   if (error || !data.session || !data.user) throw new HttpError(401, "Session expired — please sign in again");
 
-  const { role, phone, birthday } = await getProfileExtras(data.user.id);
+  const { role, phone, birthday, policyVersion } = await getProfileExtras(data.user.id);
   res.json({
     user: {
       id: data.user.id,
@@ -267,6 +283,7 @@ export async function refresh(req: Request, res: Response) {
       phone,
       birthday,
       role,
+      policyVersion,
     },
     session: data.session,
   });
@@ -287,6 +304,20 @@ export async function logout(_req: Request, res: Response) {
 
 export async function me(req: Request, res: Response) {
   res.json({ user: req.user });
+}
+
+const acceptPolicySchema = z.object({ platform: platformSchema });
+
+/** The blocking "I agree" gate (shown to any signed-in account whose policyVersion is behind
+ *  POLICY_VERSION) calls this on the button tap, on web, Android and iOS alike. */
+export async function acceptPolicyRoute(req: Request, res: Response) {
+  const { platform } = acceptPolicySchema.parse(req.body);
+  const result = await acceptPolicy(req.user!.id, platform);
+  res.json({ user: { ...req.user!, policyVersion: result.policyVersion } });
+}
+
+export async function policyStatus(_req: Request, res: Response) {
+  res.json({ policyVersion: POLICY_VERSION });
 }
 
 export async function exportAccount(req: Request, res: Response) {
@@ -332,7 +363,7 @@ export async function googleCallback(req: Request, res: Response) {
 
   const { returnTo } = parseGoogleLoginState(state);
   const completed = await completeGoogleLogin(code);
-  const { role, phone, birthday } = await getProfileExtras(completed.user.id);
+  const { role, phone, birthday, policyVersion } = await getProfileExtras(completed.user.id);
   const payload = Buffer.from(
     JSON.stringify({
       session: {
@@ -346,6 +377,7 @@ export async function googleCallback(req: Request, res: Response) {
         phone,
         birthday,
         role,
+        policyVersion,
       },
     }),
     "utf8",
@@ -370,7 +402,7 @@ export async function startGithubLogin(req: Request, res: Response) {
 
 export async function finishGithubLoginRedirect(code: string, returnTo: string): Promise<string> {
   const completed = await completeGithubLogin(code);
-  const { role, phone, birthday } = await getProfileExtras(completed.user.id);
+  const { role, phone, birthday, policyVersion } = await getProfileExtras(completed.user.id);
   const payload = Buffer.from(
     JSON.stringify({
       session: {
@@ -384,6 +416,7 @@ export async function finishGithubLoginRedirect(code: string, returnTo: string):
         phone,
         birthday,
         role,
+        policyVersion,
       },
     }),
     "utf8",

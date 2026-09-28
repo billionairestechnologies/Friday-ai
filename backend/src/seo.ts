@@ -47,6 +47,14 @@ export const PUBLIC_PAGES: Record<string, PageMeta> = {
     title: "Automations — Friday AI",
     description: "Schedule Friday to run tasks for you — a morning news brief, a weekly competitor scan, an inbox digest — and get notified when they're done.",
   },
+  "/privacy": {
+    title: "Privacy Policy — Friday AI",
+    description: "What Friday collects, which AI providers and connectors see your data, and the controls you have — export, delete memory, disconnect accounts, delete your account.",
+  },
+  "/terms": {
+    title: "Terms of Service — Friday AI",
+    description: "The terms that apply to your use of Friday on web, Android and iOS.",
+  },
 };
 
 /** App pages that exist but are private or per-user — served, but kept out of search results. */

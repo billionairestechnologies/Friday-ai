@@ -18,8 +18,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
 import com.friday.app.R
 import com.friday.app.data.Sheet
 import com.friday.app.ui.theme.FridayBg
@@ -60,17 +65,19 @@ fun AuthSheetBody(
     sheet: Sheet,
     busy: Boolean,
     error: String?,
-    onSubmit: (email: String, password: String, name: String, phone: String, birthday: String) -> Unit,
+    onSubmit: (email: String, password: String, name: String, phone: String, birthday: String, acceptedTerms: Boolean) -> Unit,
     onGoogleAuth: () -> Unit,
     onGithubAuth: () -> Unit,
     onOpen: (Sheet) -> Unit,
     onClose: () -> Unit,
 ) {
+    val ctx = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var birthday by remember { mutableStateOf("") }
+    var acceptedTerms by remember { mutableStateOf(false) }
     val isSignup = sheet == Sheet.Signup
     val title = when (sheet) {
         Sheet.Welcome -> "Welcome back"
@@ -111,13 +118,54 @@ fun AuthSheetBody(
         AuthField(value = email, onChange = { email = it }, placeholder = "Email address", keyboardType = KeyboardType.Email)
         Spacer(Modifier.height(10.dp))
         AuthField(value = password, onChange = { password = it }, placeholder = "Password", isPassword = true)
+        if (isSignup) {
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Checkbox(
+                    checked = acceptedTerms,
+                    onCheckedChange = { acceptedTerms = it },
+                    colors = CheckboxDefaults.colors(checkedColor = FridayText),
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.padding(top = 1.dp)) {
+                    Row {
+                        Text("I agree to Friday's ", color = FridayMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                        Text(
+                            "Terms of Service",
+                            color = FridayText,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            modifier = Modifier.clickable {
+                                CustomTabsIntent.Builder().build()
+                                    .launchUrl(ctx, Uri.parse("https://friday.billionairestechnologies.com/terms"))
+                            },
+                        )
+                    }
+                    Row {
+                        Text("and ", color = FridayMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                        Text(
+                            "Privacy Policy",
+                            color = FridayText,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            modifier = Modifier.clickable {
+                                CustomTabsIntent.Builder().build()
+                                    .launchUrl(ctx, Uri.parse("https://friday.billionairestechnologies.com/privacy"))
+                            },
+                        )
+                        Text(".", color = FridayMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                    }
+                }
+            }
+        }
         if (error != null) {
             Spacer(Modifier.height(10.dp))
             Text(error, color = FridayError, fontSize = 13.sp, lineHeight = 18.sp)
         }
         Spacer(Modifier.height(12.dp))
-        PillButton(if (busy) "Please wait…" else "Continue", filled = true, enabled = !busy) {
-            onSubmit(email.trim(), password, name.trim(), phone.trim(), birthday.trim())
+        PillButton(if (busy) "Please wait…" else "Continue", filled = true, enabled = !busy && (!isSignup || acceptedTerms)) {
+            onSubmit(email.trim(), password, name.trim(), phone.trim(), birthday.trim(), acceptedTerms)
         }
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {

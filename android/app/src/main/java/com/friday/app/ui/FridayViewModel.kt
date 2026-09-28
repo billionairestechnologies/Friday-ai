@@ -93,6 +93,14 @@ data class QueuedMessage(
 )
 
 class FridayViewModel(app: Application) : AndroidViewModel(app) {
+    companion object {
+        // Must exactly match backend/src/services/policyService.ts's POLICY_VERSION and
+        // frontend/src/lib/site/legal.ts's POLICY_VERSION — compared against the signed-in
+        // account's saved FridayUser.policyVersion to decide whether FridayApp.kt shows the
+        // blocking "I agree" dialog.
+        const val POLICY_VERSION = "2026-09-28"
+    }
+
     private val repo = ChatRepository()
     private val tokenStore = TokenStore(app).also { ApiClient.init(it) }
     private val vibrator = app.getSystemService(Vibrator::class.java)
@@ -147,6 +155,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                                     result.value.phone,
                                     result.value.birthday,
                                     result.value.instructions,
+                                    result.value.policyVersion,
                                 ),
                             )
                         }
@@ -279,7 +288,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     fun consumeEntrance() = _state.update { it.copy(playEntrance = false) }
 
     /** Step 1 of real auth: POST login or signup, which always replies with an OTP requirement. */
-    fun submitAuth(email: String, password: String, name: String, phone: String, birthday: String, isSignup: Boolean, onOtpRequired: () -> Unit) {
+    fun submitAuth(email: String, password: String, name: String, phone: String, birthday: String, isSignup: Boolean, acceptedTerms: Boolean, onOtpRequired: () -> Unit) {
         val cleanEmail = email.trim()
         if (cleanEmail.isBlank() || password.isBlank()) {
             _state.update { it.copy(authError = "Enter your email and password.") }
@@ -289,10 +298,14 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(authError = "Enter your mobile number and birthday (YYYY-MM-DD).") }
             return
         }
+        if (isSignup && !acceptedTerms) {
+            _state.update { it.copy(authError = "You must agree to the Terms of Service and Privacy Policy to continue.") }
+            return
+        }
         _state.update { it.copy(authBusy = true, authError = null) }
         viewModelScope.launch {
             val result = if (isSignup) {
-                AuthApi.signup(name.ifBlank { nameFromEmail(cleanEmail) }, cleanEmail, password, phone, birthday)
+                AuthApi.signup(name.ifBlank { nameFromEmail(cleanEmail) }, cleanEmail, password, phone, birthday, acceptedTerms)
             } else {
                 AuthApi.login(cleanEmail, password)
             }
@@ -325,6 +338,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                                 result.value.user.phone,
                                 result.value.user.birthday,
                                 result.value.user.instructions,
+                                result.value.user.policyVersion,
                             ),
                             authBusy = false,
                             authError = null,
@@ -391,6 +405,19 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { onResult(AuthApi.exportData()) }
     }
 
+    /** PolicyConsentDialog's "I Agree" button — records acceptance and closes the gate. */
+    fun acceptPolicy(onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            when (val result = AuthApi.acceptPolicy()) {
+                is AuthResult.Success -> {
+                    _state.update { s -> s.copy(user = s.user?.copy(policyVersion = result.value.policyVersion)) }
+                    onResult(true, null)
+                }
+                is AuthResult.Failure -> onResult(false, result.message)
+            }
+        }
+    }
+
     /** Settings > Data Controls — permanent; caller must confirm with the user before calling this. */
     fun deleteAccount(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
@@ -425,11 +452,12 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             val refreshToken = session.optString("refresh_token", session.optString("refreshToken"))
             val name = userObj.optString("name")
             val email = userObj.optString("email")
+            val policyVersion = userObj.optString("policyVersion").ifBlank { null }
             tokenStore.saveSession(accessToken, refreshToken)
             tokenStore.userName = name
             tokenStore.userEmail = email
             _state.update {
-                it.copy(user = FridayUser(name.ifBlank { nameFromEmail(email) }, email), sheet = Sheet.None)
+                it.copy(user = FridayUser(name.ifBlank { nameFromEmail(email) }, email, policyVersion = policyVersion), sheet = Sheet.None)
             }
             syncConversations()
             refreshPlan()
