@@ -20,6 +20,8 @@ export function Composer({
   const setWebSearch = useChat((s) => s.setWebSearch);
   const canvas = useChat((s) => s.canvas);
   const setCanvas = useChat((s) => s.setCanvas);
+  const research = useChat((s) => s.research);
+  const setResearch = useChat((s) => s.setResearch);
   const model = useChat((s) => s.model);
   const setModel = useChat((s) => s.setModel);
 
@@ -30,9 +32,11 @@ export function Composer({
       think={think}
       search={webSearch}
       canvas={canvas}
+      research={research}
       onThinkChange={setThink}
       onSearchChange={setWebSearch}
       onCanvasChange={setCanvas}
+      onResearchChange={setResearch}
       model={model}
       onModelChange={setModel}
       onStop={onStop}

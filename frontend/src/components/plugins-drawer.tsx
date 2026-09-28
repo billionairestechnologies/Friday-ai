@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Puzzle, Search, X } from "lucide-react";
-import { FEATURED_PLUGINS, FRIDAY_TOOLS, type PluginItem } from "@/lib/plugins";
+import { Check, Search, X } from "lucide-react";
+import { FEATURED_PLUGINS, type PluginItem } from "@/lib/plugins";
 import { PLUGIN_LOGOS, PluginLogo } from "@/components/plugin-logos";
 import { useChat } from "@/lib/chat/store";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -45,14 +45,6 @@ type ConnectorAccount = {
 export function PluginsDrawer() {
   const dialog = useChat((s) => s.dialog);
   const setDialog = useChat((s) => s.setDialog);
-  const think = useChat((s) => s.think);
-  const setThink = useChat((s) => s.setThink);
-  const webSearch = useChat((s) => s.webSearch);
-  const setWebSearch = useChat((s) => s.setWebSearch);
-  const canvas = useChat((s) => s.canvas);
-  const setCanvas = useChat((s) => s.setCanvas);
-  const research = useChat((s) => s.research);
-  const setResearch = useChat((s) => s.setResearch);
   const { user } = useCurrentUserState();
   const signedIn = Boolean(user && !user.isDevFallback);
   const [tab, setTab] = useState<"connectors" | "skills">("connectors");
@@ -64,9 +56,6 @@ export function PluginsDrawer() {
   const [preview, setPreview] = useState<{ title: string; subtitle?: string | null; url?: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-
-  const on = { search: webSearch, think, canvas, research };
-  const toggle = { search: setWebSearch, think: setThink, canvas: setCanvas, research: setResearch };
 
   const pluginProvider = useMemo(() => {
     const map = new Map<string, ConnectorProvider>();
@@ -214,72 +203,39 @@ export function PluginsDrawer() {
               {tab === "connectors" ? (
                 <>
                   {notice && <p className="mb-3 text-sm text-muted">{notice}</p>}
-                  <p className="mb-3 text-sm font-semibold">Connected</p>
-                  <ul className="mb-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {FRIDAY_TOOLS.map((p) => {
-                      const enabled = on[p.id as keyof typeof on];
-                      return (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              toggle[p.id as keyof typeof toggle](!enabled);
-                              setActive(p);
-                            }}
-                            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
-                          >
-                            <span className="grid size-9 place-items-center rounded-lg bg-chip">
-                              <Puzzle className="size-4" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-medium">{p.name}</span>
-                              <span className="block truncate text-xs text-muted">{p.desc}</span>
-                            </span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2.5 py-0.5 text-xs",
-                                enabled ? "bg-chip text-foreground" : "border border-border text-muted",
-                              )}
-                            >
-                              {enabled ? (
-                                <span className="inline-flex items-center gap-1">
+                  {accounts.length > 0 && (
+                    <>
+                      <p className="mb-3 text-sm font-semibold">Connected</p>
+                      <ul className="mb-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {accounts.map((account) => {
+                          const plugin = FEATURED_PLUGINS.find((item) => pluginProvider.get(item.id) === account.provider);
+                          if (!plugin) return null;
+                          return (
+                            <li key={account.id}>
+                              <button
+                                type="button"
+                                onClick={() => setActive(plugin)}
+                                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
+                              >
+                                <span className="grid size-9 place-items-center rounded-lg bg-chip">
+                                  {PLUGIN_LOGOS[plugin.id] ? <PluginLogo id={plugin.id} className="size-4.5" /> : plugin.name.charAt(0)}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-sm font-medium">{plugin.name}</span>
+                                  <span className="block truncate text-xs text-muted">
+                                    {account.accountLogin ?? "connected"}
+                                  </span>
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-0.5 text-xs">
                                   <Check className="size-3" /> On
                                 </span>
-                              ) : (
-                                "Add"
-                              )}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                    {accounts.map((account) => {
-                      const plugin = FEATURED_PLUGINS.find((item) => pluginProvider.get(item.id) === account.provider);
-                      if (!plugin) return null;
-                      return (
-                        <li key={account.id}>
-                          <button
-                            type="button"
-                            onClick={() => setActive(plugin)}
-                            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
-                          >
-                            <span className="grid size-9 place-items-center rounded-lg bg-chip">
-                              {PLUGIN_LOGOS[plugin.id] ? <PluginLogo id={plugin.id} className="size-4.5" /> : plugin.name.charAt(0)}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-medium">{plugin.name}</span>
-                              <span className="block truncate text-xs text-muted">
-                                {account.accountLogin ?? "connected"}
-                              </span>
-                            </span>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-0.5 text-xs">
-                              <Check className="size-3" /> On
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
                   <p className="mb-3 text-sm font-semibold">Featured</p>
                   <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {featured.map((p) => {
@@ -311,7 +267,7 @@ export function PluginsDrawer() {
               ) : (
                 <div className="text-sm text-muted">
                   <p className="mb-2 font-semibold text-foreground">Skills</p>
-                  <p>Think, Search, Canvas and Deep Research are Friday’s built-in skills. Turn them on from Connectors or the composer.</p>
+                  <p>Think, Search and Deep Research live right in the composer — Canvas opens automatically, or toggle it from the top-right icon.</p>
                 </div>
               )}
             </div>
@@ -330,9 +286,7 @@ export function PluginsDrawer() {
               </div>
               <div className="scroll-thin flex-1 overflow-y-auto px-4 pb-4 text-sm leading-relaxed text-muted">
                 <p>{active.desc}</p>
-                {active.group === "connected" ? (
-                  <p className="mt-3">This is a Friday tool. Toggle it here or from the composer.</p>
-                ) : activeAccount && activeProvider ? (
+                {activeAccount && activeProvider ? (
                   <div className="mt-3 space-y-3">
                     <p>
                       Connected as <span className="text-foreground">{activeAccount.accountLogin}</span>.
