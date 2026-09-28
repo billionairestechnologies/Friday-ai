@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Composer } from "@/components/composer";
 import { MessageThread } from "@/components/message-thread";
@@ -23,6 +23,7 @@ import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
 import { X } from "lucide-react";
+import { SITE_NAV } from "@/lib/site/pages";
 
 type ConversationMode = "single" | "auto" | "teamup";
 
@@ -481,6 +482,15 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                       </motion.button>
                     ))}
                   </div>
+                )}
+                {!isPending && !(user && !user.isDevFallback) && (
+                  <nav className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-subtle" aria-label="About Friday">
+                    {SITE_NAV.map((item) => (
+                      <Link key={item.to} to={item.to} className="hover:text-foreground">
+                        {item.label}
+                      </Link>
+                    ))}
+                  </nav>
                 )}
               </div>
             </motion.div>

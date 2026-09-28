@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
@@ -28,6 +28,7 @@ import { billingRouter } from "./routes/billing.js";
 import { connectorsRouter } from "./routes/connectors.js";
 import { organizationsRouter } from "./routes/organizations.js";
 import { appRouter } from "./routes/app.js";
+import { renderIndexHtml, robotsTxt, sitemapXml } from "./seo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // In production this server also serves the built frontend (../../frontend/dist relative to
@@ -93,9 +94,20 @@ export function createApp() {
   app.use("/api/app", appRouter);
 
   if (existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
-    app.get(/^\/(?!api\/).*/, (_req, res) => {
-      res.sendFile(path.join(frontendDist, "index.html"));
+    const indexPath = path.join(frontendDist, "index.html");
+    const indexTemplate = readFileSync(indexPath, "utf8");
+    const builtAt = statSync(indexPath).mtime;
+    app.get("/robots.txt", (req, res) => {
+      res.type("text/plain").send(robotsTxt(req.hostname));
+    });
+    app.get("/sitemap.xml", (_req, res) => {
+      res.type("application/xml").send(sitemapXml(builtAt));
+    });
+    // index: false so "/" also goes through renderIndexHtml instead of the untouched static file.
+    app.use(express.static(frontendDist, { index: false }));
+    app.get(/^\/(?!api\/).*/, (req, res) => {
+      const page = renderIndexHtml(indexTemplate, req.path, req.hostname);
+      res.status(page.status).type("html").setHeader("Cache-Control", "no-cache").send(page.html);
     });
   }
 

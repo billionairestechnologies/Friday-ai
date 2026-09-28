@@ -10,6 +10,8 @@ import { AutomationsPage } from "@/routes/automations";
 import { SharePage } from "@/routes/share";
 import { MobileAuthBridge } from "@/routes/mobile-auth-bridge";
 import { AppErrorComponent } from "@/lib/error-component";
+import { SitePage } from "@/routes/site";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -100,10 +102,32 @@ const libraryRoute = createRoute({
   component: LibraryPage,
 });
 
+// Signed-out visitors (and search crawlers) get the public Automations page; signed-in users the app.
+function AutomationsRoute() {
+  const { user, isPending } = useCurrentUserState();
+  if (isPending) return null;
+  return user && !user.isDevFallback ? <AutomationsPage /> : <SitePage slug="automations" />;
+}
+
 const automationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/automations",
-  component: AutomationsPage,
+  component: AutomationsRoute,
+});
+
+// Public product pages — the titles/descriptions Google indexes come from backend/src/seo.ts.
+const siteRoutes = (["overview", "models", "build", "research", "connectors"] as const).map((slug) =>
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: `/${slug}`,
+    component: () => <SitePage slug={slug} />,
+  }),
+);
+
+const plansRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/plans",
+  component: UpgradePage,
 });
 
 function ShareRoute() {
@@ -129,6 +153,8 @@ const routeTree = rootRoute.addChildren([
   libraryRoute,
   automationsRoute,
   shareRoute,
+  plansRoute,
+  ...siteRoutes,
 ]);
 
 export const router = createRouter({ routeTree });
