@@ -1,4 +1,4 @@
-import { getGitHubAccessToken } from "../../connectorService.js";
+import { disconnectConnector, getGitHubAccessToken } from "../../connectorService.js";
 import { clip, num, str, type FridayTool, type ToolContext } from "./types.js";
 
 const API = "https://api.github.com";
@@ -16,6 +16,14 @@ async function gh(ctx: ToolContext, path: string): Promise<unknown> {
     },
     signal: ctx.signal,
   });
+  if (res.status === 401) {
+    // The stored token is invalid (revoked on GitHub's side, or otherwise dead) — the Connectors
+    // drawer was still showing "On" purely because the DB row existed, with no way to tell it was
+    // stale until a tool call actually hit it. Clear it now so the UI reflects reality on next
+    // load, instead of silently claiming to be connected forever.
+    await disconnectConnector(ctx.userId, "github").catch(() => {});
+    throw new Error("GitHub's connection has expired or was revoked — ask the user to reconnect it from Connectors.");
+  }
   if (!res.ok) throw new Error(`GitHub API ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return res.json();
 }
