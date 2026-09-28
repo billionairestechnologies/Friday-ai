@@ -432,6 +432,13 @@ export async function searchGitHubRepositories(userId: string, query: string) {
     | Array<{ full_name: string; html_url: string; description: string | null }>;
 
   if (!response.ok) {
+    // Same stale-token cleanup as the agent's GitHub tool (tools/github.ts) — the Connectors
+    // drawer was showing "On" purely because the DB row existed, with no check that the token
+    // still actually works, so a revoked/expired token looked connected indefinitely.
+    if (response.status === 401) {
+      await disconnectConnector(userId, "github").catch(() => {});
+      throw new HttpError(401, "GitHub's connection has expired or was revoked — reconnect it from Connectors.");
+    }
     const message = !Array.isArray(body) && typeof body.message === "string" ? body.message : "GitHub request failed";
     throw new HttpError(502, message);
   }
