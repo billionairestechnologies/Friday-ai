@@ -10,7 +10,7 @@ import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan, toolOnlySteps } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
 import { AskCard } from "@/components/ask-panel";
-import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
+import { BuildBanner, BuildSteps, BuildSuggestionCard, ProjectZipCard } from "@/components/build-steps";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
@@ -205,6 +205,10 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
         }
         return null;
       })()}
+
+      {message.buildSuggestion && !message.streaming && (
+        <BuildSuggestionCard summary={message.buildSuggestion.summary} conversationId={conversationId} />
+      )}
 
       {message.error && (!plan || message.streaming) && (
         <p className="rounded-md border border-border bg-elevated px-3 py-2 text-sm text-danger">

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, GitPullRequest, Terminal, Wrench } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { AlertCircle, ArrowRight, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, GitPullRequest, Settings2, Terminal, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BuildInfo, BuildStep } from "@/lib/chat/types";
+import { api } from "@/lib/api";
+import type { BuildEffort, BuildInfo, BuildMode, BuildStep } from "@/lib/chat/types";
 import { useChat } from "@/lib/chat/store";
 import { downloadProjectZip } from "@/components/build-preview";
 
@@ -149,6 +151,187 @@ export function BuildBanner({ compact = false }: { compact?: boolean }) {
           </div>
           <div className="text-xs text-muted">Spinning up a sandbox to build, install, run and test your project…</div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Shown on a normal chat reply that looked build-shaped — normal chat never auto-builds anymore
+ *  (no file tree/terminal noise here), it just offers to open a dedicated Build Mode workspace. */
+export function BuildSuggestionCard({ summary, conversationId }: { summary: string; conversationId?: string }) {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function goToBuildMode() {
+    if (!conversationId || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post<{ conversationId: string; prompt: string }>("/build/sessions", { fromConversationId: conversationId });
+      const chatId = useChat.getState().openBuildSession(res.conversationId, "Build session");
+      useChat.getState().setPendingSend({ chatId, text: res.prompt });
+      void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversationId } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start Build Mode");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex w-full max-w-md flex-col gap-2 rounded-xl border border-border bg-elevated px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <Hammer className="size-4 text-muted" /> This looks like a build/dev task
+      </div>
+      <p className="line-clamp-2 text-xs text-muted">{summary}</p>
+      <button
+        type="button"
+        onClick={goToBuildMode}
+        disabled={loading || !conversationId}
+        className="inline-flex w-fit items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-xs font-semibold text-background disabled:opacity-60"
+      >
+        {loading ? "Starting Build Mode…" : "Go to Build Mode"} <ArrowRight className="size-3.5" />
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+const MODE_OPTIONS: { value: BuildMode; label: string; desc: string }[] = [
+  { value: "manual", label: "Manual", desc: "Ask for approval before making each edit" },
+  { value: "edit_auto", label: "Edit automatically", desc: "Edit freely, ask before installs/commands/PRs" },
+  { value: "plan", label: "Plan", desc: "Explore and present a plan before editing" },
+  { value: "auto", label: "Auto", desc: "Approve actions that pass a safety check, pause for anything risky" },
+];
+const EFFORT_OPTIONS: { value: BuildEffort; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+/** Mode + effort controls for a Build Mode workspace — mirrors the reference agent panel (Manual /
+ *  Edit automatically / Plan / Auto, plus an effort dial). Persists via PATCH /build/:id/settings;
+ *  takes effect from the agent's next action/turn (agent.ts reads it fresh each iteration). */
+export function BuildModeControls({
+  conversationId,
+  mode,
+  effort,
+  onChange,
+}: {
+  conversationId?: string;
+  mode: BuildMode;
+  effort: BuildEffort;
+  onChange: (patch: { mode?: BuildMode; effort?: BuildEffort }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  async function update(patch: { mode?: BuildMode; effort?: BuildEffort }) {
+    onChange(patch);
+    setOpen(false);
+    if (conversationId) await api.patch(`/build/${conversationId}/settings`, patch).catch(() => {});
+  }
+
+  const current = MODE_OPTIONS.find((m) => m.value === mode) ?? MODE_OPTIONS[3]!;
+
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-composer px-2.5 py-1 font-medium text-foreground hover:bg-chip-on"
+        >
+          <Settings2 className="size-3.5 text-muted" /> {current.label}
+        </button>
+        {open && (
+          <div className="absolute bottom-full left-0 z-10 mb-1 w-64 rounded-xl border border-border bg-elevated p-1 shadow-lg">
+            <p className="px-2 py-1 text-[11px] font-semibold text-subtle">Modes</p>
+            {MODE_OPTIONS.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => update({ mode: m.value })}
+                className={cn(
+                  "flex w-full flex-col items-start gap-0.5 rounded-lg px-2 py-1.5 text-left hover:bg-chip-on",
+                  m.value === mode && "bg-chip-on",
+                )}
+              >
+                <span className="flex w-full items-center justify-between text-foreground">
+                  {m.label}
+                  {m.value === mode && <Check className="size-3.5" />}
+                </span>
+                <span className="text-[11px] text-muted">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1 rounded-full border border-border bg-composer px-1 py-1">
+        {EFFORT_OPTIONS.map((e) => (
+          <button
+            key={e.value}
+            type="button"
+            onClick={() => update({ effort: e.value })}
+            className={cn(
+              "rounded-full px-2 py-0.5 font-medium text-muted hover:text-foreground",
+              e.value === effort && "bg-chip-on text-foreground",
+            )}
+          >
+            {e.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A build action paused for approval (Manual/Plan/Auto-risky-action gate — see agent.ts's
+ *  requestApproval). Shown above the composer so it's impossible to miss mid-conversation. */
+export function BuildApprovalCard({
+  action,
+  conversationId,
+  onResolved,
+}: {
+  action: { kind: string; label: string; detail?: string };
+  conversationId?: string;
+  onResolved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function resolve(approved: boolean) {
+    if (!conversationId || busy) return;
+    setBusy(true);
+    try {
+      await api.post(`/build/${conversationId}/${approved ? "approve" : "reject"}`, {});
+    } finally {
+      onResolved();
+    }
+  }
+
+  return (
+    <div className="mb-2 flex flex-col gap-2 rounded-xl border border-border bg-elevated px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <AlertCircle className="size-4 text-muted" /> Waiting for your approval
+      </div>
+      <p className="text-xs text-muted">{action.label}</p>
+      {action.detail && <p className="truncate text-[11px] text-subtle">{action.detail}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void resolve(true)}
+          className="rounded-full bg-foreground px-3 py-1.5 text-xs font-semibold text-background disabled:opacity-60"
+        >
+          Approve
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void resolve(false)}
+          className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground disabled:opacity-60"
+        >
+          Reject
+        </button>
       </div>
     </div>
   );

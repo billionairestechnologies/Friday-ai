@@ -3,6 +3,7 @@ import {
   Building2,
   ChevronDown,
   FolderKanban,
+  Hammer,
   LibraryBig,
   MessageSquare,
   PanelLeft,
@@ -63,6 +64,8 @@ export function Sidebar() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [projects, setProjects] = useState<AssistantProject[]>([]);
+  const [buildOpen, setBuildOpen] = useState(true);
+  const [buildSessions, setBuildSessions] = useState<ServerConversation[]>([]);
 
   // Project chats are project-scoped only (see hydrateFromServer/listConversations) — the main
   // list only ever receives unscoped ones from the backend, but this also guards against any
@@ -99,6 +102,14 @@ export function Sidebar() {
       .then((res) => setProjects(res.projects))
       .catch(() => {});
   }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ sessions: ServerConversation[] }>("/build/sessions")
+      .then((res) => setBuildSessions(res.sessions))
+      .catch(() => {});
+  }, [signedIn, activeId]);
 
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
@@ -275,6 +286,44 @@ export function Sidebar() {
                       >
                         <FolderKanban className="size-3.5 shrink-0" />
                         <span className="truncate">{p.name}</span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
+
+          {/* Build — Build Mode sessions (conversations.kind = 'build'), listed separately from
+              regular chat history: each one is a dedicated workspace, not a normal conversation. */}
+          <div className="mt-4">
+            <div className="flex h-8 items-center gap-1 px-1.5">
+              <button
+                type="button"
+                onClick={() => setBuildOpen((v) => !v)}
+                className="flex h-7 flex-1 items-center gap-1.5 rounded-lg px-1 text-xs font-semibold text-subtle hover:bg-chip-on hover:text-foreground"
+              >
+                <ChevronDown className={cn("size-3.5 transition-transform", !buildOpen && "-rotate-90")} />
+                Build
+              </button>
+            </div>
+            {buildOpen && (
+              <ul className="flex flex-col gap-0.5 px-1">
+                {buildSessions.length === 0 ? (
+                  <li className="px-2.5 py-1.5 text-xs text-subtle">No build sessions yet</li>
+                ) : (
+                  buildSessions.map((session) => (
+                    <li key={session.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigate({ to: "/build/$conversationId", params: { conversationId: session.id } });
+                          if (window.innerWidth < 768) setOpen(false);
+                        }}
+                        className="premium-control flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm font-medium text-muted hover:bg-chip-on hover:text-foreground"
+                      >
+                        <Hammer className="size-3.5 shrink-0" />
+                        <span className="truncate">{session.title}</span>
                       </button>
                     </li>
                   ))

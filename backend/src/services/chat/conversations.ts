@@ -1,7 +1,7 @@
 import { saveFromMessage } from "../libraryService.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
-import type { ConversationMode } from "./types.js";
+import type { ConversationKind, ConversationMode } from "./types.js";
 import type { ChatImage } from "../providers/types.js";
 import { getOwnedProject } from "../projectService.js";
 import { resolveAttachmentDataUrl, storeAttachments } from "../attachmentStorage.js";
@@ -15,6 +15,7 @@ export type MessageMetadata = {
   usedCanvas?: boolean;
   error?: string;
   build?: import("./types.js").BuildMeta;
+  buildSuggestion?: { summary: string } | null;
 };
 
 export type PageOptions = {
@@ -59,6 +60,7 @@ export async function createConversation(
   modelId?: string,
   title?: string,
   projectId?: string,
+  kind: ConversationKind = "chat",
 ) {
   let providerRowId: string | null = null;
   if (projectId) await getOwnedProject(userId, projectId);
@@ -74,7 +76,8 @@ export async function createConversation(
     providerRowId = provider.id;
   }
 
-  const defaultTitle = mode === "auto" ? "Auto chat" : mode === "teamup" ? "Team Up chat" : "New chat";
+  const defaultTitle =
+    kind === "build" ? "Build session" : mode === "auto" ? "Auto chat" : mode === "teamup" ? "Team Up chat" : "New chat";
 
   const { data, error } = await supabaseAdmin
     .from("conversations")
@@ -83,6 +86,7 @@ export async function createConversation(
       provider_id: providerRowId,
       model_id: mode === "single" ? modelId : null,
       mode,
+      kind,
       title: title || defaultTitle,
       project_id: projectId ?? null,
     })
@@ -142,9 +146,26 @@ export async function listConversations(userId: string, page: PageOptions = {}, 
     .from("conversations")
     .select("*, providers(slug, display_name)")
     .eq("user_id", userId)
+    .eq("kind", "chat")
     .order("updated_at", { ascending: false })
     .limit(pageSize(page.limit));
   query = projectId ? query.eq("project_id", projectId) : query.is("project_id", null);
+  if (page.before) query = query.lt("updated_at", page.before);
+  const { data, error } = await query;
+  if (error) throw new HttpError(500, error.message);
+  return data;
+}
+
+/** Build sessions promoted out of normal chat (conversations.kind = 'build'), listed separately
+ *  from the regular chat history for the sidebar's "Build" section. */
+export async function listBuildSessions(userId: string, page: PageOptions = {}) {
+  let query = supabaseAdmin
+    .from("conversations")
+    .select("*, providers(slug, display_name)")
+    .eq("user_id", userId)
+    .eq("kind", "build")
+    .order("updated_at", { ascending: false })
+    .limit(pageSize(page.limit));
   if (page.before) query = query.lt("updated_at", page.before);
   const { data, error } = await query;
   if (error) throw new HttpError(500, error.message);
@@ -205,7 +226,7 @@ export async function listMessages(userId: string, conversationId: string, page:
  * every history load huge and chats open blank on the clients.
  */
 export const MESSAGE_COLUMNS =
-  "id, conversation_id, role, content, input_mode, created_at, model_label, thinking, citations, agents, used_think, used_search, used_canvas, error, extracted_text, build";
+  "id, conversation_id, role, content, input_mode, created_at, model_label, thinking, citations, agents, used_think, used_search, used_canvas, error, extracted_text, build, build_suggestion";
 
 const DEFAULT_TITLES = ["New chat", "Auto chat", "Team Up chat"];
 
@@ -279,6 +300,7 @@ export async function insertAssistantMessage(
       used_canvas: metadata.usedCanvas ?? false,
       error: metadata.error ?? null,
       build: metadata.build ?? null,
+      build_suggestion: metadata.buildSuggestion ?? null,
     })
     .select(MESSAGE_COLUMNS)
     .single();

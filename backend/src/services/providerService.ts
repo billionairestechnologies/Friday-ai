@@ -183,6 +183,23 @@ export interface ChatCandidate {
   displayName: string;
   vision: boolean;
   minTier: "free" | "pro" | "premium";
+  /** Admin-set capabilities.coding flag — true/false when an admin has explicitly tagged the
+   *  model, undefined when nobody has (see isBuildWorthy, which then falls back to a name heuristic). */
+  coding?: boolean;
+}
+
+// Cheap/small chat-tier models that shouldn't drive Build Mode (a real coding agent loop needs a
+// frontier/coding-strong model, not the lightest, cheapest chat model) — a denylist rather than an
+// allowlist so unfamiliar-but-capable model names aren't accidentally excluded.
+const LIGHTWEIGHT_MODEL_PATTERN = /\b(mini|nano|lite|flash-8b|flash-lite|haiku|small(?!-\d{2,})|tiny|instant)\b/i;
+
+/** Whether a model should be offered to Build Mode: an admin's explicit capabilities.coding flag
+ *  wins, otherwise anything not matching the lightweight/chat-tier denylist above is assumed capable. */
+export function isBuildWorthy(candidate: ChatCandidate): boolean {
+  if (candidate.coding === true) return true;
+  if (candidate.coding === false) return false;
+  const label = `${candidate.modelId} ${candidate.displayName}`;
+  return !LIGHTWEIGHT_MODEL_PATTERN.test(label);
 }
 
 /** Looks up a single model's friendly display name (e.g. "Sarvam 105B") for reply labels. Falls back to the raw model id. */
@@ -243,14 +260,15 @@ export const listChatCandidates = memoAsync(30_000, async (): Promise<ChatCandid
     .filter((m) => (m.capabilities as Record<string, boolean> | null)?.chat === true)
     .map((m) => {
       const provider = (m as unknown as { providers: { slug: string; display_name: string } }).providers;
-      const vision = (m.capabilities as Record<string, boolean> | null)?.vision === true;
+      const capabilities = m.capabilities as Record<string, boolean> | null;
       return {
         slug: provider.slug,
         providerDisplayName: provider.display_name,
         modelId: m.model_id,
         displayName: m.display_name,
-        vision,
+        vision: capabilities?.vision === true,
         minTier: (m.min_tier as "free" | "pro" | "premium" | null) ?? "free",
+        coding: typeof capabilities?.coding === "boolean" ? capabilities.coding : undefined,
       };
     });
 });

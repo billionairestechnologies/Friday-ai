@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, useMatchRoute, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
 import { AdminGate } from "@/routes/admin";
@@ -40,7 +40,9 @@ const rootRoute = createRootRoute({
 // conversationId actually needs to change) on the very first message of a conversation.
 function AppShell() {
   const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
-  return <Home conversationId={conversationId} />;
+  const matchRoute = useMatchRoute();
+  const isBuildSession = Boolean(matchRoute({ to: "/build/$conversationId" }));
+  return <Home conversationId={conversationId} isBuildSession={isBuildSession} />;
 }
 
 const indexRoute = createRoute({
@@ -52,6 +54,17 @@ const indexRoute = createRoute({
 const conversationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/c/$conversationId",
+  component: AppShell,
+});
+
+// Build Mode workspace — same AppShell/Home as a normal chat (same component reference, see the
+// comment above AppShell: avoids the remount-abort bug). The backend always runs the sandbox
+// agent for a 'build'-kind conversation, and the client already auto-opens the Canvas panel the
+// moment Build Mode's preview comes up (routes/index.tsx, the `t: "preview"` SSE handler) — so
+// routing here needs no separate workspace component, just this conversationId-driven entry point.
+const buildSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/build/$conversationId",
   component: AppShell,
 });
 
@@ -157,6 +170,7 @@ const termsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   conversationRoute,
+  buildSessionRoute,
   adminRoute,
   upgradeRoute,
   projectsRoute,

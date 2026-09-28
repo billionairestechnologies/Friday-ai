@@ -31,6 +31,9 @@ export type TurnCommit = {
   usedCanvas?: boolean;
   /** Build Mode steps + preview for this turn (see BuildInfo). */
   build?: BuildInfo;
+  /** Set when this reply looked build-shaped but ran as a normal chat reply — renders a "Go to
+   *  Build Mode" card instead (see BuildSuggestionCard in message-thread.tsx). */
+  buildSuggestion?: { summary: string };
 };
 
 export type ServerConversation = {
@@ -53,6 +56,7 @@ export type ServerMessage = {
   used_canvas?: boolean | null;
   error?: string | null;
   build?: BuildInfo | null;
+  build_suggestion?: { summary: string } | null;
   message_attachments?: {
     id: string;
     name: string;
@@ -94,6 +98,9 @@ type ChatState = {
    *  syncOwner() detect an account switch on a shared device and wipe stale chats instead of
    *  leaking one user's conversations into another user's session. */
   ownerUserId: string | null;
+  /** A prompt queued to auto-send once a just-created Build Mode session's chat is active — see
+   *  openBuildSession() and the effect in routes/index.tsx that sends it and clears this. */
+  pendingSend: { chatId: string; text: string } | null;
   setHydrated: () => void;
   setSidebarOpen: (open: boolean) => void;
   setQuery: (q: string) => void;
@@ -117,6 +124,10 @@ type ChatState = {
   newChat: () => void;
   selectChat: (id: string) => void;
   selectConversation: (conversationId: string) => boolean;
+  /** Creates (or reuses) a local chat wired to an already-created backend Build Mode conversation
+   *  and selects it — used right after POST /build/sessions, before navigating to /build/:id. */
+  openBuildSession: (conversationId: string, title: string) => string;
+  setPendingSend: (v: { chatId: string; text: string } | null) => void;
   deleteChat: (id: string) => void;
   clearAllChats: () => void;
   /** Call whenever the authenticated identity resolves or changes (login, signup, logout,
@@ -223,6 +234,7 @@ export const useChat = create<ChatState>()(
       voiceName: null,
       voiceIntroSeen: false,
       ownerUserId: null,
+      pendingSend: null,
       setHydrated: () => set({ hydrated: true }),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setQuery: (query) => set({ query }),
@@ -270,6 +282,24 @@ export const useChat = create<ChatState>()(
         set({ activeId: chat.id, draft: "", attachments: [] });
         return true;
       },
+      openBuildSession: (conversationId, title) => {
+        const existing = get().chats.find((c) => c.conversationId === conversationId);
+        if (existing) {
+          set({ activeId: existing.id, draft: "", attachments: [] });
+          return existing.id;
+        }
+        const chat: Chat = {
+          id: uid(),
+          conversationId,
+          title,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [],
+        };
+        set((s) => ({ chats: [chat, ...s.chats], activeId: chat.id, draft: "", attachments: [] }));
+        return chat.id;
+      },
+      setPendingSend: (pendingSend) => set({ pendingSend }),
       deleteChat: (id) =>
         set((s) => {
           const chats = s.chats.filter((c) => c.id !== id);
@@ -351,6 +381,7 @@ export const useChat = create<ChatState>()(
                           usedSearch: m.usedSearch || data.usedSearch,
                           usedCanvas: m.usedCanvas || data.usedCanvas,
                           build: data.build ?? m.build,
+                          buildSuggestion: data.buildSuggestion ?? m.buildSuggestion,
                           streaming: false,
                           status: null,
                         }
@@ -479,6 +510,7 @@ export const useChat = create<ChatState>()(
                       usedCanvas: Boolean(m.used_canvas),
                       error: m.error ?? undefined,
                       build: m.build ?? undefined,
+                      buildSuggestion: m.build_suggestion ?? undefined,
                       attachments: m.message_attachments?.map((a) => ({
                         id: a.id,
                         name: a.name,
