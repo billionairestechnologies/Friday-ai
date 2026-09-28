@@ -13,7 +13,9 @@ import { clip, type FridayTool, type ToolContext } from "./tools/types.js";
  */
 
 export const MAX_TOOL_ROUNDS = 8;
-export const DEEP_RESEARCH_ROUNDS = 16;
+// Deep Research needs real room: a plan round, several parallel-search rounds, many fetch_url
+// reads, cross-checks, then the write-up — 16 was cutting genuinely thorough runs off early.
+export const DEEP_RESEARCH_ROUNDS = 40;
 /** Past this much conversation text, older tool results are shortened so long loops fit any context window. */
 const CONTEXT_BUDGET_CHARS = 180_000;
 const COMPACTED_RESULT_CHARS = 1_500;
@@ -29,7 +31,7 @@ export function compactToolResults(messages: AgentMessage[], budget = CONTEXT_BU
     m.content = shorter;
   }
 }
-const MAX_RESULT_CHARS = 24_000;
+const MAX_RESULT_CHARS = 32_000;
 const TOOL_TIMEOUT_MS = 45_000;
 
 export type ToolLoopResult = {

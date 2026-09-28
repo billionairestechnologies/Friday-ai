@@ -27,13 +27,29 @@ export async function buildToolset(userId: string): Promise<FridayTool[]> {
 
 /** Extra guidance for Deep Research turns (a long tool loop that ends in a cited report). */
 export const DEEP_RESEARCH_PROMPT =
-  "DEEP RESEARCH MODE. The user wants a thorough, well-sourced answer, not a quick one. Work like a research analyst: " +
-  "(1) break the question into 3-6 sub-questions; (2) run several web_search queries (different angles, recent + " +
-  "authoritative sources) and read the most relevant 5-10 pages in full with fetch_url — primary sources, official " +
-  "docs, data and reputable outlets over blogs; (3) cross-check claims that sources disagree on; (4) then write a " +
-  "structured report: a short executive summary, sections with headings, specific facts/numbers with dates, a " +
-  "clear conclusion or recommendation, and a final \"Sources\" list. Cite inline as markdown links. Say plainly what " +
-  "is uncertain or conflicting. Don't stop researching early just to answer fast.";
+  "DEEP RESEARCH MODE. You are not writing a quick answer — you are producing the single most thorough, rigorous " +
+  "report a human researcher could deliver on this question, beating a shallow one-search-and-summarize pass. " +
+  "Budget is generous: use it.\n\n" +
+  "PROCESS (do all of it, in order):\n" +
+  "1. PLAN — before searching, write a short numbered list of 5-8 concrete sub-questions that together fully cover " +
+  "the topic (definitions/background, current state, key players or options, data/numbers, risks or counterarguments, " +
+  "outlook). This is your research plan; follow it.\n" +
+  "2. SEARCH BROAD — run at least 8-12 web_search calls across the sub-questions, varying phrasing and angle (not " +
+  "near-duplicate queries). Fire independent searches in parallel in the same turn when they don't depend on each " +
+  "other's results — don't serialize what doesn't need to be.\n" +
+  "3. READ DEEP — fetch_url the 10-15 most load-bearing pages in full. Strongly prefer primary sources (official docs, " +
+  "filings, papers, government/company data) and recent, reputable reporting over blogs, SEO content or aggregators. " +
+  "Note each source's publish/updated date — recency matters, say when something might be stale.\n" +
+  "4. CROSS-CHECK — when sources disagree or a number looks surprising, search again to verify rather than picking one " +
+  "arbitrarily; state the disagreement explicitly if it can't be resolved.\n" +
+  "5. WRITE the report in this structure: a 3-5 sentence executive summary with the bottom line up front; then " +
+  "sections with clear headings covering each sub-question in depth (specific facts, numbers, dates, named " +
+  "entities — never vague filler like 'various factors'); a comparison table when comparing options/products/data; " +
+  "a short 'Risks & Caveats' or 'What's uncertain' section naming anything conflicting, stale, or unverifiable; a " +
+  "clear conclusion or recommendation; and a final 'Sources' list. Cite every non-obvious claim inline as a markdown " +
+  "link to its source at the point it's used, not just in the list at the end.\n\n" +
+  "Do not stop after one or two searches and call it done — that is the failure mode this mode exists to prevent. " +
+  "Keep researching until the sub-questions from your plan are genuinely answered with evidence, not assumed.";
 
 /** System guidance that goes with the tools: when to use them and how to treat what they return. */
 export function toolUsePrompt(tools: FridayTool[]): string {
