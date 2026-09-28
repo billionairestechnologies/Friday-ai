@@ -64,7 +64,6 @@ export function Sidebar() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [projects, setProjects] = useState<AssistantProject[]>([]);
-  const [buildOpen, setBuildOpen] = useState(true);
   const [buildSessions, setBuildSessions] = useState<ServerConversation[]>([]);
   const [startingBuild, setStartingBuild] = useState(false);
 
@@ -316,68 +315,6 @@ export function Sidebar() {
                       >
                         <FolderKanban className="size-3.5 shrink-0" />
                         <span className="truncate">{p.name}</span>
-                      </button>
-                    </li>
-                  ))
-                )}
-              </ul>
-            )}
-          </div>
-
-          {/* Build — Build Mode sessions (conversations.kind = 'build'), listed separately from
-              regular chat history: each one is a dedicated workspace, not a normal conversation. */}
-          <div className="mt-4">
-            <div className="flex h-8 items-center gap-1 px-1.5">
-              <button
-                type="button"
-                onClick={() => setBuildOpen((v) => !v)}
-                className="flex h-7 flex-1 items-center gap-1.5 rounded-lg px-1 text-xs font-semibold text-subtle hover:bg-chip-on hover:text-foreground"
-              >
-                <ChevronDown className={cn("size-3.5 transition-transform", !buildOpen && "-rotate-90")} />
-                Build
-              </button>
-              <button
-                type="button"
-                aria-label="New build session"
-                disabled={startingBuild}
-                onClick={async () => {
-                  setStartingBuild(true);
-                  try {
-                    const res = await api.post<{ conversationId: string }>("/build/sessions", {});
-                    useChat.getState().openBuildSession(res.conversationId, "Build session");
-                    setBuildSessions((prev) => [{ id: res.conversationId, title: "Build session", updated_at: new Date().toISOString() }, ...prev]);
-                    void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversationId } });
-                    if (window.innerWidth < 768) setOpen(false);
-                  } catch {
-                    // A failed start just means nothing new appears — no silent-looking navigation happens.
-                  } finally {
-                    setStartingBuild(false);
-                  }
-                }}
-                className="flex size-6 items-center justify-center rounded-md text-subtle hover:bg-chip-on hover:text-foreground disabled:opacity-50"
-              >
-                <Plus className="size-3.5" />
-              </button>
-              {/* Always starts a NEW session (intentionally distinct from openOrStartBuildMode,
-                  which the top-level nav row uses to jump into the most recent one instead). */}
-            </div>
-            {buildOpen && (
-              <ul className="flex flex-col gap-0.5 px-1">
-                {buildSessions.length === 0 ? (
-                  <li className="px-2.5 py-1.5 text-xs text-subtle">No build sessions yet</li>
-                ) : (
-                  buildSessions.map((session) => (
-                    <li key={session.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void navigate({ to: "/build/$conversationId", params: { conversationId: session.id } });
-                          if (window.innerWidth < 768) setOpen(false);
-                        }}
-                        className="premium-control flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm font-medium text-muted hover:bg-chip-on hover:text-foreground"
-                      >
-                        <Hammer className="size-3.5 shrink-0" />
-                        <span className="truncate">{session.title}</span>
                       </button>
                     </li>
                   ))

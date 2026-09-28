@@ -1,6 +1,7 @@
-import { createRootRoute, createRoute, createRouter, useMatchRoute, useParams } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
+import { BuildWorkspacePage } from "@/routes/build-workspace";
 import { AdminGate } from "@/routes/admin";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
@@ -40,9 +41,7 @@ const rootRoute = createRootRoute({
 // conversationId actually needs to change) on the very first message of a conversation.
 function AppShell() {
   const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
-  const matchRoute = useMatchRoute();
-  const isBuildSession = Boolean(matchRoute({ to: "/build/$conversationId" }));
-  return <Home conversationId={conversationId} isBuildSession={isBuildSession} />;
+  return <Home conversationId={conversationId} />;
 }
 
 const indexRoute = createRoute({
@@ -57,15 +56,18 @@ const conversationRoute = createRoute({
   component: AppShell,
 });
 
-// Build Mode workspace — same AppShell/Home as a normal chat (same component reference, see the
-// comment above AppShell: avoids the remount-abort bug). The backend always runs the sandbox
-// agent for a 'build'-kind conversation, and the client already auto-opens the Canvas panel the
-// moment Build Mode's preview comes up (routes/index.tsx, the `t: "preview"` SSE handler) — so
-// routing here needs no separate workspace component, just this conversationId-driven entry point.
+// Build Mode workspace — a genuinely separate page (not the chat shell): its own session rail,
+// repository picker, and dedicated composer, with file-tree/preview/terminal as the primary
+// surface. See build-workspace.tsx.
+function BuildWorkspaceRoute() {
+  const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
+  return <BuildWorkspacePage conversationId={conversationId} />;
+}
+
 const buildSessionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/build/$conversationId",
-  component: AppShell,
+  component: BuildWorkspaceRoute,
 });
 
 // Hidden, standalone admin gate — not linked from anywhere in the regular app.
