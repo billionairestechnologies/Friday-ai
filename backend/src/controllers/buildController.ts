@@ -58,31 +58,36 @@ export async function listSessions(req: Request, res: Response) {
 }
 
 const createSessionSchema = z.object({
-  fromConversationId: z.string().uuid(),
+  // Omitted → a blank session started directly from the sidebar's "+" (the user types the first
+  // message once they land in the workspace). Set → promoting a build-shaped chat message.
+  fromConversationId: z.string().uuid().optional(),
   mode: z.enum(["manual", "edit_auto", "plan", "auto"]).optional(),
   effort: z.enum(["low", "medium", "high"]).optional(),
 });
 
 /**
- * Promotes a build-shaped message from a normal chat into its own Build Mode workspace: a new
- * `kind: 'build'` conversation. Doesn't touch the sandbox itself — the frontend gets the prompt
- * back and sends it as the new session's first message via the normal send-message flow, which is
- * what actually kicks off the sandbox agent (see chat/index.ts: any message in a 'build'
- * conversation always runs it).
+ * Starts a new Build Mode workspace: a `kind: 'build'` conversation, either blank (sidebar "+") or
+ * seeded from a build-shaped message in a normal chat (the "Go to Build Mode" card). Doesn't touch
+ * the sandbox itself — the frontend sends the returned prompt (if any) as the new session's first
+ * message via the normal send-message flow, which is what actually kicks off the sandbox agent
+ * (see chat/index.ts: any message in a 'build' conversation always runs it).
  */
 export async function createSession(req: Request, res: Response) {
   const { fromConversationId, mode, effort } = createSessionSchema.parse(req.body);
-  await getOwnedConversation(req.user!.id, fromConversationId);
-  const { data: lastUserMessage } = await supabaseAdmin
-    .from("messages")
-    .select("content")
-    .eq("conversation_id", fromConversationId)
-    .eq("role", "user")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const prompt = (lastUserMessage?.content as string | undefined) ?? "";
-  if (!prompt) throw new HttpError(400, "That chat has no message to start Build Mode from yet.");
+  let prompt = "";
+  if (fromConversationId) {
+    await getOwnedConversation(req.user!.id, fromConversationId);
+    const { data: lastUserMessage } = await supabaseAdmin
+      .from("messages")
+      .select("content")
+      .eq("conversation_id", fromConversationId)
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    prompt = (lastUserMessage?.content as string | undefined) ?? "";
+    if (!prompt) throw new HttpError(400, "That chat has no message to start Build Mode from yet.");
+  }
 
   const conversation = await createConversation(req.user!.id, "auto", undefined, undefined, undefined, undefined, "build");
   if (mode || effort) {

@@ -66,6 +66,31 @@ export function Sidebar() {
   const [projects, setProjects] = useState<AssistantProject[]>([]);
   const [buildOpen, setBuildOpen] = useState(true);
   const [buildSessions, setBuildSessions] = useState<ServerConversation[]>([]);
+  const [startingBuild, setStartingBuild] = useState(false);
+
+  // Top-level "Build Mode" nav: opens the most recent workspace if one exists, otherwise starts a
+  // fresh blank one — same creation path as the "+" in the Build section below.
+  async function openOrStartBuildMode() {
+    if (startingBuild) return;
+    const latest = buildSessions[0];
+    if (latest) {
+      void navigate({ to: "/build/$conversationId", params: { conversationId: latest.id } });
+      if (window.innerWidth < 768) setOpen(false);
+      return;
+    }
+    setStartingBuild(true);
+    try {
+      const res = await api.post<{ conversationId: string }>("/build/sessions", {});
+      useChat.getState().openBuildSession(res.conversationId, "Build session");
+      setBuildSessions((prev) => [{ id: res.conversationId, title: "Build session", updated_at: new Date().toISOString() }, ...prev]);
+      void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversationId } });
+      if (window.innerWidth < 768) setOpen(false);
+    } catch {
+      // A failed start just means nothing new appears — no silent-looking navigation happens.
+    } finally {
+      setStartingBuild(false);
+    }
+  }
 
   // Project chats are project-scoped only (see hydrateFromServer/listConversations) — the main
   // list only ever receives unscoped ones from the backend, but this also guards against any
@@ -228,6 +253,11 @@ export function Sidebar() {
               }}
             />
             <NavRow
+              icon={Hammer}
+              label="Build Mode"
+              onClick={() => void openOrStartBuildMode()}
+            />
+            <NavRow
               icon={LibraryBig}
               label="Library"
               onClick={() => {
@@ -306,6 +336,30 @@ export function Sidebar() {
                 <ChevronDown className={cn("size-3.5 transition-transform", !buildOpen && "-rotate-90")} />
                 Build
               </button>
+              <button
+                type="button"
+                aria-label="New build session"
+                disabled={startingBuild}
+                onClick={async () => {
+                  setStartingBuild(true);
+                  try {
+                    const res = await api.post<{ conversationId: string }>("/build/sessions", {});
+                    useChat.getState().openBuildSession(res.conversationId, "Build session");
+                    setBuildSessions((prev) => [{ id: res.conversationId, title: "Build session", updated_at: new Date().toISOString() }, ...prev]);
+                    void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversationId } });
+                    if (window.innerWidth < 768) setOpen(false);
+                  } catch {
+                    // A failed start just means nothing new appears — no silent-looking navigation happens.
+                  } finally {
+                    setStartingBuild(false);
+                  }
+                }}
+                className="flex size-6 items-center justify-center rounded-md text-subtle hover:bg-chip-on hover:text-foreground disabled:opacity-50"
+              >
+                <Plus className="size-3.5" />
+              </button>
+              {/* Always starts a NEW session (intentionally distinct from openOrStartBuildMode,
+                  which the top-level nav row uses to jump into the most recent one instead). */}
             </div>
             {buildOpen && (
               <ul className="flex flex-col gap-0.5 px-1">
