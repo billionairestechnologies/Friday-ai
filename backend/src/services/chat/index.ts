@@ -522,6 +522,10 @@ export async function streamMessage(
     if (await buildIntentPromise) {
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
       onEvent({ t: "status", s: "building" });
+      // A real build (and the judgment call on whether to ask first) needs a frontier-grade model,
+      // not whatever Auto ranked first for a plain chat reply — same bias as Deep Research.
+      const buildWorthy = candidates.filter(isFrontierModel);
+      if (buildWorthy.length > 0) candidates = buildWorthy;
       // A brand-new project (no files yet, no question round yet) may be missing details that change
       // what gets built — ask first, with a recommended option per question, instead of guessing.
       if (!alreadyAsked(history) && Object.keys((await getProject(conversationId))?.files ?? {}).length === 0) {

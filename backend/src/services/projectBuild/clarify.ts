@@ -8,12 +8,16 @@ export const ASK_MARKER = "Before I start building, I have a few quick questions
 /** The client sends the user's picks back as a normal message that starts with this. */
 export const ANSWERS_PREFIX = "My answers to your questions:";
 
-const CLARIFY_TIMEOUT_MS = 9000;
+const CLARIFY_TIMEOUT_MS = 14000;
 
-const CLARIFY_PROMPT = `You are the requirements analyst of a coding agent about to build the user's request as a real project. Decide whether important details are MISSING and would change what gets built (e.g. what kind of site/app, which features, authentication method, database, visual style, pages, target audience, deployment). If the request is already specific enough to build something satisfying, ask nothing.
+const CLARIFY_PROMPT = `You are the requirements analyst of a coding agent about to build the user's request as a real project — like a senior engineer would before starting real work, not a code generator that guesses. Err toward asking: a request that names a domain but not the specifics (what kind of "trading terminal"? which market/exchange? real money or demo? what's it even called?) is NOT specific enough, even if it sounds concrete on the surface. Only skip questions for requests that are genuinely simple and unambiguous (e.g. "a one-page portfolio site with my photo and links").
+Always consider asking about, when the answer isn't already given or obvious from context:
+- What the project/site should be called (a short name — used for the title, README, package name).
+- The specific scope/domain details that change the actual build (e.g. for a trading terminal: which market or exchange's data, real order execution vs. a demo/paper-trading UI, which asset classes; for any app with accounts: auth method and whether data needs to persist).
+- Visual style/reference if the request is vague about how it should look.
 Reply with ONLY JSON, no prose, in this shape:
 {"questions":[{"question":"…?","options":[{"label":"short option","description":"one line why/what","recommended":true},{"label":"…"}]}]}
-Rules: 0-4 questions (fewer is better; only what truly matters). Each question has 2-4 concrete options; the FIRST option is your recommendation and is the only one with "recommended":true; put the reason it is best in its description. Do NOT include an "Other" option (the UI adds it). Never ask about things you can decide yourself (folder structure, library versions). If nothing important is missing reply {"questions":[]}.`;
+Rules: 1-4 questions for anything beyond a trivial single-purpose page (fewer is better; only what truly matters, but do not return zero questions just because you could technically guess reasonable defaults for a non-trivial build). Each question has 2-4 concrete options; the FIRST option is your recommendation and is the only one with "recommended":true; put the reason it is best in its description. A naming question's options can be a few plausible name suggestions plus a "You choose" style default. Do NOT include an "Other" option (the UI adds it). Never ask about things that don't change the outcome (folder structure, library versions, code style). Only reply {"questions":[]} for something genuinely small and already fully specified.`;
 
 export function alreadyAsked(history: ChatMessage[]): boolean {
   return history.some((m) => (m.role === "assistant" && m.content.includes(ASK_MARKER)) || (m.role === "user" && m.content.startsWith(ANSWERS_PREFIX)));
