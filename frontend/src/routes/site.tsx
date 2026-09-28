@@ -122,6 +122,29 @@ export function SitePage({ slug }: { slug: SiteSlug }) {
     };
   }, [page.metaTitle]);
 
+  // FAQPage structured data — lets Google show these Q&As as an expandable list directly in the
+  // search result. Injected client-side (this whole site is CSR) rather than duplicated into
+  // backend/src/seo.ts: Googlebot renders the page before reading structured data, and the
+  // homepage's JSON-LD already proved that out (indexed fine per Search Console). One script tag
+  // per page, swapped out on navigation so a stale page's FAQ never lingers.
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.text = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: page.faq.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: { "@type": "Answer", text: item.a },
+      })),
+    });
+    document.head.appendChild(script);
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, [page.faq]);
+
   return (
     <div className="min-h-dvh overflow-x-hidden bg-background text-foreground">
       <SiteHeader active={`/${slug}`} />
