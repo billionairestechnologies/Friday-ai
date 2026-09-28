@@ -19,8 +19,6 @@ import { useChat, type ServerConversation, type ServerMessage } from "@/lib/chat
 import { extractArtifact } from "@/lib/chat/artifact";
 import type { AskQuestion, ChatMessage } from "@/lib/chat/types";
 import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
-import { BuildApprovalCard, BuildModeControls } from "@/components/build-steps";
-import type { BuildEffort, BuildMode } from "@/lib/chat/types";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
@@ -46,7 +44,7 @@ function modeForModel(model: string): ConversationMode {
   return "single";
 }
 
-export function Home({ conversationId, isBuildSession }: { conversationId?: string; isBuildSession?: boolean } = {}) {
+export function Home({ conversationId }: { conversationId?: string } = {}) {
   const navigate = useNavigate();
   const greeting = useGreeting();
   const { user, isPending } = useCurrentUserState();
@@ -86,28 +84,6 @@ export function Home({ conversationId, isBuildSession }: { conversationId?: stri
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
-  const [buildMode, setBuildMode] = useState<BuildMode>("auto");
-  const [buildEffort, setBuildEffort] = useState<BuildEffort>("medium");
-  const [pendingApproval, setPendingApproval] = useState<{ kind: string; label: string; detail?: string } | null>(null);
-  const activeConversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
-
-  // Build Mode workspace: pick up the session's current mode/effort/pending-approval on load (a
-  // page reload mid-approval must still show the pending card, not silently drop it).
-  useEffect(() => {
-    if (!isBuildSession || !activeConversationId) return;
-    api
-      .get<{ mode: BuildMode; effort: BuildEffort; pendingApproval: { kind: string; label: string; detail?: string } | null }>(
-        `/build/${activeConversationId}/files`,
-      )
-      .then((res) => {
-        setBuildMode(res.mode);
-        setBuildEffort(res.effort);
-        setPendingApproval(res.pendingApproval);
-      })
-      .catch(() => {
-        // Nothing built yet (brand-new session, no build_projects row) — defaults are fine.
-      });
-  }, [isBuildSession, activeConversationId]);
 
   useEffect(() => {
     void loadModels();
@@ -354,10 +330,6 @@ export function Home({ conversationId, isBuildSession }: { conversationId?: stri
         else if (ev.t === "step") applyLiveStep(chatId, { id: ev.id, kind: ev.kind, label: ev.label, state: ev.state, detail: ev.detail });
         else if (ev.t === "ask") askQuestions = ev.questions;
         else if (ev.t === "buildSuggestion") buildSuggestion = { summary: ev.summary };
-        else if (ev.t === "mode") {
-          setBuildMode(ev.mode);
-          setBuildEffort(ev.effort);
-        } else if (ev.t === "approval") setPendingApproval(ev.action);
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });
         else if (ev.t === "preview") {
@@ -571,24 +543,6 @@ export function Home({ conversationId, isBuildSession }: { conversationId?: stri
                   )}
                   {pendingAsk && dismissedAsk !== pendingAsk.id && (
                     <AskPanel questions={pendingAsk.questions} onSubmit={(text) => void send(text)} onDismiss={() => setDismissedAsk(pendingAsk.id)} />
-                  )}
-                  {isBuildSession && (
-                    <BuildModeControls
-                      conversationId={activeConversationId}
-                      mode={buildMode}
-                      effort={buildEffort}
-                      onChange={(patch) => {
-                        if (patch.mode) setBuildMode(patch.mode);
-                        if (patch.effort) setBuildEffort(patch.effort);
-                      }}
-                    />
-                  )}
-                  {isBuildSession && pendingApproval && (
-                    <BuildApprovalCard
-                      action={pendingApproval}
-                      conversationId={activeConversationId}
-                      onResolved={() => setPendingApproval(null)}
-                    />
                   )}
                   <Composer
                     onSend={(message, files) => void send(message, files)}
