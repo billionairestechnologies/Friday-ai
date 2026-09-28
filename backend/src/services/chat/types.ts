@@ -4,30 +4,15 @@ export type StreamEvent =
   | { t: "text"; c: string }
   | { t: "think"; c: string }
   | { t: "cite"; u: string; title?: string }
-  | {
-      t: "step";
-      id: string;
-      kind: BuildStepKind;
-      label: string;
-      state: "running" | "ok" | "error";
-      detail?: string;
-      subagent?: string;
-    }
+  | { t: "step"; id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string }
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[] }
-  | { t: "buildSuggestion"; summary: string }
-  | { t: "approval"; action: { kind: string; label: string; detail?: string } }
-  | { t: "mode"; mode: BuildMode; effort: BuildEffort }
   | { t: "err"; c: string }
   | { t: "done" };
 
 export type ConversationMode = "single" | "auto" | "teamup";
-export type ConversationKind = "chat" | "build";
-
-export type BuildMode = "manual" | "edit_auto" | "plan" | "auto";
-export type BuildEffort = "low" | "medium" | "high";
 
 export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
 

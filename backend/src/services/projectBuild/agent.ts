@@ -2,53 +2,18 @@ import { getProviderAdapter } from "../providers/registry.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
-import type { BuildEffort, BuildMeta, BuildMode, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
+import type { BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
 import { ActionParser, applySearchReplace, compactAssistantTurn, type BuildAction } from "./protocol.js";
 import { findGitHubRepoUrl, importRepo, openPullRequest } from "./github.js";
-import { waitForApproval } from "./approvals.js";
 import JSZip from "jszip";
 import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, saveProject, tail } from "./sandbox.js";
 
-// Effort controls how much exploration/retry/QA budget a build gets — it only ever widens these
-// ceilings, never shrinks STUCK_REPEATS below: the standing product rule is "retry until genuinely
-// stuck," not "give up sooner on a low setting."
-const EFFORT_BUDGETS: Record<BuildEffort, { iterations: number; wallMs: number; visualRounds: number }> = {
-  low: { iterations: 25, wallMs: 10 * 60_000, visualRounds: 1 },
-  medium: { iterations: 45, wallMs: 18 * 60_000, visualRounds: 2 },
-  high: { iterations: 80, wallMs: 35 * 60_000, visualRounds: 4 },
-};
+const MAX_ITERATIONS = 45;
+const MAX_WALL_MS = 18 * 60_000;
 // The same failure this many times in a row = genuinely stuck. Before that it gets a "step back and
 // change approach" reflection at REFLECT_AT, so it recovers instead of giving up.
 const REFLECT_AT = 2;
 const STUCK_REPEATS = 5;
-
-/** Actions whose real-world effect is hard/impossible to undo, or costs money/time — installs,
- *  destructive commands, deploys, and PRs. Auto mode only pauses for these; everything else it
- *  runs freely (Manual pauses for every mutating action; Edit automatically only for these too). */
-function isRiskyAction(action: BuildAction): boolean {
-  if (action.kind === "pr") return true;
-  if (action.kind === "run") return /\b(rm -rf|drop table|truncate|npm i(nstall)?\b|npm add|pip install|yarn add|pnpm add|deploy)\b/i.test(action.cmd);
-  return false;
-}
-
-/** Whether this action must pause for the user's approve/reject before it runs, given the session's mode. */
-function shouldPauseFor(action: BuildAction, mode: BuildMode): boolean {
-  if (action.kind === "read" || action.kind === "grep" || action.kind === "ls") return false;
-  switch (mode) {
-    case "manual":
-      return action.kind === "write" || action.kind === "edit" || action.kind === "run" || action.kind === "start" || action.kind === "pr";
-    case "edit_auto":
-      return action.kind === "run" || action.kind === "pr";
-    case "auto":
-      return isRiskyAction(action);
-    case "plan":
-      // Plan mode gates once, before the iterate loop even starts (see the plan-approval check
-      // below) — by the time actions are running, the plan was already approved.
-      return false;
-    default:
-      return false;
-  }
-}
 
 const PLAN_PROMPT = `You are the tech lead of a coding agent that will build the user's request as a real, runnable project in a Linux sandbox (Node.js, npm, Python 3). Before any code is written, produce the plan. Reply in EXACTLY this format and nothing else:
 <architecture>
@@ -145,20 +110,8 @@ export async function runBuildAgent(opts: {
   candidates: ChatCandidate[];
   onEvent: (ev: StreamEvent) => void;
   signal?: AbortSignal;
-  /** Set by subagents.ts's coordinator: reuse this already-open sandbox instead of opening a new
-   *  one, so N sub-agents share one E2B VM instead of N. */
-  sandbox?: BuildSandbox;
-  /** Set by subagents.ts: confines this run to writing/editing/reading only under this directory
-   *  (e.g. "backend"), skips planning/plan-approval/start/QA-gate/final-snapshot/kill — those stay
-   *  the coordinator's job — and labels every step event so the workspace UI can group them. */
-  pathPrefix?: string;
-  subagentLabel?: string;
 }): Promise<BuildAgentResult> {
-  const { userId, conversationId, signal } = opts;
-  const isSubagent = Boolean(opts.pathPrefix);
-  // Sub-agent step events carry `subagent` so the workspace timeline can group them per workstream.
-  const onEvent = (ev: StreamEvent): void =>
-    opts.onEvent(opts.subagentLabel && ev.t === "step" ? { ...ev, subagent: opts.subagentLabel } : ev);
+  const { userId, conversationId, onEvent, signal } = opts;
   const started = Date.now();
   const steps: BuildStep[] = [];
   const build: BuildMeta = { steps };
@@ -186,41 +139,13 @@ export async function runBuildAgent(opts: {
 
 
   let box: BuildSandbox;
-  if (opts.sandbox) {
-    box = opts.sandbox;
-  } else {
-    try {
-      box = await BuildSandbox.open(userId, conversationId);
-    } catch (err) {
-      return { text: "", build, usage, candidate: null, error: err instanceof Error ? err.message : "Couldn't start the sandbox" };
-    }
+  try {
+    box = await BuildSandbox.open(userId, conversationId);
+  } catch (err) {
+    return { text: "", build, usage, candidate: null, error: err instanceof Error ? err.message : "Couldn't start the sandbox" };
   }
 
-  /** Sub-agents may only touch files under their assigned prefix (e.g. "backend/") — keeps
-   *  concurrent sub-agents from racing on each other's files on the shared sandbox filesystem. */
-  const guardPath = (path: string): string | null => {
-    const clean = safeProjectPath(path);
-    if (!clean) return null;
-    if (opts.pathPrefix && clean !== opts.pathPrefix && !clean.startsWith(`${opts.pathPrefix}/`)) return null;
-    return clean;
-  };
-
   let project = await getProject(conversationId);
-  const mode: BuildMode = project?.mode ?? "auto";
-  const effort: BuildEffort = project?.effort ?? "medium";
-  const budget = EFFORT_BUDGETS[effort];
-  onEvent({ t: "mode", mode, effort });
-
-  /** Pauses the turn for the user's approve/reject, persisting what's pending so a page reload
-   *  (or another device) can still see and act on it. Resolved by POST /build/:id/approve|reject. */
-  const requestApproval = async (action: { kind: string; label: string; detail?: string }): Promise<boolean> => {
-    await saveProject(userId, conversationId, { pending_approval: action });
-    onEvent({ t: "approval", action });
-    const approved = await waitForApproval(conversationId);
-    await saveProject(userId, conversationId, { pending_approval: null });
-    return approved;
-  };
-
   const userRequestText = [...opts.history].reverse().find((m) => m.role === "user")?.content ?? "";
 
   // "Work on github.com/owner/repo": a brand-new project whose request links a GitHub repo starts
@@ -304,7 +229,7 @@ export async function runBuildAgent(opts: {
 
   /** Runs the page in a real browser and reviews the result. Returns a problem report, or "" if fine. */
   const qualityGate = async (): Promise<string> => {
-    if (!last.start || visualRounds >= budget.visualRounds || signal?.aborted) return "";
+    if (!last.start || visualRounds >= 2 || signal?.aborted) return "";
     visualRounds++;
     const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: "Checking how it looks in a browser", state: "running" };
     steps.push(step);
@@ -358,7 +283,7 @@ export async function runBuildAgent(opts: {
     userRequest.length <= 160 &&
     !/\b(build|create|implement|redesign|rewrite|from scratch|integrate|add (a |an )?(new )?(page|feature|module|system|auth|login|dashboard|database))\b/i.test(userRequest);
   try {
-    const planner = smallFollowUp || isSubagent ? null : opts.candidates[0];
+    const planner = smallFollowUp ? null : opts.candidates[0];
     if (planner) {
       const adapter = getProviderAdapter(planner.slug);
       const apiKey = await getWorkingKeyForProvider(planner.slug);
@@ -384,24 +309,13 @@ export async function runBuildAgent(opts: {
     console.error("[build] planning skipped:", err instanceof Error ? err.message : err);
   }
 
-  // Plan mode: don't touch the sandbox until the user explicitly approves the drafted plan.
-  if (mode === "plan" && plan && !project?.plan_approved && !isSubagent) {
-    const approved = await requestApproval({ kind: "plan", label: "Approve the plan to start building" });
-    if (!approved) {
-      return { text: visibleText, build, usage, candidate: usedCandidate, error: "Plan rejected — nothing was built yet." };
-    }
-    await saveProject(userId, conversationId, { plan_approved: true });
-  }
-
   // Save the project to our database as work progresses (not only at the end) so a dropped connection
   // or an early-killed sandbox never loses what was already written.
   let snapshotting = false;
   let lastSnapshotAt = 0;
   let writesSinceSnapshot = 0;
   const saveProgress = async (force = false) => {
-    // Sub-agents share one sandbox/build_projects row with siblings — only the coordinator
-    // snapshots, so concurrent runs never race writing the same row.
-    if (isSubagent || snapshotting || (!force && Date.now() - lastSnapshotAt < 20_000)) return;
+    if (snapshotting || (!force && Date.now() - lastSnapshotAt < 20_000)) return;
     snapshotting = true;
     try {
       await box.snapshot(last.start?.cmd, last.start?.port);
@@ -423,9 +337,9 @@ export async function runBuildAgent(opts: {
   // Last outcome per command: a build that failed and was never re-run successfully is unresolved.
   const lastRunState = new Map<string, "ok" | "error">();
 
-  for (let iteration = 1; iteration <= budget.iterations; iteration++) {
+  for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     if (signal?.aborted) break;
-    if (Date.now() - started > budget.wallMs) {
+    if (Date.now() - started > MAX_WALL_MS) {
       emitText("\n\nI ran out of time before finishing — send another message and I'll continue from where the project stands.");
       break;
     }
@@ -455,17 +369,6 @@ export async function runBuildAgent(opts: {
         return;
       }
       const meta = describe(action)!;
-      if (shouldPauseFor(action, mode)) {
-        const detail = action.kind === "run" || action.kind === "start" ? action.cmd : action.kind === "pr" ? action.body : undefined;
-        const approved = await requestApproval({ kind: action.kind, label: meta.label, detail });
-        if (!approved) {
-          const step: BuildStep = { id: `s${++stepSeq}`, kind: meta.kind, label: `${meta.label} — skipped (rejected)`, state: "error" };
-          steps.push(step);
-          onEvent({ t: "step", ...step });
-          turn.results.push(`[${action.kind}] skipped: the user rejected this action.`);
-          return;
-        }
-      }
       // Reuse the row that was already shown live while the model was still writing this action.
       let step: BuildStep;
       if (liveStep && liveStep.kind === meta.kind) {
@@ -485,12 +388,10 @@ export async function runBuildAgent(opts: {
 
       try {
         if (action.kind === "write") {
-          const path = guardPath(action.path);
+          const path = safeProjectPath(action.path);
           if (!path) {
-            finish("error", opts.pathPrefix ? `Path must be inside ${opts.pathPrefix}/` : "Path is outside the project");
-            turn.results.push(
-              `[write ${action.path}] rejected: ${opts.pathPrefix ? `this workstream may only write under ${opts.pathPrefix}/` : "path must be relative and inside the project"}.`,
-            );
+            finish("error", "Path is outside the project");
+            turn.results.push(`[write ${action.path}] rejected: path must be relative and inside the project.`);
             return;
           }
           await box.write(path, action.content);
@@ -498,7 +399,7 @@ export async function runBuildAgent(opts: {
           if (++writesSinceSnapshot >= 6) void saveProgress();
           turn.results.push(`[write ${path}] ok (${action.content.length} chars)`);
         } else if (action.kind === "edit") {
-          const path = guardPath(action.path);
+          const path = safeProjectPath(action.path);
           const current = path ? await box.read(path).catch(() => null) : null;
           if (!path || current == null) {
             finish("error", path ? "File not found" : "Path is outside the project");
@@ -545,11 +446,6 @@ export async function runBuildAgent(opts: {
           finish(out.ok ? "ok" : "error");
           turn.results.push(`[ls ${path}]\n${tail(out.output.trim() || "(empty)", 6000)}`);
         } else if (action.kind === "pr") {
-          if (isSubagent) {
-            finish("error", "Sub-agents don't open pull requests — the coordinator does, once everything is merged.");
-            turn.results.push("[pr] skipped: only the coordinator opens the pull request.");
-            return;
-          }
           if (!project?.repo) {
             finish("error", "Not a GitHub project");
             turn.results.push("[pr] failed: this project was not imported from GitHub, so there is no repository to open a pull request against.");
@@ -586,11 +482,6 @@ export async function runBuildAgent(opts: {
             seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
           }
         } else if (action.kind === "start") {
-          if (isSubagent) {
-            finish("error", "Sub-agents don't start the server — the coordinator starts it once everything is merged.");
-            turn.results.push("[start] skipped: only the coordinator starts the server, after every workstream is done.");
-            return;
-          }
           const res = await box.start(action.cmd, action.port);
           if (res.ready && res.url) {
             last.start = { cmd: action.cmd, port: action.port };
@@ -796,34 +687,30 @@ export async function runBuildAgent(opts: {
   if (finalDone) emitText(`${visibleText.trim() ? "\n\n" : ""}${finalDone}`);
   else if (!visibleText.trim() && steps.length > 0) emitText("Here is where the project stands — see the steps above.");
 
-  // A sub-agent's workstream isn't the whole project — the coordinator (a plain, non-subagent run
-  // sharing the same sandbox) does the final snapshot/zip and owns the sandbox's lifecycle.
-  if (!isSubagent) {
-    // Persist a restorable snapshot (files + how to start it) so the preview survives sandbox expiry.
-    try {
-      const files = await box.snapshot(last.start?.cmd, last.start?.port);
-      const paths = Object.keys(files);
-      if (paths.length > 0) {
-        const zip = new JSZip();
-        for (const path of paths) zip.file(path, files[path]!);
-        build.zipBytes = (await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" })).length;
-        let name = "project";
-        try {
-          const pkgName = (JSON.parse(files["package.json"] ?? "{}") as { name?: string }).name;
-          if (pkgName) name = pkgName.replace(/[^\w.-]+/g, "-");
-        } catch {
-          /* no/invalid package.json — keep the default name */
-        }
-        build.zipName = `${name}.zip`;
+  // Persist a restorable snapshot (files + how to start it) so the preview survives sandbox expiry.
+  try {
+    const files = await box.snapshot(last.start?.cmd, last.start?.port);
+    const paths = Object.keys(files);
+    if (paths.length > 0) {
+      const zip = new JSZip();
+      for (const path of paths) zip.file(path, files[path]!);
+      build.zipBytes = (await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" })).length;
+      let name = "project";
+      try {
+        const pkgName = (JSON.parse(files["package.json"] ?? "{}") as { name?: string }).name;
+        if (pkgName) name = pkgName.replace(/[^\w.-]+/g, "-");
+      } catch {
+        /* no/invalid package.json — keep the default name */
       }
-    } catch (err) {
-      console.error("[build] snapshot failed:", err instanceof Error ? err.message : err);
+      build.zipName = `${name}.zip`;
     }
-
-    // Nothing left running to preview → destroy the sandbox now. The files are safe in our database;
-    // a sandbox that IS serving a preview expires (is killed, not paused) on its own TTL.
-    if (!last.start) await box.kill();
+  } catch (err) {
+    console.error("[build] snapshot failed:", err instanceof Error ? err.message : err);
   }
+
+  // Nothing left running to preview → destroy the sandbox now. The files are safe in our database;
+  // a sandbox that IS serving a preview expires (is killed, not paused) on its own TTL.
+  if (!last.start) await box.kill();
 
   build.elapsedMs = Date.now() - started;
   return { text: visibleText, build, usage, candidate: usedCandidate };

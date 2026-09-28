@@ -23,12 +23,6 @@ export type ProjectRow = {
   /** "owner/name" when the project was imported from GitHub. */
   repo?: string | null;
   repo_branch?: string | null;
-  /** How much approval the agent needs before acting, and how much retry/QA budget it gets. */
-  mode?: "manual" | "edit_auto" | "plan" | "auto";
-  effort?: "low" | "medium" | "high";
-  /** The action currently awaiting the user's approve/reject; null when nothing is paused. */
-  pending_approval?: { kind: string; label: string; detail?: string } | null;
-  plan_approved?: boolean;
 };
 
 export type RunOutcome = { ok: boolean; exitCode: number; output: string };
@@ -48,7 +42,7 @@ export function safeProjectPath(path: string): string | null {
 export async function getProject(conversationId: string): Promise<ProjectRow | null> {
   const { data } = await supabaseAdmin
     .from("build_projects")
-    .select("conversation_id, sandbox_id, start_cmd, port, files, repo, repo_branch, mode, effort, pending_approval, plan_approved")
+    .select("conversation_id, sandbox_id, start_cmd, port, files, repo, repo_branch")
     .eq("conversation_id", conversationId)
     .maybeSingle();
   return (data as ProjectRow | null) ?? null;

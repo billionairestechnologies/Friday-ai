@@ -3,7 +3,6 @@ import {
   Building2,
   ChevronDown,
   FolderKanban,
-  Hammer,
   LibraryBig,
   MessageSquare,
   PanelLeft,
@@ -64,32 +63,6 @@ export function Sidebar() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [projects, setProjects] = useState<AssistantProject[]>([]);
-  const [buildSessions, setBuildSessions] = useState<ServerConversation[]>([]);
-  const [startingBuild, setStartingBuild] = useState(false);
-
-  // Top-level "Build Mode" nav: opens the most recent workspace if one exists, otherwise starts a
-  // fresh blank one — same creation path as the "+" in the Build section below.
-  async function openOrStartBuildMode() {
-    if (startingBuild) return;
-    const latest = buildSessions[0];
-    if (latest) {
-      void navigate({ to: "/build/$conversationId", params: { conversationId: latest.id } });
-      if (window.innerWidth < 768) setOpen(false);
-      return;
-    }
-    setStartingBuild(true);
-    try {
-      const res = await api.post<{ conversationId: string }>("/build/sessions", {});
-      useChat.getState().openBuildSession(res.conversationId, "Build session");
-      setBuildSessions((prev) => [{ id: res.conversationId, title: "Build session", updated_at: new Date().toISOString() }, ...prev]);
-      void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversationId } });
-      if (window.innerWidth < 768) setOpen(false);
-    } catch {
-      // A failed start just means nothing new appears — no silent-looking navigation happens.
-    } finally {
-      setStartingBuild(false);
-    }
-  }
 
   // Project chats are project-scoped only (see hydrateFromServer/listConversations) — the main
   // list only ever receives unscoped ones from the backend, but this also guards against any
@@ -126,14 +99,6 @@ export function Sidebar() {
       .then((res) => setProjects(res.projects))
       .catch(() => {});
   }, [signedIn]);
-
-  useEffect(() => {
-    if (!signedIn) return;
-    api
-      .get<{ sessions: ServerConversation[] }>("/build/sessions")
-      .then((res) => setBuildSessions(res.sessions))
-      .catch(() => {});
-  }, [signedIn, activeId]);
 
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
@@ -250,11 +215,6 @@ export function Sidebar() {
                 void navigate({ to: "/" });
                 if (window.innerWidth < 768) setOpen(false);
               }}
-            />
-            <NavRow
-              icon={Hammer}
-              label="Build Mode"
-              onClick={() => void openOrStartBuildMode()}
             />
             <NavRow
               icon={LibraryBig}

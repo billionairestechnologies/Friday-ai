@@ -37,9 +37,6 @@ export type BuildStep = {
   label: string;
   state: "running" | "ok" | "error";
   detail?: string;
-  /** Which parallel sub-agent workstream this step belongs to (e.g. "Backend") — unset for a plain
-   *  single-agent build or for the coordinator's own steps. */
-  subagent?: string;
 };
 
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
@@ -82,13 +79,7 @@ export type ChatMessage = {
   /** Live per-model progress during a Team Up run — which models are answering and how it went. */
   agents?: AgentStatus[];
   build?: BuildInfo;
-  /** Set on a normal chat message that looked like a build/dev/design task — renders a compact
-   *  "Go to Build Mode" card instead of full Build Mode detail (that only shows inside /build/:id). */
-  buildSuggestion?: { summary: string };
 };
-
-export type BuildMode = "manual" | "edit_auto" | "plan" | "auto";
-export type BuildEffort = "low" | "medium" | "high";
 
 export type Chat = {
   id: string;
@@ -117,13 +108,10 @@ export type StreamEvent =
   | { t: "think"; c: string }
   | { t: "text"; c: string }
   | { t: "cite"; u: string; title?: string }
-  | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string; subagent?: string }
+  | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string }
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[] }
-  | { t: "buildSuggestion"; summary: string }
-  | { t: "approval"; action: { kind: string; label: string; detail?: string } }
-  | { t: "mode"; mode: BuildMode; effort: BuildEffort }
   | { t: "err"; c: string }
   | { t: "done" };

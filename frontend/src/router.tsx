@@ -1,7 +1,6 @@
 import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
-import { BuildWorkspacePage } from "@/routes/build-workspace";
 import { AdminGate } from "@/routes/admin";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
@@ -54,20 +53,6 @@ const conversationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/c/$conversationId",
   component: AppShell,
-});
-
-// Build Mode workspace — a genuinely separate page (not the chat shell): its own session rail,
-// repository picker, and dedicated composer, with file-tree/preview/terminal as the primary
-// surface. See build-workspace.tsx.
-function BuildWorkspaceRoute() {
-  const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
-  return <BuildWorkspacePage conversationId={conversationId} />;
-}
-
-const buildSessionRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/build/$conversationId",
-  component: BuildWorkspaceRoute,
 });
 
 // Hidden, standalone admin gate — not linked from anywhere in the regular app.
@@ -172,7 +157,6 @@ const termsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   conversationRoute,
-  buildSessionRoute,
   adminRoute,
   upgradeRoute,
   projectsRoute,

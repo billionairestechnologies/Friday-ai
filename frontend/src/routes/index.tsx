@@ -315,7 +315,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl, name: a.name, size: a.size, kind: a.kind }));
 
     let askQuestions: AskQuestion[] | undefined;
-    let buildSuggestion: { summary: string } | undefined;
     try {
       await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
         if (ev.t === "status" && ev.s === "building") applyLive(chatId, { text: "", think: "", cites: [], agents: [], status: "building" });
@@ -329,7 +328,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         else if (ev.t === "agent") batch.agent({ slug: ev.slug, model: ev.model, state: ev.state, error: ev.error });
         else if (ev.t === "step") applyLiveStep(chatId, { id: ev.id, kind: ev.kind, label: ev.label, state: ev.state, detail: ev.detail });
         else if (ev.t === "ask") askQuestions = ev.questions;
-        else if (ev.t === "buildSuggestion") buildSuggestion = { summary: ev.summary };
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });
         else if (ev.t === "preview") {
@@ -363,7 +361,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         // manual, so the chain-of-thought/sources panel still renders after the turn completes.
         usedSearch: Boolean(live?.cites?.length),
         usedCanvas: live?.canvasOn,
-        buildSuggestion,
         build: askQuestions
           ? { steps: [], ask: askQuestions }
           : live && (live.steps.length || live.preview || live.plan)
@@ -376,16 +373,6 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       if (next) void send(next.text, undefined, next.attachments ?? []);
     }
   }
-
-  // A Build Mode session created via "Go to Build Mode" (see BuildSuggestionCard) has its chat
-  // ready and selected but hasn't sent its first message yet — send it once this chat is active.
-  useEffect(() => {
-    const pending = useChat.getState().pendingSend;
-    if (!pending || pending.chatId !== activeId) return;
-    useChat.getState().setPendingSend(null);
-    void send(pending.text);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId]);
 
   function stop() {
     if (!activeId) return;
