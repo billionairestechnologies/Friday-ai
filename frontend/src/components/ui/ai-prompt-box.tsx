@@ -21,6 +21,7 @@ import {
   Zap,
   Users,
   AudioLines,
+  Telescope,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
@@ -535,6 +536,8 @@ export interface PromptInputBoxProps {
   onSearchChange?: (value: boolean) => void;
   canvas?: boolean;
   onCanvasChange?: (value: boolean) => void;
+  research?: boolean;
+  onResearchChange?: (value: boolean) => void;
   model?: string;
   onModelChange?: (id: string) => void;
 }
@@ -554,6 +557,8 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       onSearchChange,
       canvas,
       onCanvasChange,
+      research,
+      onResearchChange,
       model,
       onModelChange,
     } = props;
@@ -925,6 +930,19 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                       <Camera className="size-4 text-muted" />
                       Camera
                     </DropdownMenu.Item>
+                    {onResearchChange && (
+                      <>
+                        <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                        <DropdownMenu.Item
+                          onSelect={() => onResearchChange(!research)}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-foreground outline-none data-[highlighted]:bg-chip"
+                        >
+                          <Telescope className={cn("size-4", research ? "text-canvas" : "text-muted")} />
+                          Deep research
+                          {research && <Check className="ml-auto size-3.5 text-canvas" />}
+                        </DropdownMenu.Item>
+                      </>
+                    )}
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
