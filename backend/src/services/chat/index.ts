@@ -7,6 +7,7 @@ import {
   getModelMinTier,
   getModelVisionSupport,
   getWorkingKeyForProvider,
+  isFrontierModel,
   listChatCandidates,
   type ChatCandidate,
 } from "../providerService.js";
@@ -582,8 +583,14 @@ export async function streamMessage(
     const extraCitations: { url: string; title?: string }[] = [];
     let toolRun: ToolLoopResult | null = null;
     const toolStarted = Date.now();
-    // Deep Research in Auto mode prefers a tool-capable model even if routing ranked another first.
-    if (research && mode !== "single") candidates = [...candidates.filter(supportsTools), ...candidates.filter((c) => !supportsTools(c))];
+    // Deep Research in Auto/Team-Up prefers a tool-capable, frontier-grade model — the same
+    // denylist Build Mode uses to avoid the cheapest chat-tier model doing the actual research —
+    // even if routing ranked something lighter first. An explicit single-model pick is respected.
+    if (research && mode !== "single") {
+      const toolCapable = candidates.filter(supportsTools);
+      const frontier = toolCapable.filter(isFrontierModel);
+      candidates = [...(frontier.length ? frontier : toolCapable), ...candidates.filter((c) => !supportsTools(c))];
+    }
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
       if (research) onEvent({ t: "status", s: "searching" });
       const tools = await buildToolset(userId);

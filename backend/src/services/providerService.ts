@@ -185,6 +185,18 @@ export interface ChatCandidate {
   minTier: "free" | "pro" | "premium";
 }
 
+// Cheap/small chat-tier models that shouldn't drive a task that needs real reasoning depth (Deep
+// Research, and previously Build Mode) — a denylist rather than an allowlist so unfamiliar-but-
+// capable model names aren't accidentally excluded.
+const LIGHTWEIGHT_MODEL_PATTERN = /\b(mini|nano|lite|flash-8b|flash-lite|haiku|small(?!-\d{2,})|tiny|instant)\b/i;
+
+/** Whether a model is frontier-grade enough for a task that needs real depth (not the lightest,
+ *  cheapest chat model) — used to bias Deep Research toward stronger models even in Auto mode. */
+export function isFrontierModel(candidate: ChatCandidate): boolean {
+  const label = `${candidate.modelId} ${candidate.displayName}`;
+  return !LIGHTWEIGHT_MODEL_PATTERN.test(label);
+}
+
 /** Looks up a single model's friendly display name (e.g. "Sarvam 105B") for reply labels. Falls back to the raw model id. */
 export const getModelDisplayName = memoAsync(LOOKUP_TTL_MS, async (providerId: string, modelId: string): Promise<string> => {
   const { data } = await supabaseAdmin

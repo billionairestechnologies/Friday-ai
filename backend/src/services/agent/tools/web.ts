@@ -2,7 +2,7 @@ import { searchWeb } from "../../webSearch.js";
 import { htmlToText, safeFetch } from "../safeFetch.js";
 import { clip, num, str, type FridayTool } from "./types.js";
 
-const MAX_PAGE_CHARS = 20_000;
+const MAX_PAGE_CHARS = 30_000;
 
 export const webSearchTool: FridayTool = {
   spec: {
@@ -14,7 +14,7 @@ export const webSearchTool: FridayTool = {
       type: "object",
       properties: {
         query: { type: "string", description: "The search query" },
-        limit: { type: "integer", description: "Number of results (1-10, default 6)" },
+        limit: { type: "integer", description: "Number of results (1-12, default 8)" },
       },
       required: ["query"],
     },
@@ -23,7 +23,7 @@ export const webSearchTool: FridayTool = {
   async run(args, ctx) {
     const query = str(args, "query");
     if (!query) throw new Error("query is required");
-    const results = await searchWeb(query, num(args, "limit", 6, 1, 10));
+    const results = await searchWeb(query, num(args, "limit", 8, 1, 12));
     if (results.length === 0) return "No results found.";
     for (const r of results) ctx.onCite?.(r.url, r.title);
     return results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join("\n");
