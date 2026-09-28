@@ -7,6 +7,7 @@ import {
   getModelMinTier,
   getModelVisionSupport,
   getWorkingKeyForProvider,
+  isBuildWorthy,
   listChatCandidates,
   type ChatCandidate,
 } from "../providerService.js";
@@ -40,12 +41,12 @@ import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
-import { runBuildAgent } from "../projectBuild/agent.js";
+import { runBuildWithFanOut } from "../projectBuild/subagents.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
-import type { ConversationMode, StreamEvent } from "./types.js";
+import type { ConversationKind, ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import {
   reconcileQuota,
@@ -133,6 +134,13 @@ async function tryGenerateOrEditImage(
 
 const CONNECTOR_TOOL_PREFIX = /^(github|gmail|drive|calendar|notion|vercel|railway|supabase|razorpay|mcp)_/;
 
+/** Short label for the "Go to Build Mode" card shown on a normal chat message that looked
+ *  build-shaped — reused as-is, no extra model call, just a trimmed echo of the request. */
+function buildSuggestionSummary(content: string): string {
+  const clean = content.replace(/\s+/g, " ").trim();
+  return clean.length > 96 ? clean.slice(0, 96).trimEnd() + "…" : clean;
+}
+
 /**
  * Streams a reply token-by-token via `onEvent`. Single/Auto stream one model's answer directly;
  * Team Up runs its proposers concurrently (emitting `agent` start/done/error events for each so
@@ -173,6 +181,11 @@ export async function streamMessage(
     const conversation = await getOwnedConversation(userId, conversationId);
     mark("conversation loaded");
     const mode = conversation.mode as ConversationMode;
+    // 'build' conversations are Build Mode workspaces (promoted out of a normal chat, see
+    // POST /api/build/sessions) — every message there always drives the sandbox agent. A plain
+    // 'chat' conversation never auto-builds anymore; a build-shaped message there only earns a
+    // clickable suggestion (see buildSuggestion below) that the user has to act on.
+    const kind = ((conversation as { kind?: string }).kind ?? "chat") as ConversationKind;
 
     const userMessageRow = await insertUserMessage(conversationId, content, inputMode, attachments, userId);
 
@@ -194,9 +207,11 @@ export async function streamMessage(
     const memoryPromptPromise = loadMemoryPrompt(userId);
     effectivePlanPromise.catch(() => {}); // surfaced where it is awaited; avoids an unhandled rejection on early returns
     const buildIntentPromise: Promise<boolean> =
-      !canvas && !research && mode !== "teamup"
-        ? getProject(conversationId).then((project) => detectBuildIntent(content, Boolean(project))).catch(() => false)
-        : Promise.resolve(false);
+      kind === "build"
+        ? Promise.resolve(true)
+        : !canvas && !research && mode !== "teamup"
+          ? getProject(conversationId).then((project) => detectBuildIntent(content, Boolean(project))).catch(() => false)
+          : Promise.resolve(false);
     void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
     if (attachments.length > 0) {
       void recordUsageEvent(userId, "attachment_upload", attachments.length, {
@@ -518,9 +533,18 @@ export async function streamMessage(
     // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
     // Canvas (single-file preview) — Team Up already returned above.
     mark("candidates + tier resolved");
-    if (await buildIntentPromise) {
+    const buildIntent = await buildIntentPromise;
+    // Only an actual 'build' conversation runs the sandbox agent inline. A 'chat' conversation
+    // where the classifier fired just gets a suggestion card attached to its normal reply below
+    // (see buildSuggestion) instead of auto-building.
+    if (kind === "build" && buildIntent) {
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
       onEvent({ t: "status", s: "building" });
+      // Build Mode needs a real coding agent, not the lightest/cheapest chat model — restrict the
+      // pool to frontier/coding-capable models (falls back to the full pool if that empties it out,
+      // so a thin admin-configured catalog never breaks Build Mode entirely).
+      const buildWorthy = candidates.filter(isBuildWorthy);
+      if (buildWorthy.length > 0) candidates = buildWorthy;
       // A brand-new project (no files yet, no question round yet) may be missing details that change
       // what gets built — ask first, with a recommended option per question, instead of guessing.
       if (!alreadyAsked(history) && Object.keys((await getProject(conversationId))?.files ?? {}).length === 0) {
@@ -533,7 +557,7 @@ export async function streamMessage(
           return;
         }
       }
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal });
+      const built = await runBuildWithFanOut({ userId, conversationId, history, candidates, onEvent, signal });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });
         onEvent({ t: "done" });
@@ -696,6 +720,10 @@ export async function streamMessage(
           : usedCandidate.displayName;
     const toolSteps = toolRun?.steps ?? [];
     if (toolRun?.error) onEvent({ t: "err", c: "The reply was cut short — the model stopped responding. Send another message to continue." });
+    // A 'chat' conversation never auto-builds (see kind === "build" branch above); if the message
+    // still looked build-shaped, surface a compact, clickable suggestion instead of sandbox noise.
+    const buildSuggestion = kind === "chat" && buildIntent ? { summary: buildSuggestionSummary(content) } : undefined;
+    if (buildSuggestion) onEvent({ t: "buildSuggestion", summary: buildSuggestion.summary });
     await insertAssistantMessage(conversationId, full, label, {
       thinking,
       citations: [...searchResults.map((result) => ({ url: result.url, title: result.title })), ...extraCitations],
@@ -704,6 +732,7 @@ export async function streamMessage(
       usedCanvas: canvas,
       ...(toolSteps.length ? { build: { steps: toolSteps, elapsedMs: Date.now() - toolStarted } } : {}),
       ...(toolRun?.error ? { error: toolRun.error } : {}),
+      ...(buildSuggestion ? { buildSuggestion } : {}),
     });
     await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
     onEvent({ t: "done" });
