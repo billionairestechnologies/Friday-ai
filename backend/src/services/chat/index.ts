@@ -52,6 +52,8 @@ import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import {
+  chargeProgress,
+  QUOTA_STOP_MESSAGE,
   reconcileQuota,
   recordTokenLedger,
   resolveEffectivePlan,
@@ -423,6 +425,22 @@ export async function streamMessage(
       extractedDocText,
     );
 
+    // Meter the real prompt now that it's built: the route's pre-flight reservation only covered the
+    // new message, but the model is about to read the whole history. A turn the user can't afford
+    // stops here, before any model is paid for.
+    const promptTokens = Math.ceil(history.reduce((n, m) => n + m.content.length, 0) / 4) + 800;
+    const preflight = await chargeProgress(reservation, promptTokens);
+    if (!preflight.ok) {
+      const why = QUOTA_STOP_MESSAGE[preflight.reason]!.replace(", so I stopped here.", ".");
+      onEvent({ t: "err", c: `${why} This chat's history is larger than what's left — a new chat may still fit, or wait for the reset (Settings → Usage).` });
+      onEvent({ t: "done" });
+      return;
+    }
+    const budget = async (spent: number) => {
+      const r = await chargeProgress(reservation, spent);
+      return r.ok ? null : QUOTA_STOP_MESSAGE[r.reason]!;
+    };
+
     if (mode === "teamup") {
       const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
       const spent = await streamTeamUp(conversationId, content, history, searchResults, searchActuallyRan, onEvent, signal, {
@@ -582,7 +600,7 @@ export async function streamMessage(
           return;
         }
       }
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal });
+      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });
         onEvent({ t: "done" });
@@ -665,6 +683,7 @@ export async function streamMessage(
         history: withToolPreamble(history, guidance),
         tools,
         maxRounds: research ? DEEP_RESEARCH_ROUNDS : undefined,
+        budget,
         ctx: {
           userId,
           conversationId,

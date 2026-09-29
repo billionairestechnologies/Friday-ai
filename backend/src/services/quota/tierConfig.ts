@@ -55,6 +55,8 @@ export type QuotaDecisionInput = {
   plan: Plan;
   reserveTokens: number;
   counters: QuotaCounters;
+  /** Effective individual limits (personal monthly cap applied) — see effectiveIndividualLimits. */
+  limitsOverride?: { rolling: number; weekly: number; monthly: number | null };
   /** Present only for an enterprise org member — bypasses the plan table entirely. */
   enterprise?: {
     pooledMonthlyTokens: number;
@@ -110,16 +112,17 @@ export function decideQuota(input: QuotaDecisionInput): QuotaDecision {
     return { allowed: true };
   }
 
-  const limits = PLAN_LIMITS[input.plan];
+  const base = PLAN_LIMITS[input.plan];
+  const limits = input.limitsOverride ?? { rolling: base.rollingWindowTokens, weekly: base.weeklyTokens, monthly: base.monthlyTokens };
 
-  if (counters.rollingTokens + reserveTokens > limits.rollingWindowTokens) {
-    return { allowed: false, reason: "rolling_window", limit: limits.rollingWindowTokens, used: counters.rollingTokens };
+  if (counters.rollingTokens + reserveTokens > limits.rolling) {
+    return { allowed: false, reason: "rolling_window", limit: limits.rolling, used: counters.rollingTokens };
   }
-  if (counters.weeklyTokens + reserveTokens > limits.weeklyTokens) {
-    return { allowed: false, reason: "weekly", limit: limits.weeklyTokens, used: counters.weeklyTokens };
+  if (counters.weeklyTokens + reserveTokens > limits.weekly) {
+    return { allowed: false, reason: "weekly", limit: limits.weekly, used: counters.weeklyTokens };
   }
-  if (limits.monthlyTokens != null && counters.monthlyTokens + reserveTokens > limits.monthlyTokens) {
-    return { allowed: false, reason: "monthly", limit: limits.monthlyTokens, used: counters.monthlyTokens };
+  if (limits.monthly != null && counters.monthlyTokens + reserveTokens > limits.monthly) {
+    return { allowed: false, reason: "monthly", limit: limits.monthly, used: counters.monthlyTokens };
   }
   return { allowed: true };
 }

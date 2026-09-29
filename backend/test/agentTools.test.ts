@@ -159,3 +159,29 @@ test("search snippets centre on the first matching term", async () => {
   assert.ok(snip.startsWith("…") && snip.endsWith("…"));
   assert.equal(snippetAround("short text", "zzz"), "short text");
 });
+
+test("tool loop stops the moment the usage budget says the limit is reached", async () => {
+  const seen: unknown[][] = [];
+  const looping = scriptedAdapter([{ text: "Working.", toolCalls: [{ id: "x", name: "echo", args: {} }], usage: { inputTokens: 900, outputTokens: 100, totalTokens: 1000 } }], seen);
+  const echo: FridayTool = { spec: { name: "echo", description: "", parameters: { type: "object", properties: {} } }, label: () => "Echo", run: async () => "ok" };
+  const totals: number[] = [];
+  const r = await runToolLoop({
+    candidates: [CANDIDATE],
+    history: [{ role: "user", content: "hi" }],
+    tools: [echo],
+    ctx: { userId: "u", conversationId: "c" },
+    onText: () => {},
+    onStep: () => {},
+    maxRounds: 10,
+    budget: async (spent) => {
+      totals.push(spent);
+      return spent >= 2000 ? "You've reached your weekly usage limit, so I stopped here." : null;
+    },
+    resolve: async () => ({ adapter: looping, apiKey: "k" }),
+  });
+  // Round 1 is within budget (tools run), round 2 crosses it: no more tool calls, no third model call.
+  assert.deepEqual(totals, [1000, 2000]);
+  assert.equal(seen.length, 2);
+  assert.equal(r.toolCallCount, 1);
+  assert.match(r.text, /weekly usage limit/);
+});

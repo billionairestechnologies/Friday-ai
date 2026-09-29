@@ -120,8 +120,34 @@ async function counterIncr(
   return total;
 }
 
+/**
+ * The limits that actually apply to a person. A personal monthly cap (set by a package, an access
+ * grant or an admin — profiles.custom_monthly_cap) replaces the plan's monthly ceiling; when it is
+ * larger than the plan's own month, the weekly and 5-hour windows scale up with it so a generous
+ * custom package isn't silently throttled back to the base plan's weekly pace.
+ */
+export function effectiveIndividualLimits(plan: Plan, customMonthlyCap: number | null) {
+  const base = PLAN_LIMITS[plan];
+  if (customMonthlyCap == null) return { rolling: base.rollingWindowTokens, weekly: base.weeklyTokens, monthly: base.monthlyTokens };
+  const baseMonth = base.monthlyTokens ?? Math.round(base.weeklyTokens * 4.3);
+  const scale = customMonthlyCap > baseMonth ? customMonthlyCap / baseMonth : 1;
+  return {
+    rolling: Math.round(base.rollingWindowTokens * scale),
+    weekly: Math.round(base.weeklyTokens * scale),
+    monthly: customMonthlyCap,
+  };
+}
+
 export type Reservation = {
+  userId?: string;
   reserveTokens: number;
+  /** Tokens already counted against the user's windows for this turn (starts at reserveTokens and
+   *  grows as chargeProgress() meters a long turn). reconcileQuota corrects from this. */
+  charged?: number;
+  /** Extra rolling-window members added by chargeProgress (removed again on reconcile). */
+  progressMembers?: string[];
+  /** The limits this turn is metered against. */
+  limits?: { rolling?: number; weekly?: number; monthly?: number | null; org?: number; member?: number | null };
   plan: Plan;
   organizationId: string | null;
   rollingMember: string | null;
@@ -196,7 +222,11 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
     return {
       allowed: true,
       reservation: {
+        userId,
         reserveTokens,
+        charged: reserveTokens,
+        progressMembers: [],
+        limits: { org: effective.enterprise.pooledMonthlyTokens, member: effective.customMonthlyCap },
         plan: effective.plan,
         organizationId: orgId,
         rollingMember: null,
@@ -210,9 +240,10 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
   }
 
   const limits = PLAN_LIMITS[effective.plan];
+  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap);
   const rollingKey = `quota:roll:${userId}`;
   const weekKey = `quota:week:${userId}`;
-  const monthTokenKey = limits.monthlyTokens != null ? `quota:month:${userId}:${month}` : null;
+  const monthTokenKey = eff.monthly != null ? `quota:month:${userId}:${month}` : null;
 
   const [rollingUsed, weeklyUsed, monthlyUsed] = await Promise.all([
     rollingWindowUsed(redis, rollingKey, now),
@@ -224,6 +255,7 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
     plan: effective.plan,
     reserveTokens,
     counters: { rollingTokens: rollingUsed, weeklyTokens: weeklyUsed, monthlyTokens: monthlyUsed },
+    limitsOverride: eff,
   });
   if (!decision.allowed) {
     const resetAt =
@@ -244,7 +276,11 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
   return {
     allowed: true,
     reservation: {
+      userId,
       reserveTokens,
+      charged: reserveTokens,
+      progressMembers: [],
+      limits: { rolling: eff.rolling, weekly: eff.weekly, monthly: eff.monthly },
       plan: effective.plan,
       organizationId: null,
       rollingMember,
@@ -257,6 +293,59 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
   };
 }
 
+export type ProgressResult = { ok: true } | { ok: false; reason: "rolling_window" | "weekly" | "monthly" | "org_pool" | "member_cap" };
+
+/**
+ * Meters a turn WHILE it runs. The pre-flight reservation only covers the message itself; a long
+ * turn (history, many tool rounds, a 100-round build) costs far more, and that used to be counted
+ * only when the turn ended — so one turn could run well past the limit ("usage goes above 100%").
+ * Callers report the turn's running total; the difference is charged atomically (INCRBY returns
+ * the new total, so concurrent turns can't both slip past) and { ok: false } means stop now.
+ * reconcileQuota later corrects the counters to the exact final figure.
+ */
+export async function chargeProgress(reservation: Reservation | undefined, totalTokensSoFar: number): Promise<ProgressResult> {
+  if (!reservation || reservation.degraded || !reservation.limits) return { ok: true };
+  const charged = reservation.charged ?? reservation.reserveTokens;
+  const delta = Math.ceil(totalTokensSoFar - charged);
+  if (delta <= 0) return { ok: true };
+  const redis = await getRedisClient();
+  if (!redis) return { ok: true };
+  reservation.charged = charged + delta;
+  const { limits } = reservation;
+  if (reservation.memberCapKey) {
+    const total = await redis.incrBy(reservation.memberCapKey, delta);
+    if (limits.member != null && total > limits.member) return { ok: false, reason: "member_cap" };
+  }
+  if (reservation.organizationId && reservation.monthKey) {
+    const total = await redis.incrBy(reservation.monthKey, delta);
+    if (limits.org != null && total > limits.org) return { ok: false, reason: "org_pool" };
+    return { ok: true };
+  }
+  const now = Date.now();
+  if (reservation.rollingKey) {
+    const member = `${now}-progress-${randomUUID()}:${delta}`;
+    await redis.zAdd(reservation.rollingKey, [{ score: now, value: member }]);
+    (reservation.progressMembers ??= []).push(member);
+  }
+  const [weekTotal, monthTotal, rollingTotal] = await Promise.all([
+    reservation.weekKey ? redis.incrBy(reservation.weekKey, delta) : Promise.resolve(0),
+    reservation.monthKey ? redis.incrBy(reservation.monthKey, delta) : Promise.resolve(0),
+    reservation.rollingKey ? rollingWindowUsed(redis, reservation.rollingKey, now) : Promise.resolve(0),
+  ]);
+  if (limits.rolling != null && rollingTotal > limits.rolling) return { ok: false, reason: "rolling_window" };
+  if (limits.weekly != null && weekTotal > limits.weekly) return { ok: false, reason: "weekly" };
+  if (limits.monthly != null && monthTotal > limits.monthly) return { ok: false, reason: "monthly" };
+  return { ok: true };
+}
+
+export const QUOTA_STOP_MESSAGE: Record<string, string> = {
+  rolling_window: "You've reached your 5-hour usage limit, so I stopped here.",
+  weekly: "You've reached your weekly usage limit, so I stopped here.",
+  monthly: "You've reached your monthly usage limit, so I stopped here.",
+  org_pool: "Your organization's monthly token pool is used up, so I stopped here.",
+  member_cap: "You've reached the monthly cap your admin set, so I stopped here.",
+};
+
 /**
  * Post-completion reconciliation: corrects every counter incremented at reservation time by the
  * difference between what was reserved and what the provider actually reported (or 0 if the
@@ -266,23 +355,28 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
  */
 export async function reconcileQuota(reservation: Reservation, actualTokens: number): Promise<void> {
   if (reservation.degraded) return;
-  const delta = actualTokens - reservation.reserveTokens;
-  if (delta === 0) return;
+  const charged = reservation.charged ?? reservation.reserveTokens;
+  const delta = actualTokens - charged;
+  if (delta === 0 && !reservation.progressMembers?.length) return;
 
   const redis = await getRedisClient();
   if (!redis) return; // Redis died between reserve and reconcile — nothing we can safely correct.
 
   if (reservation.rollingKey && reservation.rollingMember) {
-    await redis.zRem(reservation.rollingKey, reservation.rollingMember);
+    await redis.zRem(reservation.rollingKey, [reservation.rollingMember, ...(reservation.progressMembers ?? [])]);
     if (actualTokens > 0) {
       const [tsPart] = reservation.rollingMember.split("-");
       const score = Number(tsPart) || Date.now();
       await redis.zAdd(reservation.rollingKey, [{ score, value: `${tsPart}-corrected:${actualTokens}` }]);
     }
   }
-  if (reservation.weekKey) await redis.incrBy(reservation.weekKey, delta);
-  if (reservation.monthKey) await redis.incrBy(reservation.monthKey, delta);
-  if (reservation.memberCapKey) await redis.incrBy(reservation.memberCapKey, delta);
+  if (delta !== 0) {
+    if (reservation.weekKey) await redis.incrBy(reservation.weekKey, delta);
+    if (reservation.monthKey) await redis.incrBy(reservation.monthKey, delta);
+    if (reservation.memberCapKey) await redis.incrBy(reservation.memberCapKey, delta);
+  }
+  reservation.charged = actualTokens;
+  reservation.progressMembers = [];
 }
 
 /** Fire-and-forget audit row for admin profitability reporting — distinct from usage_events'
@@ -383,19 +477,20 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
       weekly: { used: 0, limit: 0, resetAt: nextWeeklyReset().toISOString() },
       monthly: null,
       org: {
-        used: orgUsed,
+        used: Math.min(orgUsed, effective.enterprise.pooledMonthlyTokens),
         limit: effective.enterprise.pooledMonthlyTokens,
         seatCount: effective.enterprise.seatCount,
         resetAt: nextMonthlyReset().toISOString(),
       },
-      memberCap: effective.customMonthlyCap != null ? { used: memberUsed, limit: effective.customMonthlyCap } : null,
+      memberCap: effective.customMonthlyCap != null ? { used: Math.min(memberUsed, effective.customMonthlyCap), limit: effective.customMonthlyCap } : null,
     };
   }
 
   const limits = PLAN_LIMITS[effective.plan];
+  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap);
   const rollingKey = `quota:roll:${userId}`;
   const weekKey = `quota:week:${userId}`;
-  const monthTokenKey = limits.monthlyTokens != null ? `quota:month:${userId}:${month}` : null;
+  const monthTokenKey = eff.monthly != null ? `quota:month:${userId}:${month}` : null;
 
   const [rollingUsed, weeklyUsed, monthlyUsed] = redis
     ? await Promise.all([
@@ -408,15 +503,17 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
   return {
     plan: effective.plan,
     isEnterprise: false,
+    // Clamped for display: the counters can sit a few tokens past a limit (the turn that crossed it
+    // is stopped, not undone) — the meter should read "100%", never "103%".
     rolling: {
-      used: rollingUsed,
-      limit: limits.rollingWindowTokens,
+      used: Math.min(rollingUsed, eff.rolling),
+      limit: eff.rolling,
       resetAt: new Date(now + limits.rollingWindowSeconds * 1000).toISOString(),
     },
-    weekly: { used: weeklyUsed, limit: limits.weeklyTokens, resetAt: nextWeeklyReset().toISOString() },
+    weekly: { used: Math.min(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
     monthly:
-      limits.monthlyTokens != null
-        ? { used: monthlyUsed, limit: limits.monthlyTokens, resetAt: nextMonthlyReset().toISOString() }
+      eff.monthly != null
+        ? { used: Math.min(monthlyUsed, eff.monthly), limit: eff.monthly, resetAt: nextMonthlyReset().toISOString() }
         : null,
     org: null,
     memberCap: null,

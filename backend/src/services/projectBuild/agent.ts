@@ -164,6 +164,9 @@ export async function runBuildAgent(opts: {
   candidates: ChatCandidate[];
   onEvent: (ev: StreamEvent) => void;
   signal?: AbortSignal;
+  /** Usage meter (see runToolLoop): checked every round with the running token total; a non-null
+   *  message stops the build right there instead of billing past the user's limit. */
+  budget?: (totalTokensSoFar: number) => Promise<string | null>;
 }): Promise<BuildAgentResult> {
   const { userId, conversationId, onEvent, signal } = opts;
   const started = Date.now();
@@ -881,6 +884,13 @@ export async function runBuildAgent(opts: {
 
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     if (signal?.aborted) break;
+    if (iteration > 1 && opts.budget) {
+      const stop = await opts.budget(usage.totalTokens).catch(() => null);
+      if (stop) {
+        emitText(`\n\n${stop} Your project is saved — continue once your usage resets or after upgrading.`);
+        break;
+      }
+    }
     if (Date.now() - started > MAX_WALL_MS) {
       emitText("\n\nI ran out of time before finishing — send another message and I'll continue from where the project stands.");
       break;

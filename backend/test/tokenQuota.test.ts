@@ -9,7 +9,7 @@ import {
   PLAN_LIMITS,
   planSatisfiesTier,
 } from "../src/services/quota/tierConfig.js";
-import { estimateReservationTokens } from "../src/services/quota/tokenQuotaService.js";
+import { chargeProgress, effectiveIndividualLimits, estimateReservationTokens } from "../src/services/quota/tokenQuotaService.js";
 
 test("free plan allows spend under every ceiling", () => {
   const decision = decideQuota({
@@ -125,4 +125,41 @@ test("nextMonthlyReset is the 1st of next UTC month", () => {
   const reset = nextMonthlyReset(from);
   assert.equal(reset.getUTCMonth(), 9); // October, 0-indexed
   assert.equal(reset.getUTCDate(), 1);
+});
+
+test("a personal monthly cap replaces the plan month and scales the other windows up, never down", () => {
+  assert.deepEqual(effectiveIndividualLimits("pro", null), {
+    rolling: PLAN_LIMITS.pro.rollingWindowTokens,
+    weekly: PLAN_LIMITS.pro.weeklyTokens,
+    monthly: PLAN_LIMITS.pro.monthlyTokens,
+  });
+  const big = effectiveIndividualLimits("pro", PLAN_LIMITS.pro.monthlyTokens! * 3);
+  assert.equal(big.monthly, PLAN_LIMITS.pro.monthlyTokens! * 3);
+  assert.equal(big.weekly, PLAN_LIMITS.pro.weeklyTokens * 3);
+  assert.equal(big.rolling, PLAN_LIMITS.pro.rollingWindowTokens * 3);
+  // A cap below the plan's month tightens only the month (e.g. a trial grant).
+  const small = effectiveIndividualLimits("pro", 1_000_000);
+  assert.equal(small.monthly, 1_000_000);
+  assert.equal(small.weekly, PLAN_LIMITS.pro.weeklyTokens);
+  // Free has no monthly ceiling of its own — a cap still becomes one.
+  assert.equal(effectiveIndividualLimits("free", 400_000).monthly, 400_000);
+});
+
+test("decideQuota enforces an override's monthly cap", () => {
+  const decision = decideQuota({
+    plan: "free",
+    reserveTokens: 1_000,
+    counters: { rollingTokens: 0, weeklyTokens: 0, monthlyTokens: 99_500 },
+    limitsOverride: { rolling: 50_000, weekly: 250_000, monthly: 100_000 },
+  });
+  assert.equal(decision.allowed, false);
+  if (!decision.allowed) assert.equal(decision.reason, "monthly");
+});
+
+test("chargeProgress is a no-op without a live reservation (degraded / no Redis)", async () => {
+  assert.deepEqual(await chargeProgress(undefined, 10_000), { ok: true });
+  assert.deepEqual(
+    await chargeProgress({ reserveTokens: 100, plan: "free", organizationId: null, rollingMember: null, rollingKey: null, weekKey: null, monthKey: null, memberCapKey: null, degraded: true }, 10_000),
+    { ok: true },
+  );
 });
