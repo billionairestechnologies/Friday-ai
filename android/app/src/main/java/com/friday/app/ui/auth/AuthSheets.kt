@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import android.net.Uri
 import com.friday.app.R
 import com.friday.app.data.Sheet
+import com.friday.app.ui.BirthdayPickerDialog
 import com.friday.app.ui.theme.FridayBg
 import com.friday.app.ui.theme.FridayHairline
 import com.friday.app.ui.theme.FridayMuted
@@ -112,7 +113,7 @@ fun AuthSheetBody(
             Spacer(Modifier.height(10.dp))
             AuthField(value = phone, onChange = { phone = it }, placeholder = "Mobile number", keyboardType = KeyboardType.Phone)
             Spacer(Modifier.height(10.dp))
-            AuthField(value = birthday, onChange = { birthday = it }, placeholder = "Birthday (YYYY-MM-DD)", keyboardType = KeyboardType.Number)
+            BirthdayField(value = birthday, onChange = { birthday = it })
             Spacer(Modifier.height(10.dp))
         }
         AuthField(value = email, onChange = { email = it }, placeholder = "Email address", keyboardType = KeyboardType.Email)
@@ -229,6 +230,24 @@ private fun PillButton(
             }
             Text(label, color = if (filled) FridayBg else FridayText, fontWeight = FontWeight.Medium, fontSize = 14.sp)
         }
+    }
+}
+
+@Composable
+private fun BirthdayField(value: String, onChange: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(FridaySurface)
+            .clickable { showPicker = true }
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+    ) {
+        Text(value.ifEmpty { "Birthday" }, color = if (value.isEmpty()) FridayMuted else FridayText, fontSize = 15.sp)
+    }
+    if (showPicker) {
+        BirthdayPickerDialog(current = value, onPicked = onChange, onDismiss = { showPicker = false })
     }
 }
 

@@ -226,6 +226,59 @@ private struct EditableRow: View {
     }
 }
 
+private struct BirthdayEditableRow: View {
+    @Binding var value: String
+    @State private var showPicker = false
+    @State private var pickerDate = Date()
+
+    private static let isoFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    var body: some View {
+        Button {
+            pickerDate = Self.isoFormatter.date(from: value) ?? pickerDate
+            showPicker = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "gift").font(.system(size: 17)).frame(width: 22).foregroundColor(FridayColor.text)
+                Text("Birthday").font(.system(size: 15)).foregroundColor(FridayColor.text).frame(width: 78, alignment: .leading)
+                Spacer()
+                Text(value.isEmpty ? "YYYY-MM-DD" : value)
+                    .font(.system(size: 14.5))
+                    .foregroundColor(value.isEmpty ? FridayColor.muted : FridayColor.text)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 11)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showPicker) {
+            NavigationStack {
+                DatePicker("Birthday", selection: $pickerDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .padding()
+                    .navigationTitle("Birthday")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                value = Self.isoFormatter.string(from: pickerDate)
+                                showPicker = false
+                            }
+                        }
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showPicker = false }
+                        }
+                    }
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+}
+
 // MARK: - Pages
 
 private struct ProfilePage: View {
@@ -256,7 +309,7 @@ private struct ProfilePage: View {
         SettingsCard {
             EditableRow(icon: "phone", label: "Phone", text: $phone, placeholder: "Mobile number", keyboard: .phonePad)
             SettingsDivider()
-            EditableRow(icon: "gift", label: "Birthday", text: $birthday, placeholder: "YYYY-MM-DD", keyboard: .numbersAndPunctuation)
+            BirthdayEditableRow(value: $birthday)
             if dirty || saving || saved || error != nil {
                 HStack {
                     if let error { Text(error).font(.system(size: 12)).foregroundColor(FridayColor.error) }

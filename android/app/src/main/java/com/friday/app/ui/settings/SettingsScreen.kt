@@ -83,6 +83,7 @@ import com.friday.app.data.api.UsageBreakdown
 import com.friday.app.data.api.UsageQuota
 import com.friday.app.data.api.VoiceApi
 import com.friday.app.data.api.VoiceOption
+import com.friday.app.ui.BirthdayPickerDialog
 import com.friday.app.ui.FridayUiState
 import com.friday.app.ui.FridayViewModel
 import com.friday.app.data.FridayUser
@@ -338,7 +339,7 @@ private fun ProfilePage(
             saved = false
         }
         SettingsDivider()
-        EditableRow(Icons.Default.Cake, "Birthday", birthdayField, "YYYY-MM-DD") {
+        BirthdayRow(birthdayField) {
             birthdayField = it
             saved = false
         }
@@ -469,6 +470,28 @@ private fun BehaviorPage(vm: FridayViewModel, ui: FridayUiState, onOpenSheet: (S
                 }
             }) { Text("Save") }
         }
+    }
+}
+
+@Composable
+private fun BirthdayRow(value: String, onChange: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { showPicker = true }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(Icons.Default.Cake, null, tint = FridayText, modifier = Modifier.size(20.dp))
+        Text("Birthday", color = FridayText, fontSize = 15.sp, modifier = Modifier.width(90.dp))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            Text(value.ifEmpty { "YYYY-MM-DD" }, color = if (value.isEmpty()) FridayMuted else FridayText, fontSize = 14.5.sp)
+        }
+    }
+    if (showPicker) {
+        BirthdayPickerDialog(current = value, onPicked = onChange, onDismiss = { showPicker = false })
     }
 }
 

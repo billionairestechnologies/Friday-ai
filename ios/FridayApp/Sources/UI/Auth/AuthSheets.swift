@@ -44,7 +44,7 @@ struct AuthFormSheet: View {
         if vm.isSignupFlow {
             field("Name", text: $name)
             field("Mobile number", text: $phone, keyboard: .phonePad)
-            field("Birthday (YYYY-MM-DD)", text: $birthday, keyboard: .numbersAndPunctuation)
+            BirthdayPickerField(value: $birthday)
         }
         field("Email address", text: $email, keyboard: .emailAddress)
         field("Password", text: $password, secure: true)
