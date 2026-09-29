@@ -6,7 +6,7 @@ final class FridayViewModel: ObservableObject {
     // Must exactly match backend/src/services/policyService.ts's POLICY_VERSION and
     // frontend/src/lib/site/legal.ts's POLICY_VERSION — compared against the signed-in
     // account's FridayUser.policyVersion to decide whether PolicyConsentGate blocks the app.
-    static let policyVersion = "2026-09-28"
+    static let policyVersion = "2026-09-29"
 
     // Identity / session
     @Published var user: FridayUser?

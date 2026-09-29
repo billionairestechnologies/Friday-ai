@@ -352,6 +352,14 @@ export async function exportAccount(req: Request, res: Response) {
 }
 
 export async function deleteAccount(req: Request, res: Response) {
+  // Database rows go with the auth user (ON DELETE CASCADE), but files in object storage don't —
+  // remove the user's generated documents first so deleting the account really deletes them.
+  const { data: files } = await supabaseAdmin.from("generated_files").select("storage_bucket, storage_path").eq("user_id", req.user!.id).not("storage_path", "is", null);
+  const byBucket = new Map<string, string[]>();
+  for (const f of files ?? []) byBucket.set(f.storage_bucket as string, [...(byBucket.get(f.storage_bucket as string) ?? []), f.storage_path as string]);
+  for (const [bucket, paths] of byBucket) {
+    for (let i = 0; i < paths.length; i += 100) await supabaseAdmin.storage.from(bucket).remove(paths.slice(i, i + 100)).catch(() => {});
+  }
   const { error } = await supabaseAdmin.auth.admin.deleteUser(req.user!.id);
   if (error) throw new HttpError(500, error.message);
   res.status(204).send();

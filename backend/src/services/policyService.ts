@@ -8,7 +8,7 @@ import { HttpError } from "../middleware/errorHandler.js";
  * whose `policy_version` doesn't match this gets the blocking "I agree" gate again on next
  * open, on web, Android and iOS alike. Trivial wording/typo fixes don't need a bump.
  */
-export const POLICY_VERSION = "2026-09-28";
+export const POLICY_VERSION = "2026-09-29";
 
 export type Platform = "web" | "android" | "ios";
 

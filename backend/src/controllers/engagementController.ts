@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import * as updates from "../services/console/announcementService.js";
 import * as support from "../services/console/supportService.js";
@@ -100,4 +101,16 @@ export async function emailUnsubscribe(req: Request, res: Response) {
     return;
   }
   res.type("html").send(unsubscribePage("You're unsubscribed", "You won't get Friday product and marketing emails any more. Account and security emails still arrive."));
+}
+
+export async function emailPreferences(req: Request, res: Response) {
+  const { data } = await supabaseAdmin.from("profiles").select("marketing_opt_out").eq("id", req.user!.id).maybeSingle();
+  res.json({ marketing: !(data?.marketing_opt_out ?? false) });
+}
+
+export async function updateEmailPreferences(req: Request, res: Response) {
+  const { marketing } = z.object({ marketing: z.boolean() }).parse(req.body);
+  const { error } = await supabaseAdmin.from("profiles").update({ marketing_opt_out: !marketing }).eq("id", req.user!.id);
+  if (error) throw new HttpError(500, error.message);
+  res.json({ marketing });
 }

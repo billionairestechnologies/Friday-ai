@@ -98,7 +98,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         // frontend/src/lib/site/legal.ts's POLICY_VERSION — compared against the signed-in
         // account's saved FridayUser.policyVersion to decide whether FridayApp.kt shows the
         // blocking "I agree" dialog.
-        const val POLICY_VERSION = "2026-09-28"
+        const val POLICY_VERSION = "2026-09-29"
     }
 
     private val repo = ChatRepository()

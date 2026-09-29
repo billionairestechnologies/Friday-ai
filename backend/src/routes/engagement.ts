@@ -23,6 +23,9 @@ supportRouter.post("/tickets/:ticketId/reply", rateLimit({ name: "support-reply"
 export const emailRouter = Router();
 emailRouter.get("/unsubscribe", asyncHandler(c.emailUnsubscribe));
 emailRouter.post("/unsubscribe", asyncHandler(c.emailUnsubscribe));
+// The signed-in user's own choice about product/marketing email (account email is always sent).
+emailRouter.get("/preferences", requireAuth, asyncHandler(c.emailPreferences));
+emailRouter.post("/preferences", requireAuth, asyncHandler(c.updateEmailPreferences));
 
 /** /api/offers — redeem an offer code (student pass, promo, partner deal…) and see past requests. */
 export const offersRouter = Router();

@@ -131,7 +131,7 @@ export function SettingsModal() {
               {tab === "appearance" && <AppearancePane />}
               {tab === "behavior" && <BehaviorPane />}
               {tab === "voice" && <VoicePane />}
-              {tab === "notifications" && <SimpleNote title="Notifications" body="Friday doesn’t send push mail in this preview. Replies stay in this tab." />}
+              {tab === "notifications" && <NotificationsPane />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
               {tab === "memory" && <MemoryPane />}
@@ -1048,6 +1048,58 @@ function McpPane() {
             ))}
           </ul>
         </>
+      )}
+    </div>
+  );
+}
+
+/** Email preferences: product/offer email is opt-out; account email (codes, receipts, support) always goes. */
+function NotificationsPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [marketing, setMarketing] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!signedIn) return;
+    api.get<{ marketing: boolean }>("/email/preferences").then((r) => setMarketing(r.marketing)).catch(() => setError("Couldn't load your email preferences"));
+  }, [signedIn]);
+  async function toggle() {
+    if (marketing === null) return;
+    const next = !marketing;
+    setMarketing(next);
+    try {
+      await api.post("/email/preferences", { marketing: next });
+    } catch {
+      setMarketing(!next);
+      setError("Couldn't save — try again");
+    }
+  }
+  return (
+    <div>
+      <h2 className="mb-3 text-lg font-semibold">Notifications</h2>
+      {!signedIn ? (
+        <p className="text-sm text-muted">Sign in to manage your email preferences.</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-start gap-4 rounded-2xl border border-border p-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Product updates & offers</p>
+              <p className="mt-0.5 text-sm text-muted">New features, tips and occasional offers by email. Every email also has a one-click unsubscribe link.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(marketing)}
+              disabled={marketing === null}
+              onClick={() => void toggle()}
+              className={cn("relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50", marketing ? "bg-primary" : "bg-border")}
+            >
+              <span className={cn("absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform", marketing && "translate-x-5")} />
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed text-subtle">Account emails — sign-in codes, receipts, replies to your support requests and important notices — are always sent.</p>
+          {error && <p className="text-sm text-danger">{error}</p>}
+        </div>
       )}
     </div>
   );
