@@ -746,6 +746,13 @@ export async function runBuildAgent(opts: {
     repeating.forEach(([key]) => reflected.add(key));
     return "\n\nSTOP — this same failure has now happened repeatedly, so repeating the same fix will not work. Step back like a debugger: (1) state what you have tried and why it did not work, (2) form a hypothesis about the TRUE root cause (wrong dependency version? config/import path? port clash? missing file? bad syntax you cannot see?), (3) inspect real evidence (read package versions, config files, logs, the exact failing file), then (4) apply a genuinely DIFFERENT fix — or simplify that part of the design if needed.";
   };
+  /**
+   * A reply with no work done is pushed back only when work was clearly expected: files were written
+   * this run but never run, or it's a brand-new project with nothing written yet. A question about an
+   * EXISTING project ("what does App.tsx do?", "why is it slow?") gets its plain answer — every
+   * message in a Build workspace session reaches this agent, not only build requests.
+   */
+  const shouldNudge = () => writeSeq > 0 || existingFiles.length === 0;
   const isStuck = () => [...seenErrors.values()].some((n) => n >= STUCK_REPEATS);
   const STUCK_MESSAGE =
     "I kept hitting the same error even after changing approach several times, so I'm stopping here rather than looping. The steps above show exactly where it fails — tell me how you'd like to proceed and I'll continue from the current state.";
@@ -901,7 +908,7 @@ export async function runBuildAgent(opts: {
       if (result.toolCalls.length === 0) {
         const ranSomething = steps.some((st) => (st.kind === "run" || st.kind === "start") && st.state === "ok");
         nativeMessages.push({ role: "assistant", content: text.trim() || "(no reply)" });
-        if (!ranSomething && nudges < 4) {
+        if (!ranSomething && shouldNudge() && nudges < 4) {
           nudges++;
           if (unnoted.trim()) pushNote(unnoted);
           nativeMessages.push({
@@ -1102,7 +1109,7 @@ export async function runBuildAgent(opts: {
       // actually been executed yet — push back (a few times) instead of accepting that as done.
       const ranSomething = steps.some((st) => (st.kind === "run" || st.kind === "start") && st.state === "ok");
       const wroteNothing = steps.every((st) => st.kind === "note");
-      if (!ranSomething && nudges < 4) {
+      if (!ranSomething && shouldNudge() && nudges < 4) {
         nudges++;
         if (turn.plainReply) pushNote(turn.plainReply);
         conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });

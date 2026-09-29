@@ -59,6 +59,7 @@ export async function createConversation(
   modelId?: string,
   title?: string,
   projectId?: string,
+  workspace: "chat" | "build" = "chat",
 ) {
   let providerRowId: string | null = null;
   if (projectId) await getOwnedProject(userId, projectId);
@@ -74,7 +75,7 @@ export async function createConversation(
     providerRowId = provider.id;
   }
 
-  const defaultTitle = mode === "auto" ? "Auto chat" : mode === "teamup" ? "Team Up chat" : "New chat";
+  const defaultTitle = workspace === "build" ? "New build" : mode === "auto" ? "Auto chat" : mode === "teamup" ? "Team Up chat" : "New chat";
 
   const { data, error } = await supabaseAdmin
     .from("conversations")
@@ -85,6 +86,9 @@ export async function createConversation(
       mode,
       title: title || defaultTitle,
       project_id: projectId ?? null,
+      // Only written for build sessions, so ordinary chat creation keeps working on a database
+      // where migration 0030 (conversations.workspace) hasn't been applied yet.
+      ...(workspace === "build" ? { workspace } : {}),
     })
     .select()
     .single();
@@ -140,7 +144,7 @@ export async function updateConversationModel(
 export async function listConversations(userId: string, page: PageOptions = {}, projectId?: string) {
   let query = supabaseAdmin
     .from("conversations")
-    .select("*, providers(slug, display_name)")
+    .select("*, providers(slug, display_name), build_projects(conversation_id)")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(pageSize(page.limit));
@@ -148,7 +152,12 @@ export async function listConversations(userId: string, page: PageOptions = {}, 
   if (page.before) query = query.lt("updated_at", page.before);
   const { data, error } = await query;
   if (error) throw new HttpError(500, error.message);
-  return data;
+  // has_build: a project exists for this chat (Build Mode ran in it, from any workspace) — the web
+  // app's Build workspace lists these alongside dedicated build sessions.
+  return (data ?? []).map(({ build_projects, ...row }) => ({
+    ...row,
+    has_build: Array.isArray(build_projects) ? build_projects.length > 0 : Boolean(build_projects),
+  }));
 }
 
 export async function deleteAllConversations(userId: string) {

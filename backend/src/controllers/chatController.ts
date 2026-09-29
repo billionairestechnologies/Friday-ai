@@ -21,14 +21,15 @@ const createConversationSchema = z
     modelId: z.string().min(1).optional(),
     title: z.string().trim().max(200).optional(),
     projectId: z.string().uuid().optional(),
+    workspace: z.enum(["chat", "build"]).optional().default("chat"),
   })
   .refine((data) => data.mode !== "single" || (data.providerSlug && data.modelId), {
     message: "providerSlug and modelId are required for single mode",
   });
 
 export async function createConversation(req: Request, res: Response) {
-  const { mode, providerSlug, modelId, title, projectId } = createConversationSchema.parse(req.body);
-  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title, projectId);
+  const { mode, providerSlug, modelId, title, projectId, workspace } = createConversationSchema.parse(req.body);
+  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title, projectId, workspace);
   res.status(201).json({ conversation });
 }
 

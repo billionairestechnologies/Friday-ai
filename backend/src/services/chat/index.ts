@@ -185,6 +185,9 @@ export async function streamMessage(
     const conversation = await getOwnedConversation(userId, conversationId);
     mark("conversation loaded");
     const mode = conversation.mode as ConversationMode;
+    // A session from the Build workspace: every message is for the Build agent (like Claude Code) —
+    // no intent probe, no search probe. Team Up / Canvas / Deep Research keep their own flows.
+    const buildWorkspace = (conversation as { workspace?: string }).workspace === "build" && mode !== "teamup" && !canvas && !research;
 
     const userMessageRow = await insertUserMessage(conversationId, content, inputMode, attachments, userId);
 
@@ -210,6 +213,7 @@ export async function streamMessage(
               .catch(() => false);
     const searchIntentPromise: Promise<boolean> =
       !webSearch &&
+      !buildWorkspace &&
       (attachments.length === 0 || content.trim().length >= SHORT_CAPTION_CHARS_EARLY) &&
       shouldProbeForLiveSearch(content)
         ? toolsLikelyPromise.then((toolsLikely) => (toolsLikely ? false : detectNeedsLiveSearch(content)))
@@ -223,8 +227,9 @@ export async function streamMessage(
     // Long-term memory rides along on every turn (all modes); loaded in parallel, never fatal.
     const memoryPromptPromise = loadMemoryPrompt(userId);
     effectivePlanPromise.catch(() => {}); // surfaced where it is awaited; avoids an unhandled rejection on early returns
-    const buildIntentPromise: Promise<boolean> =
-      !canvas && !research && mode !== "teamup"
+    const buildIntentPromise: Promise<boolean> = buildWorkspace
+      ? Promise.resolve(true)
+      : !canvas && !research && mode !== "teamup"
         ? getProject(conversationId).then((project) => detectBuildIntent(content, Boolean(project))).catch(() => false)
         : Promise.resolve(false);
     void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
