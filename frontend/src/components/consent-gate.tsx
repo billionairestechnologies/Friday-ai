@@ -35,7 +35,11 @@ export function ConsentGate() {
     setBusy(true);
     setError(null);
     try {
-      await acceptPolicy();
+      // A hung request (dropped connection, a backend that never responds) would otherwise leave
+      // this saying "Saving…" forever with no way out but for the user to already know to reload —
+      // this screen has to always resolve to either "through" or "a visible error with a way out".
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timed out — check your connection and try again.")), 15000));
+      await Promise.race([acceptPolicy(), timeout]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save that — try again");
     } finally {
@@ -44,7 +48,11 @@ export function ConsentGate() {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-background/95 px-4 backdrop-blur-sm">
+    // pointer-events-auto guards against an ancestor (a dialog/overlay elsewhere in the tree that
+    // failed to close — see client.ts's bootstrap()/verifyOtp() fix for why one could get stuck
+    // open) leaving `pointer-events: none` inherited down to here: this is the one screen that must
+    // always stay clickable no matter what else is going on behind it.
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-background/95 px-4 backdrop-blur-sm pointer-events-auto">
       <div className="w-full max-w-md rounded-[var(--radius-2xl)] border border-border bg-surface p-6 shadow-[var(--shadow-panel)] sm:p-8">
         <h1 className="text-lg font-semibold text-foreground">Updated Terms &amp; Privacy Policy</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">
@@ -58,7 +66,14 @@ export function ConsentGate() {
           </a>
           . They cover what Friday stores, which AI providers and connectors your messages can reach, and the controls you have over your data.
         </p>
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+        {error && (
+          <p className="mt-3 text-sm text-danger">
+            {error}{" "}
+            <button type="button" onClick={() => window.location.reload()} className="underline hover:text-foreground">
+              Reload and try again
+            </button>
+          </p>
+        )}
         <button
           type="button"
           onClick={() => void agree()}

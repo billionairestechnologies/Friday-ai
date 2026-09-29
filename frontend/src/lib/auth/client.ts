@@ -98,28 +98,40 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
     setAccessToken(stored.session.access_token);
     set({ user: stored.user });
+    let res: { user: AuthUser };
     try {
-      const res = await api.get<{ user: AuthUser }>("/auth/me");
-      set({ user: res.user, isPending: false });
-      useChat.getState().syncOwner(res.user.id);
-      startRealtimeSync(res.user.id, stored.session.access_token);
-      void registerWebPush();
-      const invite = new URLSearchParams(window.location.search).get("invite");
-      if (invite) {
-        try {
-          await api.post("/organizations/invites/accept", { token: invite });
-        } catch {
-          /* invite may already be used */
-        }
-        const url = new URL(window.location.href);
-        url.searchParams.delete("invite");
-        history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-      }
+      res = await api.get<{ user: AuthUser }>("/auth/me");
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       setAccessToken(null);
       set({ user: null, isPending: false });
       useChat.getState().syncOwner(null);
+      return;
+    }
+    // The session itself is now confirmed valid — everything below is best-effort follow-up
+    // (realtime sync, push registration, an invite link) that must never undo it. This used to
+    // share the try/catch above: a transient failure in any of these (a flaky websocket, a push
+    // API hiccup) would wipe the just-verified session and silently sign the user back out,
+    // which also meant any UI gated on being signed in (the consent gate, most visibly) could be
+    // left stuck mid-transition if that same failure interrupted something else reacting to it.
+    set({ user: res.user, isPending: false });
+    try {
+      useChat.getState().syncOwner(res.user.id);
+      startRealtimeSync(res.user.id, stored.session.access_token);
+      void registerWebPush();
+    } catch (err) {
+      console.warn("[auth] post-login setup failed (session is still valid):", err);
+    }
+    const invite = new URLSearchParams(window.location.search).get("invite");
+    if (invite) {
+      try {
+        await api.post("/organizations/invites/accept", { token: invite });
+      } catch {
+        /* invite may already be used */
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("invite");
+      history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     }
   },
 
@@ -132,9 +144,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     const res = await api.post<{ user: AuthUser; session: Session }>("/auth/verify-otp", { email, code });
     persist(res.session, res.user);
     set({ user: res.user, isPending: false });
-    useChat.getState().syncOwner(res.user.id);
-    startRealtimeSync(res.user.id, res.session.access_token);
-    void registerWebPush();
+    // The account is verified and signed in at this point — the caller (the login/signup dialog)
+    // closes itself once this promise resolves, so a throw from here on would leave the dialog
+    // stuck open on top of (or under) whatever renders next for a signed-in user, e.g. the consent
+    // gate, even though the user genuinely is signed in. Best-effort follow-up only, same as
+    // bootstrap() above.
+    try {
+      useChat.getState().syncOwner(res.user.id);
+      startRealtimeSync(res.user.id, res.session.access_token);
+      void registerWebPush();
+    } catch (err) {
+      console.warn("[auth] post-verify setup failed (session is still valid):", err);
+    }
   },
 
   resendOtp: async (email) => {
