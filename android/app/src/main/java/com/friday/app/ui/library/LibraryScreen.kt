@@ -170,8 +170,14 @@ fun LibraryScreen(onClose: () -> Unit) {
                     Column(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(FridaySurface)
                             .clickable {
-                                open = item
-                                if (item.kind != "image") scope.launch { LibraryApi.get(item.id)?.let { open = it } }
+                                if (item.category == "Documents" || item.category == "Uploads") {
+                                    // Generated documents and uploads download through the web Library.
+                                    androidx.browser.customtabs.CustomTabsIntent.Builder().build()
+                                        .launchUrl(ctx, android.net.Uri.parse("https://friday.billionairestechnologies.com/library"))
+                                } else {
+                                    open = item
+                                    if (item.kind != "image") scope.launch { LibraryApi.get(item.id)?.let { open = it } }
+                                }
                             }
                             .padding(12.dp),
                     ) {

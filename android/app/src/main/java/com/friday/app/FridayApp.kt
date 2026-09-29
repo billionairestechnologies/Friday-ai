@@ -374,6 +374,58 @@ fun FridayApp(
         )
     }
 
+    // "What's new": product updates published from the Team Console, shown once per account (the
+    // server records each view, so it's once across web, Android and iOS). Never over the consent gate.
+    val announcements = ui.announcements
+    if (gateUser != null && gateUser.policyVersion == FridayViewModel.POLICY_VERSION && announcements.isNotEmpty()) {
+        var index by remember(announcements) { mutableStateOf(0) }
+        val item = announcements[index.coerceIn(0, announcements.size - 1)]
+        val last = index >= announcements.size - 1
+        AlertDialog(
+            onDismissRequest = { vm.dismissAnnouncements() },
+            title = {
+                Column {
+                    Text(
+                        when (item.kind) {
+                            "improvement" -> "IMPROVED"
+                            "news" -> "NEWS"
+                            "maintenance" -> "HEADS UP"
+                            else -> "NEW"
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF7C3AED),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(item.title, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            text = {
+                Column {
+                    com.friday.app.ui.chat.MarkdownText(item.body)
+                    if (announcements.size > 1) {
+                        Spacer(Modifier.height(10.dp))
+                        Text("${index + 1} of ${announcements.size}", fontSize = 12.sp, color = Color(0xFF9CA3AF))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (last) vm.dismissAnnouncements() else index += 1
+                }) { Text(if (last) "Got it" else "Next") }
+            },
+            dismissButton = {
+                val cta = item.ctaUrl
+                if (cta != null && item.ctaLabel != null) {
+                    TextButton(onClick = {
+                        vm.dismissAnnouncements(clickedId = item.id)
+                        CustomTabsIntent.Builder().build().launchUrl(ctx, Uri.parse(cta))
+                    }) { Text(item.ctaLabel) }
+                }
+            },
+        )
+    }
+
     if (ui.sheet == Sheet.Model || ui.sheet == Sheet.Attach) {
         CompactAnchoredPopup(
             onDismiss = vm::closeSheet,

@@ -13,6 +13,8 @@ struct FridayAppApp: App {
                 .overlay {
                     if vm.user != nil && vm.user?.policyVersion != FridayViewModel.policyVersion {
                         PolicyConsentGate().environmentObject(vm)
+                    } else if vm.user != nil && !vm.announcements.isEmpty {
+                        WhatsNewCard().environmentObject(vm)
                     }
                 }
                 .task { await vm.bootstrap() }

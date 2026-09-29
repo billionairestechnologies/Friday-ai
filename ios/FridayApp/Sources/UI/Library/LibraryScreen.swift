@@ -119,6 +119,11 @@ struct LibraryScreen: View {
     }
 
     private func openItem(_ item: LibraryItem) {
+        // Generated documents and uploads download through the web Library.
+        if item.category == "Documents" || item.category == "Uploads" {
+            if let url = URL(string: "https://friday.billionairestechnologies.com/library") { UIApplication.shared.open(url) }
+            return
+        }
         open = item
         guard item.kind != "image" else { return }
         Task {

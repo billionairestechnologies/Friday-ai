@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -83,6 +85,11 @@ fun DrawerPane(
     onUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val webContext = androidx.compose.ui.platform.LocalContext.current
+    val openWeb: (String) -> Unit = { path ->
+        androidx.browser.customtabs.CustomTabsIntent.Builder().build()
+            .launchUrl(webContext, android.net.Uri.parse("https://friday.billionairestechnologies.com$path"))
+    }
     var query by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<ChatThread?>(null) }
     val filtered = recents.filter { it.title.contains(query, ignoreCase = true) }
@@ -169,6 +176,9 @@ fun DrawerPane(
             PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
             PlainRow(Icons.AutoMirrored.Filled.LibraryBooks, "Library") { onNavigate("library") }
             PlainRow(Icons.Default.Folder, "Projects") { onNavigate("projects") }
+            // Support and status live on the web (same account, same tickets) — opened in a Custom Tab.
+            PlainRow(Icons.Default.SupportAgent, "Help & support") { openWeb("/?support=contact") }
+            PlainRow(Icons.Default.MonitorHeart, "System status") { openWeb("/status") }
         }
 
         Spacer(Modifier.height(16.dp))

@@ -51,6 +51,9 @@ final class FridayViewModel: ObservableObject {
     /// False until the plan is known (cached or fetched) — gates the "Upgrade" button so a paid user never sees it flash.
     @Published var planLoaded: Bool = TokenStore.shared.hasSession() && TokenStore.shared.plan != nil
     @Published var updateInfo: UpdateApi.Info?
+    /// Unseen "What's new" product updates (shown once, then marked seen server-side).
+    @Published var announcements: [Announcement] = []
+    private var announcementsLoaded = false
 
     // Voice preference (device-level, survives logout)
     @Published var voiceId: String?
@@ -102,6 +105,7 @@ final class FridayViewModel: ObservableObject {
                 TokenStore.shared.userName = me.name
                 TokenStore.shared.userEmail = me.email
                 await refreshPlan()
+                await loadAnnouncements()
                 await syncConversations()
                 await connectRealtime()
             } catch {
@@ -494,9 +498,24 @@ final class FridayViewModel: ObservableObject {
         defer { policyAcceptBusy = false }
         do {
             user = try await AuthApi.acceptPolicy()
+            await loadAnnouncements()
         } catch {
             policyAcceptError = error.localizedDescription
         }
+    }
+
+    /// Once per app session, and only after the current policy is accepted (the gate comes first).
+    func loadAnnouncements() async {
+        guard !announcementsLoaded, user?.policyVersion == Self.policyVersion else { return }
+        announcementsLoaded = true
+        let pending = await EngagementApi.pending()
+        if !pending.isEmpty { announcements = pending }
+    }
+
+    func dismissAnnouncements(clickedId: String? = nil) async {
+        let ids = announcements.map(\.id)
+        announcements = []
+        if !ids.isEmpty { await EngagementApi.markSeen(ids: ids, clickedId: clickedId) }
     }
 
     func resendOtp() async {
@@ -517,6 +536,7 @@ final class FridayViewModel: ObservableObject {
             authRequired = false
             sheet = .none
             await refreshPlan()
+            await loadAnnouncements()
             await syncConversations()
             await connectRealtime()
         } catch {
@@ -536,6 +556,7 @@ final class FridayViewModel: ObservableObject {
         authRequired = false
         sheet = .none
         await refreshPlan()
+        await loadAnnouncements()
         await syncConversations()
         await connectRealtime()
     }
@@ -549,6 +570,8 @@ final class FridayViewModel: ObservableObject {
     }
 
     func logout() async {
+        announcementsLoaded = false
+        announcements = []
         queued = [:]
         for (_, job) in streamJobs { job.cancel() }
         streamJobs.removeAll()

@@ -38,6 +38,8 @@ import com.friday.app.data.realtime.SupabaseRealtime
 import com.friday.app.data.api.UpdateApi
 import com.friday.app.data.api.UpdateInfo
 import com.friday.app.data.api.UsageApi
+import com.friday.app.data.api.Announcement
+import com.friday.app.data.api.EngagementApi
 import com.friday.app.data.api.VoiceApi
 import com.friday.app.BuildConfig
 import com.friday.app.data.nameFromEmail
@@ -73,6 +75,8 @@ data class FridayUiState(
     val plan: String? = null,
     /** Set when a newer app build is available server-side; null means no update (the common case). */
     val updateInfo: UpdateInfo? = null,
+    /** "What's new" product updates not yet seen by this account (shown once, then marked seen). */
+    val announcements: List<Announcement> = emptyList(),
     /** Files staged in the composer, not yet sent — cleared once [FridayViewModel.send] fires.
      *  Capped at 4 to match the backend's per-message attachment limit. */
     val pendingAttachments: List<PendingAttachment> = emptyList(),
@@ -160,6 +164,8 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             )
                         }
                         tokenStore.accessToken?.let { connectRealtime(result.value.id, it) }
+                        // Only once the current policy is accepted — the consent gate owns the screen until then.
+                        if (result.value.policyVersion == POLICY_VERSION) loadAnnouncements()
                     }
                     is AuthResult.Failure -> {
                         tokenStore.clear()
@@ -349,6 +355,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                     syncConversations()
                     refreshPlan()
                     connectRealtime(result.value.user.id, result.value.session.accessToken)
+                    if (result.value.user.policyVersion == POLICY_VERSION) loadAnnouncements()
                     onVerified()
                 }
                 is AuthResult.Failure -> _state.update { it.copy(authBusy = false, authError = result.message) }
@@ -405,6 +412,24 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { onResult(AuthApi.exportData()) }
     }
 
+    /** Fetches unseen product updates once per app session (best effort). */
+    private var announcementsLoaded = false
+    fun loadAnnouncements() {
+        if (announcementsLoaded) return
+        announcementsLoaded = true
+        viewModelScope.launch {
+            val pending = EngagementApi.pending()
+            if (pending.isNotEmpty()) _state.update { it.copy(announcements = pending) }
+        }
+    }
+
+    /** The What's New dialog closed (optionally via its button) — record the views so it never shows again. */
+    fun dismissAnnouncements(clickedId: String? = null) {
+        val ids = _state.value.announcements.map { it.id }
+        _state.update { it.copy(announcements = emptyList()) }
+        if (ids.isNotEmpty()) viewModelScope.launch { EngagementApi.markSeen(ids, clickedId) }
+    }
+
     /** PolicyConsentDialog's "I Agree" button — records acceptance and closes the gate. */
     fun acceptPolicy(onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
@@ -412,6 +437,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                 is AuthResult.Success -> {
                     _state.update { s -> s.copy(user = s.user?.copy(policyVersion = result.value.policyVersion)) }
                     onResult(true, null)
+                    loadAnnouncements()
                 }
                 is AuthResult.Failure -> onResult(false, result.message)
             }
@@ -461,10 +487,13 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             }
             syncConversations()
             refreshPlan()
+            if (policyVersion == POLICY_VERSION) loadAnnouncements()
         }
     }
 
     fun logout() {
+        announcementsLoaded = false
+        _state.update { it.copy(announcements = emptyList()) }
         // Every chat is about to be cleared below, not just the one being viewed — stop() alone
         // only stops the current chat's job.
         _state.update { it.copy(queued = emptyMap()) }

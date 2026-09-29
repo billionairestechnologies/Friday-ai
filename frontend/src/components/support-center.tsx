@@ -43,10 +43,12 @@ export function SupportCenter() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (!params.has("support")) return;
-    const number = Number(params.get("support"));
+    const value = params.get("support") ?? "";
+    const number = Number(value);
     params.delete("support");
     window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
-    setTab("tickets");
+    // ?support=contact (from the mobile apps' "Help & support"), ?support=redeem, or a ticket number.
+    setTab(value === "contact" || value === "redeem" ? (value as Tab) : "tickets");
     setDialog("help");
     if (number) {
       api

@@ -16,6 +16,9 @@ struct DrawerPane: View {
                     navRow(icon: "arrow.triangle.2.circlepath", label: "Automations") { vm.page = "automations" }
                     navRow(icon: "books.vertical", label: "Library") { vm.page = "library" }
                     navRow(icon: "folder", label: "Projects") { vm.page = "projects" }
+                    // Support and status live on the web (same account, same tickets).
+                    navRow(icon: "questionmark.bubble", label: "Help & support") { openWeb("/?support=contact") }
+                    navRow(icon: "waveform.path.ecg", label: "System status") { openWeb("/status") }
 
                     Text("Conversations")
                         .font(.system(size: 12, weight: .medium))
@@ -162,6 +165,10 @@ struct DrawerPane: View {
             }
         }
         .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 4)
+    }
+
+    private func openWeb(_ path: String) {
+        if let url = URL(string: "https://friday.billionairestechnologies.com\(path)") { UIApplication.shared.open(url) }
     }
 
     private func navRow(icon: String, label: String, action: @escaping () -> Void) -> some View {
