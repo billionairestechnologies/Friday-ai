@@ -12,10 +12,10 @@ import { WhatsNewCard, type WhatsNewItem } from "@/components/whats-new-card";
 /**
  * "What's new": product updates published from the Team Console, shown ONCE per user (the server
  * records each view, so it's once across all their devices — and new signups see what's live).
- * Several pending updates show as a short carousel. Never on the console, share pages or legal pages,
+ * Several pending updates show as a short carousel. Never on the console, share, status or legal pages,
  * and never on top of the consent gate.
  */
-const HIDDEN_ON = /^\/(admin|share|privacy|terms|mobile-auth-bridge)(\/|$)/;
+const HIDDEN_ON = /^\/(admin|share|privacy|terms|status|mobile-auth-bridge)(\/|$)/;
 
 export function WhatsNewModal() {
   const { user, isPending } = useCurrentUserState();

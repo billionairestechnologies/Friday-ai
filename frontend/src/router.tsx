@@ -105,6 +105,18 @@ const adminSectionRoute = createRoute({
   component: ConsoleRoute,
 });
 
+// Public status page — code-split; it must load even when the rest of the app is having trouble.
+const StatusPage = lazy(() => import("@/routes/status").then((m) => ({ default: m.StatusPage })));
+const statusRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/status",
+  component: () => (
+    <Suspense fallback={<div className="h-dvh bg-background" />}>
+      <StatusPage />
+    </Suspense>
+  ),
+});
+
 const upgradeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/upgrade",
@@ -215,6 +227,7 @@ const routeTree = rootRoute.addChildren([
   plansRoute,
   privacyRoute,
   termsRoute,
+  statusRoute,
   ...siteRoutes,
 ]);
 

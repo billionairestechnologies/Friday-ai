@@ -8,7 +8,7 @@ import { POLICY_VERSION } from "@/lib/site/legal";
 // themselves (so there's somewhere for the gate's own links to open), the OAuth hand-off page
 // (mobile-auth-bridge briefly holds a signed-in user mid-relay to the native app — blocking it
 // here would strand that relay), and the separate admin login gate (its own auth, not this one).
-const EXEMPT_PATHS = ["/privacy", "/terms", "/mobile-auth-bridge", "/admin"];
+const EXEMPT_PATHS = ["/privacy", "/terms", "/status", "/mobile-auth-bridge", "/admin"];
 
 /**
  * Blocks the app behind a full-screen, non-dismissable "I agree" screen for any signed-in

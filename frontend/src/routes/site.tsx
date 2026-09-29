@@ -94,6 +94,9 @@ export function SiteFooter() {
         <Link to="/terms" className="hover:text-foreground">
           Terms of Service
         </Link>
+        <Link to="/status" className="hover:text-foreground">
+          Status
+        </Link>
       </div>
     </footer>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CircleHelp, LogOut, Puzzle, Settings, Sparkles } from "lucide-react";
+import { Activity, CircleHelp, LogOut, Puzzle, Settings, Sparkles } from "lucide-react";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
@@ -50,6 +50,14 @@ export function ProfileDock() {
           <MenuItem icon={<Settings className="size-4" />} label="Settings" onClick={() => go("settings")} />
           <MenuItem icon={<Puzzle className="size-4" />} label="Plugins" onClick={() => go("plugins")} />
           <MenuItem icon={<CircleHelp className="size-4" />} label="Help & support" onClick={() => go("help")} />
+          <MenuItem
+            icon={<Activity className="size-4" />}
+            label="System status"
+            onClick={() => {
+              setOpen(false);
+              void navigate({ to: "/status" });
+            }}
+          />
           <MenuItem
             icon={<Sparkles className="size-4" />}
             label="Upgrade plan"

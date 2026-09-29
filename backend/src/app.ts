@@ -19,6 +19,7 @@ import { memoryRouter } from "./routes/memory.js";
 import { automationsRouter } from "./routes/automations.js";
 import { consoleRouter } from "./routes/console.js";
 import { emailRouter, offersRouter, supportRouter, updatesRouter } from "./routes/engagement.js";
+import { statusRouter } from "./routes/status.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { buildRouter } from "./routes/build.js";
 import { voiceRouter } from "./routes/voice.js";
@@ -99,6 +100,7 @@ export function createApp() {
   app.use("/api/support", supportRouter);
   app.use("/api/email", emailRouter);
   app.use("/api/offers", offersRouter);
+  app.use("/api/status", statusRouter);
 
   if (existsSync(frontendDist)) {
     const indexPath = path.join(frontendDist, "index.html");

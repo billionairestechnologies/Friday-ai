@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
+import * as st from "../controllers/statusController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -68,6 +69,12 @@ consoleRouter.post("/tasks", can("tasks.manage"), h(c.createTask));
 consoleRouter.patch("/tasks/:taskId", can("tasks.manage"), h(c.updateTask));
 consoleRouter.delete("/tasks/:taskId", can("tasks.manage"), h(c.deleteTask));
 
+consoleRouter.get("/status", can("status.view"), h(st.consoleOverview));
+consoleRouter.post("/status/incidents", can("status.manage"), h(st.createIncident));
+consoleRouter.post("/status/incidents/:incidentId/updates", can("status.manage"), h(st.updateIncident));
+consoleRouter.delete("/status/incidents/:incidentId", can("status.manage"), h(st.deleteIncident));
+consoleRouter.post("/status/checks", can("status.manage"), h(st.runChecks));
+consoleRouter.get("/status/crashes/:crashId", can("status.view"), h(st.crashDetail));
 consoleRouter.get("/plans", can("plans.view"), h(p.overview));
 consoleRouter.post("/plans/packages", can("plans.manage"), h(p.savePackage));
 consoleRouter.patch("/plans/catalog/:planId", can("plans.manage"), h(p.saveCatalog));

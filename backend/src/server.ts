@@ -10,6 +10,7 @@ const { createApp } = await import("./app.js");
 const { startAutomationScheduler, stopAutomationScheduler } = await import("./services/automations/automationService.js");
 const { startCampaignScheduler } = await import("./services/console/campaignService.js");
 const { startGrantExpirySweep } = await import("./services/console/plansService.js");
+const { startStatusMonitor } = await import("./services/status/statusService.js");
 const app = createApp();
 const sockets = new Set<Socket>();
 
@@ -21,6 +22,7 @@ const server = app.listen(env.port, () => {
   startAutomationScheduler();
   startCampaignScheduler();
   startGrantExpirySweep();
+  startStatusMonitor();
 });
 
 server.on("connection", (socket) => {

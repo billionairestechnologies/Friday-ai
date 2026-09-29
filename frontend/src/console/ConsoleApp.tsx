@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType } from
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Activity,
   BadgeIndianRupee,
   Boxes,
   ClipboardList,
@@ -58,6 +59,7 @@ const MailSection = lazy(() => import("./sections/MailSettings"));
 const Models = lazy(() => import("./sections/Models"));
 const Billing = lazy(() => import("./sections/Billing"));
 const Audit = lazy(() => import("./sections/Audit"));
+const StatusSection = lazy(() => import("./sections/Status"));
 
 export const SECTIONS: Section[] = [
   { id: "overview", label: "Overview", icon: Gauge, permission: "overview.view", group: "Workspace", component: Overview },
@@ -70,6 +72,7 @@ export const SECTIONS: Section[] = [
   { id: "users", label: "Users", icon: Users, permission: "users.view", group: "Admin", component: UsersSection },
   { id: "team", label: "Team & roles", icon: ShieldCheck, permission: "team.manage", group: "Admin", component: Team },
   { id: "mail", label: "Team mail", icon: Mail, permission: "mail.manage", group: "Admin", component: MailSection },
+  { id: "status", label: "Status & crashes", icon: Activity, permission: "status.view", group: "Admin", component: StatusSection },
   { id: "models", label: "Models & keys", icon: Cpu, permission: "providers.view", group: "Admin", component: Models },
   { id: "billing", label: "Billing & usage", icon: BadgeIndianRupee, permission: "users.view", group: "Admin", component: Billing },
   { id: "audit", label: "Audit log", icon: ScrollText, permission: "audit.view", group: "Admin", component: Audit },

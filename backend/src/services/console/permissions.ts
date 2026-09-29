@@ -36,6 +36,8 @@ export const PERMISSIONS = [
   { id: "providers.manage", group: "Models", label: "Manage providers, keys and model tiers" },
   { id: "mail.manage", group: "Mail", label: "Manage team mail addresses" },
   { id: "audit.view", group: "Audit", label: "See the audit log" },
+  { id: "status.view", group: "Status", label: "See system status, incidents and crash reports" },
+  { id: "status.manage", group: "Status", label: "Post incidents and status updates" },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]["id"];

@@ -55,6 +55,10 @@ export const PUBLIC_PAGES: Record<string, PageMeta> = {
     title: "Terms of Service — Friday AI",
     description: "The terms that apply to your use of Friday on web, Android and iOS.",
   },
+  "/status": {
+    title: "System Status — Friday AI",
+    description: "Live status of Friday and every AI model it runs: uptime over 90 days, model success rates, current and past incidents. Report a problem to the team.",
+  },
 };
 
 /** App pages that exist but are private or per-user — served, but kept out of search results. */

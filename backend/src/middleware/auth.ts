@@ -71,6 +71,18 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
   next();
 });
 
+/** Like requireAuth, but a missing or bad token just means "anonymous" (public forms: problem
+ *  reports, crash reports) instead of a 401. */
+export const optionalAuth = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
+  if (token) {
+    req.user = await loadUserCached(token).catch(() => undefined);
+    if (req.user) req.authToken = token;
+  }
+  next();
+});
+
 export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
   if (req.user?.role !== "admin") throw new HttpError(403, "Admin access required");
   next();

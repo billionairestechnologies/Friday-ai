@@ -52,6 +52,7 @@ import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
+import { recordModelOutcome } from "../status/statusService.js";
 import {
   chargeProgress,
   QUOTA_STOP_MESSAGE,
@@ -773,6 +774,10 @@ export async function streamMessage(
       if (streamed.hedged) console.log(`[chat] hedged: ${streamed.candidate.slug}/${streamed.candidate.modelId} answered first`);
     }
     if (streamed) lastError = streamed.lastError;
+
+    // Real-traffic model uptime for /status: did the model that handled this turn actually answer?
+    const outcomeModel = usedCandidate ?? candidates[0];
+    if (outcomeModel) void recordModelOutcome(outcomeModel.slug, outcomeModel.modelId, Boolean(usedCandidate) && (full.trim().length > 0 || !lastError));
 
     if (!usedCandidate) {
       onEvent({ t: "err", c: lastError ?? "The model failed to respond" });

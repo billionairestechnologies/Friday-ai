@@ -54,6 +54,9 @@ export const env = {
   ssoProviderLabel: process.env.SSO_PROVIDER_LABEL ?? "Company SSO",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Friday <onboarding@resend.dev>",
+  // Who gets outage alerts and problem reports from /status (comma separated). Falls back to the
+  // team's support mail identity, then the console owners.
+  statusAlertEmails: (process.env.STATUS_ALERT_EMAILS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   e2bApiKey: process.env.E2B_API_KEY ?? "",
   razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? "",
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? "",

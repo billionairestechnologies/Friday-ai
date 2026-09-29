@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import { useId, type SVGProps } from "react";
 
 // Official brand marks (via simple-icons, MIT-licensed), inlined with fill="currentColor" so they
 // pick up the surrounding text color and work in both themes. Sarvam has no simple-icons entry,
@@ -113,20 +113,57 @@ export function resolveVendorSlug(providerSlug?: string, modelText?: string): st
   return providerSlug;
 }
 
+/**
+ * Official brand colours. Marks whose real logo is monochrome (Ollama, ElevenLabs, Z.ai, Sarvam's
+ * monogram) stay in the text colour — colouring them would be a made-up logo, not the real one.
+ */
+const BRAND_COLORS: Record<string, string> = {
+  openai: "#10A37F",
+  anthropic: "#D97757",
+  scalemax: "#D97757",
+  openrouter: "#6467F2",
+  nvidia: "#76B900",
+};
+
+/** Gemini's mark is a blue→purple→rose gradient; the id is per-instance so several can share a page. */
+function GeminiColorLogo(props: SVGProps<SVGSVGElement>) {
+  const id = `gemini-${useId().replace(/:/g, "")}`;
+  return (
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#4285F4" />
+          <stop offset="0.55" stopColor="#9B72CB" />
+          <stop offset="1" stopColor="#D96570" />
+        </linearGradient>
+      </defs>
+      <path
+        fill={`url(#${id})`}
+        d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"
+      />
+    </svg>
+  );
+}
+
 export function ProviderLogo({
   slug,
   modelText,
   className,
+  mono = false,
 }: {
   slug?: string;
   /** The model's own id/label — used to disambiguate a shared provider slug (see resolveVendorSlug). */
   modelText?: string;
   className?: string;
+  /** Single-colour mark in the surrounding text colour (for dense or tinted UI). Default: brand colours. */
+  mono?: boolean;
 }) {
   const resolved = resolveVendorSlug(slug, modelText);
   const Logo = resolved ? PROVIDER_LOGOS[resolved] : undefined;
-  if (!Logo) return null;
-  return <Logo className={className} aria-hidden />;
+  if (!Logo || !resolved) return null;
+  if (!mono && resolved === "gemini") return <GeminiColorLogo className={className} aria-hidden />;
+  const color = mono ? undefined : BRAND_COLORS[resolved];
+  return <Logo className={className} aria-hidden style={color ? { color } : undefined} />;
 }
 
 /** Human-facing vendor name for a resolved slug — used to group the model picker by company. */
