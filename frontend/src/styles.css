@@ -718,3 +718,40 @@ textarea::-webkit-scrollbar-thumb {
 @media (prefers-reduced-motion: reduce) {
   .build-orb, .build-banner { animation: none; }
 }
+
+/* Live build activity (build-steps.tsx): the label of whatever is running right now gets a soft
+   moving highlight, so it's obvious at a glance what Friday is doing this second. */
+@keyframes shimmer-text { 0% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
+.shimmer-text {
+  background-image: linear-gradient(90deg, var(--color-muted) 0%, var(--color-muted) 35%, var(--color-foreground) 50%, var(--color-muted) 65%, var(--color-muted) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-text 1.8s linear infinite;
+}
+
+/* Block cursor at the end of a running command's output in the mini terminal. */
+@keyframes terminal-blink { 50% { opacity: 0; } }
+.terminal-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #9aa0a6;
+  animation: terminal-blink 1s steps(1) infinite;
+}
+
+/* Code cards reuse the .md highlight colours but drop the document margins/box. */
+.build-code pre { margin: 0; background: transparent; }
+.build-code pre code { font-size: 11.5px; line-height: 1.55; background: transparent; padding: 0; }
+
+/* A plan item ticking to done pops in instead of just swapping. */
+@keyframes plan-check-pop { 0% { transform: scale(0.4); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+.plan-check { animation: plan-check-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text { animation: none; color: var(--color-foreground); background: none; }
+  .terminal-cursor, .plan-check { animation: none; }
+}

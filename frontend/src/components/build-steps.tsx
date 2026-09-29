@@ -1,26 +1,214 @@
-import { useEffect, useState } from "react";
-import { AlertCircle, Check, ChevronRight, Download, FileArchive, FilePen, Hammer, Lightbulb, ListChecks, Play, GitPullRequest, Terminal, Wrench } from "lucide-react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
+import {
+  AlertCircle,
+  Check,
+  ChevronRight,
+  Download,
+  Eye,
+  FileArchive,
+  FileCode2,
+  FilePen,
+  GitPullRequest,
+  Globe,
+  Hammer,
+  Lightbulb,
+  ListChecks,
+  Play,
+  Search,
+  Terminal,
+  Wrench,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildInfo, BuildStep } from "@/lib/chat/types";
 import { useChat } from "@/lib/chat/store";
 import { downloadProjectZip } from "@/components/build-preview";
 
+// ---------------------------------------------------------------------------------------------
+// Small shared pieces
+// ---------------------------------------------------------------------------------------------
+
+function formatDuration(totalSeconds: number) {
+  const s = Math.max(0, Math.round(totalSeconds));
+  return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+}
+
+function formatMs(ms: number) {
+  return ms < 1000 ? `${ms}ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : formatDuration(ms / 1000);
+}
+
+function formatBytes(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : `${(bytes / 1024).toFixed(2)} KB`;
+}
+
+/** Live "12s" for a running step (from its server start time), or its final duration. */
+function StepTime({ step }: { step: BuildStep }) {
+  const [now, setNow] = useState(() => Date.now());
+  const running = step.state === "running" && step.startedAt != null;
+  useEffect(() => {
+    if (!running) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [running]);
+  if (running) return <span className="shrink-0 text-xs text-subtle tabular-nums">{formatDuration((now - step.startedAt!) / 1000)}</span>;
+  if (step.ms != null && step.ms >= 300) return <span className="shrink-0 text-xs text-subtle tabular-nums">{formatMs(step.ms)}</span>;
+  return null;
+}
+
+function stepIcon(step: BuildStep) {
+  if (step.kind === "tool") return /^Searched/i.test(step.label) ? Search : /^Read /i.test(step.label) ? Globe : Wrench;
+  if (step.kind === "write") return FilePen;
+  if (step.kind === "read") return /^Checking|browser/i.test(step.label) ? Eye : FileCode2;
+  if (step.kind === "start") return Play;
+  return /browser/i.test(step.label) ? Eye : Terminal;
+}
+
 function StepIcon({ step }: { step: BuildStep }) {
   if (step.state === "running") return <span className="build-orb" aria-hidden />;
   if (step.state === "error") return <AlertCircle className="size-3.5 text-danger" />;
-  const Icon =
-    step.kind === "tool" ? Wrench : step.kind === "write" || step.kind === "read" ? FilePen : step.kind === "start" ? Play : Terminal;
+  const Icon = stepIcon(step);
   return <Icon className="size-3.5 text-muted" />;
 }
 
 function verb(step: BuildStep): string {
-  if (step.kind === "run") return step.state === "running" ? "Running command" : "Ran command";
+  if (step.kind === "run") return step.state === "running" ? "Running" : "Ran";
   if (step.kind === "start") return step.state === "running" ? "Starting server" : "Started server";
   return "";
 }
 
-function StepRow({ step }: { step: BuildStep }) {
+/** Collapsible body with a smooth height transition (grid-rows 0fr → 1fr — no layout measuring). */
+function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
+  return (
+    <div className={cn("grid transition-[grid-template-rows,opacity] duration-200 ease-out", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mini terminal — a command, its live output, and how it ended
+// ---------------------------------------------------------------------------------------------
+
+const MiniTerminal = memo(function MiniTerminal({ step }: { step: BuildStep }) {
+  const body = useRef<HTMLPreElement>(null);
+  const running = step.state === "running";
+  const output = step.output ?? (step.state !== "running" ? step.detail : undefined) ?? "";
+  // Follow the newest output while the command runs, like a real terminal.
+  useLayoutEffect(() => {
+    if (running && body.current) body.current.scrollTop = body.current.scrollHeight;
+  }, [output, running]);
+  return (
+    <div className="build-terminal mt-1 mb-2 overflow-hidden rounded-xl border border-white/[0.07] bg-[#0c0c0d] shadow-[0_2px_12px_rgba(0,0,0,0.25)]">
+      <div className="flex items-center gap-1.5 border-b border-white/[0.05] px-3 py-1.5">
+        <span className="size-2 rounded-full bg-[#ff5f57]/70" />
+        <span className="size-2 rounded-full bg-[#febc2e]/70" />
+        <span className="size-2 rounded-full bg-[#28c840]/70" />
+        <span className="ml-2 font-mono text-[10.5px] text-[#6b7078]">{step.kind === "start" ? "server" : "bash"}</span>
+        <span className="flex-1" />
+        {!running && step.exitCode != null && (
+          <span className={cn("font-mono text-[10.5px]", step.exitCode === 0 ? "text-emerald-400/80" : "text-red-400")}>exit {step.exitCode}</span>
+        )}
+      </div>
+      <pre ref={body} className="max-h-56 overflow-auto px-3 py-2 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap text-[#c9ccd1]">
+        <span className="text-emerald-400">$ </span>
+        <span className="text-[#e8eaed]">{step.cmd}</span>
+        {output ? `\n${output.replace(/\s+$/, "")}` : ""}
+        {running && <span className="terminal-cursor" aria-hidden />}
+      </pre>
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
+// Code card — what a write/edit actually put in the file
+// ---------------------------------------------------------------------------------------------
+
+const REHYPE = [rehypeHighlight];
+
+const CodePreview = memo(function CodePreview({ step }: { step: BuildStep }) {
+  if (!step.code) return null;
+  if (step.lang === "diff") {
+    return (
+      <pre className="max-h-64 overflow-auto py-1.5 font-mono text-[11.5px] leading-[1.55]">
+        {step.code.split("\n").map((line, i) => (
+          <div
+            key={i}
+            className={cn(
+              "px-3 whitespace-pre",
+              line.startsWith("+ ") && "bg-emerald-500/10 text-emerald-300",
+              line.startsWith("- ") && "bg-red-500/10 text-red-300",
+              line === "⋯" && "text-subtle",
+            )}
+          >
+            {line || " "}
+          </div>
+        ))}
+      </pre>
+    );
+  }
+  const fence = step.code.includes("```") ? "````" : "```";
+  return (
+    <div className="md build-code max-h-64 overflow-auto">
+      <ReactMarkdown rehypePlugins={REHYPE} components={{ pre: ({ children }) => <pre className="px-3 py-2">{children}</pre> }}>
+        {`${fence}${step.lang && step.lang !== "text" ? step.lang : ""}\n${step.code}\n${fence}`}
+      </ReactMarkdown>
+    </div>
+  );
+});
+
+function DiffCounts({ step }: { step: BuildStep }) {
+  if (step.added == null && step.removed == null) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1 font-mono text-[11px]">
+      {step.added ? <span className="text-emerald-400">+{step.added}</span> : null}
+      {step.removed ? <span className="text-red-400">−{step.removed}</span> : null}
+    </span>
+  );
+}
+
+function fileName(step: BuildStep) {
+  return step.path ?? step.label.replace(/^(Wrote|Writing|Edited|Editing|Read) /, "").replace(/…$/, "");
+}
+
+function FileRow({ step }: { step: BuildStep }) {
   const [open, setOpen] = useState(false);
+  const running = step.state === "running";
+  const expandable = Boolean(step.code) || (step.state === "error" && Boolean(step.detail));
+  const editing = /^Edit/i.test(step.label) || step.lang === "diff";
+  return (
+    <div className="step-enter">
+      <button
+        type="button"
+        disabled={!expandable}
+        onClick={() => setOpen((v) => !v)}
+        className={cn("flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px]", expandable && "hover:bg-white/[0.04]")}
+      >
+        {running ? <span className="build-orb scale-75" aria-hidden /> : step.state === "error" ? <AlertCircle className="size-3.5 shrink-0 text-danger" /> : <FileCode2 className="size-3.5 shrink-0 text-muted" />}
+        <span className={cn("min-w-0 flex-1 truncate font-mono text-[12px]", running ? "shimmer-text" : step.state === "error" ? "text-danger" : "text-foreground/90")}>
+          {running ? `${editing ? "Editing" : "Writing"} ${fileName(step)}` : fileName(step)}
+        </span>
+        <DiffCounts step={step} />
+        {expandable && <ChevronRight className={cn("size-3 shrink-0 text-subtle transition-transform duration-200", open && "rotate-90")} />}
+      </button>
+      {expandable && (
+        <Collapse open={open}>
+          <div className="mx-2 mt-0.5 mb-1.5 overflow-hidden rounded-lg border border-white/[0.06] bg-[#0f0f10]">
+            {step.code ? <CodePreview step={step} /> : <pre className="p-2 font-mono text-[11px] whitespace-pre-wrap text-danger">{step.detail}</pre>}
+          </div>
+        </Collapse>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Rows
+// ---------------------------------------------------------------------------------------------
+
+function StepRow({ step }: { step: BuildStep }) {
+  // Terminal steps stay open while running and after an error; a success folds away (click to reopen).
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
   // Narration between actions ("Installing dependencies…") — a plain thought line, not a command.
   if (step.kind === "note") {
     return (
@@ -32,54 +220,91 @@ function StepRow({ step }: { step: BuildStep }) {
       </div>
     );
   }
-  const expandable = Boolean(step.detail);
+  const terminal = Boolean(step.cmd) && (step.kind === "run" || step.kind === "start");
+  const open = userOpen ?? (terminal && step.state !== "ok");
+  const expandable = terminal || Boolean(step.detail);
   return (
     <div className="step-enter relative pl-6">
-      <span className="absolute top-1/2 left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
+      <span className="absolute top-[13px] left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
         <StepIcon step={step} />
       </span>
       <button
         type="button"
         disabled={!expandable}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setUserOpen(!open)}
         className={cn("flex w-full items-center gap-2 py-1 text-left text-sm", expandable && "hover:text-foreground")}
       >
-        {verb(step) && <span className="text-foreground">{verb(step)}</span>}
-        <span className={cn("min-w-0 flex-1 truncate", step.state === "error" ? "text-danger" : "text-muted")}>{step.label}</span>
-        {expandable && <ChevronRight className={cn("size-3.5 text-subtle transition-transform", open && "rotate-90")} />}
+        {verb(step) && <span className="shrink-0 text-foreground">{verb(step)}</span>}
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            step.state === "error" ? "text-danger" : step.state === "running" ? "shimmer-text" : "text-muted",
+          )}
+        >
+          {step.label}
+        </span>
+        <StepTime step={step} />
+        {expandable && <ChevronRight className={cn("size-3.5 shrink-0 text-subtle transition-transform duration-200", open && "rotate-90")} />}
       </button>
-      {open && step.detail && (
-        <pre className="mb-1 max-h-48 overflow-auto rounded-lg bg-chip p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted">
-          {step.detail}
-        </pre>
+      {expandable && (
+        <Collapse open={open}>
+          {terminal ? (
+            <MiniTerminal step={step} />
+          ) : (
+            <pre className="mb-1 max-h-48 overflow-auto rounded-lg bg-chip p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted">
+              {step.detail}
+            </pre>
+          )}
+        </Collapse>
       )}
     </div>
   );
 }
 
-function WriteGroup({ steps }: { steps: BuildStep[] }) {
-  const [open, setOpen] = useState(false);
+function WriteGroup({ steps, streaming }: { steps: BuildStep[]; streaming: boolean }) {
   const running = steps.some((st) => st.state === "running");
   const failed = steps.some((st) => st.state === "error");
+  // Open while files are being written live, so the user watches them land; folded in history.
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const open = userOpen ?? streaming;
+  const added = steps.reduce((n, st) => n + (st.added ?? 0), 0);
+  const removed = steps.reduce((n, st) => n + (st.removed ?? 0), 0);
+  const anyEdit = steps.some((st) => /^Edit/i.test(st.label) || st.lang === "diff");
   return (
     <div className="step-enter relative pl-6">
-      <span className="absolute top-1/2 left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
+      <span className="absolute top-[13px] left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
         {running ? <span className="build-orb" aria-hidden /> : failed ? <AlertCircle className="size-3.5 text-danger" /> : <FilePen className="size-3.5 text-muted" />}
       </span>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 py-1 text-left text-sm hover:text-foreground">
-        <span className="text-foreground">{running ? "Editing" : "Edited"} {steps.length} file{steps.length === 1 ? "" : "s"}</span>
-        <span className="min-w-0 flex-1 truncate text-muted">{steps.map((st) => st.label.replace(/^(Wrote|Writing|Edited|Editing) /, "").replace(/…$/, "")).join(", ")}</span>
-        <ChevronRight className={cn("size-3.5 text-subtle transition-transform", open && "rotate-90")} />
+      <button type="button" onClick={() => setUserOpen(!open)} className="flex w-full items-center gap-2 py-1 text-left text-sm hover:text-foreground">
+        <span className="shrink-0 text-foreground">
+          {running ? (anyEdit ? "Editing" : "Writing") : anyEdit ? "Edited" : "Wrote"} {steps.length} file{steps.length === 1 ? "" : "s"}
+        </span>
+        {!open && <span className="min-w-0 flex-1 truncate text-muted">{steps.map(fileName).join(", ")}</span>}
+        {open && <span className="flex-1" />}
+        <DiffCounts step={{ ...steps[0]!, added: added || undefined, removed: removed || undefined }} />
+        <ChevronRight className={cn("size-3.5 shrink-0 text-subtle transition-transform duration-200", open && "rotate-90")} />
       </button>
-      {open && (
-        <div className="mb-1 rounded-lg bg-chip p-2 font-mono text-[11px] leading-relaxed text-muted">
+      <Collapse open={open}>
+        <div className="mb-1 rounded-xl border border-border/70 bg-composer/60 py-1">
           {steps.map((st) => (
-            <div key={st.id}>{st.label.replace(/^(Wrote|Writing|Edited|Editing) /, "").replace(/…$/, "")}</div>
+            <FileRow key={st.id} step={st} />
           ))}
         </div>
-      )}
+      </Collapse>
     </div>
   );
+}
+
+/** The step running right now, spelled out — "Running npm install", "Writing src/App.jsx". */
+function currentActivity(steps: BuildStep[]): string | null {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const st = steps[i]!;
+    if (st.state !== "running" || st.kind === "note") continue;
+    if (st.kind === "run" && st.cmd) return `Running ${st.cmd.length > 60 ? `${st.cmd.slice(0, 60)}…` : st.cmd}`;
+    if (st.kind === "write") return st.label.replace(/…$/, "");
+    return st.label.replace(/…$/, "");
+  }
+  return null;
 }
 
 /** The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish. */
@@ -102,7 +327,9 @@ function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
           <button type="button" onClick={() => setShowArch((v) => !v)} className="flex items-center gap-1 text-xs text-muted hover:text-foreground">
             Architecture <ChevronRight className={cn("size-3 transition-transform", showArch && "rotate-90")} />
           </button>
-          {showArch && <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-muted">{plan.architecture}</p>}
+          <Collapse open={showArch}>
+            <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-muted">{plan.architecture}</p>
+          </Collapse>
         </div>
       )}
       <ul className="mt-2 space-y-1">
@@ -110,7 +337,7 @@ function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
           <li key={i} className="flex items-start gap-2 text-sm">
             <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
               {item.state === "done" ? (
-                <span className="flex size-4 items-center justify-center rounded-full bg-foreground text-background">
+                <span className="plan-check flex size-4 items-center justify-center rounded-full bg-foreground text-background">
                   <Check className="size-3" strokeWidth={3} />
                 </span>
               ) : item.state === "doing" ? (
@@ -119,7 +346,14 @@ function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
                 <span className="size-3.5 rounded-full border border-border" />
               )}
             </span>
-            <span className={cn(item.state === "done" ? "text-muted line-through decoration-border" : "text-foreground")}>{item.text}</span>
+            <span
+              className={cn(
+                "transition-colors duration-300",
+                item.state === "done" ? "text-muted line-through decoration-border" : item.state === "doing" ? "text-foreground" : "text-foreground/80",
+              )}
+            >
+              {item.text}
+            </span>
           </li>
         ))}
       </ul>
@@ -154,18 +388,9 @@ export function BuildBanner({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function formatDuration(totalSeconds: number) {
-  const s = Math.max(0, Math.round(totalSeconds));
-  return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
-}
-
-function formatBytes(bytes: number) {
-  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : `${(bytes / 1024).toFixed(2)} KB`;
-}
-
-/** Build Mode's task list, laid out like the reference product: while working, flat rows
- *  ("Ran command · Install dependencies") joined by a thin vertical line, and "Working for 15s";
- *  once finished it folds into one "Worked for 7m 39s ›" line that expands to the same rows. */
+/** Build Mode's task list: while working, rows joined by a thin vertical line — live terminals for
+ *  commands, file cards for writes/edits — with the current activity spelled out at the bottom; once
+ *  finished it folds into one "Worked for 7m 39s ›" line that expands to the same rows. */
 export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: boolean }) {
   const setCanvasOpen = useChat((s) => s.setCanvasOpen);
   const [elapsed, setElapsed] = useState(0);
@@ -178,8 +403,8 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming]);
 
-  // Consecutive file writes fold into one "Edited 9 files" row (like the reference product) so a big
-  // scaffold doesn't bury the commands that matter.
+  // Consecutive file writes fold into one "Wrote 9 files" group so a big scaffold doesn't bury the
+  // commands that matter; each file inside still opens to show its code or diff.
   const groups: Array<BuildStep | BuildStep[]> = [];
   for (const step of build.steps) {
     const prev = groups[groups.length - 1];
@@ -190,7 +415,7 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
   const rows = (
     <div className="relative">
       <span className="absolute top-3 bottom-3 left-[7.5px] w-px bg-border" aria-hidden />
-      {groups.map((g) => (Array.isArray(g) ? <WriteGroup key={g[0]!.id} steps={g} /> : <StepRow key={g.id} step={g} />))}
+      {groups.map((g) => (Array.isArray(g) ? <WriteGroup key={g[0]!.id} steps={g} streaming={streaming} /> : <StepRow key={g.id} step={g} />))}
     </div>
   );
 
@@ -198,13 +423,18 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
   const toolsOnly = build.steps.length > 0 && build.steps.every((st) => st.kind === "tool") && !build.plan;
 
   if (streaming) {
+    const activity = currentActivity(build.steps);
     return (
       <div className="w-full">
         {!toolsOnly && <BuildBanner compact />}
         {build.plan && <PlanCard plan={build.plan} />}
         {rows}
-        <div className="flex items-center gap-2 pt-2 text-sm text-muted">
-          <span className="build-orb" aria-hidden /> Working for {formatDuration(elapsed)}
+        <div className="flex min-w-0 items-center gap-2 pt-2 text-sm text-muted">
+          <span className="build-orb shrink-0" aria-hidden />
+          <span className="min-w-0 truncate">
+            {activity ? <span className="shimmer-text">{activity}</span> : "Thinking about the next step"}
+          </span>
+          <span className="shrink-0 text-subtle tabular-nums">· {formatDuration(elapsed)}</span>
         </div>
       </div>
     );
@@ -224,9 +454,11 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
           : seconds > 0
             ? `Worked for ${formatDuration(seconds)}`
             : `${build.steps.length} steps`}
-        <ChevronRight className={cn("size-3.5 transition-transform", expanded && "rotate-90")} />
+        <ChevronRight className={cn("size-3.5 transition-transform duration-200", expanded && "rotate-90")} />
       </button>
-      {expanded && <div className="mt-2">{rows}</div>}
+      <Collapse open={expanded}>
+        <div className="mt-2">{expanded && rows}</div>
+      </Collapse>
       {build.prUrl && (
         <a
           href={build.prUrl}

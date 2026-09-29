@@ -326,7 +326,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         }
         else if (ev.t === "cite") batch.cite({ url: ev.u, title: ev.title });
         else if (ev.t === "agent") batch.agent({ slug: ev.slug, model: ev.model, state: ev.state, error: ev.error });
-        else if (ev.t === "step") applyLiveStep(chatId, { id: ev.id, kind: ev.kind, label: ev.label, state: ev.state, detail: ev.detail });
+        else if (ev.t === "step") {
+          const { t: _t, ...step } = ev;
+          applyLiveStep(chatId, step);
+        }
         else if (ev.t === "ask") askQuestions = ev.questions;
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });

@@ -37,6 +37,17 @@ export type BuildStep = {
   label: string;
   state: "running" | "ok" | "error";
   detail?: string;
+  /** Rich activity (v2 backend; absent on older messages): see backend chat/types.ts BuildStep. */
+  cmd?: string;
+  output?: string;
+  exitCode?: number;
+  path?: string;
+  code?: string;
+  lang?: string;
+  added?: number;
+  removed?: number;
+  startedAt?: number;
+  ms?: number;
 };
 
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
@@ -108,7 +119,7 @@ export type StreamEvent =
   | { t: "think"; c: string }
   | { t: "text"; c: string }
   | { t: "cite"; u: string; title?: string }
-  | { t: "step"; id: string; kind: BuildStep["kind"]; label: string; state: BuildStep["state"]; detail?: string }
+  | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
