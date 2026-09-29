@@ -9,7 +9,9 @@ import { streamMessage } from "../chat/index.js";
 import { finishGeneration, registerGeneration } from "../chat/activeGenerations.js";
 import { logger } from "../../utils/logger.js";
 import { isValidTimeZone, nextRunAt, zonedParts, type Frequency } from "./schedule.js";
+import { entitlementsFor } from "../quota/entitlements.js";
 
+/** Default automation limit — plans override it via the automations entitlement. */
 export const MAX_AUTOMATIONS_PER_USER = 20;
 const LEASE_MS = 25 * 60_000;
 const RUN_TIMEOUT_MS = 20 * 60_000;
@@ -105,7 +107,8 @@ async function getOwned(userId: string, id: string): Promise<Row> {
 
 export async function createAutomation(userId: string, input: AutomationInput): Promise<Automation> {
   const { count } = await supabaseAdmin.from("automations").select("id", { count: "exact", head: true }).eq("user_id", userId);
-  if ((count ?? 0) >= MAX_AUTOMATIONS_PER_USER) throw new HttpError(400, `You can have up to ${MAX_AUTOMATIONS_PER_USER} automations`);
+  const allowed = (await entitlementsFor(userId)).automations;
+  if ((count ?? 0) >= allowed) throw new HttpError(400, `Your plan includes up to ${allowed} automations — upgrade for more`);
   const weekday = input.frequency === "weekly" ? (input.weekday ?? 1) : null;
   const { data, error } = await supabaseAdmin
     .from("automations")

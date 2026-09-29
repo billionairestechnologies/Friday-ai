@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { resolveEffectivePlan } from "../quota/tokenQuotaService.js";
+import { resolveEntitlements } from "../quota/entitlements.js";
+import { sanitizeEntitlements, type Entitlements } from "../quota/planCatalog.js";
 import { NEW_USER_DAYS, findUserByEmail, userLabels } from "./directory.js";
 
 /**
@@ -32,6 +34,12 @@ export type PackageInput = {
   currency?: string;
   features?: string[];
   active?: boolean;
+  /** Listed on the public Plans page and purchasable through checkout. */
+  public?: boolean;
+  entitlements?: Partial<Entitlements>;
+  badge?: string | null;
+  highlight?: boolean;
+  sortOrder?: number;
 };
 
 function packageRow(input: Partial<PackageInput>) {
@@ -48,12 +56,30 @@ function packageRow(input: Partial<PackageInput>) {
   if (input.currency !== undefined) row.currency = input.currency;
   if (input.features !== undefined) row.features = input.features;
   if (input.active !== undefined) row.active = input.active;
+  if (input.public !== undefined) row.public = input.public;
+  if (input.entitlements !== undefined) row.entitlements = sanitizeEntitlements(input.entitlements);
+  if (input.badge !== undefined) row.badge = input.badge;
+  if (input.highlight !== undefined) row.highlight = input.highlight;
+  if (input.sortOrder !== undefined) row.sort_order = input.sortOrder;
   return row;
 }
 
 function validatePackage(input: Partial<PackageInput>) {
   if (input.target === "organization" && input.plan && input.plan !== "enterprise") throw new HttpError(400, "Organization packages use the Enterprise plan");
   if (input.target === "individual" && input.plan === "enterprise") throw new HttpError(400, "Individual packages use Free, Pro or Premium");
+  if (input.public && !(input.pricePaise && input.pricePaise >= 100)) throw new HttpError(400, "A public package needs a price of at least ₹1");
+}
+
+/** Active public packages, for the Plans page. */
+export async function listPublicPackages() {
+  const { data, error } = await supabaseAdmin
+    .from("plan_packages")
+    .select("id, name, description, target, plan, monthly_token_cap, seats, pooled_monthly_tokens, duration_days, price_paise, currency, features, entitlements, badge, highlight, sort_order")
+    .eq("active", true)
+    .eq("public", true)
+    .order("sort_order", { ascending: true });
+  if (error) return []; // before migration 0033: no public packages yet
+  return data ?? [];
 }
 
 export async function listPackages() {
@@ -102,7 +128,21 @@ export type GrantInput = {
   packageId?: string | null;
   offerId?: string | null;
   note?: string;
+  /** Feature entitlements this grant adds on top of the plan (from a package). */
+  entitlements?: Partial<Entitlements> | null;
 };
+
+/** Writes (or clears) the entitlement overrides a grant gives. A separate write so that, before
+ *  migration 0033, a grant without entitlements still works. */
+async function writeEntitlements(target: { userId?: string | null; organizationId?: string | null }, entitlements: Partial<Entitlements> | null | undefined) {
+  const clean = sanitizeEntitlements(entitlements);
+  const table = target.userId ? "profiles" : "organizations";
+  const id = target.userId ?? target.organizationId;
+  if (!id) return;
+  const { error } = await supabaseAdmin.from(table).update({ entitlements: clean }).eq("id", id);
+  if (error && Object.keys(clean).length) throw new HttpError(500, error.message);
+  if (target.userId) resolveEntitlements.invalidate(target.userId);
+}
 
 export function endsAtFor(durationDays: number | null | undefined, from = Date.now()): string | null {
   return durationDays ? new Date(from + durationDays * 86_400_000).toISOString() : null;
@@ -118,6 +158,7 @@ export async function grantAccess(input: GrantInput, actorId: string | null) {
       .eq("id", input.userId);
     if (error) throw new HttpError(500, error.message);
     await supabaseAdmin.from("access_grants").update({ status: "revoked" }).eq("user_id", input.userId).eq("status", "active");
+    await writeEntitlements({ userId: input.userId }, input.entitlements);
     resolveEffectivePlan.invalidate(input.userId);
   } else if (input.organizationId) {
     const seats = Math.max(1, input.seats ?? 1);
@@ -131,6 +172,7 @@ export async function grantAccess(input: GrantInput, actorId: string | null) {
       .eq("id", input.organizationId);
     if (error) throw new HttpError(500, error.message);
     await supabaseAdmin.from("access_grants").update({ status: "revoked" }).eq("organization_id", input.organizationId).eq("status", "active");
+    await writeEntitlements({ organizationId: input.organizationId }, input.entitlements);
   } else {
     throw new HttpError(400, "Choose a person or an organization");
   }
@@ -149,6 +191,7 @@ export async function grantAccess(input: GrantInput, actorId: string | null) {
       ends_at: endsAt,
       note: input.note ?? "",
       granted_by: actorId,
+      ...(input.entitlements && Object.keys(sanitizeEntitlements(input.entitlements)).length ? { entitlements: sanitizeEntitlements(input.entitlements) } : {}),
     })
     .select()
     .single();
@@ -172,6 +215,7 @@ export async function applyPackage(packageId: string, target: { userId?: string 
       source: "package",
       packageId,
       note,
+      entitlements: (pkg.entitlements as Partial<Entitlements> | null) ?? null,
     },
     actorId,
   );
@@ -190,11 +234,15 @@ async function revert(grant: Record<string, unknown>) {
       .gt("updated_at", grant.created_at as string);
     if (profile?.plan === grant.plan && !paidSince) {
       await supabaseAdmin.from("profiles").update({ plan: "free", plan_renews_at: null, custom_monthly_cap: null }).eq("id", grant.user_id);
+      await writeEntitlements({ userId: grant.user_id as string }, null).catch(() => {});
       resolveEffectivePlan.invalidate(grant.user_id as string);
     }
   } else if (grant.organization_id) {
     const { data: org } = await supabaseAdmin.from("organizations").select("plan").eq("id", grant.organization_id).maybeSingle();
-    if (org?.plan === grant.plan) await supabaseAdmin.from("organizations").update({ plan: "free" }).eq("id", grant.organization_id);
+    if (org?.plan === grant.plan) {
+      await supabaseAdmin.from("organizations").update({ plan: "free" }).eq("id", grant.organization_id);
+      await writeEntitlements({ organizationId: grant.organization_id as string }, null).catch(() => {});
+    }
   }
 }
 
@@ -472,7 +520,11 @@ export async function myRedemptions(userId: string) {
 export async function discountForCheckout(userId: string, code: string, planId: string): Promise<{ offerId: string; percent: number }> {
   const offer = await loadRedeemableOffer(code);
   if (offer.kind !== "discount") throw new HttpError(400, "That code isn't a discount code — redeem it from Settings instead");
-  if (!((offer.applies_to_plans as string[]) ?? []).includes(planId)) throw new HttpError(400, `That code doesn't apply to ${planId}`);
+  // Package checkouts arrive as "package:<id>"; an offer applies to one package by that id, or to
+  // every public package via "packages".
+  const appliesTo = (offer.applies_to_plans as string[]) ?? [];
+  const applies = appliesTo.includes(planId) || (planId.startsWith("package:") && appliesTo.includes("packages"));
+  if (!applies) throw new HttpError(400, planId.startsWith("package:") ? "That code doesn't apply to this package" : `That code doesn't apply to ${planId}`);
   const verdict = await checkEligibility(offer, userId);
   if (verdict === "review") throw new HttpError(403, "That discount needs approval first");
   const { data: used } = await supabaseAdmin.from("offer_redemptions").select("status").eq("offer_id", offer.id).eq("user_id", userId).eq("status", "applied").maybeSingle();

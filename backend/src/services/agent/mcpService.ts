@@ -5,7 +5,9 @@ import { decryptSecret, encryptSecret } from "../../utils/crypto.js";
 import { BlockedUrlError, assertFetchableUrl } from "./safeFetch.js";
 import { McpClient, mcpToolName, sanitizeSchema, type McpTool } from "./mcpClient.js";
 import { clip, type FridayTool } from "./tools/types.js";
+import { entitlementsFor } from "../quota/entitlements.js";
 
+/** Default MCP server limit — plans override it via the mcpServers entitlement. */
 export const MAX_MCP_SERVERS = 10;
 const MAX_MCP_TOOLS_PER_TURN = 40;
 const LIST_TIMEOUT_MS = 6_000;
@@ -72,7 +74,9 @@ export async function addMcpServer(userId: string, input: z.infer<typeof mcpServ
     throw new HttpError(400, err instanceof BlockedUrlError ? err.message : "Invalid URL");
   }
   const { count } = await supabaseAdmin.from("mcp_servers").select("id", { count: "exact", head: true }).eq("user_id", userId);
-  if ((count ?? 0) >= MAX_MCP_SERVERS) throw new HttpError(400, `You can add up to ${MAX_MCP_SERVERS} MCP servers`);
+  // The plan's entitlement sets the limit (per-turn tool count stays bounded by MAX_MCP_TOOLS_PER_TURN).
+  const allowed = (await entitlementsFor(userId)).mcpServers;
+  if ((count ?? 0) >= allowed) throw new HttpError(400, `Your plan includes up to ${allowed} MCP servers — upgrade for more`);
   const authorization = authorizationHeader(input.authorization);
   let tools: McpTool[];
   try {

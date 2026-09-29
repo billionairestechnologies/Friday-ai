@@ -167,8 +167,14 @@ export async function runBuildAgent(opts: {
   /** Usage meter (see runToolLoop): checked every round with the running token total; a non-null
    *  message stops the build right there instead of billing past the user's limit. */
   budget?: (totalTokensSoFar: number) => Promise<string | null>;
+  /** Rounds this user's plan allows (entitlement buildMaxRounds); default MAX_ITERATIONS. */
+  maxRounds?: number;
 }): Promise<BuildAgentResult> {
   const { userId, conversationId, onEvent, signal } = opts;
+  // Plans buy longer runs: rounds come from the entitlement, and the wall clock stretches with them
+  // (~24s a round) so a Premium 150-round build isn't cut off by the 40-minute default.
+  const maxIterations = Math.max(5, Math.min(300, opts.maxRounds ?? MAX_ITERATIONS));
+  const maxWallMs = Math.max(MAX_WALL_MS, maxIterations * 24_000);
   const started = Date.now();
   const steps: BuildStep[] = [];
   const build: BuildMeta = { steps };
@@ -882,7 +888,7 @@ export async function runBuildAgent(opts: {
     }
   };
 
-  for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
+  for (let iteration = 1; iteration <= maxIterations; iteration++) {
     if (signal?.aborted) break;
     if (iteration > 1 && opts.budget) {
       const stop = await opts.budget(usage.totalTokens).catch(() => null);
@@ -891,7 +897,7 @@ export async function runBuildAgent(opts: {
         break;
       }
     }
-    if (Date.now() - started > MAX_WALL_MS) {
+    if (Date.now() - started > maxWallMs) {
       emitText("\n\nI ran out of time before finishing — send another message and I'll continue from where the project stands.");
       break;
     }

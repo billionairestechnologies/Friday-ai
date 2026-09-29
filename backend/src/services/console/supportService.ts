@@ -3,6 +3,7 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { findUserByEmail, userLabels } from "./directory.js";
 import { brandedEmail, fromAddress, mailConfigured, renderMarkdown, sendEmail } from "./mail.js";
+import { entitlementsFor } from "../quota/entitlements.js";
 
 /**
  * Support center. Users open tickets from the app (web/Android/iOS) or by emailing the support
@@ -44,6 +45,8 @@ export async function createTicket(input: {
   channel: "app" | "email" | "web" | "console";
   priority?: string;
 }) {
+  // Priority support is an entitlement (Premium / Enterprise, or a package): those tickets open high.
+  const priority = input.priority ?? (input.userId && (await entitlementsFor(input.userId)).prioritySupport ? "high" : "normal");
   const { data: ticket, error } = await supabaseAdmin
     .from("support_tickets")
     .insert({
@@ -53,7 +56,7 @@ export async function createTicket(input: {
       subject: input.subject.slice(0, 200),
       category: input.category ?? "general",
       channel: input.channel,
-      priority: input.priority ?? "normal",
+      priority,
     })
     .select()
     .single();

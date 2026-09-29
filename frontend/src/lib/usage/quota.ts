@@ -17,6 +17,8 @@ export type QuotaResponse = {
   breakdown: QuotaBreakdownEntry[];
   rollingBreakdown: QuotaBreakdownEntry[];
   monthlyBreakdown: QuotaBreakdownEntry[];
+  /** What the user's plan / packages unlock (newer servers). */
+  entitlements?: import("@/lib/billing/checkout").Entitlements | null;
 };
 
 export function percentUsed(bucket: { used: number; limit: number } | null): number {

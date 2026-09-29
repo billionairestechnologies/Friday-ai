@@ -643,8 +643,38 @@ function UsagePane() {
               help="A personal sub-limit your org admin set within the shared pool above."
             />
           )}
+          {quota.entitlements && <PlanIncludes e={quota.entitlements} />}
         </div>
       )}
+    </div>
+  );
+}
+
+/** What the user's plan (plus any package or enterprise settings) unlocks — from GET /usage/quota. */
+function PlanIncludes({ e }: { e: NonNullable<QuotaResponse["entitlements"]> }) {
+  const storage = e.libraryStorageMb >= 1024 ? `${+(e.libraryStorageMb / 1024).toFixed(1)} GB` : `${e.libraryStorageMb} MB`;
+  const rows: [string, string][] = [
+    ["Build Mode", e.buildMode ? `${e.buildMaxRounds} rounds per run` : "Not included"],
+    ["Deep Research", e.deepResearchPerDay ? `${e.deepResearchPerDay} per day` : "Not included"],
+    ["Documents", `${e.documentsPerDay} per day`],
+    ["Custom skills", String(e.customSkills)],
+    ["Library storage", storage],
+    ["Team Up", `Up to ${e.teamUpModels} models`],
+    ["MCP servers", String(e.mcpServers)],
+    ["Automations", String(e.automations)],
+    ["Support", e.prioritySupport ? "Priority" : "Standard"],
+  ];
+  return (
+    <div className="rounded-2xl border border-border p-4">
+      <p className="text-sm font-semibold text-foreground">What your plan includes</p>
+      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3">
+            <dt className="text-muted">{k}</dt>
+            <dd className="text-foreground">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

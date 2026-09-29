@@ -51,7 +51,7 @@ export async function streamTeamUp(
   webSearch: boolean,
   onEvent: (ev: StreamEvent) => void,
   signal?: AbortSignal,
-  options: { think?: boolean; canvas?: boolean; images?: ChatImage[]; requiresVision?: boolean } = {},
+  options: { think?: boolean; canvas?: boolean; images?: ChatImage[]; requiresVision?: boolean; maxModels?: number } = {},
 ): Promise<TeamUpUsage> {
   const spent: TeamUpUsage = [];
   const historyChars = history.reduce((n, m) => n + m.content.length, 0);
@@ -59,7 +59,8 @@ export async function streamTeamUp(
   const images = options.images ?? [];
   const pool = await listChatCandidates();
   const eligiblePool = requiresVision ? pool.filter((c) => c.vision) : pool;
-  const proposerCount = teamUpProposerCount(eligiblePool, content);
+  // The plan's Team Up entitlement caps the panel size (never below 2 — that wouldn't be a team).
+  const proposerCount = Math.min(teamUpProposerCount(eligiblePool, content), Math.max(2, options.maxModels ?? Infinity));
   const proposers = pickDistinctProviders(pool, proposerCount, requiresVision);
   if (proposers.length === 0) {
     onEvent({

@@ -17,6 +17,7 @@ import {
   type Plan,
   type QuotaDecision,
 } from "./tierConfig.js";
+import { getCatalogPlan, planLimitsFor } from "./planCatalog.js";
 
 export type { Plan } from "./tierConfig.js";
 
@@ -59,10 +60,13 @@ async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePl
     const resolved = Array.isArray(org) ? org[0] : org;
     if (resolved) {
       const seatCount = Math.max(ENTERPRISE_MIN_SEATS, resolved.seat_count ?? ENTERPRISE_MIN_SEATS);
+      const perSeat = resolved.pooled_monthly_tokens == null
+        ? ((await getCatalogPlan("enterprise").catch(() => null))?.limits.tokensPerSeat ?? ENTERPRISE_TOKENS_PER_SEAT)
+        : 0;
       enterprise = {
         organizationId: enterpriseRow.organization_id as string,
         seatCount,
-        pooledMonthlyTokens: resolved.pooled_monthly_tokens ?? seatCount * ENTERPRISE_TOKENS_PER_SEAT,
+        pooledMonthlyTokens: resolved.pooled_monthly_tokens ?? seatCount * perSeat,
       };
     }
   }
@@ -126,14 +130,22 @@ async function counterIncr(
  * larger than the plan's own month, the weekly and 5-hour windows scale up with it so a generous
  * custom package isn't silently throttled back to the base plan's weekly pace.
  */
-export function effectiveIndividualLimits(plan: Plan, customMonthlyCap: number | null) {
-  const base = PLAN_LIMITS[plan];
-  if (customMonthlyCap == null) return { rolling: base.rollingWindowTokens, weekly: base.weeklyTokens, monthly: base.monthlyTokens };
-  const baseMonth = base.monthlyTokens ?? Math.round(base.weeklyTokens * 4.3);
+export function effectiveIndividualLimits(
+  plan: Plan,
+  customMonthlyCap: number | null,
+  // The plan's own limits — from the console-edited catalog (planLimitsFor); code defaults otherwise.
+  base: { rolling: number; weekly: number; monthly: number | null } = {
+    rolling: PLAN_LIMITS[plan].rollingWindowTokens,
+    weekly: PLAN_LIMITS[plan].weeklyTokens,
+    monthly: PLAN_LIMITS[plan].monthlyTokens,
+  },
+) {
+  if (customMonthlyCap == null) return { ...base };
+  const baseMonth = base.monthly ?? Math.round(base.weekly * 4.3);
   const scale = customMonthlyCap > baseMonth ? customMonthlyCap / baseMonth : 1;
   return {
-    rolling: Math.round(base.rollingWindowTokens * scale),
-    weekly: Math.round(base.weeklyTokens * scale),
+    rolling: Math.round(base.rolling * scale),
+    weekly: Math.round(base.weekly * scale),
     monthly: customMonthlyCap,
   };
 }
@@ -240,7 +252,7 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
   }
 
   const limits = PLAN_LIMITS[effective.plan];
-  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap);
+  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap, await planLimitsFor(effective.plan).catch(() => undefined));
   const rollingKey = `quota:roll:${userId}`;
   const weekKey = `quota:week:${userId}`;
   const monthTokenKey = eff.monthly != null ? `quota:month:${userId}:${month}` : null;
@@ -487,7 +499,7 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
   }
 
   const limits = PLAN_LIMITS[effective.plan];
-  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap);
+  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap, await planLimitsFor(effective.plan).catch(() => undefined));
   const rollingKey = `quota:roll:${userId}`;
   const weekKey = `quota:week:${userId}`;
   const monthTokenKey = eff.monthly != null ? `quota:month:${userId}:${month}` : null;

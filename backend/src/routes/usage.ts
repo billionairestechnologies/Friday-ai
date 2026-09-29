@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { usageSummary, BREAKDOWN_EVENT_TYPES } from "../services/usageService.js";
 import { getQuotaStatus } from "../services/quota/tokenQuotaService.js";
+import { resolveEntitlements } from "../services/quota/entitlements.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { nextWeeklyReset } from "../services/quota/tierConfig.js";
 
@@ -61,12 +62,13 @@ usageRouter.get(
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
 
-    const [breakdown, rollingBreakdown, monthlyBreakdown] = await Promise.all([
+    const [breakdown, rollingBreakdown, monthlyBreakdown, access] = await Promise.all([
       computeBreakdown(userId, weekStart),
       computeBreakdown(userId, rollingStart),
       computeBreakdown(userId, monthStart),
+      resolveEntitlements(userId).catch(() => null),
     ]);
 
-    res.json({ status, breakdown, rollingBreakdown, monthlyBreakdown });
+    res.json({ status, breakdown, rollingBreakdown, monthlyBreakdown, entitlements: access?.entitlements ?? null });
   }),
 );

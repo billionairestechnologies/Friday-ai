@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BadgeCheck, Copy, GraduationCap, Package, Plus, ShieldOff, Ticket, Trash2, UserPlus } from "lucide-react";
+import { BadgeCheck, Copy, Crown, Globe, GraduationCap, Package, Pencil, Plus, ShieldOff, Ticket, Trash2, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCan } from "../access";
 import { Badge, Button, Card, Drawer, EmptyState, ErrorNote, Field, Input, Loading, PageHeader, Segmented, Select, Textarea, Toggle, act, formatDate, formatMoney, formatNumber, fromLocalInput, statusTone, timeAgo, toLocalInput, toast, useResource } from "../ui";
@@ -18,6 +18,27 @@ type Pkg = {
   currency: string;
   features: string[];
   active: boolean;
+  public?: boolean;
+  entitlements?: Record<string, boolean | number>;
+  badge?: string | null;
+  highlight?: boolean;
+  sort_order?: number;
+};
+type EntitlementDef = { key: string; label: string; type: "boolean" | "number"; hint: string };
+type CatalogPlan = {
+  id: "free" | "pro" | "premium" | "enterprise";
+  name: string;
+  tagline: string;
+  monthlyPricePaise: number;
+  annualDiscountPercent: number;
+  minSeats: number | null;
+  features: string[];
+  badge: string | null;
+  highlight: boolean;
+  limits: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+  entitlements: Record<string, boolean | number>;
+  active: boolean;
+  sortOrder: number;
 };
 type Offer = {
   id: string;
@@ -55,13 +76,14 @@ type Grant = {
 };
 type Redemption = { id: string; status: string; proof: string; created_at: string; user: { name: string; email: string | null } | null; offers: { code: string; name: string; eligibility: string } | null };
 type Org = { id: string; name: string; plan: string; seat_count: number };
-type PlansData = { packages: Pkg[]; offers: Offer[]; grants: Grant[]; pending: Redemption[]; organizations: Org[] };
+type PlansData = { catalog?: CatalogPlan[]; entitlementDefs?: EntitlementDef[]; packages: Pkg[]; offers: Offer[]; grants: Grant[]; pending: Redemption[]; organizations: Org[] };
 
-type Tab = "offers" | "packages" | "review" | "grants";
+type Tab = "plans" | "offers" | "packages" | "review" | "grants";
 
 export default function Plans() {
   const data = useResource<PlansData>("/console/plans");
-  const [tab, setTab] = useState<Tab>("offers");
+  const [tab, setTab] = useState<Tab>("plans");
+  const [editingPlan, setEditingPlan] = useState<CatalogPlan | null>(null);
   const [offer, setOffer] = useState<Offer | "new" | null>(null);
   const [pkg, setPkg] = useState<Pkg | "new" | null>(null);
   const [granting, setGranting] = useState(false);
@@ -78,7 +100,7 @@ export default function Plans() {
           canManage && (
             <>
               <Button onClick={() => setGranting(true)}><UserPlus className="size-4" /> Grant access</Button>
-              {tab === "packages" ? (
+              {tab === "plans" ? null : tab === "packages" ? (
                 <Button variant="primary" onClick={() => setPkg("new")}><Plus className="size-4" /> New package</Button>
               ) : (
                 <Button variant="primary" onClick={() => setOffer("new")}><Plus className="size-4" /> New offer</Button>
@@ -93,6 +115,7 @@ export default function Plans() {
           value={tab}
           onChange={setTab}
           options={[
+            { value: "plans", label: "Plans" },
             { value: "offers", label: "Offers & codes", count: d?.offers.length },
             { value: "packages", label: "Packages", count: d?.packages.length },
             { value: "review", label: "Review queue", count: d?.pending.length },
@@ -102,7 +125,49 @@ export default function Plans() {
       </div>
       {data.loading && !d ? (
         <Loading />
-      ) : !d ? null : tab === "offers" ? (
+      ) : !d ? null : tab === "plans" ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {(d.catalog ?? []).map((plan) => (
+            <Card key={plan.id} className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                {plan.id === "enterprise" ? <Crown className="size-4 text-muted" /> : null}
+                <span className="font-semibold">{plan.name}</span>
+                {plan.badge && <Badge tone="purple">{plan.badge}</Badge>}
+                {plan.highlight && <Badge tone="blue">featured</Badge>}
+                {!plan.active && <Badge>hidden</Badge>}
+                {canManage && (
+                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setEditingPlan(plan)}><Pencil className="size-3.5" /> Edit</Button>
+                )}
+              </div>
+              <div className="font-[var(--font-heading)] text-2xl font-semibold">
+                {plan.monthlyPricePaise ? formatMoney(plan.monthlyPricePaise / 100, "INR") : "Free"}
+                <span className="text-sm font-normal text-muted">{plan.monthlyPricePaise ? (plan.id === "enterprise" ? " / seat / mo" : " / mo") : ""}</span>
+              </div>
+              <div className="text-xs text-muted">{plan.tagline}</div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-xl bg-chip/60 p-3 text-xs">
+                {plan.id === "enterprise" ? (
+                  <span className="col-span-2">{formatNumber(plan.limits.tokensPerSeat ?? 0)} pooled tokens / seat / mo · min {plan.minSeats} seats</span>
+                ) : (
+                  <>
+                    <span className="text-muted">5-hour</span><span>{formatNumber(plan.limits.rolling)}</span>
+                    <span className="text-muted">Weekly</span><span>{formatNumber(plan.limits.weekly)}</span>
+                    <span className="text-muted">Monthly</span><span>{plan.limits.monthly ? formatNumber(plan.limits.monthly) : "—"}</span>
+                  </>
+                )}
+              </div>
+              <ul className="space-y-1 text-xs text-muted">
+                {(d.entitlementDefs ?? []).map((def) => (
+                  <li key={def.key} className="flex justify-between gap-2">
+                    <span>{def.label}</span>
+                    <span className="text-foreground">{formatEntitlement(def, plan.entitlements[def.key])}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+          {!d.catalog?.length && <EmptyState icon={Crown} title="Plan catalog unavailable" text="Apply migration 0033 to edit plans from here." />}
+        </div>
+      ) : tab === "offers" ? (
         d.offers.length === 0 ? (
           <EmptyState icon={Ticket} title="No offers yet" text="Create a promo code, a partner deal, or a student pass (verified by college email or reviewed by your team)." action={canManage && <Button variant="primary" onClick={() => setOffer("new")}>Create an offer</Button>} />
         ) : (
@@ -144,6 +209,7 @@ export default function Plans() {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{p.name}</span>
                     <Badge tone={p.target === "organization" ? "purple" : "blue"}>{p.target === "organization" ? "enterprise" : "individual"}</Badge>
+                    {p.public && <Badge tone="green"><Globe className="mr-1 inline size-3" />on Plans page</Badge>}
                     {!p.active && <Badge>archived</Badge>}
                   </div>
                   <div className="mt-2 font-[var(--font-heading)] text-2xl font-semibold">
@@ -210,7 +276,8 @@ export default function Plans() {
         </Card>
       )}
       <OfferEditor offer={offer} packages={d?.packages ?? []} onClose={() => setOffer(null)} onSaved={() => { setOffer(null); reload(); }} />
-      <PackageEditor pkg={pkg} onClose={() => setPkg(null)} onSaved={() => { setPkg(null); reload(); }} />
+      <PackageEditor pkg={pkg} defs={d?.entitlementDefs ?? []} catalog={d?.catalog ?? []} onClose={() => setPkg(null)} onSaved={() => { setPkg(null); reload(); }} />
+      <CatalogEditor plan={editingPlan} defs={d?.entitlementDefs ?? []} onClose={() => setEditingPlan(null)} onSaved={() => { setEditingPlan(null); reload(); }} />
       <GrantDrawer open={granting} packages={d?.packages ?? []} orgs={d?.organizations ?? []} onClose={() => setGranting(false)} onSaved={() => { setGranting(false); setTab("grants"); reload(); }} />
     </>
   );
@@ -354,7 +421,7 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
             <Field label="Discount %"><Input type="number" min={1} max={100} value={f.discountPercent} onChange={(e) => setF({ ...f, discountPercent: e.target.value })} /></Field>
             <Field label="Applies to">
               <div className="flex h-10 items-center gap-3">
-                {["pro", "premium", "enterprise"].map((p) => (
+                {["pro", "premium", "enterprise", "packages"].map((p) => (
                   <label key={p} className="flex items-center gap-1.5 text-sm capitalize">
                     <input type="checkbox" checked={f.appliesToPlans.includes(p)} onChange={(e) => setF({ ...f, appliesToPlans: e.target.checked ? [...f.appliesToPlans, p] : f.appliesToPlans.filter((x) => x !== p) })} /> {p}
                   </label>
@@ -387,8 +454,11 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
   );
 }
 
-function PackageEditor({ pkg, onClose, onSaved }: { pkg: Pkg | "new" | null; onClose: () => void; onSaved: () => void }) {
-  const blank = { name: "", description: "", target: "individual" as Pkg["target"], plan: "pro", monthlyTokenCap: "", seats: "", pooledMonthlyTokens: "", durationDays: "30", price: "", currency: "INR", features: "", active: true };
+function PackageEditor({ pkg, defs, catalog, onClose, onSaved }: { pkg: Pkg | "new" | null; defs: EntitlementDef[]; catalog: CatalogPlan[]; onClose: () => void; onSaved: () => void }) {
+  const blank = {
+    name: "", description: "", target: "individual" as Pkg["target"], plan: "pro", monthlyTokenCap: "", seats: "", pooledMonthlyTokens: "", durationDays: "30", price: "", currency: "INR", features: "", active: true,
+    isPublic: false, badge: "", highlight: false, entitlements: {} as Record<string, boolean | number>,
+  };
   const [f, setF] = useState(blank);
   const [busy, setBusy] = useState(false);
   const existing = pkg && pkg !== "new" ? pkg : null;
@@ -399,6 +469,7 @@ function PackageEditor({ pkg, onClose, onSaved }: { pkg: Pkg | "new" | null; onC
         name: pkg.name, description: pkg.description, target: pkg.target, plan: pkg.plan, monthlyTokenCap: pkg.monthly_token_cap ? String(pkg.monthly_token_cap) : "", seats: pkg.seats ? String(pkg.seats) : "",
         pooledMonthlyTokens: pkg.pooled_monthly_tokens ? String(pkg.pooled_monthly_tokens) : "", durationDays: pkg.duration_days ? String(pkg.duration_days) : "", price: pkg.price_paise ? String(pkg.price_paise / 100) : "",
         currency: pkg.currency, features: pkg.features.join("\n"), active: pkg.active,
+        isPublic: Boolean(pkg.public), badge: pkg.badge ?? "", highlight: Boolean(pkg.highlight), entitlements: pkg.entitlements ?? {},
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkg]);
@@ -439,6 +510,10 @@ function PackageEditor({ pkg, onClose, onSaved }: { pkg: Pkg | "new" | null; onC
                     currency: f.currency.toUpperCase(),
                     features: f.features.split("\n").map((s) => s.trim()).filter(Boolean),
                     active: f.active,
+                    public: f.isPublic,
+                    badge: f.badge.trim() || null,
+                    highlight: f.highlight,
+                    entitlements: f.entitlements,
                   }),
                 existing ? "Package saved" : "Package created",
               );
@@ -470,11 +545,148 @@ function PackageEditor({ pkg, onClose, onSaved }: { pkg: Pkg | "new" | null; onC
         )}
         <div className="grid grid-cols-[1fr_1fr_90px] gap-3">
           <Field label="Duration (days)" hint="Empty = no end"><Input type="number" min={1} value={f.durationDays} onChange={(e) => setF({ ...f, durationDays: e.target.value })} /></Field>
-          <Field label="Price" hint="For your records / invoices"><Input type="number" min={0} value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
+          <Field label="Price" hint={f.isPublic ? "Charged at checkout" : "For your records / invoices"}><Input type="number" min={0} value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
           <Field label="Currency"><Input value={f.currency} maxLength={3} onChange={(e) => setF({ ...f, currency: e.target.value })} /></Field>
         </div>
         <Field label="What's included" hint="One per line"><Textarea value={f.features} onChange={(e) => setF({ ...f, features: e.target.value })} placeholder={"Priority support\nDedicated onboarding"} /></Field>
+        <Field label="Unlocks" hint="Blank = the plan's own value. Applied while the package is active.">
+          <EntitlementsEditor defs={defs} value={f.entitlements} onChange={(entitlements) => setF({ ...f, entitlements })} inherit={catalog.find((c) => c.id === (org ? "enterprise" : f.plan))?.entitlements} />
+        </Field>
         <Toggle checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="Available to apply" />
+        <div className="rounded-2xl border border-border p-3">
+          <Toggle checked={f.isPublic} onChange={(v) => setF({ ...f, isPublic: v })} label="Sell on the public Plans page" />
+          {f.isPublic && (
+            <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-3">
+              <Field label="Badge" hint="Optional, e.g. LIMITED"><Input value={f.badge} maxLength={24} onChange={(e) => setF({ ...f, badge: e.target.value })} /></Field>
+              <Toggle checked={f.highlight} onChange={(v) => setF({ ...f, highlight: v })} label="Feature it" />
+            </div>
+          )}
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+
+function formatEntitlement(def: EntitlementDef, value: boolean | number | undefined): string {
+  if (value === undefined) return "—";
+  if (def.type === "boolean") return value ? "Yes" : "No";
+  if (def.key === "libraryStorageMb" && typeof value === "number") return value >= 1024 ? `${+(value / 1024).toFixed(1)} GB` : `${value} MB`;
+  return formatNumber(Number(value));
+}
+
+/**
+ * Edits entitlements. With `inherit` (packages), a blank field means "keep the plan's value" and is
+ * left out of the saved object; without it (the plan catalog) every value is explicit.
+ */
+function EntitlementsEditor({ defs, value, onChange, inherit }: { defs: EntitlementDef[]; value: Record<string, boolean | number>; onChange: (v: Record<string, boolean | number>) => void; inherit?: Record<string, boolean | number> }) {
+  const set = (key: string, v: boolean | number | undefined) => {
+    const next = { ...value };
+    if (v === undefined) delete next[key];
+    else next[key] = v;
+    onChange(next);
+  };
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {defs.map((def) => (
+        <label key={def.key} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2" title={def.hint}>
+          <span className="min-w-0 flex-1 truncate text-xs text-muted">{def.label}</span>
+          {def.type === "boolean" ? (
+            <select
+              value={value[def.key] === undefined ? "" : value[def.key] ? "on" : "off"}
+              onChange={(e) => set(def.key, e.target.value === "" ? undefined : e.target.value === "on")}
+              className="h-8 rounded-lg border border-border bg-background px-2 text-xs"
+            >
+              {inherit && <option value="">Plan ({inherit[def.key] ? "yes" : "no"})</option>}
+              <option value="on">Yes</option>
+              <option value="off">No</option>
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={0}
+              value={value[def.key] === undefined ? "" : String(value[def.key])}
+              placeholder={inherit ? String(inherit[def.key] ?? "") : ""}
+              onChange={(e) => set(def.key, e.target.value === "" ? (inherit ? undefined : 0) : Number(e.target.value))}
+              className="h-8 w-24 rounded-lg border border-border bg-background px-2 text-right text-xs"
+            />
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function CatalogEditor({ plan, defs, onClose, onSaved }: { plan: CatalogPlan | null; defs: EntitlementDef[]; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({ name: "", tagline: "", price: "", discount: "10", minSeats: "", badge: "", highlight: false, features: "", weekly: "", rolling: "", monthly: "", perSeat: "", active: true, entitlements: {} as Record<string, boolean | number> });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!plan) return;
+    setF({
+      name: plan.name, tagline: plan.tagline, price: plan.monthlyPricePaise ? String(plan.monthlyPricePaise / 100) : "", discount: String(plan.annualDiscountPercent), minSeats: plan.minSeats ? String(plan.minSeats) : "",
+      badge: plan.badge ?? "", highlight: plan.highlight, features: plan.features.join("\n"), weekly: String(plan.limits.weekly || ""), rolling: String(plan.limits.rolling || ""),
+      monthly: plan.limits.monthly ? String(plan.limits.monthly) : "", perSeat: plan.limits.tokensPerSeat ? String(plan.limits.tokensPerSeat) : "", active: plan.active, entitlements: { ...plan.entitlements },
+    });
+  }, [plan]);
+  if (!plan) return <Drawer open={false} onClose={onClose} title="">{null}</Drawer>;
+  const enterprise = plan.id === "enterprise";
+  const num = (v: string) => (v ? Number(v) : null);
+  const save = async () => {
+    setBusy(true);
+    const ok = await act(
+      () =>
+        api.patch(`/console/plans/catalog/${plan.id}`, {
+          name: f.name,
+          tagline: f.tagline,
+          monthlyPricePaise: plan.id === "free" ? 0 : Math.round((Number(f.price) || 0) * 100),
+          annualDiscountPercent: Number(f.discount) || 0,
+          ...(enterprise ? { minSeats: num(f.minSeats), tokensPerSeat: num(f.perSeat) } : { weeklyTokens: num(f.weekly), rollingTokens: num(f.rolling), monthlyTokens: num(f.monthly) }),
+          badge: f.badge.trim() || null,
+          highlight: f.highlight,
+          features: f.features.split("\n").map((s) => s.trim()).filter(Boolean),
+          entitlements: f.entitlements,
+          active: f.active,
+        }),
+      "Plan saved — the Plans page and limits update within a minute",
+    );
+    setBusy(false);
+    if (ok) onSaved();
+  };
+  return (
+    <Drawer
+      open
+      onClose={onClose}
+      title={`Edit ${plan.name}`}
+      subtitle={<span className="text-xs text-muted">Changes apply to everyone on this plan</span>}
+      footer={<><span className="flex-1" /><Button variant="primary" loading={busy} disabled={!f.name.trim()} onClick={() => void save()}>Save plan</Button></>}
+    >
+      <div className="grid gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Name"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+          <Field label="Badge" hint="Optional, e.g. MOST POPULAR"><Input value={f.badge} maxLength={24} onChange={(e) => setF({ ...f, badge: e.target.value })} /></Field>
+        </div>
+        <Field label="Tagline"><Input value={f.tagline} onChange={(e) => setF({ ...f, tagline: e.target.value })} /></Field>
+        {plan.id !== "free" && (
+          <div className="grid grid-cols-3 gap-3">
+            <Field label={enterprise ? "₹ / seat / month" : "₹ / month"}><Input type="number" min={0} value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
+            <Field label="Annual discount %"><Input type="number" min={0} max={90} value={f.discount} onChange={(e) => setF({ ...f, discount: e.target.value })} /></Field>
+            {enterprise && <Field label="Min seats"><Input type="number" min={1} value={f.minSeats} onChange={(e) => setF({ ...f, minSeats: e.target.value })} /></Field>}
+          </div>
+        )}
+        {enterprise ? (
+          <Field label="Pooled tokens per seat / month"><Input type="number" min={1} value={f.perSeat} onChange={(e) => setF({ ...f, perSeat: e.target.value })} /></Field>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="5-hour tokens"><Input type="number" min={1} value={f.rolling} onChange={(e) => setF({ ...f, rolling: e.target.value })} /></Field>
+            <Field label="Weekly tokens"><Input type="number" min={1} value={f.weekly} onChange={(e) => setF({ ...f, weekly: e.target.value })} /></Field>
+            <Field label="Monthly tokens" hint="Empty = none"><Input type="number" min={1} value={f.monthly} onChange={(e) => setF({ ...f, monthly: e.target.value })} /></Field>
+          </div>
+        )}
+        <Field label="Plans page bullets" hint="One per line"><Textarea value={f.features} onChange={(e) => setF({ ...f, features: e.target.value })} className="min-h-[120px]" /></Field>
+        <Field label="Unlocks"><EntitlementsEditor defs={defs} value={f.entitlements} onChange={(entitlements) => setF({ ...f, entitlements })} /></Field>
+        <div className="flex flex-wrap gap-6">
+          <Toggle checked={f.highlight} onChange={(v) => setF({ ...f, highlight: v })} label="Feature this plan" />
+          {plan.id !== "free" && <Toggle checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="Show & sell" />}
+        </div>
       </div>
     </Drawer>
   );

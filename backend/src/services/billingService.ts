@@ -1,4 +1,5 @@
-import { discountForCheckout, recordDiscountUse } from "./console/plansService.js";
+import { applyPackage, discountForCheckout, listPublicPackages, recordDiscountUse } from "./console/plansService.js";
+import { annualPricePaise, getCatalogPlan, getPlanCatalog, type CatalogPlan } from "./quota/planCatalog.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
@@ -47,7 +48,13 @@ export const ENTERPRISE_PLAN = {
   description: `Pooled org-wide tokens (${(ENTERPRISE_TOKENS_PER_SEAT / 1_000_000).toFixed(0)}M/seat/mo), no 5-hour lockout, every model.`,
 } as const;
 
-type OrderPlanId = "pro" | "premium" | "enterprise";
+type OrderPlanId = "pro" | "premium" | "enterprise" | "package";
+
+/** Prices come from the console-edited plan catalog (migration 0033); the constants above are the
+ *  defaults it falls back to. */
+function cycleAmount(plan: Pick<CatalogPlan, "monthlyPricePaise" | "annualDiscountPercent">, cycle: BillingCycle): number {
+  return cycle === "annual" ? annualPricePaise(plan) : plan.monthlyPricePaise;
+}
 
 function requireRazorpayConfigured() {
   if (!env.razorpayKeyId || !env.razorpayKeySecret) {
@@ -55,17 +62,45 @@ function requireRazorpayConfigured() {
   }
 }
 
-export function publicBillingConfig() {
+export async function publicBillingConfig() {
+  const [catalog, packages] = await Promise.all([getPlanCatalog(), listPublicPackages()]);
+  const pick = (id: string) => catalog.find((p) => p.id === id)!;
+  const enterprise = pick("enterprise");
   return {
     provider: "razorpay",
     keyId: env.razorpayKeyId || null,
     currency: "INR",
-    annualDiscountPercent: 10,
-    individual: INDIVIDUAL_PLANS.map((p) => ({
-      ...p,
-      annualAmountPaise: annualAmountPaise(p.monthlyAmountPaise),
+    annualDiscountPercent: pick("pro").annualDiscountPercent,
+    // Legacy shape (Android/iOS read these) — now filled from the catalog.
+    individual: (["pro", "premium"] as const).map((id) => {
+      const p = pick(id);
+      return { id, name: `Friday ${p.name}`, description: p.tagline, monthlyAmountPaise: p.monthlyPricePaise, annualAmountPaise: annualPricePaise(p) };
+    }),
+    enterprise: {
+      id: "enterprise",
+      name: `Friday ${enterprise.name}`,
+      perSeatMonthlyAmountPaise: enterprise.monthlyPricePaise,
+      minSeats: enterprise.minSeats ?? ENTERPRISE_MIN_SEATS,
+      description: enterprise.tagline,
+    },
+    // Full catalog for the Plans page: every plan's copy, features, limits and entitlements.
+    plans: catalog.filter((p) => p.active).map((p) => ({ ...p, annualPricePaise: annualPricePaise(p) })),
+    packages: packages.map((pkg) => ({
+      id: pkg.id as string,
+      name: pkg.name as string,
+      description: pkg.description as string,
+      target: pkg.target as "individual" | "organization",
+      plan: pkg.plan as string,
+      pricePaise: Number(pkg.price_paise),
+      currency: pkg.currency as string,
+      durationDays: pkg.duration_days as number | null,
+      monthlyTokenCap: pkg.monthly_token_cap as number | null,
+      seats: pkg.seats as number | null,
+      features: (pkg.features as string[]) ?? [],
+      entitlements: pkg.entitlements ?? {},
+      badge: (pkg.badge as string | null) ?? null,
+      highlight: Boolean(pkg.highlight),
     })),
-    enterprise: ENTERPRISE_PLAN,
   };
 }
 
@@ -79,6 +114,8 @@ export type CreateOrderInput = {
   organizationId?: string;
   /** A discount offer code (Team Console → Plans & Offers); validated and applied server-side. */
   offerCode?: string;
+  /** planId "package": the public package being bought (priced from the package row, never the client). */
+  packageId?: string;
 };
 
 export async function createRazorpayOrder(userId: string, input: CreateOrderInput) {
@@ -90,30 +127,42 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
   let description: string;
   let seats: number | null = null;
 
-  if (input.planId === "enterprise") {
+  if (input.planId === "package") {
+    if (!input.packageId) throw new HttpError(400, "packageId is required");
+    const { data: pkg } = await supabaseAdmin.from("plan_packages").select("*").eq("id", input.packageId).eq("active", true).eq("public", true).maybeSingle();
+    if (!pkg) throw new HttpError(404, "That package isn't available");
+    if (pkg.target === "organization") {
+      if (!input.organizationId) throw new HttpError(400, "Choose the team this package is for");
+      await requireOrgRole(userId, input.organizationId, ["owner", "admin"]);
+    }
+    amountPaise = Number(pkg.price_paise);
+    name = pkg.name as string;
+    description = pkg.duration_days ? `${pkg.duration_days} days` : "Package";
+  } else if (input.planId === "enterprise") {
     if (!input.organizationId) throw new HttpError(400, "organizationId is required for an Enterprise purchase");
     // Without this, any authenticated user could pass an arbitrary organizationId and buy/
     // upgrade seats on an org they don't own — the webhook grant trusts whatever org the order
     // was created against, so authorization has to happen here, before the order even exists.
     await requireOrgRole(userId, input.organizationId, ["owner", "admin"]);
-    seats = Math.max(ENTERPRISE_PLAN.minSeats, Math.floor(input.seats ?? ENTERPRISE_PLAN.minSeats));
-    const perSeatForCycle = amountForCycle(ENTERPRISE_PLAN.perSeatMonthlyAmountPaise, input.billingCycle);
-    amountPaise = perSeatForCycle * seats;
-    name = ENTERPRISE_PLAN.name;
+    const enterprise = await getCatalogPlan("enterprise");
+    const minSeats = enterprise.minSeats ?? ENTERPRISE_MIN_SEATS;
+    seats = Math.max(minSeats, Math.floor(input.seats ?? minSeats));
+    amountPaise = cycleAmount(enterprise, input.billingCycle) * seats;
+    name = `Friday ${enterprise.name}`;
     description = `${seats} seats, ${input.billingCycle}`;
   } else {
-    const plan = INDIVIDUAL_PLANS.find((p) => p.id === input.planId);
-    if (!plan) throw new HttpError(400, "Unknown billing plan");
-    amountPaise = amountForCycle(plan.monthlyAmountPaise, input.billingCycle);
-    name = plan.name;
-    description = plan.description;
+    const plan = await getCatalogPlan(input.planId);
+    if (!plan.active || plan.monthlyPricePaise <= 0) throw new HttpError(400, "That plan isn't available for purchase");
+    amountPaise = cycleAmount(plan, input.billingCycle);
+    name = `Friday ${plan.name}`;
+    description = plan.tagline;
   }
 
   // The discount is computed here, never trusted from the client; the use is only recorded once the
   // payment webhook confirms the order was paid.
   let discount: { offerId: string; percent: number } | null = null;
   if (input.offerCode?.trim()) {
-    discount = await discountForCheckout(userId, input.offerCode, input.planId);
+    discount = await discountForCheckout(userId, input.offerCode, input.planId === "package" ? `package:${input.packageId}` : input.planId);
     amountPaise = Math.max(100, Math.round((amountPaise * (100 - discount.percent)) / 100));
     description = `${description} · ${discount.percent}% off`;
   }
@@ -150,7 +199,7 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
       amount_paise: amountPaise,
       currency: "INR",
       razorpay_order_id: body.id,
-      metadata: { receipt, billingCycle: input.billingCycle, seats, ...(discount ? { offerId: discount.offerId, discountPercent: discount.percent } : {}) },
+      metadata: { receipt, billingCycle: input.billingCycle, seats, ...(input.planId === "package" ? { packageId: input.packageId } : {}), ...(discount ? { offerId: discount.offerId, discountPercent: discount.percent } : {}) },
     })
     .select()
     .single();
@@ -246,10 +295,22 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
 
   // This is the ONLY place a payment actually grants anything — without it, paying just marks
   // the order row "paid" with no effect on the user's actual limits.
-  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string } | null) ?? {};
+  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string; packageId?: string } | null) ?? {};
   if (metadata.offerId) await recordDiscountUse(metadata.offerId, order.user_id as string, orderId).catch(() => {});
   const renewsInDays = metadata.billingCycle === "annual" ? 365 : 30;
   const renewsAt = new Date(Date.now() + renewsInDays * 24 * 60 * 60 * 1000).toISOString();
+
+  if (order.plan === "package" && metadata.packageId) {
+    // The package's own duration/limits/entitlements apply, recorded as an access grant so expiry
+    // and history work exactly like a console-applied package.
+    await applyPackage(
+      metadata.packageId,
+      order.organization_id ? { organizationId: order.organization_id as string } : { userId: order.user_id as string },
+      `Purchased (order ${orderId})`,
+      null,
+    ).catch((err) => logger.warn("razorpay_package_grant_failed", { orderId, error: err instanceof Error ? err.message : String(err) }));
+    return;
+  }
 
   if (order.plan === "pro" || order.plan === "premium" || order.plan === "business") {
     // "business" is a pre-migration legacy id (see 0016) — treated as premium going forward.
@@ -263,13 +324,14 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   }
 
   if (order.plan === "enterprise" && order.organization_id) {
-    const seats = Math.max(ENTERPRISE_PLAN.minSeats, metadata.seats ?? ENTERPRISE_PLAN.minSeats);
+    const enterprise = await getCatalogPlan("enterprise");
+    const seats = Math.max(enterprise.minSeats ?? ENTERPRISE_PLAN.minSeats, metadata.seats ?? ENTERPRISE_PLAN.minSeats);
     const { error: orgError } = await supabaseAdmin
       .from("organizations")
       .update({
         plan: "enterprise",
         seat_count: seats,
-        pooled_monthly_tokens: seats * ENTERPRISE_TOKENS_PER_SEAT,
+        pooled_monthly_tokens: seats * (enterprise.limits.tokensPerSeat ?? ENTERPRISE_TOKENS_PER_SEAT),
         billing_cycle_anchor: new Date().toISOString(),
       })
       .eq("id", order.organization_id);

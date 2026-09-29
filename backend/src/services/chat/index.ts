@@ -51,6 +51,7 @@ import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from 
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
+import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import {
   chargeProgress,
   QUOTA_STOP_MESSAGE,
@@ -183,9 +184,24 @@ export async function streamMessage(
   const mark = (label: string) => {
     if (process.env.FRIDAY_CHAT_TIMING) console.log(`[chat timing] +${Date.now() - timingStart}ms ${label}`);
   };
+  // What the user's plan / package unlocks (Build Mode, rounds, Deep Research, Team Up size…).
+  const entitlementsPromise = entitlementsFor(userId);
   try {
     const conversation = await getOwnedConversation(userId, conversationId);
     mark("conversation loaded");
+    if (research) {
+      const allowance = await consumeDailyAllowance(userId, "deep_research", (await entitlementsPromise).deepResearchPerDay);
+      if (!allowance.ok) {
+        onEvent({
+          t: "err",
+          c: allowance.limit > 0
+            ? `You've used today's ${allowance.limit} Deep Research runs — they reset at midnight UTC. Turn Deep Research off to keep chatting, or upgrade for more.`
+            : "Deep Research isn't included in your plan. Turn it off to keep chatting, or upgrade to use it.",
+        });
+        onEvent({ t: "done" });
+        return;
+      }
+    }
     const mode = conversation.mode as ConversationMode;
     // A session from the Build workspace: every message is for the Build agent (like Claude Code) —
     // no intent probe, no search probe. Team Up / Canvas / Deep Research keep their own flows.
@@ -448,6 +464,7 @@ export async function streamMessage(
         canvas,
         images: attachments,
         requiresVision: hasImageAttachment && !extractedDocText,
+        maxModels: (await entitlementsPromise).teamUpModels,
       });
       // Every proposer + the synthesizer counts against the quota (Team Up used to be unmetered).
       if (spent.length > 0) {
@@ -582,6 +599,12 @@ export async function streamMessage(
     // Canvas (single-file preview) — Team Up already returned above.
     mark("candidates + tier resolved");
     if (await buildIntentPromise) {
+      const entitlements = await entitlementsPromise;
+      if (!entitlements.buildMode) {
+        onEvent({ t: "err", c: "Build Mode isn't included in your plan. Upgrade to build and run real projects." });
+        onEvent({ t: "done" });
+        return;
+      }
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
       onEvent({ t: "status", s: "building" });
       // A real build (and the judgment call on whether to ask first) needs a frontier-grade model,
@@ -600,7 +623,7 @@ export async function streamMessage(
           return;
         }
       }
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget });
+      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });
         onEvent({ t: "done" });

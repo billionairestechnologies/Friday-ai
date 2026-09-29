@@ -13,11 +13,12 @@ import {
 export const billingRouter = Router();
 
 const createOrderSchema = z.object({
-  planId: z.enum(["pro", "premium", "enterprise"]),
+  planId: z.enum(["pro", "premium", "enterprise", "package"]),
   billingCycle: z.enum(["monthly", "annual"]).default("monthly"),
   seats: z.number().int().min(1).max(10_000).optional(),
   organizationId: z.string().uuid().optional(),
   offerCode: z.string().trim().max(40).optional(),
+  packageId: z.string().uuid().optional(),
 });
 
 billingRouter.post(
@@ -39,7 +40,7 @@ billingRouter.post(
 billingRouter.get(
   "/config",
   asyncHandler(async (_req, res) => {
-    res.json(publicBillingConfig());
+    res.json(await publicBillingConfig());
   }),
 );
 

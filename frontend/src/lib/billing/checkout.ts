@@ -17,6 +17,56 @@ export type BillingConfig = {
     minSeats: number;
     description: string;
   };
+  /** Newer servers: the full catalog and public packages (older servers omit them). */
+  plans?: CatalogPlan[];
+  packages?: PublicPackage[];
+};
+
+export type Entitlements = {
+  buildMode: boolean;
+  buildMaxRounds: number;
+  deepResearchPerDay: number;
+  documentsPerDay: number;
+  customSkills: number;
+  libraryStorageMb: number;
+  teamUpModels: number;
+  mcpServers: number;
+  automations: number;
+  prioritySupport: boolean;
+};
+
+/** A plan from the console-edited catalog (GET /billing/config → plans). */
+export type CatalogPlan = {
+  id: "free" | "pro" | "premium" | "enterprise";
+  name: string;
+  tagline: string;
+  monthlyPricePaise: number;
+  annualPricePaise: number;
+  annualDiscountPercent: number;
+  minSeats: number | null;
+  features: string[];
+  badge: string | null;
+  highlight: boolean;
+  limits: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+  entitlements: Entitlements;
+};
+
+/** A public package an admin built in the console, bought as a one-off order. */
+export type PublicPackage = {
+  id: string;
+  name: string;
+  description: string;
+  target: "individual" | "organization";
+  plan: string;
+  pricePaise: number;
+  currency: string;
+  durationDays: number | null;
+  monthlyTokenCap: number | null;
+  seats: number | null;
+  features: string[];
+  entitlements: Partial<Entitlements>;
+  badge: string | null;
+  highlight: boolean;
 };
 
 export type CheckoutResponse = {

@@ -1,48 +1,56 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { Check, Gift, Sparkles, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
-  amountForCyclePreview,
   formatRupees,
   openCheckout,
   type BillingConfig,
+  type CatalogPlan,
   type CheckoutResponse,
+  type Entitlements,
+  type PublicPackage,
 } from "@/lib/billing/checkout";
 import type { QuotaResponse, QuotaStatus } from "@/lib/usage/quota";
 import { cn } from "@/lib/utils";
 
-const FREE_FEATURES = [
-  "250,000 tokens/week",
-  "50,000 tokens per 5-hour burst",
-  "Lightweight models",
-  "Chat, Search, Canvas preview",
-];
+/**
+ * The Plans page. Everything on it — names, prices, feature bullets, limits, what each plan unlocks,
+ * and any special packages — comes from GET /billing/config, which the Team Console edits (Plans &
+ * offers → Plans / Packages). Nothing here is hardcoded except the fallback copy for an old server.
+ */
 
-const PRO_FEATURES = [
-  "Everything in Free",
-  "2.5M tokens/week (10M/month)",
-  "500,000 tokens per 5-hour burst",
-  "Flagship models unlocked",
-  "Higher concurrency",
-];
+type Tier = "free" | "pro" | "premium";
 
-const PREMIUM_FEATURES = [
-  "Everything in Pro",
-  "6.25M tokens/week (25M/month)",
-  "1.2M tokens per 5-hour burst",
-  "Reasoning & heavy models unlocked",
-  "Highest concurrency",
-];
+const FALLBACK_FEATURES: Record<CatalogPlan["id"], string[]> = {
+  free: ["250K tokens a week", "Chat, search, Canvas and images"],
+  pro: ["Everything in Free", "2.5M tokens a week", "Flagship models"],
+  premium: ["Everything in Pro", "6.25M tokens a week", "Reasoning and heavy models"],
+  enterprise: ["Org-pooled tokens, no 5-hour lockout", "Per-member caps", "Every model"],
+};
 
-const ENTERPRISE_FEATURES = [
-  "Org-pooled tokens, no 5-hour lockout",
-  "Per-member caps set by your own admin",
-  "Every model, priority handling",
-  "Centralized billing across your team",
-  "Add or remove seats anytime",
-];
+function tokens(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(n % 1_000_000 ? 2 : 0)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
+/** The few entitlements worth a chip on a plan card (the full list lives in Settings → Usage). */
+function entitlementChips(e: Partial<Entitlements> | undefined): string[] {
+  if (!e) return [];
+  const chips: string[] = [];
+  if (e.buildMode === false) chips.push("No Build Mode");
+  else if (e.buildMaxRounds) chips.push(`Build: ${e.buildMaxRounds} rounds/run`);
+  if (e.deepResearchPerDay) chips.push(`${e.deepResearchPerDay} Deep Research/day`);
+  if (e.documentsPerDay) chips.push(`${e.documentsPerDay} documents/day`);
+  if (e.customSkills) chips.push(`${e.customSkills} custom skills`);
+  if (e.libraryStorageMb) chips.push(`${e.libraryStorageMb >= 1024 ? `${Math.round(e.libraryStorageMb / 1024)} GB` : `${e.libraryStorageMb} MB`} Library`);
+  if (e.teamUpModels) chips.push(`Team Up ×${e.teamUpModels}`);
+  if (e.prioritySupport) chips.push("Priority support");
+  return chips;
+}
 
 function FeatureList({ items }: { items: string[] }) {
   return (
@@ -57,8 +65,26 @@ function FeatureList({ items }: { items: string[] }) {
   );
 }
 
+function Chips({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">{title}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((m) => (
+          <span key={m} className="rounded-full bg-chip px-2 py-0.5 text-xs text-foreground">
+            {m}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PlanCard({
   name,
+  tagline,
+  badge,
   highlighted,
   price,
   cadence,
@@ -68,9 +94,13 @@ function PlanCard({
   busy,
   disabled,
   features,
+  included,
   models,
+  index,
 }: {
   name: string;
+  tagline?: string;
+  badge?: string | null;
   highlighted?: boolean;
   price: string;
   cadence: string;
@@ -80,18 +110,26 @@ function PlanCard({
   busy: boolean;
   disabled: boolean;
   features: string[];
-  /** Model display names unlocked AT this tier specifically — sourced live from GET /models,
-   *  so an admin re-tiering a model in the provider panel shows up here without a code change. */
+  included?: string[];
+  /** Model display names unlocked AT this tier — live from GET /models. */
   models?: string[];
+  index: number;
 }) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "flex w-full max-w-sm flex-col rounded-3xl border bg-elevated p-6",
+        "relative flex w-full flex-col rounded-3xl border bg-elevated p-6",
         highlighted ? "border-search shadow-[var(--shadow-panel)]" : "border-border",
       )}
     >
+      {badge && (
+        <span className="absolute -top-3 left-6 rounded-full bg-search px-3 py-1 text-[11px] font-semibold tracking-wide text-white uppercase">{badge}</span>
+      )}
       <p className="text-xl font-semibold text-foreground">{name}</p>
+      {tagline && <p className="mt-1 text-sm text-muted">{tagline}</p>}
       <p className="mt-3 font-mono text-3xl font-semibold text-foreground">
         {price}
         <span className="ml-1 text-sm font-normal text-muted">{cadence}</span>
@@ -101,28 +139,16 @@ function PlanCard({
         disabled={current || disabled}
         onClick={onBuy}
         className={cn(
-          "mt-5 h-11 rounded-full text-sm font-semibold disabled:opacity-60",
-          current
-            ? "border border-border text-muted"
-            : "bg-primary text-primary-foreground hover:opacity-90",
+          "mt-5 h-11 rounded-full text-sm font-semibold transition-opacity disabled:opacity-60",
+          current || !onBuy ? "border border-border text-muted" : "bg-primary text-primary-foreground hover:opacity-90",
         )}
       >
-        {current ? "Current Plan" : busy ? "Starting…" : cta}
+        {current ? "Current plan" : busy ? "Starting…" : cta}
       </button>
       <FeatureList items={features} />
-      {models && models.length > 0 && (
-        <div className="mt-4 border-t border-border pt-4">
-          <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">Models unlocked</p>
-          <div className="flex flex-wrap gap-1.5">
-            {models.map((m) => (
-              <span key={m} className="rounded-full bg-chip px-2 py-0.5 text-xs text-foreground">
-                {m}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      <Chips title="Included" items={included ?? []} />
+      <Chips title="Models unlocked" items={models ?? []} />
+    </motion.div>
   );
 }
 
@@ -142,6 +168,11 @@ export function UpgradePage() {
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState<{ code: string; percent: number; appliesTo: string[] } | null>(null);
   const [redeeming, setRedeeming] = useState(false);
+  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
+  const [orgName, setOrgName] = useState("");
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [seats, setSeats] = useState(3);
+  const [modelsByTier, setModelsByTier] = useState<Record<Tier, string[]>>({ free: [], pro: [], premium: [] });
 
   async function applyCode() {
     if (!code.trim()) return;
@@ -159,33 +190,23 @@ export function UpgradePage() {
       setRedeeming(false);
     }
   }
-  const offerFor = (planId: string) => (discount && discount.appliesTo.includes(planId) ? { offerCode: discount.code } : {});
-  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
-  const [orgName, setOrgName] = useState("");
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [seats, setSeats] = useState(3);
-  const [modelsByTier, setModelsByTier] = useState<Record<"free" | "pro" | "premium", string[]>>({
-    free: [],
-    pro: [],
-    premium: [],
-  });
+  const offerFor = (planId: string) =>
+    discount && (discount.appliesTo.includes(planId) || (planId.startsWith("package:") && discount.appliesTo.includes("packages")))
+      ? { offerCode: discount.code }
+      : {};
 
   useEffect(() => {
-    // Public endpoint (no auth) — the plan cards should show the live model catalog even to a
-    // signed-out visitor, and it reflects whatever an admin just re-tiered without a code change.
+    // Public endpoint (no auth) — the plan cards show the live model catalog even to a signed-out
+    // visitor, and reflect whatever an admin just re-tiered without a code change.
     api
-      .get<{ models: { display_name: string; min_tier: "free" | "pro" | "premium" }[] }>("/models")
+      .get<{ models: { display_name: string; min_tier: Tier }[] }>("/models")
       .then((res) => {
-        const grouped: Record<"free" | "pro" | "premium", string[]> = { free: [], pro: [], premium: [] };
-        for (const m of res.models) grouped[m.min_tier].push(m.display_name);
+        const grouped: Record<Tier, string[]> = { free: [], pro: [], premium: [] };
+        for (const m of res.models) grouped[m.min_tier]?.push(m.display_name);
         setModelsByTier(grouped);
       })
       .catch(() => setModelsByTier({ free: [], pro: [], premium: [] }));
-  }, []);
-
-  // Public, same as /models above — prices must show for a signed-out visitor too, and mustn't
-  // ever depend on a maybe-stale session token the way the account-specific calls below do.
-  useEffect(() => {
+    // Public too — prices must show for a signed-out visitor, and mustn't depend on a maybe-stale token.
     api.get<BillingConfig>("/billing/config").then(setConfig).catch(() => setConfig(null));
   }, []);
 
@@ -204,27 +225,37 @@ export function UpgradePage() {
       .catch(() => setOrgs([]));
   }, [signedIn]);
 
-  async function createOrgInline() {
-    if (!orgName.trim()) return;
-    try {
-      const res = await api.post<{ organization: { id: string; name: string } }>("/organizations", { name: orgName });
-      setOrgs((prev) => [res.organization, ...prev]);
-      setSelectedOrgId(res.organization.id);
-      setOrgName("");
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Couldn't create team");
-    }
-  }
+  // Old servers only send individual/enterprise; build the same shape from those.
+  const plans: CatalogPlan[] = useMemo(() => {
+    if (config?.plans?.length) return config.plans;
+    if (!config) return [];
+    const legacy = (id: CatalogPlan["id"], name: string, monthly: number, annualPrice: number, tagline: string, minSeats: number | null = null): CatalogPlan => ({
+      id, name, tagline, monthlyPricePaise: monthly, annualPricePaise: annualPrice, annualDiscountPercent: config.annualDiscountPercent,
+      minSeats, features: FALLBACK_FEATURES[id], badge: null, highlight: id === "pro",
+      limits: { weekly: 0, rolling: 0, monthly: null, tokensPerSeat: null }, entitlements: {} as Entitlements,
+    });
+    const pro = config.individual.find((p) => p.id === "pro");
+    const premium = config.individual.find((p) => p.id === "premium");
+    return [
+      legacy("free", "Free", 0, 0, "Get started"),
+      ...(pro ? [legacy("pro", "Pro", pro.monthlyAmountPaise, pro.annualAmountPaise, pro.description)] : []),
+      ...(premium ? [legacy("premium", "Premium", premium.monthlyAmountPaise, premium.annualAmountPaise, premium.description)] : []),
+      legacy("enterprise", "Enterprise", config.enterprise.perSeatMonthlyAmountPaise, Math.round(config.enterprise.perSeatMonthlyAmountPaise * 12 * 0.9), config.enterprise.description, config.enterprise.minSeats),
+    ];
+  }, [config]);
 
-  async function buyIndividual(planId: "pro" | "premium") {
-    setBusyPlan(planId);
+  const individual = plans.filter((p) => p.id !== "enterprise");
+  const enterprise = plans.find((p) => p.id === "enterprise");
+  const packages = (config?.packages ?? []).filter((p) => (tab === "individual" ? p.target === "individual" : p.target === "organization"));
+  const minSeats = enterprise?.minSeats ?? 3;
+  const enterprisePerSeat = enterprise ? (annual ? enterprise.annualPricePaise : enterprise.monthlyPricePaise) : 0;
+  const canPay = Boolean(config?.keyId) && signedIn;
+
+  async function checkout(key: string, body: Record<string, unknown>) {
+    setBusyPlan(key);
     setNotice(null);
     try {
-      const res = await api.post<CheckoutResponse>("/billing/orders", {
-        planId,
-        billingCycle: annual ? "annual" : "monthly",
-        ...offerFor(planId),
-      });
+      const res = await api.post<CheckoutResponse>("/billing/orders", body);
       const failMsg = await openCheckout(res);
       if (failMsg) setNotice(failMsg);
     } catch (err) {
@@ -234,36 +265,69 @@ export function UpgradePage() {
     }
   }
 
-  async function buyEnterprise() {
-    if (!selectedOrgId) {
-      setNotice("Create or select a team first.");
-      return;
-    }
-    setBusyPlan("enterprise");
-    setNotice(null);
-    try {
-      const res = await api.post<CheckoutResponse>("/billing/orders", {
-        planId: "enterprise",
-        billingCycle: annual ? "annual" : "monthly",
-        seats,
-        organizationId: selectedOrgId,
-        ...offerFor("enterprise"),
-      });
-      const failMsg = await openCheckout(res);
-      if (failMsg) setNotice(failMsg);
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Couldn't start Razorpay checkout");
-    } finally {
-      setBusyPlan(null);
-    }
-  }
+  const buyPlan = (planId: Tier) => void checkout(planId, { planId, billingCycle: annual ? "annual" : "monthly", ...offerFor(planId) });
+  const buyEnterprise = () => {
+    if (!selectedOrgId) return setNotice("Create or select a team first.");
+    void checkout("enterprise", { planId: "enterprise", billingCycle: annual ? "annual" : "monthly", seats, organizationId: selectedOrgId, ...offerFor("enterprise") });
+  };
+  const buyPackage = (pkg: PublicPackage) => {
+    if (pkg.target === "organization" && !selectedOrgId) return setNotice("Create or select a team first.");
+    void checkout(`package:${pkg.id}`, {
+      planId: "package",
+      packageId: pkg.id,
+      billingCycle: "monthly",
+      ...(pkg.target === "organization" ? { organizationId: selectedOrgId } : {}),
+      ...offerFor(`package:${pkg.id}`),
+    });
+  };
 
-  const minSeats = config?.enterprise.minSeats ?? 3;
-  const pro = config?.individual.find((p) => p.id === "pro");
-  const premium = config?.individual.find((p) => p.id === "premium");
-  const enterprisePerSeat = config
-    ? amountForCyclePreview(config.enterprise.perSeatMonthlyAmountPaise, annual)
-    : 0;
+  const isCurrent = (id: CatalogPlan["id"]) =>
+    id === "free" ? !currentPlan || (currentPlan.plan === "free" && !currentPlan.isEnterprise) : Boolean(currentPlan?.plan === id && !currentPlan.isEnterprise);
+
+  const teamPicker = (
+    <label className="flex flex-col gap-1 text-xs text-muted">
+      Team
+      {orgs.length > 0 ? (
+        <select
+          value={selectedOrgId ?? ""}
+          onChange={(e) => setSelectedOrgId(e.target.value)}
+          className="h-10 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+        >
+          {orgs.map((org) => (
+            <option key={org.id} value={org.id}>
+              {org.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="flex gap-2">
+          <input
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            placeholder="Team name"
+            className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none"
+          />
+          <button
+            type="button"
+            onClick={async () => {
+              if (!orgName.trim()) return;
+              try {
+                const res = await api.post<{ organization: { id: string; name: string } }>("/organizations", { name: orgName });
+                setOrgs((prev) => [res.organization, ...prev]);
+                setSelectedOrgId(res.organization.id);
+                setOrgName("");
+              } catch (err) {
+                setNotice(err instanceof Error ? err.message : "Couldn't create team");
+              }
+            }}
+            className="h-10 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
+          >
+            Create
+          </button>
+        </span>
+      )}
+    </label>
+  );
 
   return (
     <div className="min-h-dvh bg-background px-4 py-10 text-foreground md:px-8">
@@ -276,25 +340,24 @@ export function UpgradePage() {
         <X className="size-5" />
       </button>
 
-      <div className="mx-auto flex max-w-5xl flex-col items-center">
-        <h1 className="text-2xl font-bold tracking-tight">Friday</h1>
-        <p className="mt-2 text-2xl font-semibold text-foreground">Manage your subscription</p>
+      <div className="mx-auto flex max-w-6xl flex-col items-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted">
+          <Sparkles className="size-3.5 text-search" /> Plans & pricing
+        </span>
+        <h1 className="mt-4 text-center text-3xl font-semibold tracking-tight md:text-4xl">Pick the Friday that fits your work</h1>
+        <p className="mt-2 text-center text-sm text-muted">Upgrade, downgrade or add a package anytime. Prices in INR, taxes included.</p>
 
         <div className="mt-6 flex items-center rounded-full bg-chip p-0.5">
-          <button
-            type="button"
-            onClick={() => setTab("individual")}
-            className={cn("h-9 rounded-full px-4 text-sm font-medium", tab === "individual" ? "bg-background text-foreground" : "text-muted")}
-          >
-            Individual
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("business")}
-            className={cn("h-9 rounded-full px-4 text-sm font-medium", tab === "business" ? "bg-background text-foreground" : "text-muted")}
-          >
-            Business
-          </button>
+          {(["individual", "business"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={cn("h-9 rounded-full px-4 text-sm font-medium transition-colors", tab === t ? "bg-background text-foreground" : "text-muted")}
+            >
+              {t === "individual" ? "Individual" : "Business"}
+            </button>
+          ))}
         </div>
 
         <label className="mt-4 flex items-center gap-2 text-sm text-muted">
@@ -306,16 +369,9 @@ export function UpgradePage() {
             onClick={() => setAnnual((v) => !v)}
             className={cn("relative h-5 w-9 rounded-full transition-colors", annual ? "bg-primary" : "bg-chip")}
           >
-            <span
-              className={cn(
-                "absolute top-0.5 left-0.5 size-4 rounded-full bg-elevated transition-transform",
-                annual && "translate-x-[18px]",
-              )}
-            />
+            <span className={cn("absolute top-0.5 left-0.5 size-4 rounded-full bg-elevated transition-transform", annual && "translate-x-[18px]")} />
           </button>
-          <span className={cn("font-medium", annual && "text-foreground")}>
-            Save {config?.annualDiscountPercent ?? 10}%
-          </span>
+          <span className={cn("font-medium", annual && "text-foreground")}>Save {plans.find((p) => p.id === "pro")?.annualDiscountPercent ?? config?.annualDiscountPercent ?? 10}%</span>
         </label>
 
         {signedIn && (
@@ -324,7 +380,7 @@ export function UpgradePage() {
               e.preventDefault();
               void applyCode();
             }}
-            className="mt-4 flex items-center gap-2"
+            className="mt-4 flex flex-wrap items-center justify-center gap-2"
           >
             <input
               value={code}
@@ -340,124 +396,117 @@ export function UpgradePage() {
           </form>
         )}
 
-        {notice && (
-          <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">{notice}</p>
-        )}
-        {!signedIn && (
-          <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">
-            Sign in to see your current plan and upgrade.
-          </p>
-        )}
+        {notice && <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">{notice}</p>}
+        {!signedIn && <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">Sign in to see your current plan and upgrade.</p>}
 
         {tab === "individual" ? (
-          <div className="mt-10 grid w-full gap-5 md:grid-cols-3">
-            <PlanCard
-              name="Free"
-              price="₹0"
-              cadence="/month"
-              current={!currentPlan || currentPlan.plan === "free"}
-              cta="Current Plan"
-              busy={false}
-              disabled
-              features={FREE_FEATURES}
-              models={modelsByTier.free}
-            />
-            <PlanCard
-              name="Pro"
-              highlighted
-              price={formatRupees(pro ? (annual ? pro.annualAmountPaise : pro.monthlyAmountPaise) : 0)}
-              cadence={annual ? "/year" : "/month"}
-              current={Boolean(currentPlan?.plan === "pro" && !currentPlan.isEnterprise)}
-              cta="Upgrade to Pro"
-              onBuy={() => void buyIndividual("pro")}
-              busy={busyPlan === "pro"}
-              disabled={busyPlan !== null || !config?.keyId || !signedIn}
-              features={PRO_FEATURES}
-              models={modelsByTier.pro}
-            />
-            <PlanCard
-              name="Premium"
-              price={formatRupees(premium ? (annual ? premium.annualAmountPaise : premium.monthlyAmountPaise) : 0)}
-              cadence={annual ? "/year" : "/month"}
-              current={Boolean(currentPlan?.plan === "premium" && !currentPlan.isEnterprise)}
-              cta="Upgrade to Premium"
-              onBuy={() => void buyIndividual("premium")}
-              busy={busyPlan === "premium"}
-              disabled={busyPlan !== null || !config?.keyId || !signedIn}
-              features={PREMIUM_FEATURES}
-              models={modelsByTier.premium}
-            />
+          <div className={cn("mt-10 grid w-full gap-5", individual.length >= 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>
+            {individual.map((plan, i) => {
+              const tier = plan.id as Tier;
+              const free = plan.monthlyPricePaise <= 0;
+              return (
+                <PlanCard
+                  key={plan.id}
+                  index={i}
+                  name={plan.name}
+                  tagline={plan.tagline}
+                  badge={plan.badge}
+                  highlighted={plan.highlight}
+                  price={formatRupees(free ? 0 : annual ? plan.annualPricePaise : plan.monthlyPricePaise)}
+                  cadence={free ? "/month" : annual ? "/year" : "/month"}
+                  current={isCurrent(plan.id)}
+                  cta={free ? "Free forever" : `Upgrade to ${plan.name}`}
+                  onBuy={free ? undefined : () => buyPlan(tier)}
+                  busy={busyPlan === plan.id}
+                  disabled={free || busyPlan !== null || !canPay}
+                  features={plan.features}
+                  included={entitlementChips(plan.entitlements)}
+                  models={modelsByTier[tier]}
+                />
+              );
+            })}
           </div>
         ) : (
-          <div className="mt-10 flex w-full flex-col items-center">
-            <div className="w-full max-w-md rounded-3xl border border-border bg-elevated p-6">
-              <p className="text-xl font-semibold text-foreground">Enterprise</p>
-              <p className="mt-3 font-mono text-3xl font-semibold text-foreground">
-                {formatRupees(enterprisePerSeat)}
-                <span className="ml-1 text-sm font-normal text-muted">/seat/{annual ? "year" : "month"}</span>
-              </p>
-
-              <div className="mt-5 flex flex-col gap-3">
-                <label className="flex flex-col gap-1 text-xs text-muted">
-                  Team
-                  {orgs.length > 0 ? (
-                    <select
-                      value={selectedOrgId ?? ""}
-                      onChange={(e) => setSelectedOrgId(e.target.value)}
-                      className="h-10 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
-                    >
-                      {orgs.map((org) => (
-                        <option key={org.id} value={org.id}>
-                          {org.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="flex gap-2">
-                      <input
-                        value={orgName}
-                        onChange={(e) => setOrgName(e.target.value)}
-                        placeholder="Team name"
-                        className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void createOrgInline()}
-                        className="h-10 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip"
-                      >
-                        Create
-                      </button>
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-muted">
-                  Seats (min {minSeats})
-                  <input
-                    type="number"
-                    min={minSeats}
-                    value={seats}
-                    onChange={(e) => setSeats(Math.max(minSeats, Number(e.target.value) || minSeats))}
-                    className="h-10 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none"
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={busyPlan !== null || !config?.keyId || orgs.length === 0 || !signedIn}
-                  onClick={() => void buyEnterprise()}
-                  className="h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  {busyPlan === "enterprise" ? "Starting…" : `Pay ${formatRupees(enterprisePerSeat * seats)}`}
-                </button>
-              </div>
-
-              <FeatureList items={ENTERPRISE_FEATURES} />
+          enterprise && (
+            <div className="mt-10 flex w-full flex-col items-center">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-md rounded-3xl border border-border bg-elevated p-6"
+              >
+                <p className="text-xl font-semibold text-foreground">{enterprise.name}</p>
+                <p className="mt-1 text-sm text-muted">{enterprise.tagline}</p>
+                <p className="mt-3 font-mono text-3xl font-semibold text-foreground">
+                  {formatRupees(enterprisePerSeat)}
+                  <span className="ml-1 text-sm font-normal text-muted">/seat/{annual ? "year" : "month"}</span>
+                </p>
+                <div className="mt-5 flex flex-col gap-3">
+                  {teamPicker}
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    Seats (min {minSeats})
+                    <input
+                      type="number"
+                      min={minSeats}
+                      value={seats}
+                      onChange={(e) => setSeats(Math.max(minSeats, Number(e.target.value) || minSeats))}
+                      className="h-10 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={busyPlan !== null || !canPay || orgs.length === 0}
+                    onClick={buyEnterprise}
+                    className="h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    {busyPlan === "enterprise" ? "Starting…" : `Pay ${formatRupees(enterprisePerSeat * Math.max(seats, minSeats))}`}
+                  </button>
+                </div>
+                <FeatureList items={enterprise.features} />
+                <Chips title="Included for every member" items={entitlementChips(enterprise.entitlements)} />
+                {enterprise.limits.tokensPerSeat ? (
+                  <p className="mt-4 text-xs text-subtle">{tokens(enterprise.limits.tokensPerSeat)} pooled tokens per seat every month.</p>
+                ) : null}
+              </motion.div>
             </div>
-          </div>
+          )
         )}
 
-        {config && !config.keyId && (
-          <p className="mt-6 text-xs text-muted">Razorpay keys are not configured on this environment yet.</p>
+        {packages.length > 0 && (
+          <section className="mt-14 w-full">
+            <div className="mb-5 flex items-center gap-2">
+              <Gift className="size-4 text-search" />
+              <h2 className="text-lg font-semibold">{tab === "individual" ? "Packages & passes" : "Team packages"}</h2>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {packages.map((pkg, i) => (
+                <PlanCard
+                  key={pkg.id}
+                  index={i}
+                  name={pkg.name}
+                  tagline={pkg.description}
+                  badge={pkg.badge}
+                  highlighted={pkg.highlight}
+                  price={formatRupees(pkg.pricePaise)}
+                  cadence={pkg.durationDays ? ` for ${pkg.durationDays} days` : " one-time"}
+                  current={false}
+                  cta="Get this package"
+                  onBuy={() => buyPackage(pkg)}
+                  busy={busyPlan === `package:${pkg.id}`}
+                  disabled={busyPlan !== null || !canPay || (pkg.target === "organization" && orgs.length === 0)}
+                  features={[
+                    ...pkg.features,
+                    ...(pkg.monthlyTokenCap ? [`${tokens(pkg.monthlyTokenCap)} tokens a month`] : []),
+                    ...(pkg.seats ? [`${pkg.seats} seats`] : []),
+                  ]}
+                  included={entitlementChips(pkg.entitlements)}
+                />
+              ))}
+            </div>
+            {tab === "business" && orgs.length === 0 && <div className="mt-4 max-w-sm">{teamPicker}</div>}
+          </section>
         )}
+
+        {config && !config.keyId && <p className="mt-6 text-xs text-muted">Razorpay keys are not configured on this environment yet.</p>}
       </div>
     </div>
   );
