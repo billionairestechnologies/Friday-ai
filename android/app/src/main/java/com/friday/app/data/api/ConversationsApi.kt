@@ -85,10 +85,16 @@ object ConversationsApi {
                             zipName = b.optString("zipName").ifBlank { null },
                         )
                     }
+                    // A turn the server rejected before generating anything (e.g. the plan/tier
+                    // gate) is persisted with empty content and the message in `error` instead —
+                    // the live stream already folds this into content as it arrives (ChatApi.kt's
+                    // "err" handling), so a reload does the same instead of showing a blank bubble.
+                    val errorText = o.optString("error").ifBlank { null }
+                    val rawContent = o.optString("content")
                     ChatMessage(
                         id = o.optString("id").ifBlank { "m-$i" },
                         role = role,
-                        content = o.optString("content"),
+                        content = if (errorText == null) rawContent else if (rawContent.isBlank()) errorText else "$rawContent\n\n$errorText",
                         sources = sources,
                         build = build,
                     )

@@ -243,10 +243,22 @@ enum ConversationsApi {
                 let ask = ChatApi.parseAsk(b["ask"])
                 build = BuildInfo(plan: plan, steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String, ask: ask.isEmpty ? nil : ask)
             }
+            // A turn the server rejected before generating anything (e.g. the plan/tier gate) is
+            // persisted with empty content and the message in `error` instead — the live stream
+            // already folds this into content as it arrives (the .err case below), so a reload
+            // does the same instead of showing a blank bubble.
+            let errorText = row["error"] as? String
+            let rawContent = row["content"] as? String ?? ""
+            let content: String
+            if let errorText, !errorText.isEmpty {
+                content = rawContent.isEmpty ? errorText : "\(rawContent)\n\n\(errorText)"
+            } else {
+                content = rawContent
+            }
             return ChatMessage(
                 id: row["id"] as? String ?? UUID().uuidString,
                 role: (row["role"] as? String) == "user" ? .user : .assistant,
-                content: row["content"] as? String ?? "",
+                content: content,
                 sources: sources,
                 build: build
             )
