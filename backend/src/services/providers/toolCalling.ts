@@ -38,6 +38,9 @@ export type ToolTurnOptions = {
   toolChoice?: "auto" | "none";
   signal?: AbortSignal;
   maxTokens?: number;
+  /** Fires the moment the model STARTS a tool call (before its arguments finish streaming), so the
+   *  UI can show a live row — a big write_file otherwise looks like the app froze for 30s+. */
+  onToolStart?: (name: string) => void;
 };
 
 export type ToolTurnResult = { text: string; toolCalls: ToolCall[]; usage: TokenUsage | null };
@@ -170,7 +173,10 @@ export async function streamOpenAiToolTurn(
       const index = tc.index ?? 0;
       const current = partial.get(index) ?? { id: "", name: "", args: "" };
       if (tc.id) current.id = tc.id;
-      if (tc.function?.name) current.name += tc.function.name;
+      if (tc.function?.name) {
+        if (!current.name) opts.onToolStart?.(tc.function.name);
+        current.name += tc.function.name;
+      }
       if (tc.function?.arguments) current.args += tc.function.arguments;
       partial.set(index, current);
     }
@@ -262,7 +268,10 @@ export async function streamAnthropicToolTurn(
       tracker.ingest(data.usage as Record<string, unknown> | undefined);
     } else if (type === "content_block_start") {
       const block = data.content_block as { type?: string; id?: string; name?: string } | undefined;
-      if (block?.type === "tool_use") blocks.set(Number(data.index ?? 0), { id: block.id ?? "", name: block.name ?? "", json: "" });
+      if (block?.type === "tool_use") {
+        blocks.set(Number(data.index ?? 0), { id: block.id ?? "", name: block.name ?? "", json: "" });
+        if (block.name) opts.onToolStart?.(block.name);
+      }
     } else if (type === "content_block_delta") {
       const delta = data.delta as { type?: string; text?: string; partial_json?: string } | undefined;
       if (delta?.type === "text_delta" && delta.text) {

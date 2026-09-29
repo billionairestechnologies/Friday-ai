@@ -143,3 +143,31 @@ test("Gemini dialect: functionCall parts become tool calls, thoughtSignature rou
   assert.equal(contents[1]!.parts[2]!.thoughtSignature, "sig-1");
   assert.equal(contents[2]!.parts.length, 2, "parallel function responses share one turn");
 });
+
+test("onToolStart fires once per call as soon as the call opens (OpenAI + Anthropic), before arguments finish", async () => {
+  const started: string[] = [];
+  let openAi = mockSse([
+    { choices: [{ delta: { tool_calls: [{ index: 0, id: "a", function: { name: "write_", arguments: '{"pa' } }] } }] },
+    { choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "file", arguments: 'th":"x"}' } }] } }] },
+    { choices: [{ delta: { tool_calls: [{ index: 1, id: "b", function: { name: "run_command", arguments: "{}" } }] } }] },
+  ]);
+  try {
+    await streamOpenAiToolTurn("https://x", {}, "m", CONVERSATION, { tools: TOOLS, onToolStart: (n) => started.push(n) }, () => {});
+  } finally {
+    openAi.restore();
+  }
+  // OpenAI streams the name in fragments — the hook reports the first fragment, once per call index.
+  assert.deepEqual(started, ["write_", "run_command"]);
+
+  started.length = 0;
+  openAi = mockSse([
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "t1", name: "write_file", input: {} } },
+    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } },
+  ]);
+  try {
+    await streamAnthropicToolTurn("https://x", {}, "claude", CONVERSATION, { tools: TOOLS, onToolStart: (n) => started.push(n) }, () => {});
+  } finally {
+    openAi.restore();
+  }
+  assert.deepEqual(started, ["write_file"]);
+});

@@ -1,5 +1,7 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import type { AgentMessage, ToolTurnResult } from "../providers/toolCalling.js";
 import type { ChatMessage } from "../providers/types.js";
+import { compactToolResults, supportsTools } from "../agent/toolLoop.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
 import type { BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
@@ -7,9 +9,21 @@ import { ActionParser, applySearchReplace, compactAssistantTurn, type BuildActio
 import { findGitHubRepoUrl, importRepo, openPullRequest } from "./github.js";
 import JSZip from "jszip";
 import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, saveProject, tail } from "./sandbox.js";
+import { BUILD_TOOL_SPECS, compactToolCallArgs, toolCallToAction, type NativeBuildAction } from "./tools.js";
 
-const MAX_ITERATIONS = 45;
-const MAX_WALL_MS = 18 * 60_000;
+// A native tool round can carry several calls (write 4 files at once), so the round budget goes
+// further than a text-protocol iteration did. The wall clock is the real ceiling; the sandbox TTL
+// is refreshed on every action (sandbox.ts touch()), so a long build never loses its box midway.
+const MAX_ITERATIONS = 60;
+const MAX_WALL_MS = 25 * 60_000;
+// "Done" is re-verified (failed commands, the project's own build/tests, a real browser) and pushed
+// back this many times before a claim is accepted as-is.
+const MAX_DONE_PUSHBACKS = 4;
+/** Native tool calling for Build Mode; "off" forces the legacy <friday-*> text protocol. */
+const NATIVE_TOOLS_ENABLED = process.env.FRIDAY_BUILD_NATIVE_TOOLS !== "off";
+// Big files come back as one write_file argument; 8192 output tokens (the chat default) truncates
+// anything past ~600 lines mid-JSON. Retried at 8192 once if a model rejects the larger budget.
+const NATIVE_MAX_TOKENS = 16_000;
 // The same failure this many times in a row = genuinely stuck. Before that it gets a "step back and
 // change approach" reflection at REFLECT_AT, so it recovers instead of giving up.
 const REFLECT_AT = 2;
@@ -68,6 +82,30 @@ RULES
 - NEVER tell the user to run commands themselves ("run npm install", "then npm start"). You run them, with <friday-run>/<friday-start>, and you only say it works after you saw it work.
 - If the user asks to change/fix/extend an existing project, edit the existing files (read them first if needed) instead of starting over. Prefer <friday-edit> for small or medium changes to an existing file; use <friday-write> for new files or full rewrites. In an unfamiliar codebase, look around first with <friday-ls> and <friday-grep>.
 - Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below — it describes that repo's conventions, commands and tests. Run the project's tests/linters when they exist before finishing.`;
+
+/** System prompt for the native tool-calling path (the text-protocol prompt above describes tags instead). */
+const NATIVE_BUILD_PROMPT = `You are Friday's Build agent — a senior software engineer with a real Linux sandbox (Node.js LTS + npm, Python 3, git, curl, internet access). You build and fix the user's project for real with your tools: write the files, install, run, read the errors, fix them and repeat until it genuinely works. Deliver a complete, runnable project with a proper folder structure — never snippets.
+
+THE LOOP — work like this until the job is truly done:
+1. Understand — for an existing project, explore before changing anything (list_files, grep, read_file) and follow its conventions.
+2. Plan — a plan (architecture + checklist) is below and is shown to the user. Keep it current with update_progress whenever an item starts or finishes (every item, same order and wording).
+3. Build — write_file for new files or full rewrites, edit_file for targeted changes to existing files. Call several independent tools in the SAME turn when you can (e.g. write all the config + source files at once) — it is much faster.
+4. Run — run_command to install/build/test; start_server for web apps and APIs.
+5. Verify — read every result. For a web app call check_app after start_server; for an API curl its endpoints; run the project's own tests/build when it has them.
+6. Fix — on any error find the ROOT CAUSE (read the failing file, check versions/config/imports/ports), fix it and re-run. Never repeat a fix that already failed; if the same thing failed twice, step back and change approach.
+7. Finish — call finish only after you have seen it work. Friday then re-verifies (build, tests, browser) and sends back anything still broken for you to fix.
+
+RULES
+- The project root is ${PROJECT_DIR}; all paths are relative to it. Never write outside it.
+- Sandbox gotchas: do NOT rely on a PORT environment variable — put explicit ports in commands/config (Vite 5173, API 4000). Restarting a server is just another start_server on the same port — never pkill/killall. Avoid long multi-line shell one-liners with nested quotes: write a small script with write_file and run it.
+- Write ALL files a project needs (package.json, config, index.html, source, styles, README). Never use interactive scaffolders (npm create …, npx create-… without flags) — write the files yourself.
+- Pin dependency versions known to work together instead of "latest": vite ^5, @vitejs/plugin-react ^4, react/react-dom ^18. Tailwind: tailwindcss ^3.4 with postcss + autoprefixer, a tailwind.config.js (content: ["./index.html","./src/**/*.{js,jsx,ts,tsx}"]) and "@tailwind base/components/utilities" in the CSS — do NOT use Tailwind v4 through the postcss "tailwindcss" plugin (it errors).
+- Web apps: prefer Vite with a "dev" script "vite --host 0.0.0.0 --port 5173". Bind servers to 0.0.0.0. Backend/API projects (Express, Flask, FastAPI, …) are fine — start them on a port and verify with curl.
+- Make it genuinely polished: modern responsive UI, real content (no lorem ipsum / TODO placeholders). Exception: contact details the user never gave you — use obviously fake placeholders (hello@yourdomain.com, +1 (555) 000-0000) and say so in the summary.
+- NEVER tell the user to run commands themselves — you run them, and you only say it works after you saw it work.
+- Existing projects: edit what's there instead of starting over. Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below and run its tests/linters before finishing.
+- Between tool calls write at most one short plain sentence about what you're doing. Save the explanation for the finish summary.
+- The finish summary is what the user reads: clean, well-structured markdown — a one-line headline of what now works, a short "What's inside" list (key files/folders and what they do), "How to use it", then any placeholders, limitations or next steps. No walls of text.`;
 
 type Iteration = { assistantText: string; results: string[]; done: string | null; anyAction: boolean; doneLead?: string; plainReply?: string };
 
@@ -184,7 +222,7 @@ export async function runBuildAgent(opts: {
           : "The sandbox is still alive: dependencies are probably installed and the dev server may still be running (restarting is fine).\n") +
         (project?.start_cmd ? `Last start command: ${project.start_cmd} (port ${project.port}).` : "") +
         (project?.repo
-          ? `\nThis project is the GitHub repository ${project.repo} (base branch ${project.repo_branch ?? "main"}). It is an existing codebase: explore it before changing it, keep its conventions, and when the user asks for a pull request finish with <friday-pr>.`
+          ? `\nThis project is the GitHub repository ${project.repo} (base branch ${project.repo_branch ?? "main"}). It is an existing codebase: explore it before changing it, keep its conventions, and when the user asks for a pull request, open one before finishing.`
           : "") +
         instructionFile
       : "This is a new, empty project directory.";
@@ -227,11 +265,20 @@ export async function runBuildAgent(opts: {
     }
   };
 
-  /** Runs the page in a real browser and reviews the result. Returns a problem report, or "" if fine. */
-  const qualityGate = async (): Promise<string> => {
-    if (!last.start || visualRounds >= 2 || signal?.aborted) return "";
-    visualRounds++;
-    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: "Checking how it looks in a browser", state: "running" };
+  // Bumped on every successful write/edit: a check that passed at the current value is still valid,
+  // so the done-gate never re-runs a build/test/browser check the agent itself just passed.
+  let writeSeq = 0;
+  const okRunAt = new Map<string, number>();
+  let appCheckedOkAt = -1;
+  let checkAppUses = 0;
+  let verifyRounds = 0;
+  const normCmd = (cmd: string) =>
+    cmd.trim().replace(/^(CI=\S+\s+)+/, "").replace(/^npm run test\b/, "npm test").replace(/\s+/g, " ");
+
+  /** Opens the running app in a real browser (+ a vision review). Returns a problem report, or "" if it looks right. */
+  const inspectApp = async (label: string): Promise<string> => {
+    if (!last.start) return "";
+    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label, state: "running" };
     steps.push(step);
     onEvent({ t: "step", ...step });
     const problems: string[] = [];
@@ -252,11 +299,62 @@ export async function runBuildAgent(opts: {
     step.state = problems.length ? "error" : "ok";
     step.detail = tail(problems.join("\n\n") || detail || "Looks good", 700);
     onEvent({ t: "step", ...step });
+    if (!problems.length) appCheckedOkAt = writeSeq;
     return problems.join("\n\n");
+  };
+
+  /** Last gate before "done": look at the page in a browser, unless the agent already did since its last change. */
+  const qualityGate = async (): Promise<string> => {
+    if (!last.start || visualRounds >= 2 || signal?.aborted || appCheckedOkAt === writeSeq) return "";
+    visualRounds++;
+    return inspectApp("Checking how it looks in a browser");
+  };
+
+  /**
+   * Claude-Code-style hard gate: run the project's own type-check / build / tests before accepting
+   * "done". Before this, "run the tests" was only a line in the prompt — a model could claim success
+   * over a build that doesn't compile. Checks the agent already passed since its last edit are skipped.
+   */
+  const verifyProject = async (): Promise<string> => {
+    if (verifyRounds >= 3 || signal?.aborted) return "";
+    let scripts: Record<string, string> = {};
+    try {
+      const pkg = await box.read("package.json").catch(() => "");
+      scripts = (JSON.parse(pkg || "{}") as { scripts?: Record<string, string> }).scripts ?? {};
+    } catch {
+      /* no/invalid package.json — nothing to verify this way */
+    }
+    const checks: { label: string; cmd: string }[] = [];
+    if (scripts.typecheck) checks.push({ label: "Verify · type-check", cmd: "npm run typecheck" });
+    // `next build` while `next dev` is serving the preview corrupts the shared .next folder; the
+    // start_server crawl already proves a Next app compiles, so skip its production build.
+    if (scripts.build && !/\bnext build\b/.test(scripts.build)) checks.push({ label: "Verify · production build", cmd: "npm run build" });
+    if (scripts.test && !/no test specified/i.test(scripts.test)) checks.push({ label: "Verify · run the tests", cmd: "CI=true npm test" });
+    const pending = checks.filter((c) => okRunAt.get(normCmd(c.cmd)) !== writeSeq);
+    if (!pending.length) return "";
+    verifyRounds++;
+    const failures: string[] = [];
+    for (const check of pending) {
+      const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: check.label, state: "running" };
+      steps.push(step);
+      onEvent({ t: "step", ...step });
+      const out = await box.run(check.cmd, 5 * 60_000, signal);
+      step.state = out.ok ? "ok" : "error";
+      step.detail = tail(out.output, 700);
+      onEvent({ t: "step", ...step });
+      if (out.ok) {
+        okRunAt.set(normCmd(check.cmd), writeSeq);
+      } else {
+        failures.push(`$ ${check.cmd}  (exit ${out.exitCode})\n${tail(out.output, 2500)}`);
+        break; // the later checks almost always fail for the same reason
+      }
+    }
+    return failures.join("\n\n");
   };
 
   // ---- Planning phase: architecture + todo checklist, drafted before any code is written. ----
   let plan: BuildPlan | null = null;
+  let planNote = "";
   const emitPlan = () => {
     if (!plan) return;
     build.plan = plan;
@@ -299,10 +397,8 @@ export async function runBuildAgent(opts: {
       if (items.length >= 2) {
         plan = { architecture, items: items.map((text, i) => ({ text, state: i === 0 ? "doing" : "todo" })) };
         emitPlan();
-        conversation[0] = {
-          role: "system",
-          content: `${conversation[0]!.content}\n\nAPPROVED PLAN\nArchitecture:\n${architecture || "(none)"}\nTodo:\n${items.map((t) => `- [ ] ${t}`).join("\n")}`,
-        };
+        planNote = `\n\nAPPROVED PLAN\nArchitecture:\n${architecture || "(none)"}\nTodo:\n${items.map((t) => `- [ ] ${t}`).join("\n")}`;
+        conversation[0] = { role: "system", content: `${conversation[0]!.content}${planNote}` };
       }
     }
   } catch (err) {
@@ -337,6 +433,321 @@ export async function runBuildAgent(opts: {
   // Last outcome per command: a build that failed and was never re-run successfully is unresolved.
   const lastRunState = new Map<string, "ok" | "error">();
 
+  /** Opens a live "Writing src/App.jsx…" row the moment the model starts an action, before its body finishes streaming. */
+  const openLiveStep = (name: string, a: Record<string, string>): BuildStep => {
+    const kind: BuildStep["kind"] = name === "edit" ? "write" : (name as BuildStep["kind"]);
+    const label =
+      name === "write" || name === "edit"
+        ? `${name === "edit" ? "Editing" : "Writing"} ${a.path ?? "file"}…`
+        : name === "start"
+          ? a.desc || "Starting server…"
+          : a.desc || "Running command…";
+    const step: BuildStep = { id: `s${++stepSeq}`, kind, label, state: "running" };
+    steps.push(step);
+    onEvent({ t: "step", ...step });
+    return step;
+  };
+
+  /**
+   * Executes one action (shared by the native and text protocols) and returns the result text the
+   * model sees. `live` is the row already shown while the model was still writing this action.
+   */
+  const execute = async (action: NativeBuildAction, live?: BuildStep | null): Promise<string> => {
+    if (action.kind === "done" || action.kind === "progress") return "";
+    if (action.kind === "malformed") {
+      if (live) {
+        live.state = "error";
+        live.detail = action.reason;
+        onEvent({ t: "step", ...live });
+      }
+      return `[error] ${action.reason}. Re-send that action correctly (split very large files if needed).`;
+    }
+    if (action.kind === "check") {
+      if (!last.start) return "[check_app] no server is running yet — start it with start_server first.";
+      if (++checkAppUses > 5) return "[check_app] browser-check limit reached for this run — rely on start_server's crawl and curl instead.";
+      const problems = await inspectApp("Checking the app in a browser");
+      return problems
+        ? `[check_app] problems found:\n${tail(problems, 3000)}`
+        : "[check_app] the page loads with no console errors, has content, and the visual review passed.";
+    }
+    const meta = describe(action)!;
+    let step: BuildStep;
+    if (live && live.kind === meta.kind) {
+      step = live;
+      step.label = meta.label;
+    } else {
+      if (live) {
+        live.state = "error";
+        live.detail = "Not executed";
+        onEvent({ t: "step", ...live });
+      }
+      step = { id: `s${++stepSeq}`, kind: meta.kind, label: meta.label, state: "running" };
+      steps.push(step);
+    }
+    onEvent({ t: "step", ...step });
+    const finish = (state: "ok" | "error", detail?: string) => {
+      step.state = state;
+      if (detail) step.detail = tail(detail, 700);
+      onEvent({ t: "step", ...step });
+    };
+
+    try {
+      if (action.kind === "write") {
+        const path = safeProjectPath(action.path);
+        if (!path) {
+          finish("error", "Path is outside the project");
+          return `[write ${action.path}] rejected: path must be relative and inside the project.`;
+        }
+        await box.write(path, action.content);
+        writeSeq++;
+        finish("ok");
+        if (++writesSinceSnapshot >= 6) void saveProgress();
+        return `[write ${path}] ok (${action.content.length} chars)`;
+      }
+      if (action.kind === "edit") {
+        const path = safeProjectPath(action.path);
+        const current = path ? await box.read(path).catch(() => null) : null;
+        if (!path || current == null) {
+          finish("error", path ? "File not found" : "Path is outside the project");
+          return `[edit ${action.path}] failed: ${path ? "file not found — create it with a write instead" : "path must be inside the project"}`;
+        }
+        const applied = applySearchReplace(current, action.edits);
+        if (!applied.ok) {
+          finish("error", applied.error);
+          return `[edit ${path}] failed: ${applied.error}. Nothing was changed — read the file and copy the text exactly.`;
+        }
+        await box.write(path, applied.content);
+        writeSeq++;
+        finish("ok");
+        if (++writesSinceSnapshot >= 6) void saveProgress();
+        return `[edit ${path}] ok (${action.edits.length} change${action.edits.length === 1 ? "" : "s"} applied)`;
+      }
+      if (action.kind === "grep") {
+        const path = action.path === "." ? "." : safeProjectPath(action.path);
+        if (!path) {
+          finish("error", "Path is outside the project");
+          return `[grep] path must be inside the project`;
+        }
+        // Pattern/path travel as env vars through a script file: no shell quoting can break them.
+        const out = await box.runScript(
+          'grep -rnIE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next -e "$FRIDAY_PATTERN" -- "$FRIDAY_PATH" | head -150',
+          60_000,
+          { FRIDAY_PATTERN: action.pattern, FRIDAY_PATH: path },
+        );
+        finish("ok");
+        return `[grep ${JSON.stringify(action.pattern)} in ${path}]\n${tail(out.output.trim() || "(no matches)", 6000)}`;
+      }
+      if (action.kind === "ls") {
+        const path = action.path === "." ? "." : safeProjectPath(action.path);
+        if (!path) {
+          finish("error", "Path is outside the project");
+          return `[ls] path must be inside the project`;
+        }
+        const out = await box.runScript(
+          'find "$FRIDAY_PATH" -maxdepth 3 -not -path "*/node_modules*" -not -path "*/.git/*" -not -path "*/.git" -not -path "*/dist/*" | sort | head -400',
+          30_000,
+          { FRIDAY_PATH: path },
+        );
+        finish(out.ok ? "ok" : "error");
+        return `[ls ${path}]\n${tail(out.output.trim() || "(empty)", 6000)}`;
+      }
+      if (action.kind === "pr") {
+        if (!project?.repo) {
+          finish("error", "Not a GitHub project");
+          return "[pr] failed: this project was not imported from GitHub, so there is no repository to open a pull request against.";
+        }
+        const pr = await openPullRequest(box, userId, {
+          repo: project.repo,
+          base: project.repo_branch || "main",
+          title: action.title,
+          branch: action.branch,
+          body: action.body,
+        });
+        finish(pr.ok ? "ok" : "error", pr.message);
+        if (pr.url) build.prUrl = pr.url;
+        return `[pr] ${pr.ok ? "ok" : "failed"}: ${pr.message}`;
+      }
+      if (action.kind === "read") {
+        const path = safeProjectPath(action.path);
+        const content = path ? await box.read(path).catch(() => null) : null;
+        if (content == null) {
+          finish("error", "File not found");
+          return `[read ${action.path}] not found`;
+        }
+        finish("ok");
+        return `[read ${action.path}]\n${tail(content, 6000)}`;
+      }
+      if (action.kind === "run") {
+        const out = await box.run(action.cmd, 5 * 60_000, signal);
+        lastRunState.set(action.cmd, out.ok ? "ok" : "error");
+        if (out.ok) okRunAt.set(normCmd(action.cmd), writeSeq);
+        if (out.ok && /\b(install|add|ci)\b/.test(action.cmd)) void saveProgress(true);
+        finish(out.ok ? "ok" : "error", out.output);
+        if (!out.ok) {
+          const key = `${action.cmd}::${tail(out.output, 300)}`;
+          seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
+        }
+        return `[run ${JSON.stringify(action.cmd)}] exit ${out.exitCode}\n${tail(out.output)}`;
+      }
+      if (action.kind === "start") {
+        const res = await box.start(action.cmd, action.port);
+        if (res.ready && res.url) {
+          last.start = { cmd: action.cmd, port: action.port };
+          void saveProgress(true);
+          build.previewUrl = res.url;
+          build.port = action.port;
+          onEvent({ t: "preview", url: res.url, port: action.port });
+          // The port answering isn't proof the app works — crawl it and surface real errors.
+          const problems = await box.probeApp(action.port);
+          if (problems) {
+            finish("error", `The server is up but the app fails to load:\n${problems}`);
+            const key = `probe::${tail(problems, 300)}`;
+            seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
+            appBroken = true;
+            return `[start ${JSON.stringify(action.cmd)}] server is listening on port ${action.port} BUT the app is BROKEN — requesting its files fails:\n${tail(problems, 2500)}\nServer log:\n${tail(res.log, 1500)}\nFix the cause (check dependency versions/config), then start it again.`;
+          }
+          appBroken = false;
+          finish("ok", res.log);
+          return `[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}; all pages/scripts/styles load without errors\n${tail(res.log, 1500)}`;
+        }
+        finish("error", res.log || "The server did not respond in time");
+        const key = `start::${tail(res.log, 300)}`;
+        seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
+        return `[start ${JSON.stringify(action.cmd)}] NOT ready after 90s. Server log:\n${tail(res.log)}`;
+      }
+      return "";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "action failed";
+      finish("error", message);
+      // write/edit/read/grep/ls/pr failures used to never reach seenErrors (only run/start did),
+      // so a broken sandbox connection could fail every single write in a turn — 15 in a row,
+      // confirmed in production 2026-09-26 — with no "step back" reflection and no early stop.
+      // Sandbox.ts now auto-reconnects once on that specific error; this is the fallback for
+      // anything that still fails repeatedly (e.g. E2B itself unreachable).
+      const key = `${action.kind}::${"path" in action ? action.path : ""}::${tail(message, 200)}`;
+      seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
+      return `[${action.kind}] failed: ${message}`;
+    }
+  };
+
+  /**
+   * Decides whether a "done" claim is accepted: null = accept, otherwise the pushback for the model.
+   * Order is cheapest-first: known-failed commands → the project's own build/tests → a real browser.
+   */
+  const reviewDone = async (): Promise<string | null> => {
+    if (donePushbacks >= MAX_DONE_PUSHBACKS || signal?.aborted) return null;
+    const failedCmds = [...lastRunState.entries()].filter(([, state]) => state === "error").map(([cmd]) => cmd);
+    let verifyProblems = "";
+    let gateProblems = "";
+    if (!appBroken && failedCmds.length === 0) {
+      verifyProblems = await verifyProject();
+      if (!verifyProblems) gateProblems = await qualityGate();
+    }
+    if (!appBroken && failedCmds.length === 0 && !verifyProblems && !gateProblems) return null;
+    donePushbacks++;
+    return (
+      `You said you're done, but something is still failing${appBroken ? " (the running app does not load cleanly)" : ""}` +
+      `${failedCmds.length ? `; these commands last failed: ${failedCmds.map((c) => JSON.stringify(c)).join(", ")}` : ""}.` +
+      (verifyProblems ? `\n<verification>\nFriday ran the project's own checks and they fail:\n${verifyProblems}\n</verification>` : "") +
+      (gateProblems ? `\n<review>\n${gateProblems}\n</review>` : "") +
+      "\nFind the root cause, fix it, re-run/re-start, and only finish after it genuinely works and looks right. " +
+      "(If a failure is pre-existing in an imported repo and unrelated to the requested change, say so explicitly in your summary and finish again.)"
+    );
+  };
+
+  /** The "step back" nudge once the same failure repeats; also marks it so it's only sent once per failure. */
+  const takeReflection = (): string => {
+    const repeating = [...seenErrors.entries()].filter(([key, n]) => n >= REFLECT_AT && !reflected.has(key));
+    if (repeating.length === 0) return "";
+    repeating.forEach(([key]) => reflected.add(key));
+    return "\n\nSTOP — this same failure has now happened repeatedly, so repeating the same fix will not work. Step back like a debugger: (1) state what you have tried and why it did not work, (2) form a hypothesis about the TRUE root cause (wrong dependency version? config/import path? port clash? missing file? bad syntax you cannot see?), (3) inspect real evidence (read package versions, config files, logs, the exact failing file), then (4) apply a genuinely DIFFERENT fix — or simplify that part of the design if needed.";
+  };
+  const isStuck = () => [...seenErrors.values()].some((n) => n >= STUCK_REPEATS);
+  const STUCK_MESSAGE =
+    "I kept hitting the same error even after changing approach several times, so I'm stopping here rather than looping. The steps above show exactly where it fails — tell me how you'd like to proceed and I'll continue from the current state.";
+
+  // ---- Native tool-calling path (preferred) ----
+  const toolCandidates = opts.candidates.filter(supportsTools);
+  let mode: "native" | "text" = NATIVE_TOOLS_ENABLED && toolCandidates.length > 0 ? "native" : "text";
+  const nativeMessages: AgentMessage[] = [
+    { role: "system", content: `${NATIVE_BUILD_PROMPT}\n\n${stateNote}${planNote}` },
+    ...opts.history.filter((m) => m.role !== "system"),
+  ];
+  let nativeRounds = 0;
+  // How much of the current native turn's text has already become a note row (narration before a tool call).
+  let noted = 0;
+  let nativeMaxTokens = NATIVE_MAX_TOKENS;
+  // Rows opened live by onToolStart, claimed in order by the calls that opened them.
+  const LIVE_KIND: Record<string, string> = { write_file: "write", edit_file: "edit", run_command: "run", start_server: "start" };
+  let liveQueue: BuildStep[] = [];
+
+  /** One streamed model turn with the build tools; falls through tool-capable candidates like the text path. */
+  const nativeTurn = async (): Promise<{ result: ToolTurnResult; text: string } | { error: string }> => {
+    const order = usedCandidate && toolCandidates.includes(usedCandidate) ? [usedCandidate, ...toolCandidates.filter((c) => c !== usedCandidate)] : toolCandidates;
+    let lastError = "No tool-capable model responded";
+    for (const candidate of order) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let text = "";
+        noted = 0;
+        liveQueue = [];
+        try {
+          const adapter = getProviderAdapter(candidate.slug);
+          const apiKey = await getWorkingKeyForProvider(candidate.slug);
+          const result = await adapter.chatStreamWithTools!(
+            apiKey,
+            candidate.modelId,
+            nativeMessages,
+            {
+              tools: BUILD_TOOL_SPECS,
+              toolChoice: "auto",
+              signal,
+              maxTokens: nativeMaxTokens,
+              onToolStart: (name) => {
+                // Narration streamed before this call becomes its note row, in order with the steps.
+                if (text.slice(noted).trim()) pushNote(text.slice(noted));
+                noted = text.length;
+                const kind = LIVE_KIND[name];
+                if (kind) liveQueue.push(openLiveStep(kind, {}));
+              },
+            },
+            (delta) => {
+              text += delta;
+            },
+          );
+          usedCandidate = candidate;
+          return { result, text };
+        } catch (err) {
+          lastError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
+          for (const step of liveQueue) {
+            step.state = "error";
+            step.detail = "Interrupted";
+            onEvent({ t: "step", ...step });
+          }
+          liveQueue = [];
+          if (signal?.aborted) return { error: lastError };
+          if (attempt === 0 && nativeMaxTokens > 8192 && /max_tokens|max_output|maximum.*tokens/i.test(lastError)) {
+            nativeMaxTokens = 8192;
+            continue;
+          }
+          break;
+        }
+      }
+    }
+    return { error: lastError };
+  };
+  /** Hands a half-finished native run to the text protocol, telling it what already happened. */
+  const fallBackToText = (why: string) => {
+    console.error(`[build] native tools unavailable, falling back to the text protocol: ${why}`);
+    mode = "text";
+    if (nativeRounds > 0) {
+      const done = steps.filter((st) => st.kind !== "note").slice(-40).map((st) => `- ${st.state === "error" ? "FAILED: " : ""}${st.label}`);
+      conversation[0] = {
+        role: "system",
+        content: `${conversation[0]!.content}\n\nWORK ALREADY DONE IN THIS SANDBOX (continue from here, don't redo it):\n${done.join("\n")}`,
+      };
+    }
+  };
+
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     if (signal?.aborted) break;
     if (Date.now() - started > MAX_WALL_MS) {
@@ -344,9 +755,108 @@ export async function runBuildAgent(opts: {
       break;
     }
 
+    if (mode === "native") {
+      compactToolCallArgs(nativeMessages);
+      compactToolResults(nativeMessages);
+      const turnResult = await nativeTurn();
+      if (signal?.aborted) break;
+      if ("error" in turnResult) {
+        fallBackToText(turnResult.error);
+        iteration--; // the text protocol gets this round
+        continue;
+      }
+      nativeRounds++;
+      const { result, text } = turnResult;
+      usage = mergeTokenUsage(
+        usage,
+        result.usage ?? estimateTokenUsageFromText(nativeMessages.reduce((n, m) => n + m.content.length, 0), text.length),
+      );
+      const unnoted = text.slice(noted);
+
+      if (result.toolCalls.length === 0) {
+        const ranSomething = steps.some((st) => (st.kind === "run" || st.kind === "start") && st.state === "ok");
+        nativeMessages.push({ role: "assistant", content: text.trim() || "(no reply)" });
+        if (!ranSomething && nudges < 4) {
+          nudges++;
+          if (unnoted.trim()) pushNote(unnoted);
+          nativeMessages.push({
+            role: "user",
+            content:
+              "You replied without calling any tools, so nothing was executed. Do the work now with your tools: write_file for the files, " +
+              "run_command to install, start_server to run it, check the results and fix errors — then call finish.",
+          });
+          continue;
+        }
+        // Worked, then answered in plain text instead of calling finish: that's a done claim — verify it.
+        const pushback = ranSomething ? await reviewDone() : null;
+        if (pushback) {
+          if (unnoted.trim()) pushNote(unnoted);
+          nativeMessages.push({ role: "user", content: pushback });
+          continue;
+        }
+        if (unnoted.trim()) finalDone = unnoted.trim();
+        break;
+      }
+
+      if (unnoted.trim()) pushNote(unnoted);
+      nativeMessages.push({ role: "assistant", content: text, toolCalls: result.toolCalls });
+      const outputs: string[] = [];
+      let doneIndex = -1;
+      for (const [i, call] of result.toolCalls.entries()) {
+        const action = toolCallToAction(call);
+        const liveKind = LIVE_KIND[call.name];
+        const live = liveKind && liveQueue[0] && (liveQueue[0].kind === (liveKind === "edit" ? "write" : liveKind)) ? liveQueue.shift()! : null;
+        if (action.kind === "done") {
+          doneIndex = i;
+          outputs.push("");
+        } else if (action.kind === "progress") {
+          applyProgress(action.body);
+          outputs.push("[update_progress] ok");
+        } else {
+          outputs.push(signal?.aborted ? "[cancelled]" : await execute(action, live));
+        }
+      }
+      for (const step of liveQueue) {
+        step.state = "error";
+        step.detail = "Not executed";
+        onEvent({ t: "step", ...step });
+      }
+      liveQueue = [];
+      if (signal?.aborted) break;
+
+      let accepted = false;
+      if (doneIndex >= 0) {
+        const pushback = await reviewDone();
+        if (pushback) {
+          outputs[doneIndex] = `[finish] NOT accepted yet.\n${pushback}`;
+        } else {
+          outputs[doneIndex] = "[finish] accepted.";
+          finalDone = (toolCallToAction(result.toolCalls[doneIndex]!) as { summary: string }).summary || null;
+          accepted = true;
+        }
+      }
+      if (!accepted && isStuck()) {
+        emitText(STUCK_MESSAGE);
+        break;
+      }
+      const reflection = accepted ? "" : takeReflection();
+      result.toolCalls.forEach((call, i) => {
+        const suffix = i === result.toolCalls.length - 1 ? reflection : "";
+        nativeMessages.push({ role: "tool", toolCallId: call.id, name: call.name, content: `${outputs[i] || "ok"}${suffix}` });
+      });
+      if (accepted) {
+        if (plan) {
+          plan.items.forEach((item) => (item.state = "done"));
+          emitPlan();
+        }
+        break;
+      }
+      continue;
+    }
+
+    // ---- Text-protocol path (fallback for models without native tools) ----
     const turn: Iteration = { assistantText: "", results: [], done: null, anyAction: false };
     let chain: Promise<void> = Promise.resolve();
-
     let liveStep: BuildStep | null = null;
     const runAction = async (action: BuildAction) => {
       turn.anyAction = true;
@@ -358,171 +868,9 @@ export async function runBuildAgent(opts: {
         applyProgress(action.body);
         return;
       }
-      if (action.kind === "malformed") {
-        if (liveStep) {
-          liveStep.state = "error";
-          liveStep.detail = action.reason;
-          onEvent({ t: "step", ...liveStep });
-          liveStep = null;
-        }
-        turn.results.push(`[error] ${action.reason}. Re-send that action correctly (split very large files if needed).`);
-        return;
-      }
-      const meta = describe(action)!;
-      // Reuse the row that was already shown live while the model was still writing this action.
-      let step: BuildStep;
-      if (liveStep && liveStep.kind === meta.kind) {
-        step = liveStep;
-        liveStep = null;
-        step.label = meta.label;
-      } else {
-        step = { id: `s${++stepSeq}`, kind: meta.kind, label: meta.label, state: "running" };
-        steps.push(step);
-      }
-      onEvent({ t: "step", ...step });
-      const finish = (state: "ok" | "error", detail?: string) => {
-        step.state = state;
-        if (detail) step.detail = tail(detail, 700);
-        onEvent({ t: "step", ...step });
-      };
-
-      try {
-        if (action.kind === "write") {
-          const path = safeProjectPath(action.path);
-          if (!path) {
-            finish("error", "Path is outside the project");
-            turn.results.push(`[write ${action.path}] rejected: path must be relative and inside the project.`);
-            return;
-          }
-          await box.write(path, action.content);
-          finish("ok");
-          if (++writesSinceSnapshot >= 6) void saveProgress();
-          turn.results.push(`[write ${path}] ok (${action.content.length} chars)`);
-        } else if (action.kind === "edit") {
-          const path = safeProjectPath(action.path);
-          const current = path ? await box.read(path).catch(() => null) : null;
-          if (!path || current == null) {
-            finish("error", path ? "File not found" : "Path is outside the project");
-            turn.results.push(`[edit ${action.path}] failed: ${path ? "file not found — use <friday-write> to create it" : "path must be inside the project"}`);
-            return;
-          }
-          const applied = applySearchReplace(current, action.edits);
-          if (!applied.ok) {
-            finish("error", applied.error);
-            turn.results.push(`[edit ${path}] failed: ${applied.error}. Nothing was changed.`);
-            return;
-          }
-          await box.write(path, applied.content);
-          finish("ok");
-          if (++writesSinceSnapshot >= 6) void saveProgress();
-          turn.results.push(`[edit ${path}] ok (${action.edits.length} change${action.edits.length === 1 ? "" : "s"} applied)`);
-        } else if (action.kind === "grep") {
-          const path = action.path === "." ? "." : safeProjectPath(action.path);
-          if (!path) {
-            finish("error", "Path is outside the project");
-            turn.results.push(`[grep] path must be inside the project`);
-            return;
-          }
-          // Pattern/path travel as env vars through a script file: no shell quoting can break them.
-          const out = await box.runScript(
-            'grep -rnIE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next -e "$FRIDAY_PATTERN" -- "$FRIDAY_PATH" | head -150',
-            60_000,
-            { FRIDAY_PATTERN: action.pattern, FRIDAY_PATH: path },
-          );
-          finish("ok");
-          turn.results.push(`[grep ${JSON.stringify(action.pattern)} in ${path}]\n${tail(out.output.trim() || "(no matches)", 6000)}`);
-        } else if (action.kind === "ls") {
-          const path = action.path === "." ? "." : safeProjectPath(action.path);
-          if (!path) {
-            finish("error", "Path is outside the project");
-            turn.results.push(`[ls] path must be inside the project`);
-            return;
-          }
-          const out = await box.runScript(
-            'find "$FRIDAY_PATH" -maxdepth 3 -not -path "*/node_modules*" -not -path "*/.git/*" -not -path "*/.git" -not -path "*/dist/*" | sort | head -400',
-            30_000,
-            { FRIDAY_PATH: path },
-          );
-          finish(out.ok ? "ok" : "error");
-          turn.results.push(`[ls ${path}]\n${tail(out.output.trim() || "(empty)", 6000)}`);
-        } else if (action.kind === "pr") {
-          if (!project?.repo) {
-            finish("error", "Not a GitHub project");
-            turn.results.push("[pr] failed: this project was not imported from GitHub, so there is no repository to open a pull request against.");
-            return;
-          }
-          const pr = await openPullRequest(box, userId, {
-            repo: project.repo,
-            base: project.repo_branch || "main",
-            title: action.title,
-            branch: action.branch,
-            body: action.body,
-          });
-          finish(pr.ok ? "ok" : "error", pr.message);
-          turn.results.push(`[pr] ${pr.ok ? "ok" : "failed"}: ${pr.message}`);
-          if (pr.url) build.prUrl = pr.url;
-        } else if (action.kind === "read") {
-          const path = safeProjectPath(action.path);
-          const content = path ? await box.read(path).catch(() => null) : null;
-          if (content == null) {
-            finish("error", "File not found");
-            turn.results.push(`[read ${action.path}] not found`);
-          } else {
-            finish("ok");
-            turn.results.push(`[read ${action.path}]\n${tail(content, 6000)}`);
-          }
-        } else if (action.kind === "run") {
-          const out = await box.run(action.cmd, 5 * 60_000, signal);
-          lastRunState.set(action.cmd, out.ok ? "ok" : "error");
-          if (out.ok && /\b(install|add|ci)\b/.test(action.cmd)) void saveProgress(true);
-          finish(out.ok ? "ok" : "error", out.output);
-          turn.results.push(`[run ${JSON.stringify(action.cmd)}] exit ${out.exitCode}\n${tail(out.output)}`);
-          if (!out.ok) {
-            const key = `${action.cmd}::${tail(out.output, 300)}`;
-            seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
-          }
-        } else if (action.kind === "start") {
-          const res = await box.start(action.cmd, action.port);
-          if (res.ready && res.url) {
-            last.start = { cmd: action.cmd, port: action.port };
-            void saveProgress(true);
-            build.previewUrl = res.url;
-            build.port = action.port;
-            onEvent({ t: "preview", url: res.url, port: action.port });
-            // The port answering isn't proof the app works — crawl it and surface real errors.
-            const problems = await box.probeApp(action.port);
-            if (problems) {
-              finish("error", `The server is up but the app fails to load:\n${problems}`);
-              turn.results.push(
-                `[start ${JSON.stringify(action.cmd)}] server is listening on port ${action.port} BUT the app is BROKEN — requesting its files fails:\n${tail(problems, 2500)}\nServer log:\n${tail(res.log, 1500)}\nFix the cause (check dependency versions/config), then <friday-start> again.`,
-              );
-              const key = `probe::${tail(problems, 300)}`;
-              seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
-              appBroken = true;
-            } else {
-              appBroken = false;
-              finish("ok", res.log);
-              turn.results.push(`[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}; all pages/scripts/styles load without errors\n${tail(res.log, 1500)}`);
-            }
-          } else {
-            finish("error", res.log || "The server did not respond in time");
-            turn.results.push(`[start ${JSON.stringify(action.cmd)}] NOT ready after 90s. Server log:\n${tail(res.log)}`);
-            const key = `start::${tail(res.log, 300)}`;
-            seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "action failed";
-        finish("error", message);
-        turn.results.push(`[${action.kind}] failed: ${message}`);
-        // write/edit/read/grep/ls/pr failures used to never reach seenErrors (only run/start did),
-        // so a broken sandbox connection could fail every single write in a turn — 15 in a row,
-        // confirmed in production 2026-09-26 — with no "step back" reflection and no early stop.
-        // Sandbox.ts now auto-reconnects once on that specific error; this is the fallback for
-        // anything that still fails repeatedly (e.g. E2B itself unreachable).
-        const key = `${action.kind}::${"path" in action ? action.path : ""}::${tail(message, 200)}`;
-        seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
-      }
+      const live = liveStep;
+      liveStep = null;
+      turn.results.push(await execute(action, live));
     };
 
     let pendingText = "";
@@ -550,12 +898,7 @@ export async function runBuildAgent(opts: {
         pendingText = "";
         chain = chain.then(() => {
           pushNote(narration);
-          const label =
-            name === "write" ? `Writing ${a.path ?? "file"}…` : name === "start" ? a.desc || "Starting server…" : a.desc || "Running command…";
-          const step: BuildStep = { id: `s${++stepSeq}`, kind: name as BuildStep["kind"], label, state: "running" };
-          steps.push(step);
-          liveStep = step;
-          onEvent({ t: "step", ...step });
+          liveStep = openLiveStep(name, a);
         });
       },
     );
@@ -615,21 +958,11 @@ export async function runBuildAgent(opts: {
     if (signal?.aborted) break;
 
     if (turn.done !== null) {
-      // Don't accept "done" while something is known to be broken — push back a few times first.
-      const failedCmds = [...lastRunState.entries()].filter(([, state]) => state === "error").map(([cmd]) => cmd);
-      // Last gate before "done": actually look at the page in a browser (and have a vision model review it).
-      const gateProblems = !appBroken && failedCmds.length === 0 && donePushbacks < 3 ? await qualityGate() : "";
-      if ((appBroken || failedCmds.length > 0 || gateProblems) && donePushbacks < 3) {
-        donePushbacks++;
+      // Don't accept "done" while something is known to be broken — verify and push back first.
+      const pushback = await reviewDone();
+      if (pushback) {
         conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });
-        conversation.push({
-          role: "user",
-          content:
-            `<results>\n${turn.results.join("\n\n")}\n</results>\n` +
-            `You said you're done, but something is still failing${appBroken ? " (the running app does not load cleanly)" : ""}${failedCmds.length ? `; these commands last failed: ${failedCmds.map((c) => JSON.stringify(c)).join(", ")}` : ""}. ` +
-            (gateProblems ? `\n<review>\n${gateProblems}\n</review>\n` : "") +
-            "Find the root cause, fix it, re-run/re-start, and only finish with <friday-done> after it genuinely works and looks right.",
-        });
+        conversation.push({ role: "user", content: `<results>\n${turn.results.join("\n\n")}\n</results>\n${pushback}` });
         continue;
       }
       finalDone = turn.done;
@@ -661,19 +994,13 @@ export async function runBuildAgent(opts: {
       break; // plain reply, nothing left to do
     }
 
-    if ([...seenErrors.values()].some((n) => n >= STUCK_REPEATS)) {
-      emitText("I kept hitting the same error even after changing approach several times, so I'm stopping here rather than looping. The steps above show exactly where it fails — tell me how you'd like to proceed and I'll continue from the current state.");
+    if (isStuck()) {
+      emitText(STUCK_MESSAGE);
       break;
     }
     // Recall/reflect: the same failure twice means the current approach isn't working. Instead of
     // repeating it, force a step back — diagnose the real cause and pick a different route.
-    const repeating = [...seenErrors.entries()].filter(([key, n]) => n >= REFLECT_AT && !reflected.has(key));
-    let reflection = "";
-    if (repeating.length > 0) {
-      repeating.forEach(([key]) => reflected.add(key));
-      reflection =
-        "\n\nSTOP — this same failure has now happened repeatedly, so repeating the same fix will not work. Step back like a debugger: (1) state what you have tried and why it did not work, (2) form a hypothesis about the TRUE root cause (wrong dependency version? config/import path? port clash? missing file? bad syntax you cannot see?), (3) inspect real evidence with <friday-read>/<friday-run> (package versions, config files, logs, the exact failing file), then (4) apply a genuinely DIFFERENT fix — or simplify that part of the design if needed.";
-    }
+    const reflection = takeReflection();
 
     conversation.push({ role: "assistant", content: compactAssistantTurn(raw) });
     conversation.push({
