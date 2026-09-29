@@ -185,3 +185,14 @@ test("tool loop stops the moment the usage budget says the limit is reached", as
   assert.equal(r.toolCallCount, 1);
   assert.match(r.text, /weekly usage limit/);
 });
+
+test("the agent is told which apps aren't connected so it suggests connecting instead of guessing", async () => {
+  const { notConnectedHint, toolUsePrompt } = await import("../src/services/agent/toolset.js");
+  const hint = notConnectedHint(["web_search", "github_read_file", "gmail_search"]);
+  assert.ok(hint && !hint.includes("GitHub,") && !hint.includes("Gmail,") && hint.includes("Notion") && hint.includes("Plugins"));
+  const everything = ["github_read_file", "gmail_search", "drive_search", "calendar_events", "notion_search", "vercel_deployments", "railway_projects", "supabase_query", "razorpay_payments"];
+  assert.equal(notConnectedHint(everything), null);
+  const prompt = toolUsePrompt([{ spec: { name: "github_read_file", description: "", parameters: { type: "object", properties: {} } }, label: () => "", run: async () => "" }]);
+  assert.match(prompt, /The user connected: GitHub/);
+  assert.match(prompt, /Not connected yet: Gmail/);
+});

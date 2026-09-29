@@ -19,7 +19,9 @@ export type NativeBuildAction =
   | BuildAction
   | { kind: "check" }
   /** Look something up on the web (docs, an error message, a library's current API) — same tools chat uses. */
-  | { kind: "web"; tool: "web_search" | "fetch_url"; args: Record<string, unknown> };
+  | { kind: "web"; tool: "web_search" | "fetch_url"; args: Record<string, unknown> }
+  /** One of the user's connected-app or MCP tools (GitHub, Supabase, Vercel…) — run by the shared executor. */
+  | { kind: "ext"; tool: string; args: Record<string, unknown> };
 
 export const BUILD_TOOL_SPECS: ToolSpec[] = [
   {
@@ -179,7 +181,7 @@ function s(args: Record<string, unknown>, key: string): string {
 }
 
 /** Converts one native tool call into the shared BuildAction the executor runs. */
-export function toolCallToAction(call: ToolCall): NativeBuildAction {
+export function toolCallToAction(call: ToolCall, extTools?: ReadonlySet<string>): NativeBuildAction {
   const a = call.args ?? {};
   switch (call.name) {
     case "write_file": {
@@ -235,6 +237,7 @@ export function toolCallToAction(call: ToolCall): NativeBuildAction {
     case "finish":
       return { kind: "done", summary: s(a, "summary").trim() };
     default:
+      if (extTools?.has(call.name)) return { kind: "ext", tool: call.name, args: a };
       return { kind: "malformed", reason: `there is no tool named ${call.name}` };
   }
 }
