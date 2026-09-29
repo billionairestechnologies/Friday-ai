@@ -18,19 +18,19 @@ Parameters:
     Description: Optional ACM certificate ARN (same region) — enables HTTPS and redirects HTTP to it
   DesiredCount:
     Type: Number
-    Default: 2
+    Default: 1
     MinValue: 1
   MaxCount:
     Type: Number
-    Default: 6
+    Default: 3
     MinValue: 1
   TaskCpu:
     Type: String
-    Default: "1024"
+    Default: "512"
     AllowedValues: ["512", "1024", "2048", "4096"]
   TaskMemory:
     Type: String
-    Default: "2048"
+    Default: "1024"
     AllowedValues: ["1024", "2048", "3072", "4096", "8192"]
   CreateRedis:
     Type: String

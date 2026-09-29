@@ -76,5 +76,5 @@ back automatically to the last working version.
 ## Cost (ap-south-1, rough, per month)
 
 Load balancer ≈ $20 · 2 Fargate tasks (1 vCPU, 2 GB) ≈ $65 · Redis `cache.t4g.micro` ≈ $12 · logs,
-Secrets Manager, ECR, CodeBuild ≈ $5. About **$100/month** before traffic. No NAT gateway (tasks use
+Secrets Manager, ECR, CodeBuild ≈ $5. About **$100/month** at the old 2-task sizing; defaults are now 1 task (0.5 vCPU, 1 GB) autoscaling to 3, roughly **$50/month** (raise with `DESIRED_COUNT`, `TaskCpu`, `TaskMemory`). No NAT gateway (tasks use
 public IPs but only accept traffic from the load balancer).

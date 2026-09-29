@@ -5,7 +5,7 @@
 #   infra/aws/deploy.sh                                   # later deploys: current commit, same settings
 #
 # Env: AWS_REGION (default ap-south-1), FRIDAY_STACK (default friday), CERTIFICATE_ARN (optional,
-# enables HTTPS), DESIRED_COUNT (default 2). Needs: aws CLI v2 or v1, git, python3.
+# enables HTTPS), DESIRED_COUNT (default 1). Needs: aws CLI v2 or v1, git, python3.
 # Deploys the COMMITTED tree (git archive HEAD) — commit first.
 set -euo pipefail
 
@@ -100,7 +100,7 @@ fi
 step "App stack ($NAME) with $REPO:$TAG"
 aws cloudformation deploy --stack-name "$NAME" --template-file "$HERE/friday-stack.yaml" --capabilities CAPABILITY_IAM \
   --no-fail-on-empty-changeset --parameter-overrides \
-  "ImageUri=$REPO:$TAG" "AppSecretArn=$SECRET_ARN" "CertificateArn=${CERTIFICATE_ARN:-}" "DesiredCount=${DESIRED_COUNT:-2}"
+  "ImageUri=$REPO:$TAG" "AppSecretArn=$SECRET_ARN" "CertificateArn=${CERTIFICATE_ARN:-}" "DesiredCount=${DESIRED_COUNT:-1}"
 CLUSTER="$(out "$NAME" ClusterName)"
 SERVICE="$(out "$NAME" ServiceName)"
 step "Waiting for the service to be stable"
