@@ -16,7 +16,7 @@ model — it orchestrates OpenAI, Anthropic, Gemini, OpenRouter, ScaleMax, Sarva
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0027 (apply in order; RLS on, backend uses service role)
+supabase/   SQL migrations 0001…0030 (apply in order; RLS on, backend uses service role)
 docs/       OPERATIONS.md, PLATFORM_BRIEFING.md, UPGRADE_ROADMAP.md, diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -69,7 +69,15 @@ Gotchas:
   `sandbox.ts` (E2B; `run()` for model commands, `runScript()` for trusted scripts with env-passed values),
   `github.ts` (clone + PR). Both protocols share ONE executor; a "done" claim is only accepted after
   known-failed commands, the project's own typecheck/build/tests and a real-browser check pass
-  (each skipped if the agent already passed it since its last edit).
+  (each skipped if the agent already passed it since its last edit). Also: `web_search`/`fetch_url`
+  tools, FRIDAY.md project memory kept in every project (read back each turn, nudged at the done
+  gate), `summarize.ts` (auto-compacts the transcript past 150k chars), `activity.ts` (size-capped
+  step payloads: live command output, code previews, edit diffs — steps carry cmd/output/exitCode/
+  path/code/lang/added/removed/startedAt/ms).
+- Build workspace: `conversations.workspace = 'build'` (migration 0030) — every message goes straight
+  to the Build agent. Web: `/build` + `/build/$conversationId` (Home with `workspace="build"`), its own
+  "Builds" history in the sidebar (build sessions + chats with `has_build`), and the project panel
+  (`BuildCanvas`: Preview / Files / Terminal) docked on the right.
 - `services/automations/` — schedule math (`schedule.ts`, DST-safe) + service/scheduler (atomic lease).
 - `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/quota/*`, `services/connectorService.ts`.
 
@@ -86,7 +94,9 @@ Gotchas:
 
 ## Current state (branch `v2`)
 
-v2 adds: Build Mode on native tool calling with a hard verify gate (60 rounds / 25 min), live step rows
+v2 adds: a dedicated Build workspace (own history, docked Preview/Files/Terminal), live terminals and
+code/diff cards in chat while building, web lookups + FRIDAY.md memory + transcript summarisation in the
+Build agent (100 rounds / 40 min), Build Mode on native tool calling with a hard verify gate, live step rows
 the moment a tool call starts (`onToolStart`), lower time-to-first-token (search probe skipped when the
 model has tools; toolset preloaded), SSE anti-buffering headers, a smooth adaptive typewriter + glitch-free
 markdown streaming on web, and a direct/well-structured response-style prompt.
@@ -100,7 +110,7 @@ Automations (+ page) · full-text chat search · share links · Build Mode edit/
 AGENTS.md/FRIDAY.md/CLAUDE.md read by Build Mode · Team Up metered · current date in prompts ·
 connector audit log · fixed env-dependent tests · removed committed scratch script.
 
-Deploy requires migrations `0023`–`0028`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
+Deploy requires migrations `0023`–`0030`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
 `FRIDAY_PROMPT_CACHE=off`, `FRIDAY_BUILD_NATIVE_TOOLS=off` (Build Mode back on the text protocol).
 
 Also shipped since: prompt caching restored (Anthropic/ScaleMax/OpenAI/OpenRouter/Gemini, with

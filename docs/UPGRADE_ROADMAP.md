@@ -35,8 +35,8 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 | B4 | Import a GitHub repo into the sandbox (clone with the user's connector token) | Work on existing code, not only new apps | ✅ |
 | B5 | Commit, push a branch and open a PR from the sandbox | The Codex/Claude Code workflow | ✅ |
 | B6 | Run the project's tests/linters as a gate before "done" | Correctness, not just "it renders" | ✅ hard gate: failed commands → typecheck/build/tests → browser |
-| B7 | Diff view of every change in the UI (web/Android/iOS) | Reviewability | ⬜ |
-| B8 | Context compaction by summarisation for long runs; raise the 45-iteration / 18-minute ceiling for background jobs | Long tasks | 🚧 old file bodies/tool results compacted; 60 rounds / 25 min; no summarisation yet |
+| B7 | Diff view of every change in the UI (web/Android/iOS) | Reviewability | 🚧 web: per-edit -/+ diff + code preview cards, session terminal (mobile ⬜) |
+| B8 | Context compaction by summarisation for long runs; raise the 45-iteration / 18-minute ceiling for background jobs | Long tasks | ✅ model-written summary past 150k chars; 100 rounds / 40 min (survives tab close; not server restarts — see B9) |
 | B9 | Background build jobs (queue + resumable progress, survives server restarts) | Tasks that take hours | ⬜ |
 | B10 | Sub-agents (parallel explore/test/review workers) | Speed and quality on large tasks | ⬜ |
 | B11 | Project instruction file (`FRIDAY.md` / `AGENTS.md`) read automatically | Repo-specific conventions | ✅ |

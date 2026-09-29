@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -16,8 +16,11 @@ import { extForLang, saveFile } from "@/lib/chat/download";
 import { BuildCanvas } from "@/components/build-preview";
 import { buildReactPreviewHtml } from "@/lib/chat/react-preview";
 import { normalizeRunLanguage, runSandboxCode, type AutoRunResult } from "@/lib/chat/runnable";
-import { useLiveStream } from "@/lib/chat/live-stream";
+import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { useChat } from "@/lib/chat/store";
+import type { ChatMessage } from "@/lib/chat/types";
+
+const NO_MESSAGES: ChatMessage[] = [];
 
 export function CanvasPanel() {
   const open = useChat((s) => s.canvasOpen);
@@ -274,6 +277,12 @@ function CanvasBody({
     return "";
   });
   const buildUrl = live?.preview?.url ?? storedBuildUrl;
+  // Every build step in this chat (history + the live turn) — feeds the workspace's Terminal tab and
+  // tells the Files tab when to refresh.
+  const chatWorkspace = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.workspace);
+  const chatMessages = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.messages ?? NO_MESSAGES);
+  const buildSteps = useMemo(() => overlayLive(chatMessages, live).flatMap((m) => m.build?.steps ?? []), [chatMessages, live]);
+  const hasBuildWork = buildSteps.some((st) => st.kind === "write" || st.kind === "run" || st.kind === "start");
   const content = live?.text || stored;
   const streaming = Boolean(live);
   const artifact = content ? extractArtifact(content) : null;
@@ -287,11 +296,18 @@ function CanvasBody({
   const [view, setView] = useState<"preview" | "code">("preview");
   const hasPreview = artifact?.kind === "html" || artifact?.kind === "react";
 
-  if (buildUrl && conversationId) {
+  // A Build workspace session always gets the project workspace (terminal first, preview once the
+  // app runs); elsewhere it takes over once Build Mode has produced something newer than an artifact.
+  if (buildUrl || chatWorkspace === "build" || (hasBuildWork && !artifact)) {
     return (
       <BuildCanvas
+        // One panel per chat: switching chats must not keep showing the previous project's preview.
+        key={activeId ?? "new"}
         conversationId={conversationId}
         liveUrl={live?.preview?.url}
+        hasPreview={Boolean(buildUrl)}
+        steps={buildSteps}
+        building={streaming}
         onClose={onClose}
         onResizeStart={onResizeStart}
       />

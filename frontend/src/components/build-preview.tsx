@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,9 +14,11 @@ import {
   RefreshCw,
   Smartphone,
   SquareStack,
+  TerminalSquare,
 } from "lucide-react";
 import { API_BASE_URL, api, getAccessToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { BuildStep } from "@/lib/chat/types";
 
 type ProjectFiles = Record<string, string>;
 
@@ -111,32 +113,105 @@ function TreeRow({
 const iconBtn =
   "premium-control flex size-8 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground disabled:opacity-40";
 
-/** Canvas view for a Build Mode project, laid out like the reference product: globe/files icon tabs
- *  on the left, then a browser-style toolbar over the running app, or a file tree + code viewer.
- *  The sandbox is short-lived, so unless the URL just came from the live turn the backend is asked
- *  to make sure it's alive (it restores the snapshot and restarts the server if it expired). */
+/** Everything the build ran, as one continuous terminal session (like Claude Code's): each command
+ *  with its output and how it ended, file writes as dim comment lines between them, the running
+ *  command live at the bottom. Follows new output unless the user scrolled up to read. */
+function SessionTerminal({ steps, building }: { steps: BuildStep[]; building: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const entries = steps.filter((st) => (st.cmd && (st.kind === "run" || st.kind === "start")) || (st.kind === "write" && st.state !== "running" && st.path));
+  const signature = entries.map((st) => `${st.id}:${st.state}:${st.output?.length ?? 0}`).join("|");
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+  }, [signature]);
+  if (entries.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#0c0c0d] px-6 text-center font-mono text-xs text-[#6b7078]">
+        <TerminalSquare className="size-5" />
+        {building ? "Waiting for the first command…" : "Commands Friday runs for this project show up here."}
+      </div>
+    );
+  }
+  return (
+    <div
+      ref={ref}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      }}
+      className="h-full overflow-auto bg-[#0c0c0d] px-4 py-3 font-mono text-[12px] leading-[1.6] text-[#c9ccd1]"
+    >
+      {entries.map((st) =>
+        st.kind === "write" ? (
+          <div key={st.id} className="text-[#5c6370]">
+            # {st.lang === "diff" ? "edited" : "wrote"} {st.path}
+            {st.added ? <span className="text-emerald-500/70"> +{st.added}</span> : null}
+            {st.removed ? <span className="text-red-400/70"> −{st.removed}</span> : null}
+          </div>
+        ) : (
+          <div key={st.id} className="step-enter mt-2 first:mt-0">
+            <div className="whitespace-pre-wrap">
+              <span className={st.state === "error" ? "text-red-400" : "text-emerald-400"}>$ </span>
+              <span className="text-[#e8eaed]">{st.cmd}</span>
+            </div>
+            {(st.output ?? (st.state !== "running" ? st.detail : "")) && (
+              <div className="whitespace-pre-wrap text-[#aeb3ba]">{(st.output ?? st.detail ?? "").replace(/\s+$/, "")}</div>
+            )}
+            {st.state === "running" ? (
+              <span className="terminal-cursor" aria-hidden />
+            ) : (
+              <div className={cn("text-[11px]", st.state === "error" ? "text-red-400/90" : "text-[#5c6370]")}>
+                {st.kind === "start" ? (st.state === "ok" ? "✓ server running" : "✗ server failed to start") : `exit ${st.exitCode ?? (st.state === "ok" ? 0 : 1)}`}
+                {st.ms != null ? ` · ${st.ms < 1000 ? `${st.ms}ms` : `${(st.ms / 1000).toFixed(1)}s`}` : ""}
+              </div>
+            )}
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/** The Build workspace panel: Preview (the running app in a browser frame), Files (tree + code) and
+ *  Terminal (the whole session's commands and output). The sandbox is short-lived, so unless the
+ *  URL just came from the live turn the backend is asked to make sure it's alive (it restores the
+ *  snapshot and restarts the server if it expired) — only when the Preview tab is actually open. */
 export function BuildCanvas({
   conversationId,
   liveUrl,
+  hasPreview = true,
+  steps = [],
+  building = false,
   onClose,
   onResizeStart,
 }: {
-  conversationId: string;
+  conversationId?: string;
   liveUrl?: string;
+  /** A preview has existed for this project (so restoring one is worth trying). */
+  hasPreview?: boolean;
+  /** Every build step in the chat — drives the Terminal tab and Files refreshes. */
+  steps?: BuildStep[];
+  building?: boolean;
   onClose: () => void;
   onResizeStart: (e: PointerEvent<HTMLButtonElement>) => void;
 }) {
   const [url, setUrl] = useState<string | null>(liveUrl ?? null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(liveUrl ? "ready" : "loading");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(liveUrl ? "ready" : "idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [view, setView] = useState<"preview" | "files">("preview");
+  const [view, setView] = useState<"preview" | "files" | "terminal">(liveUrl || hasPreview ? "preview" : "terminal");
   const [files, setFiles] = useState<ProjectFiles | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showTree, setShowTree] = useState(true);
   const [mobile, setMobile] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const commandRunning = steps.some((st) => st.state === "running" && (st.kind === "run" || st.kind === "start"));
+  // Bumps whenever the agent finishes writing a file — the Files tab refetches to stay current.
+  const filesVersion = steps.filter((st) => st.kind === "write" && st.state === "ok").length;
+  const fetchedVersion = useRef(-1);
 
   const ensure = useCallback(() => {
+    if (!conversationId) return;
     setStatus("loading");
     setMessage(null);
     api
@@ -156,33 +231,44 @@ export function BuildCanvas({
       });
   }, [conversationId]);
 
-  // Once a URL is showing (from the live turn), don't re-run the restore round-trip when the live
-  // snapshot clears at the end of the turn — that would reload the iframe for no reason.
-  const hasUrl = url !== null;
+  // A live preview URL arriving mid-build flips the panel to Preview so the user sees the app appear.
+  const sawLiveUrl = useRef(Boolean(liveUrl));
   useEffect(() => {
-    if (liveUrl) {
-      setUrl(liveUrl);
-      setStatus("ready");
-    } else if (!hasUrl) {
-      ensure();
+    if (!liveUrl) return;
+    setUrl(liveUrl);
+    setStatus("ready");
+    if (!sawLiveUrl.current) {
+      sawLiveUrl.current = true;
+      setView("preview");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, liveUrl, ensure]);
+  }, [liveUrl]);
+
+  // Once a URL is showing, don't re-run the restore round-trip when the live snapshot clears at the
+  // end of the turn — that would reload the iframe for no reason.
+  useEffect(() => {
+    if (view !== "preview" || url || liveUrl || !hasPreview || status !== "idle") return;
+    ensure();
+  }, [view, url, liveUrl, hasPreview, status, ensure]);
 
   useEffect(() => {
-    if (view !== "files" || files) return;
+    if (view !== "files" || !conversationId) return;
+    if (files && fetchedVersion.current === filesVersion) return;
+    fetchedVersion.current = filesVersion;
     api
       .get<{ files: ProjectFiles }>(`/build/${conversationId}/files`)
       .then((res) => {
         setFiles(res.files);
-        const first = Object.keys(res.files).find((p) => /(^|\/)(App|main|index)\.(jsx|tsx|js|ts|html|py)$/.test(p)) ?? Object.keys(res.files).sort()[0];
-        setSelected(first ?? null);
+        setSelected((current) =>
+          current && res.files[current] != null
+            ? current
+            : (Object.keys(res.files).find((p) => /(^|\/)(App|main|index)\.(jsx|tsx|js|ts|html|py)$/.test(p)) ?? Object.keys(res.files).sort()[0] ?? null),
+        );
       })
       .catch((err) => setMessage(err instanceof Error ? err.message : "Couldn't load the files"));
-  }, [view, files, conversationId]);
+  }, [view, files, filesVersion, conversationId]);
 
   const tree = useMemo(() => buildTree(Object.keys(files ?? {})), [files]);
-  const lines = useMemo(() => (selected && files ? files[selected]!.split("\n") : []), [selected, files]);
+  const lines = useMemo(() => (selected && files?.[selected] != null ? files[selected]!.split("\n") : []), [selected, files]);
 
   return (
     <aside className="premium-panel relative flex h-full w-full min-w-0 flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-40">
@@ -195,12 +281,13 @@ export function BuildCanvas({
         <span className="h-10 w-[3px] rounded-full bg-border transition-colors group-hover:bg-muted" />
       </button>
 
-      {/* Icon tabs: globe = running preview, stack = project files. */}
+      {/* Tabs: preview · files · terminal. */}
       <div className="flex h-12 shrink-0 items-center gap-1 px-3">
         {(
           [
             ["preview", Globe, "Preview"],
             ["files", SquareStack, "Files"],
+            ["terminal", TerminalSquare, "Terminal"],
           ] as const
         ).map(([id, Icon, label]) => (
           <button
@@ -210,14 +297,21 @@ export function BuildCanvas({
             aria-pressed={view === id}
             onClick={() => setView(id)}
             className={cn(
-              "premium-control flex size-8 items-center justify-center rounded-lg",
+              "premium-control relative flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors",
               view === id ? "bg-chip text-foreground" : "text-muted hover:text-foreground",
             )}
           >
-            <Icon className="size-[18px]" />
+            <Icon className="size-[15px]" />
+            <span className="max-sm:hidden">{label}</span>
+            {id === "terminal" && commandRunning && <span className="absolute top-1 right-1 size-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />}
           </button>
         ))}
         <span className="flex-1" />
+        {building && (
+          <span className="mr-1 flex items-center gap-1.5 text-xs text-muted">
+            <span className="build-orb scale-75" aria-hidden /> <span className="max-sm:hidden">Building</span>
+          </span>
+        )}
         <button type="button" aria-label="Close canvas" onClick={onClose} className={iconBtn}>
           <PanelRightClose className="size-4" />
         </button>
@@ -225,7 +319,7 @@ export function BuildCanvas({
 
       {view === "preview" ? (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/80 px-3">
-          <button type="button" aria-label="Reload" onClick={() => (url ? setNonce((n) => n + 1) : ensure())} className={iconBtn}>
+          <button type="button" aria-label="Reload" onClick={() => (url ? setNonce((n) => n + 1) : ensure())} className={iconBtn} disabled={!conversationId}>
             <RefreshCw className="size-3.5" />
           </button>
           <span className="min-w-0 flex-1 truncate px-1 text-xs text-subtle">{url ? url.replace(/^https:\/\//, "") : ""}</span>
@@ -238,20 +332,31 @@ export function BuildCanvas({
             <Smartphone className="size-3.5" />
           </button>
         </div>
-      ) : (
+      ) : view === "files" ? (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/80 px-3">
           <button type="button" aria-label="Toggle file list" aria-pressed={showTree} onClick={() => setShowTree((v) => !v)} className={cn(iconBtn, showTree && "bg-chip text-foreground")}>
             <ListTree className="size-3.5" />
           </button>
           <span className="min-w-0 flex-1 truncate px-1 text-sm text-foreground">{selected ?? ""}</span>
-          <button type="button" aria-label="Download project" onClick={() => void downloadProjectZip(conversationId).catch((e) => setMessage(e instanceof Error ? e.message : "Download failed"))} className={iconBtn}>
-            <Download className="size-3.5" />
-          </button>
+          {conversationId && (
+            <button type="button" aria-label="Download project" onClick={() => void downloadProjectZip(conversationId).catch((e) => setMessage(e instanceof Error ? e.message : "Download failed"))} className={iconBtn}>
+              <Download className="size-3.5" />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/80 bg-[#0c0c0d] px-4 font-mono text-[11px] text-[#6b7078]">
+          <span className="size-2 rounded-full bg-[#ff5f57]/70" />
+          <span className="size-2 rounded-full bg-[#febc2e]/70" />
+          <span className="size-2 rounded-full bg-[#28c840]/70" />
+          <span className="ml-1">friday@sandbox: ~/app</span>
         </div>
       )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {view === "preview" ? (
+        {view === "terminal" ? (
+          <SessionTerminal steps={steps} building={building} />
+        ) : view === "preview" ? (
           status === "ready" && url ? (
             <div className={cn("flex h-full w-full justify-center", mobile && "bg-chip/40")}>
               <iframe
@@ -267,14 +372,21 @@ export function BuildCanvas({
               <Loader2 className="size-5 animate-spin" />
               Starting your project… restoring files and dependencies can take a minute.
             </div>
-          ) : (
+          ) : status === "error" ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-danger">
               <pre className="max-h-60 max-w-full overflow-auto text-left text-xs whitespace-pre-wrap">{message}</pre>
               <button type="button" onClick={ensure} className="rounded-full bg-chip px-3 py-1.5 text-xs text-foreground">
                 Try again
               </button>
             </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-sm text-muted">
+              <Globe className="size-5" />
+              {building ? "The live preview appears here the moment the app starts running." : "No preview yet — ask Friday to build and run an app."}
+            </div>
           )
+        ) : !conversationId ? (
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted">No files yet.</div>
         ) : files === null ? (
           <div className="flex h-full items-center justify-center text-muted">
             <Loader2 className="size-5 animate-spin" />
@@ -284,6 +396,7 @@ export function BuildCanvas({
             {showTree && (
               <div className="w-56 shrink-0 overflow-auto border-r border-border/80 p-2 max-md:w-40">
                 <div className="px-2 pb-1 text-xs text-subtle">Files</div>
+                {tree.length === 0 && <div className="px-2 py-1 text-xs text-subtle">No files yet</div>}
                 {tree.map((n) => (
                   <TreeRow key={n.path} node={n} depth={0} selected={selected} onSelect={setSelected} />
                 ))}

@@ -3,6 +3,7 @@ import {
   Building2,
   ChevronDown,
   FolderKanban,
+  Hammer,
   LibraryBig,
   MessageSquare,
   PanelLeft,
@@ -28,12 +29,16 @@ type SearchHit = { conversationId: string; title: string; messageId: string; rol
 /** Top-level nav rows above Projects/Chats — Chat is the only one with a real destination today;
  *  Library/Automations are placeholder pages (see routes/library.tsx, routes/automations.tsx)
  *  until those features actually exist, per explicit product decision. */
-function NavRow({ icon: Icon, label, onClick }: { icon: typeof MessageSquare; label: string; onClick: () => void }) {
+function NavRow({ icon: Icon, label, onClick, active = false }: { icon: typeof MessageSquare; label: string; onClick: () => void; active?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-semibold text-foreground hover:bg-chip-on"
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-semibold text-foreground hover:bg-chip-on",
+        active && "bg-chip-on",
+      )}
     >
       <Icon className="size-4 text-muted" />
       {label}
@@ -54,6 +59,8 @@ export function Sidebar() {
   const newChat = useChat((s) => s.newChat);
   const setActiveProjectId = useChat((s) => s.setActiveProjectId);
   const setDialog = useChat((s) => s.setDialog);
+  const workspace = useChat((s) => s.workspace);
+  const buildMode = workspace === "build";
   const isEnterprise = usePlan((s) => s.isEnterprise);
   const loadPlan = usePlan((s) => s.load);
   const { user } = useCurrentUserState();
@@ -67,10 +74,20 @@ export function Sidebar() {
   // Project chats are project-scoped only (see hydrateFromServer/listConversations) — the main
   // list only ever receives unscoped ones from the backend, but this also guards against any
   // stale project-tagged chat left over in localStorage from before that filter existed.
+  // Two histories: the Build workspace lists build sessions plus any chat where Build Mode made a
+  // project; the main list leaves dedicated build sessions out (they live on the Build page).
   const visible = filteredChats(
-    chats.filter((c) => !c.projectId),
+    chats.filter((c) => !c.projectId && (buildMode ? c.workspace === "build" || c.hasBuild : c.workspace !== "build")),
     query,
   );
+  const openChat = (c: (typeof chats)[number]) => {
+    selectChat(c.id);
+    if (c.conversationId) {
+      if (buildMode || c.workspace === "build") void navigate({ to: "/build/$conversationId", params: { conversationId: c.conversationId } });
+      else void navigate({ to: "/c/$conversationId", params: { conversationId: c.conversationId } });
+    }
+    if (window.innerWidth < 768) setOpen(false);
+  };
 
   useEffect(() => {
     void loadPlan();
@@ -103,7 +120,7 @@ export function Sidebar() {
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
     deleteChatLocal(id);
-    if (id === activeId) void navigate({ to: "/" });
+    if (id === activeId) void navigate({ to: buildMode ? "/build" : "/" });
     if (conversationId) {
       api.delete(`/chat/conversations/${conversationId}`).catch(() => {
         // The delete didn't reach the server, so the chat would silently come back on the next
@@ -209,10 +226,22 @@ export function Sidebar() {
             <NavRow
               icon={MessageSquare}
               label="Chat"
+              active={!buildMode}
               onClick={() => {
                 setActiveProjectId(null);
                 newChat();
                 void navigate({ to: "/" });
+                if (window.innerWidth < 768) setOpen(false);
+              }}
+            />
+            <NavRow
+              icon={Hammer}
+              label="Build"
+              active={buildMode}
+              onClick={() => {
+                setActiveProjectId(null);
+                newChat();
+                void navigate({ to: "/build" });
                 if (window.innerWidth < 768) setOpen(false);
               }}
             />
@@ -283,13 +312,29 @@ export function Sidebar() {
             )}
           </div>
 
-          {/* Chats */}
+          {/* Chats — or, in the Build workspace, its own build history */}
           <div className="mt-4">
-            <p className="px-2.5 py-1 text-xs font-medium text-subtle">Chats</p>
+            <div className="flex h-7 items-center px-2.5">
+              <p className="flex-1 text-xs font-medium text-subtle">{buildMode ? "Builds" : "Chats"}</p>
+              {buildMode && (
+                <button
+                  type="button"
+                  aria-label="New build"
+                  onClick={() => {
+                    newChat();
+                    void navigate({ to: "/build" });
+                    if (window.innerWidth < 768) setOpen(false);
+                  }}
+                  className="flex size-6 items-center justify-center rounded-md text-subtle hover:bg-chip-on hover:text-foreground"
+                >
+                  <Plus className="size-3.5" />
+                </button>
+              )}
+            </div>
             <nav>
               {visible.length === 0 ? (
                 <p className="px-2 py-6 text-center text-xs text-subtle">
-                  {chats.length === 0 ? "No chats yet" : "No matches"}
+                  {query.trim() ? "No matches" : buildMode ? "No builds yet — describe an app to start one" : "No chats yet"}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-0.5">
@@ -297,20 +342,15 @@ export function Sidebar() {
                     <li key={c.id} className="group relative">
                       <button
                         type="button"
-                        onClick={() => {
-                          selectChat(c.id);
-                          if (c.conversationId) {
-                            void navigate({ to: "/c/$conversationId", params: { conversationId: c.conversationId } });
-                          }
-                          if (window.innerWidth < 768) setOpen(false);
-                        }}
+                        onClick={() => openChat(c)}
                         className={cn(
-                          "premium-control flex h-10 w-full items-center rounded-xl pr-9 pl-2.5 text-left text-sm font-medium",
+                          "premium-control flex h-10 w-full items-center gap-2 rounded-xl pr-9 pl-2.5 text-left text-sm font-medium",
                           c.id === activeId
                             ? "bg-selected text-foreground"
                             : "text-muted hover:bg-chip-on hover:text-foreground",
                         )}
                       >
+                        {buildMode && <Hammer className="size-3.5 shrink-0 text-subtle" />}
                         <span className="truncate">{c.title}</span>
                       </button>
                       <button

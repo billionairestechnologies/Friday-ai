@@ -55,6 +55,31 @@ const conversationRoute = createRoute({
   component: AppShell,
 });
 
+// The Build workspace (like Claude Code): the same chat engine in build mode — build-only history,
+// every message goes to the Build agent, the project workspace (preview/files/terminal) docked on
+// the right. One shared component for both routes, for the same no-remount reason as AppShell.
+// Signed-out visitors (and search crawlers) on bare /build keep the public product page; signed-in
+// users get the workspace.
+function BuildShell() {
+  const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
+  const { user, isPending } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  if (!conversationId && !signedIn) return isPending ? null : <SitePage slug="build" />;
+  return <Home conversationId={conversationId} workspace="build" />;
+}
+
+const buildRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/build",
+  component: BuildShell,
+});
+
+const buildConversationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/build/$conversationId",
+  component: BuildShell,
+});
+
 // Hidden, standalone admin gate — not linked from anywhere in the regular app.
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -117,7 +142,7 @@ const automationsRoute = createRoute({
 });
 
 // Public product pages — the titles/descriptions Google indexes come from backend/src/seo.ts.
-const siteRoutes = (["overview", "models", "build", "research", "connectors"] as const).map((slug) =>
+const siteRoutes = (["overview", "models", "research", "connectors"] as const).map((slug) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path: `/${slug}`,
@@ -157,6 +182,8 @@ const termsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   conversationRoute,
+  buildRoute,
+  buildConversationRoute,
   adminRoute,
   upgradeRoute,
   projectsRoute,

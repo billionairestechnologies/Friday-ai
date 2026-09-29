@@ -22,7 +22,7 @@ import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
-import { X } from "lucide-react";
+import { Hammer, X } from "lucide-react";
 import { SITE_NAV } from "@/lib/site/pages";
 
 type ConversationMode = "single" | "auto" | "teamup";
@@ -38,13 +38,21 @@ const PROMPTS = [
   "Write a Python script that renames files in bulk",
 ];
 
+const BUILD_PROMPTS = [
+  "Build a SaaS landing page with pricing and a waitlist form",
+  "Create a Kanban board app with drag and drop",
+  "Build a REST API for a todo app with Express and tests",
+  "Fix the failing tests in github.com/owner/repo and open a PR",
+];
+
 function modeForModel(model: string): ConversationMode {
   if (model === AUTO_MODEL_ID) return "auto";
   if (model === TEAMUP_MODEL_ID) return "teamup";
   return "single";
 }
 
-export function Home({ conversationId }: { conversationId?: string } = {}) {
+export function Home({ conversationId, workspace = "chat" }: { conversationId?: string; workspace?: "chat" | "build" } = {}) {
+  const buildMode = workspace === "build";
   const navigate = useNavigate();
   const greeting = useGreeting();
   const { user, isPending } = useCurrentUserState();
@@ -107,6 +115,27 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
     if (!conversationId) return;
     useChat.getState().selectConversation(conversationId);
   }, [conversationId]);
+
+  // Entering a workspace: new chats inherit it, and a chat from the other workspace doesn't stay
+  // open (the Build page starts a fresh build session; the chat page leaves a build session).
+  useEffect(() => {
+    const s = useChat.getState();
+    s.setWorkspace(workspace);
+    if (conversationId) return;
+    const active = s.chats.find((c) => c.id === s.activeId);
+    if (active && (active.workspace === "build") !== buildMode) s.newChat();
+  }, [workspace, buildMode, conversationId]);
+
+  // The Build workspace docks the project panel (preview / files / terminal) on the right as soon as
+  // there is something to show — on desktop only; on mobile it's a full-screen overlay the user opens.
+  const activeHasBuild = useChat((s) => {
+    const chat = s.chats.find((c) => c.id === s.activeId);
+    return Boolean(chat?.hasBuild || chat?.messages.some((m) => m.build?.steps.length || m.build?.previewUrl));
+  });
+  useEffect(() => {
+    if (!buildMode || window.innerWidth < 1024) return;
+    if (activeHasBuild || streaming) useChat.getState().setCanvasOpen(true);
+  }, [buildMode, activeHasBuild, streaming, activeId]);
 
   useEffect(() => {
     if (isPending || !user) return;
@@ -173,7 +202,8 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
 
     if (chat?.conversationId) {
       if (!conversationId || conversationId !== chat.conversationId) {
-        void navigate({ to: "/c/$conversationId", params: { conversationId: chat.conversationId } });
+        if (buildMode) void navigate({ to: "/build/$conversationId", params: { conversationId: chat.conversationId } });
+        else void navigate({ to: "/c/$conversationId", params: { conversationId: chat.conversationId } });
       }
       // Same conversation, but the user picked a different model since the last message —
       // switch the conversation over to it so the next reply actually comes from that model
@@ -192,8 +222,9 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       return { conversationId: chat.conversationId };
     }
 
-    const body: { mode: ConversationMode; providerSlug?: string; modelId?: string; projectId?: string } = { mode };
-    if (s.activeProjectId) body.projectId = s.activeProjectId;
+    const body: { mode: ConversationMode; providerSlug?: string; modelId?: string; projectId?: string; workspace?: "build" } = { mode };
+    if (s.activeProjectId && !buildMode) body.projectId = s.activeProjectId;
+    if (buildMode) body.workspace = "build";
     if (mode === "single") {
       const decoded = decodeModelId(model);
       if (!decoded) throw new Error("Pick a model first");
@@ -201,9 +232,10 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       body.modelId = decoded.modelId;
     }
     const res = await api.post<{ conversation: { id: string } }>("/chat/conversations", body);
-    useChat.getState().setConversationId(chatId, res.conversation.id, s.activeProjectId ?? undefined);
+    useChat.getState().setConversationId(chatId, res.conversation.id, buildMode ? undefined : (s.activeProjectId ?? undefined), buildMode ? "build" : undefined);
     useChat.getState().setConversationModel(chatId, model);
-    void navigate({ to: "/c/$conversationId", params: { conversationId: res.conversation.id } });
+    if (buildMode) void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversation.id } });
+    else void navigate({ to: "/c/$conversationId", params: { conversationId: res.conversation.id } });
     return { conversationId: res.conversation.id };
   }
 
@@ -397,7 +429,12 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
       <div className="flex min-w-[320px] flex-1 shrink flex-col">
         <header className="flex h-14 shrink-0 items-center gap-1 px-3">
           <SidebarToggle />
-          <span className="min-w-0 flex-1 truncate text-sm text-muted">{title}</span>
+          {buildMode && (
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-chip px-2.5 py-1 text-xs font-medium text-foreground">
+              <Hammer className="size-3" /> Build
+            </span>
+          )}
+          <span className="min-w-0 flex-1 truncate text-sm text-muted">{buildMode && empty ? "New build" : title}</span>
           <HeaderActions />
         </header>
         {syncError && (
@@ -418,7 +455,35 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
             >
               <div className="ambient-glow ambient-glow-breathe" aria-hidden />
               <div className="relative z-10 mb-8 flex flex-col items-center text-center">
-                {available ? (
+                {available && buildMode ? (
+                  <>
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}
+                      className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-border bg-composer shadow-[var(--shadow-soft)]"
+                    >
+                      <Hammer className="size-5" />
+                    </motion.span>
+                    <motion.h1
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.56, ease: [0.2, 0, 0, 1] }}
+                      className="text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl"
+                    >
+                      What should we build?
+                    </motion.h1>
+                    <motion.p
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.56, delay: 0.08, ease: [0.2, 0, 0, 1] }}
+                      className="mt-3 max-w-lg text-pretty text-sm text-muted"
+                    >
+                      Friday plans it, writes the code, runs it in a real sandbox, tests it and fixes what breaks — you
+                      watch every file and command live, then preview, download or open a pull request.
+                    </motion.p>
+                  </>
+                ) : available ? (
                   <h1 className="relative text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl">
                     {heroLine.kind === "greeting" ? (
                       <>
@@ -473,7 +538,7 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
                 />
                 {available && (
                   <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {PROMPTS.map((p, i) => (
+                    {(buildMode ? BUILD_PROMPTS : PROMPTS).map((p, i) => (
                       <motion.button
                         key={p}
                         type="button"

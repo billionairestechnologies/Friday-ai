@@ -105,6 +105,11 @@ export type Chat = {
   /** Set when this chat belongs to a Project — project chats are scoped-only: kept out of the
    *  main sidebar list and only shown from inside that project's own view. */
   projectId?: string;
+  /** "build" = a Build workspace session (every message goes to the Build agent); listed in the
+   *  Build workspace's own history instead of the main chat list. */
+  workspace?: "build";
+  /** Build Mode has produced a project in this chat (from any workspace) — also listed under Builds. */
+  hasBuild?: boolean;
 };
 
 export type ChatRequestMessage = {

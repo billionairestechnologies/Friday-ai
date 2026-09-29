@@ -38,6 +38,8 @@ export type ServerConversation = {
   title: string;
   updated_at: string;
   project_id?: string | null;
+  workspace?: string | null;
+  has_build?: boolean | null;
 };
 
 export type ServerMessage = {
@@ -79,6 +81,8 @@ type ChatState = {
   canvasOpen: boolean;
   settingsTab: string;
   activeProjectId: string | null;
+  /** Which workspace the current page is (the Build page vs regular chat) — new chats inherit it. */
+  workspace: "chat" | "build";
   appearance: "dark" | "light";
   /** Persona/behavior instruction from Settings → Behavior, sent as a system prompt with every message. */
   behavior: string;
@@ -106,6 +110,7 @@ type ChatState = {
   setCanvasOpen: (v: boolean) => void;
   setSettingsTab: (id: string) => void;
   setActiveProjectId: (id: string | null) => void;
+  setWorkspace: (workspace: "chat" | "build") => void;
   setAppearance: (v: "dark" | "light") => void;
   setVoice: (id: string, name: string) => void;
   setVoiceIntroSeen: (v: boolean) => void;
@@ -126,7 +131,7 @@ type ChatState = {
   syncOwner: (userId: string | null) => void;
   beginTurn: (user: ChatMessage) => { chatId: string; assistantId: string };
   commitTurn: (chatId: string, assistantId: string, data: TurnCommit) => void;
-  setConversationId: (chatId: string, conversationId: string, projectId?: string) => void;
+  setConversationId: (chatId: string, conversationId: string, projectId?: string, workspace?: "build") => void;
   setConversationModel: (chatId: string, model: string) => void;
   appendUserMessage: (user: ChatMessage) => { chatId: string };
   appendAssistantReplies: (chatId: string, replies: { content: string; modelLabel: string }[]) => void;
@@ -214,6 +219,7 @@ export const useChat = create<ChatState>()(
       canvasOpen: false,
       settingsTab: "account",
       activeProjectId: null,
+      workspace: "chat",
       appearance: "light",
       behavior: "",
       draft: "",
@@ -225,6 +231,7 @@ export const useChat = create<ChatState>()(
       ownerUserId: null,
       setHydrated: () => set({ hydrated: true }),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+      setWorkspace: (workspace) => set({ workspace }),
       setQuery: (query) => set({ query }),
       setModel: (model) => set({ model }),
       setThink: (think) => set({ think }),
@@ -326,6 +333,7 @@ export const useChat = create<ChatState>()(
           createdAt: Date.now(),
           updatedAt: Date.now(),
           messages: [user, assistant],
+          ...(get().workspace === "build" ? { workspace: "build" as const } : {}),
         };
         set({ chats: [chat, ...chats], activeId: chat.id, canvasOpen: canvas ? true : get().canvasOpen });
         return { chatId: chat.id, assistantId: assistant.id };
@@ -338,6 +346,10 @@ export const useChat = create<ChatState>()(
               : {
                   ...c,
                   updatedAt: Date.now(),
+                  // A real build (not just chat tool calls) makes this chat show up under Builds.
+                  hasBuild:
+                    c.hasBuild ||
+                    Boolean(data.build?.previewUrl || data.build?.plan || data.build?.steps?.some((st) => st.kind === "write" || st.kind === "run" || st.kind === "start")),
                   messages: c.messages.map((m) =>
                     m.id === assistantId
                       ? {
@@ -359,9 +371,9 @@ export const useChat = create<ChatState>()(
                 },
           ),
         })),
-      setConversationId: (chatId, conversationId, projectId) =>
+      setConversationId: (chatId, conversationId, projectId, workspace) =>
         set((s) => ({
-          chats: s.chats.map((c) => (c.id === chatId ? { ...c, conversationId, projectId } : c)),
+          chats: s.chats.map((c) => (c.id === chatId ? { ...c, conversationId, projectId, ...(workspace ? { workspace } : {}) } : c)),
         })),
       setConversationModel: (chatId, model) =>
         set((s) => ({
@@ -432,6 +444,8 @@ export const useChat = create<ChatState>()(
               updatedAt: new Date(sc.updated_at).getTime(),
               messages: [],
               projectId: projectId ?? sc.project_id ?? undefined,
+              ...(sc.workspace === "build" ? { workspace: "build" as const } : {}),
+              ...(sc.has_build ? { hasBuild: true } : {}),
             }));
           const serverIds = new Map(conversations.map((sc) => [sc.id, sc]));
           // An unscoped list below the page size is the COMPLETE set of top-level chats, so a
@@ -448,7 +462,11 @@ export const useChat = create<ChatState>()(
           );
           const retitled = kept.map((c) => {
             const sc = c.conversationId ? serverIds.get(c.conversationId) : undefined;
-            return sc && sc.title && sc.title !== c.title ? { ...c, title: sc.title } : c;
+            if (!sc) return c;
+            const title = sc.title && sc.title !== c.title ? sc.title : c.title;
+            const workspace = sc.workspace === "build" ? ("build" as const) : c.workspace;
+            const hasBuild = Boolean(sc.has_build) || c.hasBuild;
+            return title !== c.title || workspace !== c.workspace || hasBuild !== c.hasBuild ? { ...c, title, workspace, hasBuild } : c;
           });
           if (additions.length === 0 && retitled.every((c, i) => c === kept[i]) && kept.length === s.chats.length) {
             return {};
