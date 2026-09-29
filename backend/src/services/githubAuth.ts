@@ -3,6 +3,7 @@ import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { supabasePublic } from "../config/supabasePublic.js";
 import { HttpError } from "../middleware/errorHandler.js";
+import { acceptPolicy } from "./policyService.js";
 
 const GITHUB_LOGIN_SCOPES = ["read:user", "user:email"];
 
@@ -119,7 +120,7 @@ export async function completeGithubLogin(code: string) {
 
   const name = profile.name || profile.login || email.split("@")[0];
 
-  const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { full_name: name, github_id: profile.id, github_login: profile.login, auth_provider: "github" },
@@ -127,6 +128,10 @@ export async function completeGithubLogin(code: string) {
   if (createError && !/already|registered|exists/i.test(createError.message)) {
     throw new HttpError(500, createError.message);
   }
+  // Same reasoning as googleAuth.ts's completeGoogleLogin: a brand-new account here never saw the
+  // signup form's own Terms/Privacy checkbox, so this stands in for it instead of landing the
+  // account straight on the blocking "I Agree" gate on its first visit.
+  if (!createError && created?.user) await acceptPolicy(created.user.id, "web");
 
   const { data: link, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: "magiclink",

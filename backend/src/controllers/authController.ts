@@ -22,6 +22,7 @@ import {
 } from "../services/googleAuth.js";
 import { buildGithubLoginUrl, completeGithubLogin, githubLoginConfigured } from "../services/githubAuth.js";
 import { acceptPolicy, POLICY_VERSION, type Platform } from "../services/policyService.js";
+import { invalidateAuthedUser } from "../middleware/auth.js";
 
 const platformSchema = z.enum(["web", "android", "ios"]).default("web");
 
@@ -313,6 +314,10 @@ const acceptPolicySchema = z.object({ platform: platformSchema });
 export async function acceptPolicyRoute(req: Request, res: Response) {
   const { platform } = acceptPolicySchema.parse(req.body);
   const result = await acceptPolicy(req.user!.id, platform);
+  // requireAuth's 45s memo would otherwise keep serving the pre-acceptance policyVersion to any
+  // request (this device or another) that reuses this same token before the TTL expires, which
+  // is exactly what makes the "I Agree" gate reappear right after agreeing to it.
+  if (req.authToken) invalidateAuthedUser(req.authToken);
   res.json({ user: { ...req.user!, policyVersion: result.policyVersion } });
 }
 

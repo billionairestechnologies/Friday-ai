@@ -11,14 +11,21 @@ type Entry<T> = { at: number; value?: T; inflight?: Promise<T> };
 
 const registry = new Set<Map<string, Entry<unknown>>>();
 
+export type Memoized<A extends unknown[], T> = ((...args: A) => Promise<T>) & {
+  /** Drops one cached entry immediately, by the same key `keyOf` would produce for it — for
+   *  when a mutation makes a specific cached value stale before its TTL would (e.g. a profile
+   *  field a request just changed), instead of waiting it out or clearing every key. */
+  invalidate: (key: string) => void;
+};
+
 export function memoAsync<A extends unknown[], T>(
   ttlMs: number,
   fn: (...args: A) => Promise<T>,
   keyOf: (...args: A) => string = (...args) => JSON.stringify(args),
-): (...args: A) => Promise<T> {
+): Memoized<A, T> {
   const store = new Map<string, Entry<T>>();
   registry.add(store as Map<string, Entry<unknown>>);
-  return (...args: A) => {
+  const memoized = ((...args: A) => {
     const key = keyOf(...args);
     const hit = store.get(key);
     const now = Date.now();
@@ -36,7 +43,9 @@ export function memoAsync<A extends unknown[], T>(
     );
     store.set(key, { at: hit?.at ?? 0, inflight });
     return inflight;
-  };
+  }) as Memoized<A, T>;
+  memoized.invalidate = (key: string) => store.delete(key);
+  return memoized;
 }
 
 /** Drops every memoized value (call after any admin change to providers, keys or models). */

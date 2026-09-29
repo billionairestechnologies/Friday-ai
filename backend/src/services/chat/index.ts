@@ -28,6 +28,7 @@ import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDoc
 import {
   appendExtractedText,
   attachImages,
+  modelIdentitySystemMessage,
   trimHistoryToBudget,
   unsupportedAttachmentReason,
   withSystemPreamble,
@@ -43,6 +44,7 @@ import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
+import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
@@ -499,21 +501,31 @@ export async function streamMessage(
       effectivePlan.enterprise != null || planSatisfiesTier(effectivePlan.plan, c.minTier);
     if (mode === "single") {
       if (!tierAllows(candidates[0]!)) {
-        onEvent({
-          t: "err",
-          c: `${candidates[0]!.displayName} needs a higher plan — upgrade to unlock it.`,
-        });
+        const message = `${candidates[0]!.displayName} needs a higher plan — upgrade to unlock it.`;
+        onEvent({ t: "err", c: message });
         onEvent({ t: "done" });
+        // Persist so the bubble survives the realtime refetch this same turn's user message
+        // triggers (that refetch replaces the local optimistic list with the server's, which
+        // otherwise has no assistant row for a turn that never got this far) — see
+        // realtime.ts#refetchMessages.
+        await insertAssistantMessage(conversationId, "", candidates[0]!.displayName, { error: message });
         return;
       }
     } else {
       candidates = candidates.filter(tierAllows);
       if (candidates.length === 0) {
-        onEvent({ t: "err", c: "No chat models are available on your current plan yet — upgrade to unlock more." });
+        const message = "No chat models are available on your current plan yet — upgrade to unlock more.";
+        onEvent({ t: "err", c: message });
         onEvent({ t: "done" });
+        await insertAssistantMessage(conversationId, "", "Auto", { error: message });
         return;
       }
     }
+
+    // "Which model are you" needs a real, sharable answer (Friday's own label, never the vendor's) —
+    // can only be added now that tier filtering/vision fallback has settled on the model actually
+    // answering; withSystemPreamble ran too early to know this. See modelIdentitySystemMessage.
+    history.push(modelIdentitySystemMessage(candidates[0]!.displayName));
 
     // Build Mode: a request for a real, runnable project goes to the sandbox agent (write files →
     // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
@@ -569,6 +581,22 @@ export async function streamMessage(
       if (built.error) onEvent({ t: "err", c: built.error });
       onEvent({ t: "done" });
       return;
+    }
+
+    // Non-build tasks can hide missing specifics too — who to send/message, a real date or name,
+    // specific content a wrong guess would waste — same "ask once, recommended default first"
+    // pattern as Build Mode's clarify round above, gated behind mightNeedClarification's cheap
+    // heuristic so ordinary chat (questions, conversation, search-style asks) never pays for a
+    // probe it doesn't need. Deep Research and Canvas skip this — they have their own flows.
+    if (!canvas && !research && !alreadyAsked(history) && mightNeedClarification(content)) {
+      const questions = await clarifyGeneralRequest(history, candidates);
+      if (questions.length > 0 && !signal?.aborted) {
+        onEvent({ t: "ask", questions });
+        await insertAssistantMessage(conversationId, ASK_MARKER, "Friday", { usedCanvas: false, usedSearch: false, usedThink: false, build: { steps: [], ask: questions } });
+        await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+        onEvent({ t: "done" });
+        return;
+      }
     }
 
     onEvent({ t: "status", s: "thinking" });

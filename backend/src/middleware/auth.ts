@@ -22,6 +22,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthedUser;
+      authToken?: string;
     }
   }
 }
@@ -53,11 +54,19 @@ async function loadUserForToken(token: string): Promise<AuthedUser> {
 // revoked or a role changed is honoured for at most this long.
 const loadUserCached = memoAsync(45_000, loadUserForToken, (token) => token);
 
+/** Drops a token's cached profile immediately — call right after a mutation to a field this
+ *  cache serves (role, policy acceptance) so the next request doesn't see a stale value for up
+ *  to the cache's TTL. The token is the same bearer value requireAuth cached it under. */
+export function invalidateAuthedUser(token: string) {
+  loadUserCached.invalidate(token);
+}
+
 /** Verifies the Supabase access token from the Authorization header and loads the user's profile/role. */
 export const requireAuth = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) throw new HttpError(401, "Missing bearer token");
+  req.authToken = token;
   req.user = await loadUserCached(token);
   next();
 });

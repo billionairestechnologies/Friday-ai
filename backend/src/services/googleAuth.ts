@@ -3,6 +3,7 @@ import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { supabasePublic } from "../config/supabasePublic.js";
 import { HttpError } from "../middleware/errorHandler.js";
+import { acceptPolicy } from "./policyService.js";
 
 const GOOGLE_LOGIN_SCOPES = ["openid", "email", "profile"];
 
@@ -89,7 +90,7 @@ export async function completeGoogleLogin(code: string) {
   const email = profile.email.toLowerCase();
   const name = profile.name || email.split("@")[0];
 
-  const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { full_name: name, google_id: profile.id, auth_provider: "google" },
@@ -97,6 +98,12 @@ export async function completeGoogleLogin(code: string) {
   if (createError && !/already|registered|exists/i.test(createError.message)) {
     throw new HttpError(500, createError.message);
   }
+  // A brand-new account has no signup form of its own to check a Terms/Privacy box on — this
+  // stands in for it (same as the checkbox does for the password flow's signup()), rather than
+  // leaving the account to hit the blocking "I Agree" gate on its very first visit. An existing
+  // account signing back in via Google keeps whatever acceptance status it already has (still
+  // re-gated normally if it's behind on a later policy version, same as any other account).
+  if (!createError && created?.user) await acceptPolicy(created.user.id, "web");
 
   const { data: link, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: "magiclink",

@@ -3,8 +3,9 @@ import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AskQuestion } from "@/lib/chat/types";
 
-/** Text the server stores as the question message — also lets the thread recognise it. */
-export const ASK_MARKER = "Before I start building, I have a few quick questions so the result is what you need.";
+/** Text the server stores as the question message — also lets the thread recognise it. Shared by
+ *  Build Mode's and general chat's ask rounds alike, so it's worded generically. */
+export const ASK_MARKER = "A few quick questions before I go ahead, so the result is what you need.";
 /** The user's picks go back as a normal message starting with this (the backend keys off it). */
 export const ANSWERS_PREFIX = "My answers to your questions:";
 
