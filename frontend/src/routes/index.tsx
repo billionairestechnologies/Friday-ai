@@ -347,7 +347,9 @@ export function Home({ conversationId }: { conversationId?: string } = {}) {
         });
       }
     } finally {
-      batch.flush();
+      // Let already-received text finish typing out smoothly (bounded) unless the user hit Stop.
+      if (ac.signal.aborted) batch.flush();
+      else await batch.drain();
       const live = peekLive(chatId);
       useChat.getState().commitTurn(chatId, assistantId, {
         content: live?.text || (askQuestions ? ASK_MARKER : ""),

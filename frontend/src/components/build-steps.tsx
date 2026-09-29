@@ -24,7 +24,7 @@ function StepRow({ step }: { step: BuildStep }) {
   // Narration between actions ("Installing dependencies…") — a plain thought line, not a command.
   if (step.kind === "note") {
     return (
-      <div className="relative py-1 pl-6 text-sm text-foreground">
+      <div className="step-enter relative py-1 pl-6 text-sm text-foreground">
         <span className="absolute top-2 left-0 flex size-4 items-center justify-center bg-background">
           <Lightbulb className="size-3.5 text-muted" />
         </span>
@@ -34,7 +34,7 @@ function StepRow({ step }: { step: BuildStep }) {
   }
   const expandable = Boolean(step.detail);
   return (
-    <div className="relative pl-6">
+    <div className="step-enter relative pl-6">
       <span className="absolute top-1/2 left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
         <StepIcon step={step} />
       </span>
@@ -62,19 +62,19 @@ function WriteGroup({ steps }: { steps: BuildStep[] }) {
   const running = steps.some((st) => st.state === "running");
   const failed = steps.some((st) => st.state === "error");
   return (
-    <div className="relative pl-6">
+    <div className="step-enter relative pl-6">
       <span className="absolute top-1/2 left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
         {running ? <span className="build-orb" aria-hidden /> : failed ? <AlertCircle className="size-3.5 text-danger" /> : <FilePen className="size-3.5 text-muted" />}
       </span>
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 py-1 text-left text-sm hover:text-foreground">
         <span className="text-foreground">{running ? "Editing" : "Edited"} {steps.length} file{steps.length === 1 ? "" : "s"}</span>
-        <span className="min-w-0 flex-1 truncate text-muted">{steps.map((st) => st.label.replace(/^(Wrote|Writing) /, "").replace(/…$/, "")).join(", ")}</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{steps.map((st) => st.label.replace(/^(Wrote|Writing|Edited|Editing) /, "").replace(/…$/, "")).join(", ")}</span>
         <ChevronRight className={cn("size-3.5 text-subtle transition-transform", open && "rotate-90")} />
       </button>
       {open && (
         <div className="mb-1 rounded-lg bg-chip p-2 font-mono text-[11px] leading-relaxed text-muted">
           {steps.map((st) => (
-            <div key={st.id}>{st.label.replace(/^(Wrote|Writing) /, "").replace(/…$/, "")}</div>
+            <div key={st.id}>{st.label.replace(/^(Wrote|Writing|Edited|Editing) /, "").replace(/…$/, "")}</div>
           ))}
         </div>
       )}

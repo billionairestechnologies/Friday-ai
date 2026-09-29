@@ -106,13 +106,22 @@ function FadeInImage({ src, alt }: { src?: string; alt?: string }) {
   );
 }
 
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+const REMARK_PLUGINS = [remarkGfm];
+const REHYPE_HIGHLIGHT = [rehypeHighlight];
+const NO_REHYPE: typeof REHYPE_HIGHLIGHT = [];
+
+/**
+ * `live` = this is the still-streaming tail of a reply: a half-written mermaid diagram is shown as
+ * code (rendering it every frame would throw and flicker), and a very long open code block skips
+ * syntax highlighting until it completes (re-highlighting 10KB+ on every frame drops frames).
+ */
+export const Markdown = memo(function Markdown({ text, live = false }: { text: string; live?: boolean }) {
   if (!text) return null;
   return (
     <div className="md">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={live && text.length > 6000 ? NO_REHYPE : REHYPE_HIGHLIGHT}
         components={{
           a: ({ href, children }) => (
             <a href={href} target="_blank" rel="noreferrer">
@@ -132,7 +141,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
                 {children}
               </CodeBlock>
             );
-            return lang === "mermaid" ? <MermaidBlock text={value} fallback={block} /> : block;
+            return lang === "mermaid" && !live ? <MermaidBlock text={value} fallback={block} /> : block;
           },
           code: ({ className, children, node: _node, ...props }) => (
             <code className={className} {...props}>
@@ -175,14 +184,23 @@ export const StreamingMarkdown = memo(function StreamingMarkdown({
 }) {
   const committedRef = useRef("");
   // Every completed block (a whole paragraph, table, list, code block — whatever
-  // splitStreamingMarkdown's `\n\n`/fence boundary just closed off) gets pushed here once and
-  // rendered as its OWN Markdown instance, so it can fade in as a unit right when it completes.
-  // Previously the entire growing prefix re-rendered as one plain, unanimated block on every
-  // commit — for content-heavy replies (tables, multi-paragraph answers) that's most of what's
-  // on screen, so animating only the last couple of in-progress words barely registered.
+  // splitStreamingMarkdown's `\n\n`/fence boundary just closed off) is pushed here once and rendered
+  // as its OWN memoized Markdown instance, so finished blocks are never re-parsed while the reply
+  // keeps streaming — only the short in-progress tail is.
   const chunksRef = useRef<string[]>([]);
 
-  if (!streaming) {
+  if (streaming) {
+    const { stable } = splitStreamingMarkdown(text);
+    if (stable.length > committedRef.current.length && stable.startsWith(committedRef.current)) {
+      chunksRef.current = [...chunksRef.current, stable.slice(committedRef.current.length)];
+      committedRef.current = stable;
+    } else if (!text.startsWith(committedRef.current)) {
+      // Defensive fallback for the rare case text didn't purely grow from what we'd committed.
+      chunksRef.current = stable ? [stable] : [];
+      committedRef.current = stable;
+    }
+  } else if (!committedRef.current || !text.startsWith(committedRef.current)) {
+    // A message loaded from history (never streamed in this component): one plain render.
     committedRef.current = "";
     chunksRef.current = [];
     return (
@@ -192,49 +210,19 @@ export const StreamingMarkdown = memo(function StreamingMarkdown({
     );
   }
 
-  const { stable } = splitStreamingMarkdown(text);
-  if (stable.length > committedRef.current.length && stable.startsWith(committedRef.current)) {
-    chunksRef.current = [...chunksRef.current, stable.slice(committedRef.current.length)];
-    committedRef.current = stable;
-  } else if (!text.startsWith(committedRef.current)) {
-    // Defensive fallback for the rare case text didn't purely grow from what we'd committed —
-    // same guard the original single-prefix version had, just resetting the chunk list too.
-    chunksRef.current = stable ? [stable] : [];
-    committedRef.current = stable;
-  }
-  const prefix = committedRef.current;
-  const rest = text.startsWith(prefix) ? text.slice(prefix.length) : text;
-  // Word-chunked, not the whole tail as one flat string — each new word mounts (and fades in)
-  // exactly once; a still-growing last word just gets its text updated in place since its array
-  // index — and therefore its React key — doesn't change.
-  const words = rest.match(/\S+\s*/g) ?? [];
-
+  // The tail renders as real markdown too. It used to be plain word spans that were swapped for
+  // formatted markdown (and faded in again from invisible) the moment a paragraph completed — text
+  // the user was already reading blinked out, reflowed and slid back in once per paragraph, the
+  // main "glitchy" feel of streaming. Now nothing already on screen ever re-animates or remounts:
+  // a finished reply keeps this exact tree (same keys), so the end of a stream is seamless too.
+  const rest = text.slice(committedRef.current.length);
   return (
-    <div className="relative min-h-[1.65em] w-full [overflow-anchor:none]">
+    <div className={cn("relative min-h-[1.65em] w-full [overflow-anchor:none]", streaming && "stream-live")}>
       {chunksRef.current.map((chunk, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <Markdown text={chunk} />
-        </motion.div>
+        <Markdown key={i} text={chunk} />
       ))}
-      <span className="md whitespace-pre-wrap text-[0.975rem] leading-[1.65]">
-        {words.map((word, i) => (
-          <motion.span
-            key={i}
-            initial={{ opacity: 0, y: 6, filter: "blur(3px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="inline-block"
-          >
-            {word}
-          </motion.span>
-        ))}
-        <span className="stream-caret" aria-hidden />
-      </span>
+      {rest ? <Markdown key="tail" text={rest} live={streaming} /> : null}
+      {streaming && !rest && <span className="stream-caret" aria-hidden />}
     </div>
   );
 });

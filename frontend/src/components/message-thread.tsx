@@ -141,7 +141,7 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
 
   return (
     <div
-      className="msg-enter group/msg flex min-h-[1.75rem] flex-col items-start gap-3"
+      className="msg-enter group/msg relative flex min-h-[1.75rem] flex-col items-start gap-3"
       style={done ? { contentVisibility: "auto", containIntrinsicSize: "auto 120px" } : undefined}
     >
       {message.streaming && message.build && message.build.steps.length === 0 && !message.build.plan && <BuildBanner />}
@@ -157,7 +157,10 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
         </div>
       )}
 
-      <AnimatePresence initial={false}>
+      {/* popLayout: the exiting pill is lifted out of the flow immediately, so the first streamed
+          words take its place instead of appearing below it and then jumping up when it finishes
+          fading — that jump was the visible "glitch" at the start of every reply. */}
+      <AnimatePresence initial={false} mode="popLayout">
         {waiting && (
           <motion.div
             key="ttft"

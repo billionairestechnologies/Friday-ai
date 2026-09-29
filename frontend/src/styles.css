@@ -290,6 +290,35 @@ html.light {
   text-wrap: pretty;
 }
 
+/* A streamed reply renders one .md per completed block (see StreamingMarkdown) and each block's
+   first/last margins are zeroed above — restore the gap those blocks have inside one document, so
+   spacing is identical while streaming and after (it used to jump when the reply finished). */
+.md + .md {
+  margin-top: 0.7em;
+}
+
+.md + .md > :is(h1, h2, h3):first-child {
+  margin-top: 0.4em;
+}
+
+.md strong {
+  font-weight: 600;
+}
+
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 1.4em 0;
+}
+
+.md li::marker {
+  color: var(--color-muted);
+}
+
+.md li > p {
+  margin: 0.25em 0;
+}
+
 .md h1,
 .md h2,
 .md h3 {
@@ -313,7 +342,21 @@ html.light {
 .md ul,
 .md ol {
   margin: 0.5em 0;
-  padding-left: 1.2em;
+  padding-left: 1.4em;
+}
+
+/* Tailwind's preflight resets list-style to none — without these, every bulleted/numbered answer
+   rendered as bare indented lines with no markers at all. */
+.md ul {
+  list-style: disc;
+}
+
+.md ol {
+  list-style: decimal;
+}
+
+.md ul ul {
+  list-style: circle;
 }
 
 .md li {
@@ -428,8 +471,14 @@ html.light {
 .md th,
 .md td {
   border: 1px solid var(--color-border);
-  padding: 0.4em 0.6em;
+  padding: 0.45em 0.7em;
   text-align: left;
+  vertical-align: top;
+}
+
+.md th {
+  font-weight: 600;
+  background: var(--color-chip);
 }
 
 .scroll-thin {
@@ -445,6 +494,18 @@ html.light {
 
 .msg-enter {
   animation: msg-enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Build/tool step rows: a new row eases in instead of popping, without moving what's above it. */
+.step-enter {
+  animation: step-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
 }
 
 @keyframes msg-enter {
@@ -555,6 +616,22 @@ textarea::-webkit-scrollbar-thumb {
   animation: caret 1.05s steps(1) infinite;
 }
 
+/* The streaming tail is real markdown now, so an inline caret span can't sit at the end of its
+   last line — a pseudo-element on the last text block does, wherever that block is (paragraph,
+   heading, quote, or the last item of a list). Open code blocks get no caret. */
+.stream-live > .md:last-child > :is(p, h1, h2, h3, h4, h5, h6, blockquote):last-child::after,
+.stream-live > .md:last-child > :is(ul, ol):last-child > li:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: var(--color-foreground);
+  animation: caret 1.05s steps(1) infinite;
+}
+
 @keyframes caret {
   50% {
     opacity: 0;
@@ -594,10 +671,13 @@ textarea::-webkit-scrollbar-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   .stream-caret,
+  .stream-live > .md:last-child > :is(p, h1, h2, h3, h4, h5, h6, blockquote):last-child::after,
+  .stream-live > .md:last-child > :is(ul, ol):last-child > li:last-child::after,
   .live-label,
   .think-dot,
   .enter-up,
   .msg-enter,
+  .step-enter,
   .spin-slow,
   .rise,
   .ambient-glow-breathe,
