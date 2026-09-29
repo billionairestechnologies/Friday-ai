@@ -160,6 +160,14 @@ export function startStatusMonitor(intervalMs = PROBE_INTERVAL_MS) {
   if (monitor || process.env.FRIDAY_DISABLE_STATUS_MONITOR) return;
   let runs = 0;
   const tick = async () => {
+    // Several API instances each run this timer; a short Redis lease makes one of them do the
+    // probing per interval (duplicate rows would skew nothing, but two instances could each open
+    // the same automatic incident). Without Redis there's only one instance to worry about.
+    const redis = await getRedisClient().catch(() => null);
+    if (redis) {
+      const got = await redis.set("status:probe:lease", String(process.pid), { NX: true, PX: Math.max(30_000, intervalMs - 15_000) }).catch(() => "OK");
+      if (got !== "OK") return;
+    }
     await runProbes().catch((err) => logger.warn("status_probe_run_failed", { error: String(err) }));
     // Prune once a day-ish (every 288 runs at the 5-minute default).
     if (runs++ % 288 === 0) {

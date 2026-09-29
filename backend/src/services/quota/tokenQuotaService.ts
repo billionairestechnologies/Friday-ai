@@ -379,7 +379,9 @@ export async function reconcileQuota(reservation: Reservation, actualTokens: num
     if (actualTokens > 0) {
       const [tsPart] = reservation.rollingMember.split("-");
       const score = Number(tsPart) || Date.now();
-      await redis.zAdd(reservation.rollingKey, [{ score, value: `${tsPart}-corrected:${actualTokens}` }]);
+      // Unique per turn: two turns reconciling in the same millisecond with the same total would
+      // otherwise collapse into one sorted-set member and under-count the window.
+      await redis.zAdd(reservation.rollingKey, [{ score, value: `${tsPart}-corrected-${randomUUID()}:${actualTokens}` }]);
     }
   }
   if (delta !== 0) {
