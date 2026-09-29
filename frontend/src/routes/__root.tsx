@@ -4,6 +4,7 @@ import { useChat } from "@/lib/chat/store";
 import { currentDirection, currentLocale } from "@/lib/i18n";
 import { QuotaAlerts } from "@/components/quota-alerts";
 import { ConsentGate } from "@/components/consent-gate";
+import { WhatsNewModal } from "@/components/whats-new-modal";
 
 export function RootLayout() {
   const appearance = useChat((s) => s.appearance);
@@ -19,6 +20,7 @@ export function RootLayout() {
       <Outlet />
       <QuotaAlerts />
       <ConsentGate />
+      <WhatsNewModal />
     </>
   );
 }

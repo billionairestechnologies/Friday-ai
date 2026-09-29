@@ -137,6 +137,29 @@ export function UpgradePage() {
   const [annual, setAnnual] = useState(false);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Offer codes (Team Console → Plans & offers): a discount code rides along to checkout (the
+  // server re-validates and applies it); plan/pass codes apply immediately.
+  const [code, setCode] = useState("");
+  const [discount, setDiscount] = useState<{ code: string; percent: number; appliesTo: string[] } | null>(null);
+  const [redeeming, setRedeeming] = useState(false);
+
+  async function applyCode() {
+    if (!code.trim()) return;
+    setRedeeming(true);
+    setNotice(null);
+    try {
+      const res = await api.post<{ status: "applied" | "pending" | "discount"; message: string; percent?: number; appliesTo?: string[] }>("/offers/redeem", { code });
+      if (res.status === "discount") setDiscount({ code: code.trim(), percent: res.percent ?? 0, appliesTo: res.appliesTo ?? [] });
+      else setDiscount(null);
+      setNotice(res.message);
+    } catch (err) {
+      setDiscount(null);
+      setNotice(err instanceof Error ? err.message : "That code didn't work");
+    } finally {
+      setRedeeming(false);
+    }
+  }
+  const offerFor = (planId: string) => (discount && discount.appliesTo.includes(planId) ? { offerCode: discount.code } : {});
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [orgName, setOrgName] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
@@ -200,6 +223,7 @@ export function UpgradePage() {
       const res = await api.post<CheckoutResponse>("/billing/orders", {
         planId,
         billingCycle: annual ? "annual" : "monthly",
+        ...offerFor(planId),
       });
       const failMsg = await openCheckout(res);
       if (failMsg) setNotice(failMsg);
@@ -223,6 +247,7 @@ export function UpgradePage() {
         billingCycle: annual ? "annual" : "monthly",
         seats,
         organizationId: selectedOrgId,
+        ...offerFor("enterprise"),
       });
       const failMsg = await openCheckout(res);
       if (failMsg) setNotice(failMsg);
@@ -292,6 +317,28 @@ export function UpgradePage() {
             Save {config?.annualDiscountPercent ?? 10}%
           </span>
         </label>
+
+        {signedIn && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void applyCode();
+            }}
+            className="mt-4 flex items-center gap-2"
+          >
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="Have a code?"
+              aria-label="Offer code"
+              className="h-9 w-44 rounded-full border border-border bg-background px-4 font-mono text-sm tracking-wider text-foreground outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-subtle focus:border-foreground/40"
+            />
+            <button type="submit" disabled={!code.trim() || redeeming} className="h-9 rounded-full border border-border px-4 text-sm font-medium hover:bg-chip disabled:opacity-50">
+              {redeeming ? "Checking…" : "Apply"}
+            </button>
+            {discount && <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-500">{discount.percent}% off applied</span>}
+          </form>
+        )}
 
         {notice && (
           <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">{notice}</p>

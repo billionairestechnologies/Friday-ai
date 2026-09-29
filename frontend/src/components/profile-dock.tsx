@@ -49,7 +49,7 @@ export function ProfileDock() {
           <div className="my-1 h-px bg-border" />
           <MenuItem icon={<Settings className="size-4" />} label="Settings" onClick={() => go("settings")} />
           <MenuItem icon={<Puzzle className="size-4" />} label="Plugins" onClick={() => go("plugins")} />
-          <MenuItem icon={<CircleHelp className="size-4" />} label="Help" onClick={() => go("help")} />
+          <MenuItem icon={<CircleHelp className="size-4" />} label="Help & support" onClick={() => go("help")} />
           <MenuItem
             icon={<Sparkles className="size-4" />}
             label="Upgrade plan"

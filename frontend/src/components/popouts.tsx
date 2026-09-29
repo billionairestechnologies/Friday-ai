@@ -1,3 +1,4 @@
+import { SupportCenter } from "@/components/support-center";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, LayoutDashboard, Link2, Share2, X } from "lucide-react";
@@ -433,17 +434,6 @@ export function LoginPopout() {
   );
 }
 
-function HelpPopout() {
-  const dialog = useChat((s) => s.dialog);
-  const setDialog = useChat((s) => s.setDialog);
-  return (
-    <Shell open={dialog === "help"} onClose={() => setDialog(null)} title="Help">
-      <p className="text-sm leading-relaxed text-muted">
-        Friday answers in this chat. Turn on Search for live web, Think for the reasoning trail, and Canvas to open a workspace on the right when something is built. Friday can be wrong — check anything important.
-      </p>
-    </Shell>
-  );
-}
 
 
 // Settings/account already live in the sidebar's ProfileDock (bottom of the sidebar) — these
@@ -557,7 +547,7 @@ export function Popouts() {
       <LoginPopout />
       <SettingsModal />
       <PluginsDrawer />
-      <HelpPopout />
+      <SupportCenter />
     </>
   );
 }
