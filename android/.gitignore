@@ -11,3 +11,8 @@
 *.aab
 *.ap_
 *.dex
+
+# Play Store upload key — generated locally per README below, never committed.
+keystore.properties
+*.jks
+*.keystore
