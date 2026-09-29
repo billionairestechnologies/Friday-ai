@@ -24,7 +24,7 @@ android {
         applicationId = "com.friday.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "API_BASE_URL", "\"https://friday.billionairestechnologies.com/api/\"")
