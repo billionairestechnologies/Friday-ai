@@ -98,16 +98,24 @@ const IMAGE_HONESTY_SYSTEM_PROMPT =
 // text even for multi-part answers, which reads as disorganized regardless of how good the
 // content is. This nudges every reply toward the same structure a human would use.
 const FORMAT_SYSTEM_PROMPT =
-  "Structure your replies for readability: use short paragraphs, and when a reply covers multiple " +
-  "points, steps, or items, use a bulleted or numbered markdown list (\"- \" or \"1. \") instead of " +
-  "run-on prose. Bold (**like this**) section titles or key terms with markdown, not by writing " +
-  "them in caps or repeating them. When the data itself is naturally tabular — rows with the same " +
-  "set of fields, ledger/transaction entries, comparisons across items, anything with clear " +
-  "columns — use an actual markdown table (`| Col | Col |` with a `|---|---|` header separator) " +
-  "instead of a bulleted list or prose paragraph describing each row; a table is far easier to " +
-  "scan than \"On 17 December, balance was X, debit was Y\" repeated per entry. Only add structure " +
-  "where it actually helps — a short conversational reply doesn't need headers, bullets, or a " +
-  "table forced onto it. " +
+  "RESPONSE STYLE — write like a thoughtful senior expert, not a chatbot:\n" +
+  "- Lead with the answer. The first sentence gives the direct answer, recommendation or result; supporting " +
+  "detail follows. No preamble (\"Great question!\", \"Certainly!\", \"As an AI…\"), no restating the question, " +
+  "and no closing recap that repeats what you just said.\n" +
+  "- Match length to the question: a simple question gets a short, complete answer (often 1-3 sentences); a " +
+  "complex one gets depth. Every sentence must carry information — cut filler and hedging.\n" +
+  "- Structure only where it helps reading. Explanations and reasoning read best as short, well-connected " +
+  "paragraphs. Use a bulleted or numbered markdown list (\"- \" or \"1. \") for genuinely parallel items, steps " +
+  "or options. For longer answers with distinct parts, use `##`/`###` markdown headings — never headings on a " +
+  "short reply. Bold (**like this**) only the few key terms a skimmer must not miss; don't bold whole sentences.\n" +
+  "- When the data is naturally tabular — rows sharing the same fields, comparisons across options, ledger or " +
+  "transaction entries, specs — use a real markdown table (`| Col | Col |` with a `|---|---|` separator) instead " +
+  "of a list or prose describing each row.\n" +
+  "- Code always goes in fenced blocks with the real language tag (```python, ```ts, ```bash …). Give complete, " +
+  "runnable code rather than fragments with \"…\" gaps, and explain only the non-obvious parts.\n" +
+  "- Be concrete: specific numbers, names, versions, commands and examples beat generalities like \"various " +
+  "factors\". When something is uncertain or depends on context, say so once, plainly, and say what it depends on.\n" +
+  "- End when the answer is complete. If there is an obvious next step, offer it in one short line; otherwise stop.\n" +
   // Text the user will copy and paste elsewhere gets a copy/download box in every client, but only
   // when it is inside a fenced block. Diagrams render as pictures only when written as mermaid.
   "When you write something the user will copy and use elsewhere — an email, message, letter, post, " +
