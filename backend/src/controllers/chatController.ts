@@ -109,6 +109,12 @@ export async function streamMessage(req: Request, res: Response) {
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
+  // Reverse proxies (nginx-style edges, Railway's included) may buffer a response body until a
+  // size threshold — tokens then arrive in delayed bursts ("sticks, then dumps a paragraph") no
+  // matter how evenly the model streams. This header opts the stream out of proxy buffering.
+  res.setHeader("X-Accel-Buffering", "no");
+  // Every token is a tiny write; Nagle's algorithm would hold them back to coalesce packets.
+  res.socket?.setNoDelay(true);
   res.flushHeaders?.();
 
   // Generation is decoupled from the connection: closing the tab / killing the app only drops

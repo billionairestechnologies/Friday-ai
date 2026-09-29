@@ -36,6 +36,7 @@ import {
 } from "./promptContext.js";
 import { loadMemoryPrompt } from "../memoryService.js";
 import { buildToolset, toolUsePrompt } from "../agent/toolset.js";
+import type { FridayTool } from "../agent/tools/types.js";
 import { DEEP_RESEARCH_ROUNDS, runToolLoop, supportsTools, type ToolLoopResult } from "../agent/toolLoop.js";
 import { DEEP_RESEARCH_PROMPT } from "../agent/toolset.js";
 import { streamTeamUp } from "./teamUp.js";
@@ -136,6 +137,14 @@ async function tryGenerateOrEditImage(
 
 const CONNECTOR_TOOL_PREFIX = /^(github|gmail|drive|calendar|notion|vercel|railway|supabase|razorpay|mcp)_/;
 
+function adapterHasTools(slug: string): boolean {
+  try {
+    return typeof getProviderAdapter(slug).chatStreamWithTools === "function";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Streams a reply token-by-token via `onEvent`. Single/Auto stream one model's answer directly;
  * Team Up runs its proposers concurrently (emitting `agent` start/done/error events for each so
@@ -184,12 +193,30 @@ export async function streamMessage(
     // them off NOW, in parallel with each other and with the history query below, and await them only
     // where the result is needed — the latency hides behind work that had to happen anyway.
     const SHORT_CAPTION_CHARS_EARLY = 20;
+    const toolsEnabled = !process.env.FRIDAY_DISABLE_TOOLS;
+    // Will this reply run through the agent tool loop? Then the model decides for itself whether to
+    // search (web_search is one of its tools), and the pre-flight YES/NO search probe — up to 1.5s
+    // on the critical path of every question — is pure added latency before the first token.
+    const toolsLikelyPromise: Promise<boolean> =
+      !toolsEnabled || webSearch || mode === "teamup"
+        ? Promise.resolve(false)
+        : mode === "single"
+          ? Promise.resolve(Boolean(conversation.providers?.slug) && adapterHasTools(conversation.providers!.slug))
+          : listChatCandidates()
+              .then((pool) => {
+                const first = rankCandidatesForMessage(pool, content)[0];
+                return first ? supportsTools(first) : false;
+              })
+              .catch(() => false);
     const searchIntentPromise: Promise<boolean> =
       !webSearch &&
       (attachments.length === 0 || content.trim().length >= SHORT_CAPTION_CHARS_EARLY) &&
       shouldProbeForLiveSearch(content)
-        ? detectNeedsLiveSearch(content)
+        ? toolsLikelyPromise.then((toolsLikely) => (toolsLikely ? false : detectNeedsLiveSearch(content)))
         : Promise.resolve(false);
+    // The toolset (connector + MCP lookups) doesn't depend on anything else — load it alongside.
+    const toolsetPromise: Promise<FridayTool[]> | null = toolsEnabled && mode !== "teamup" ? buildToolset(userId) : null;
+    toolsetPromise?.catch(() => {});
     mark("user message stored");
     // The plan/tier lookup is a DB round trip that doesn't depend on anything above — start it now.
     const effectivePlanPromise = resolveEffectivePlan(userId);
@@ -625,7 +652,7 @@ export async function streamMessage(
     }
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
       if (research) onEvent({ t: "status", s: "searching" });
-      const tools = await buildToolset(userId);
+      const tools = await (toolsetPromise ?? buildToolset(userId));
       const citedUrls = new Set(searchResults.map((r) => r.url));
       const guidance = toolUsePrompt(tools) + (research ? `\n\n${DEEP_RESEARCH_PROMPT}` : "");
       toolRun = await runToolLoop({

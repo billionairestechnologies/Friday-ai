@@ -12,6 +12,8 @@ import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
   const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools()];
+  // Both lookups sit on the critical path before the first token — run them concurrently.
+  const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());
   if (connected.has("github")) tools.push(...GITHUB_TOOLS);
   const googleScopes = connected.get("google");
@@ -21,7 +23,7 @@ export async function buildToolset(userId: string): Promise<FridayTool[]> {
   }
   // Tools from the user's own MCP servers; names never shadow a built-in tool.
   const taken = new Set(tools.map((t) => t.spec.name));
-  tools.push(...(await loadMcpTools(userId).catch(() => [])).filter((t) => !taken.has(t.spec.name)));
+  tools.push(...(await mcpPromise).filter((t) => !taken.has(t.spec.name)));
   return tools;
 }
 
