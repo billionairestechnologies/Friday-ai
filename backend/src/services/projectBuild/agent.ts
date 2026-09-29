@@ -10,12 +10,26 @@ import { findGitHubRepoUrl, importRepo, openPullRequest } from "./github.js";
 import JSZip from "jszip";
 import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, saveProject, tail } from "./sandbox.js";
 import { BUILD_TOOL_SPECS, compactToolCallArgs, toolCallToAction, type NativeBuildAction } from "./tools.js";
+import { SAVED_OUTPUT_CHARS, codePreview, editDiff, langForPath, tailText, throttledOutput } from "./activity.js";
+import { fetchUrlTool, webSearchTool } from "../agent/tools/web.js";
+import { SUMMARY_PROMPT, applySummary, planSummaryCut, renderTranscript, transcriptChars } from "./summarize.js";
 
 // A native tool round can carry several calls (write 4 files at once), so the round budget goes
 // further than a text-protocol iteration did. The wall clock is the real ceiling; the sandbox TTL
 // is refreshed on every action (sandbox.ts touch()), so a long build never loses its box midway.
-const MAX_ITERATIONS = 60;
-const MAX_WALL_MS = 25 * 60_000;
+const MAX_ITERATIONS = 100;
+const MAX_WALL_MS = 40 * 60_000;
+// Past this much transcript (after dropping old file bodies), older turns are summarised by the model
+// so a long build keeps its thread instead of running into the context window.
+const SUMMARIZE_AT_CHARS = 150_000;
+const KEEP_RECENT_MESSAGES = 10;
+
+/** What FRIDAY.md — the project memory Friday keeps in EVERY project — must contain. */
+const FRIDAY_MD_SPEC =
+  "FRIDAY.md is this project's memory for future sessions (like CLAUDE.md): a short markdown file at the project root " +
+  "with ## Overview (what it is, for whom), ## Stack (frameworks + key versions), ## Run & test (exact commands, ports), " +
+  "## Structure (key folders/files and what each does), ## Decisions (important choices and why), and " +
+  "## Status & next steps (what works, known gaps/placeholders). Keep it accurate and under ~80 lines.";
 // "Done" is re-verified (failed commands, the project's own build/tests, a real browser) and pushed
 // back this many times before a claim is accepted as-is.
 const MAX_DONE_PUSHBACKS = 4;
@@ -81,7 +95,8 @@ RULES
 - When the project runs correctly, finish with exactly one <friday-done>…</friday-done>. Never claim it works if you did not see it run.
 - NEVER tell the user to run commands themselves ("run npm install", "then npm start"). You run them, with <friday-run>/<friday-start>, and you only say it works after you saw it work.
 - If the user asks to change/fix/extend an existing project, edit the existing files (read them first if needed) instead of starting over. Prefer <friday-edit> for small or medium changes to an existing file; use <friday-write> for new files or full rewrites. In an unfamiliar codebase, look around first with <friday-ls> and <friday-grep>.
-- Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below — it describes that repo's conventions, commands and tests. Run the project's tests/linters when they exist before finishing.`;
+- Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below — it describes that repo's conventions, commands and tests. Run the project's tests/linters when they exist before finishing.
+- FRIDAY.md in EVERY project: write it with your first files on a new project, and update it before <friday-done> whenever the project changed. ${FRIDAY_MD_SPEC}`;
 
 /** System prompt for the native tool-calling path (the text-protocol prompt above describes tags instead). */
 const NATIVE_BUILD_PROMPT = `You are Friday's Build agent — a senior software engineer with a real Linux sandbox (Node.js LTS + npm, Python 3, git, curl, internet access). You build and fix the user's project for real with your tools: write the files, install, run, read the errors, fix them and repeat until it genuinely works. Deliver a complete, runnable project with a proper folder structure — never snippets.
@@ -92,7 +107,7 @@ THE LOOP — work like this until the job is truly done:
 3. Build — write_file for new files or full rewrites, edit_file for targeted changes to existing files. Call several independent tools in the SAME turn when you can (e.g. write all the config + source files at once) — it is much faster.
 4. Run — run_command to install/build/test; start_server for web apps and APIs.
 5. Verify — read every result. For a web app call check_app after start_server; for an API curl its endpoints; run the project's own tests/build when it has them.
-6. Fix — on any error find the ROOT CAUSE (read the failing file, check versions/config/imports/ports), fix it and re-run. Never repeat a fix that already failed; if the same thing failed twice, step back and change approach.
+6. Fix — on any error find the ROOT CAUSE (read the failing file, check versions/config/imports/ports), fix it and re-run. Never repeat a fix that already failed; if the same thing failed twice, step back and change approach. Unsure about a library's current API, the right package version or an unfamiliar error? web_search it and fetch_url the docs instead of guessing.
 7. Finish — call finish only after you have seen it work. Friday then re-verifies (build, tests, browser) and sends back anything still broken for you to fix.
 
 RULES
@@ -104,6 +119,7 @@ RULES
 - Make it genuinely polished: modern responsive UI, real content (no lorem ipsum / TODO placeholders). Exception: contact details the user never gave you — use obviously fake placeholders (hello@yourdomain.com, +1 (555) 000-0000) and say so in the summary.
 - NEVER tell the user to run commands themselves — you run them, and you only say it works after you saw it work.
 - Existing projects: edit what's there instead of starting over. Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below and run its tests/linters before finishing.
+- FRIDAY.md in EVERY project: write it with your first batch of files on a new project, and update it before you finish whenever the project changed. ${FRIDAY_MD_SPEC}
 - Between tool calls write at most one short plain sentence about what you're doing. Save the explanation for the finish summary.
 - The finish summary is what the user reads: clean, well-structured markdown — a one-line headline of what now works, a short "What's inside" list (key files/folders and what they do), "How to use it", then any placeholders, limitations or next steps. No walls of text.`;
 
@@ -205,12 +221,17 @@ export async function runBuildAgent(opts: {
   }
   const existingFiles = Object.keys(project?.files ?? {});
 
-  // Repo conventions for the agent, like Claude Code's CLAUDE.md / Codex's AGENTS.md.
+  // Repo conventions for the agent, like Claude Code's CLAUDE.md / Codex's AGENTS.md — plus FRIDAY.md,
+  // the project memory Friday itself keeps in every project (see FRIDAY_MD_SPEC), read on every turn.
   let instructionFile = "";
-  for (const name of ["AGENTS.md", "FRIDAY.md", "CLAUDE.md"]) {
-    const content = project?.files?.[name] ?? (existingFiles.length ? await box.read(name).catch(() => null) : null);
+  const readProjectFile = async (name: string) =>
+    project?.files?.[name] ?? (existingFiles.length ? await box.read(name).catch(() => null) : null);
+  const fridayMd = await readProjectFile("FRIDAY.md");
+  if (fridayMd) instructionFile += `\n\nPROJECT MEMORY (FRIDAY.md — keep it current):\n${tail(fridayMd, 5000)}`;
+  for (const name of ["AGENTS.md", "CLAUDE.md"]) {
+    const content = await readProjectFile(name);
     if (content) {
-      instructionFile = `\n\nPROJECT INSTRUCTIONS (${name}):\n${tail(content, 4000)}`;
+      instructionFile += `\n\nPROJECT INSTRUCTIONS (${name}):\n${tail(content, 4000)}`;
       break;
     }
   }
@@ -268,6 +289,8 @@ export async function runBuildAgent(opts: {
   // Bumped on every successful write/edit: a check that passed at the current value is still valid,
   // so the done-gate never re-runs a build/test/browser check the agent itself just passed.
   let writeSeq = 0;
+  let fridayMdTouched = false;
+  let fridayMdNudged = false;
   const okRunAt = new Map<string, number>();
   let appCheckedOkAt = -1;
   let checkAppUses = 0;
@@ -285,7 +308,7 @@ export async function runBuildAgent(opts: {
   /** Opens the running app in a real browser (+ a vision review). Returns a problem report, or "" if it looks right. */
   const inspectApp = async (label: string): Promise<string> => {
     if (!last.start) return "";
-    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label, state: "running" };
+    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label, state: "running", startedAt: Date.now() };
     steps.push(step);
     onEvent({ t: "step", ...step });
     const problems: string[] = [];
@@ -305,6 +328,7 @@ export async function runBuildAgent(opts: {
     }
     step.state = problems.length ? "error" : "ok";
     step.detail = tail(problems.join("\n\n") || detail || "Looks good", 700);
+    step.ms = Date.now() - step.startedAt!;
     onEvent({ t: "step", ...step });
     if (!problems.length) appCheckedOkAt = writeSeq;
     return problems.join("\n\n");
@@ -342,12 +366,20 @@ export async function runBuildAgent(opts: {
     verifyRounds++;
     const failures: string[] = [];
     for (const check of pending) {
-      const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: check.label, state: "running" };
+      const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: check.label, state: "running", cmd: check.cmd, startedAt: Date.now() };
       steps.push(step);
       onEvent({ t: "step", ...step });
-      const out = await box.run(check.cmd, 5 * 60_000, signal);
+      const live = throttledOutput((output) => {
+        step.output = output;
+        onEvent({ t: "step", ...step });
+      });
+      const out = await box.run(check.cmd, 5 * 60_000, signal, (chunk) => live.push(chunk));
+      live.stop();
       step.state = out.ok ? "ok" : "error";
       step.detail = tail(out.output, 700);
+      step.output = tailText(out.output, SAVED_OUTPUT_CHARS);
+      step.exitCode = out.exitCode;
+      step.ms = Date.now() - step.startedAt!;
       onEvent({ t: "step", ...step });
       recordRun(check.cmd, out.ok);
       if (!out.ok) {
@@ -445,7 +477,7 @@ export async function runBuildAgent(opts: {
         : name === "start"
           ? a.desc || "Starting server…"
           : a.desc || "Running command…";
-    const step: BuildStep = { id: `s${++stepSeq}`, kind, label, state: "running" };
+    const step: BuildStep = { id: `s${++stepSeq}`, kind, label, state: "running", startedAt: Date.now(), ...(a.path ? { path: a.path } : {}) };
     steps.push(step);
     onEvent({ t: "step", ...step });
     return step;
@@ -473,6 +505,26 @@ export async function runBuildAgent(opts: {
         ? `[check_app] problems found:\n${tail(problems, 3000)}`
         : "[check_app] the page loads with no console errors, has content, and the visual review passed.";
     }
+    if (action.kind === "web") {
+      const tool = action.tool === "web_search" ? webSearchTool : fetchUrlTool;
+      const step: BuildStep = { id: `s${++stepSeq}`, kind: "tool", label: tool.label(action.args), state: "running", startedAt: Date.now() };
+      steps.push(step);
+      onEvent({ t: "step", ...step });
+      try {
+        const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timed out")), 45_000));
+        const result = await Promise.race([tool.run(action.args, { userId, conversationId, signal }), timeout]);
+        step.state = "ok";
+        step.detail = tail(result, 600);
+        return `[${action.tool}]\n${tail(result, 12_000)}`;
+      } catch (err) {
+        step.state = "error";
+        step.detail = err instanceof Error ? err.message : "failed";
+        return `[${action.tool}] failed: ${step.detail}`;
+      } finally {
+        step.ms = Date.now() - step.startedAt!;
+        onEvent({ t: "step", ...step });
+      }
+    }
     const meta = describe(action)!;
     let step: BuildStep;
     if (live && live.kind === meta.kind) {
@@ -484,13 +536,17 @@ export async function runBuildAgent(opts: {
         live.detail = "Not executed";
         onEvent({ t: "step", ...live });
       }
-      step = { id: `s${++stepSeq}`, kind: meta.kind, label: meta.label, state: "running" };
+      step = { id: `s${++stepSeq}`, kind: meta.kind, label: meta.label, state: "running", startedAt: Date.now() };
       steps.push(step);
     }
+    step.startedAt ??= Date.now();
+    if (action.kind === "write" || action.kind === "edit" || action.kind === "read") step.path = action.path;
+    if (action.kind === "run" || action.kind === "start") step.cmd = action.cmd.slice(0, 2000);
     onEvent({ t: "step", ...step });
     const finish = (state: "ok" | "error", detail?: string) => {
       step.state = state;
       if (detail) step.detail = tail(detail, 700);
+      step.ms = Date.now() - step.startedAt!;
       onEvent({ t: "step", ...step });
     };
 
@@ -503,6 +559,9 @@ export async function runBuildAgent(opts: {
         }
         await box.write(path, action.content);
         writeSeq++;
+        if (path === "FRIDAY.md") fridayMdTouched = true;
+        const preview = codePreview(action.content);
+        Object.assign(step, { path, lang: langForPath(path), code: preview.code, added: preview.added });
         finish("ok");
         if (++writesSinceSnapshot >= 6) void saveProgress();
         return `[write ${path}] ok (${action.content.length} chars)`;
@@ -521,6 +580,9 @@ export async function runBuildAgent(opts: {
         }
         await box.write(path, applied.content);
         writeSeq++;
+        if (path === "FRIDAY.md") fridayMdTouched = true;
+        const diff = editDiff(action.edits);
+        Object.assign(step, { path, lang: "diff", code: diff.code, added: diff.added, removed: diff.removed });
         finish("ok");
         if (++writesSinceSnapshot >= 6) void saveProgress();
         return `[edit ${path}] ok (${action.edits.length} change${action.edits.length === 1 ? "" : "s"} applied)`;
@@ -581,9 +643,17 @@ export async function runBuildAgent(opts: {
         return `[read ${action.path}]\n${tail(content, 6000)}`;
       }
       if (action.kind === "run") {
-        const out = await box.run(action.cmd, 5 * 60_000, signal);
+        // Live terminal: output streams into the step row while the command runs.
+        const live = throttledOutput((output) => {
+          step.output = output;
+          onEvent({ t: "step", ...step });
+        });
+        const out = await box.run(action.cmd, 5 * 60_000, signal, (chunk) => live.push(chunk));
+        live.stop();
         recordRun(action.cmd, out.ok);
         if (out.ok && /\b(install|add|ci)\b/.test(action.cmd)) void saveProgress(true);
+        step.output = tailText(out.output, SAVED_OUTPUT_CHARS);
+        step.exitCode = out.exitCode;
         finish(out.ok ? "ok" : "error", out.output);
         if (!out.ok) {
           const key = `${action.cmd}::${tail(out.output, 300)}`;
@@ -609,9 +679,11 @@ export async function runBuildAgent(opts: {
             return `[start ${JSON.stringify(action.cmd)}] server is listening on port ${action.port} BUT the app is BROKEN — requesting its files fails:\n${tail(problems, 2500)}\nServer log:\n${tail(res.log, 1500)}\nFix the cause (check dependency versions/config), then start it again.`;
           }
           appBroken = false;
+          step.output = tailText(res.log, SAVED_OUTPUT_CHARS);
           finish("ok", res.log);
           return `[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}; all pages/scripts/styles load without errors\n${tail(res.log, 1500)}`;
         }
+        step.output = tailText(res.log, SAVED_OUTPUT_CHARS);
         finish("error", res.log || "The server did not respond in time");
         const key = `start::${tail(res.log, 300)}`;
         seenErrors.set(key, (seenErrors.get(key) ?? 0) + 1);
@@ -645,7 +717,17 @@ export async function runBuildAgent(opts: {
       verifyProblems = await verifyProject();
       if (!verifyProblems) gateProblems = await qualityGate();
     }
-    if (!appBroken && failedCmds.length === 0 && !verifyProblems && !gateProblems) return null;
+    if (!appBroken && failedCmds.length === 0 && !verifyProblems && !gateProblems) {
+      // Everything works — last, make sure the project memory is current (once per run, only when code changed).
+      if (writeSeq > 0 && !fridayMdTouched && !fridayMdNudged) {
+        fridayMdNudged = true;
+        return (
+          "Everything passes — one last thing before finishing: FRIDAY.md was not written or updated in this run. " +
+          `${FRIDAY_MD_SPEC} Create or update it now (edit_file for small updates), then finish again.`
+        );
+      }
+      return null;
+    }
     donePushbacks++;
     return (
       `You said you're done, but something is still failing${appBroken ? " (the running app does not load cleanly)" : ""}` +
@@ -671,7 +753,7 @@ export async function runBuildAgent(opts: {
   // ---- Native tool-calling path (preferred) ----
   const toolCandidates = opts.candidates.filter(supportsTools);
   let mode: "native" | "text" = NATIVE_TOOLS_ENABLED && toolCandidates.length > 0 ? "native" : "text";
-  const nativeMessages: AgentMessage[] = [
+  let nativeMessages: AgentMessage[] = [
     { role: "system", content: `${NATIVE_BUILD_PROMPT}\n\n${stateNote}${planNote}` },
     ...opts.history.filter((m) => m.role !== "system"),
   ];
@@ -737,6 +819,46 @@ export async function runBuildAgent(opts: {
     }
     return { error: lastError };
   };
+  /** Replaces all but the latest turns with a model-written summary once the transcript outgrows the budget. */
+  const compactBySummary = async () => {
+    const cut = planSummaryCut(nativeMessages, KEEP_RECENT_MESSAGES);
+    if (cut < 0) return;
+    const step: BuildStep = { id: `s${++stepSeq}`, kind: "run", label: "Compacting context so the build can keep going", state: "running", startedAt: Date.now() };
+    steps.push(step);
+    onEvent({ t: "step", ...step });
+    const mechanical = steps
+      .filter((st) => st.kind !== "note" && st !== step)
+      .slice(-60)
+      .map((st) => `- ${st.state === "error" ? "FAILED: " : ""}${st.label}`)
+      .join("\n");
+    let summary = "";
+    const summarizer = usedCandidate ?? toolCandidates[0];
+    if (summarizer) {
+      try {
+        const adapter = getProviderAdapter(summarizer.slug);
+        const apiKey = await getWorkingKeyForProvider(summarizer.slug);
+        const transcript = renderTranscript(nativeMessages.slice(0, cut));
+        const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("summary timed out")), 60_000));
+        summary = await Promise.race([
+          adapter.chat(apiKey, summarizer.modelId, [
+            { role: "system", content: SUMMARY_PROMPT },
+            { role: "user", content: transcript },
+          ]),
+          timeout,
+        ]);
+        usage = mergeTokenUsage(usage, estimateTokenUsageFromText(transcript.length, summary.length));
+      } catch (err) {
+        console.error("[build] summary failed, using the step log:", err instanceof Error ? err.message : err);
+      }
+    }
+    if (!summary.trim()) summary = `Steps taken so far:\n${mechanical}`;
+    nativeMessages = applySummary(nativeMessages, cut, summary.trim(), userRequestText);
+    step.state = "ok";
+    step.detail = tail(summary, 700);
+    step.ms = Date.now() - step.startedAt!;
+    onEvent({ t: "step", ...step });
+  };
+
   /** Hands a half-finished native run to the text protocol, telling it what already happened. */
   const fallBackToText = (why: string) => {
     console.error(`[build] native tools unavailable, falling back to the text protocol: ${why}`);
@@ -760,6 +882,7 @@ export async function runBuildAgent(opts: {
     if (mode === "native") {
       compactToolCallArgs(nativeMessages);
       compactToolResults(nativeMessages);
+      if (transcriptChars(nativeMessages) > SUMMARIZE_AT_CHARS) await compactBySummary();
       const turnResult = await nativeTurn();
       if (signal?.aborted) break;
       if ("error" in turnResult) {

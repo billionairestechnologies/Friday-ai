@@ -163,8 +163,12 @@ export class BuildSandbox {
     return this.withReconnect(() => this.sandbox.files.read(`${PROJECT_DIR}/${path}`));
   }
 
-  /** Runs a command to completion (installs, builds, scripts). Never throws — failures are data. */
-  async run(cmd: string, timeoutMs = 5 * 60_000, signal?: AbortSignal): Promise<RunOutcome> {
+  /**
+   * Runs a command to completion (installs, builds, scripts). Never throws — failures are data.
+   * `onOutput` receives stdout/stderr as it is produced, so the UI can show a live terminal instead
+   * of a spinner that sits silent for the whole of a 2-minute `npm install`.
+   */
+  async run(cmd: string, timeoutMs = 5 * 60_000, signal?: AbortSignal, onOutput?: (chunk: string) => void): Promise<RunOutcome> {
     this.touch();
     if (signal?.aborted) return { ok: false, exitCode: -1, output: "cancelled" };
     try {
@@ -172,6 +176,7 @@ export class BuildSandbox {
         this.sandbox.commands.run(`bash -lc ${JSON.stringify(`cd ${PROJECT_DIR} && ${cmd}`)}`, {
           timeoutMs,
           envs: { CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
+          ...(onOutput ? { onStdout: (d: string) => onOutput(d), onStderr: (d: string) => onOutput(d) } : {}),
         }),
       );
       return { ok: true, exitCode: 0, output: [result.stdout, result.stderr].filter(Boolean).join("\n") };

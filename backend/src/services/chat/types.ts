@@ -4,7 +4,7 @@ export type StreamEvent =
   | { t: "text"; c: string }
   | { t: "think"; c: string }
   | { t: "cite"; u: string; title?: string }
-  | { t: "step"; id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string }
+  | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
@@ -17,7 +17,35 @@ export type ConversationMode = "single" | "auto" | "teamup";
 export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
 
 /** What a Build Mode turn did — persisted on the message (`messages.build`) so it survives reloads. */
-export type BuildStep = { id: string; kind: BuildStepKind; label: string; state: "running" | "ok" | "error"; detail?: string };
+export type BuildStep = {
+  id: string;
+  kind: BuildStepKind;
+  label: string;
+  state: "running" | "ok" | "error";
+  detail?: string;
+  // Rich, optional activity fields (v2) so clients can show what is really happening — a live mini
+  // terminal for commands, a code card for file writes/edits. Older clients ignore them and keep
+  // using `detail`; every field is size-capped before it is sent or persisted.
+  /** run/start: the exact shell command. */
+  cmd?: string;
+  /** run/start: output so far (tail), streamed live while the command runs. */
+  output?: string;
+  /** run: exit code once finished. */
+  exitCode?: number;
+  /** write/edit/read: project-relative file path. */
+  path?: string;
+  /** write: the start of the new file; edit: a -/+ diff of the change. */
+  code?: string;
+  /** Language hint for `code` (from the file extension); "diff" for edits. */
+  lang?: string;
+  /** write/edit: lines added / removed. */
+  added?: number;
+  removed?: number;
+  /** Epoch ms when the step started — lets clients show a live elapsed timer. */
+  startedAt?: number;
+  /** Duration once finished. */
+  ms?: number;
+};
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
 
 /** The architecture + todo checklist Build Mode drafts before it starts (updated live as items finish). */

@@ -1,4 +1,5 @@
 import type { ToolCall, ToolSpec } from "../providers/toolCalling.js";
+import { fetchUrlTool, webSearchTool } from "../agent/tools/web.js";
 import type { BuildAction } from "./protocol.js";
 
 /**
@@ -14,7 +15,11 @@ import type { BuildAction } from "./protocol.js";
  */
 
 /** Extra action kinds only the native path has (the text protocol never emits them). */
-export type NativeBuildAction = BuildAction | { kind: "check" };
+export type NativeBuildAction =
+  | BuildAction
+  | { kind: "check" }
+  /** Look something up on the web (docs, an error message, a library's current API) — same tools chat uses. */
+  | { kind: "web"; tool: "web_search" | "fetch_url"; args: Record<string, unknown> };
 
 export const BUILD_TOOL_SPECS: ToolSpec[] = [
   {
@@ -115,6 +120,16 @@ export const BUILD_TOOL_SPECS: ToolSpec[] = [
     parameters: { type: "object", properties: {} },
   },
   {
+    ...webSearchTool.spec,
+    description:
+      "Search the web — for a library's current docs/API, the right package version, or an error message you don't " +
+      "recognise. Returns titles, URLs and snippets; follow up with fetch_url to read a page in full.",
+  },
+  {
+    ...fetchUrlTool.spec,
+    description: "Read a public web page (docs, a GitHub README, a changelog, an issue) as text.",
+  },
+  {
     name: "update_progress",
     description:
       "Update the plan checklist the user sees. Send every plan item, same order and wording, each prefixed with " +
@@ -207,6 +222,10 @@ export function toolCallToAction(call: ToolCall): NativeBuildAction {
     }
     case "check_app":
       return { kind: "check" };
+    case "web_search":
+      return s(a, "query").trim() ? { kind: "web", tool: "web_search", args: a } : { kind: "malformed", reason: "web_search is missing its query" };
+    case "fetch_url":
+      return s(a, "url").trim() ? { kind: "web", tool: "fetch_url", args: a } : { kind: "malformed", reason: "fetch_url is missing its url" };
     case "update_progress":
       return { kind: "progress", body: s(a, "checklist") };
     case "open_pull_request": {
