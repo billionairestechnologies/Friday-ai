@@ -62,9 +62,14 @@ Gotchas:
   `systemInstruction.parts` + reading `cachedContentTokenCount`). `ChatMessage.volatile` marks
   per-turn-different system text (search results, Canvas snapshot, attachment nudge) so it never
   breaks the cacheable stable prefix. Kill switch: `FRIDAY_PROMPT_CACHE=off`.
-- `services/projectBuild/` — Build Mode: `agent.ts` (plan → iterate → QA gate), `protocol.ts` (text-tag
-  actions `<friday-write|edit|run|start|read|grep|ls|pr|progress|done>`), `sandbox.ts` (E2B; `run()` for
-  model commands, `runScript()` for trusted scripts with env-passed values), `github.ts` (clone + PR).
+- `services/projectBuild/` — Build Mode: `agent.ts` (plan → build/run/verify/fix loop → done gate),
+  `tools.ts` (native tools: write_file, edit_file, read_file, list_files, grep, run_command, start_server,
+  check_app, update_progress, open_pull_request, finish — the preferred path), `protocol.ts` (text-tag
+  fallback `<friday-write|edit|run|start|read|grep|ls|pr|progress|done>` for models without tools),
+  `sandbox.ts` (E2B; `run()` for model commands, `runScript()` for trusted scripts with env-passed values),
+  `github.ts` (clone + PR). Both protocols share ONE executor; a "done" claim is only accepted after
+  known-failed commands, the project's own typecheck/build/tests and a real-browser check pass
+  (each skipped if the agent already passed it since its last edit).
 - `services/automations/` — schedule math (`schedule.ts`, DST-safe) + service/scheduler (atomic lease).
 - `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/quota/*`, `services/connectorService.ts`.
 
@@ -79,7 +84,14 @@ Gotchas:
 - Tools must degrade, never break chat: a model rejecting tools falls back to plain streaming.
 - Clients (web/Android/iOS) must tolerate unknown SSE event fields/kinds; tool activity reuses `step` events with `kind: "tool"`.
 
-## Current state (branch `claude/architecture-analysis-p7x2lr`)
+## Current state (branch `v2`)
+
+v2 adds: Build Mode on native tool calling with a hard verify gate (60 rounds / 25 min), live step rows
+the moment a tool call starts (`onToolStart`), lower time-to-first-token (search probe skipped when the
+model has tools; toolset preloaded), SSE anti-buffering headers, a smooth adaptive typewriter + glitch-free
+markdown streaming on web, and a direct/well-structured response-style prompt.
+
+Earlier:
 
 Shipped (see `docs/UPGRADE_ROADMAP.md` for the full list with status):
 native tool calling · agent loop · web_search/fetch_url · run_code · GitHub/Gmail/Drive/Calendar/Notion/
@@ -89,7 +101,7 @@ AGENTS.md/FRIDAY.md/CLAUDE.md read by Build Mode · Team Up metered · current d
 connector audit log · fixed env-dependent tests · removed committed scratch script.
 
 Deploy requires migrations `0023`–`0028`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
-`FRIDAY_PROMPT_CACHE=off`.
+`FRIDAY_PROMPT_CACHE=off`, `FRIDAY_BUILD_NATIVE_TOOLS=off` (Build Mode back on the text protocol).
 
 Also shipped since: prompt caching restored (Anthropic/ScaleMax/OpenAI/OpenRouter/Gemini, with
 cache-aware cost accounting in `token_ledger` — migration `0028`) and Team Up now fans out to more
@@ -101,7 +113,7 @@ mobile builds.
 ## Next up (highest value first)
 
 1. Android/iOS parity: Memory, MCP servers, Automations, Deep Research toggle, Share, server search.
-2. Build agent on native tool calling (keep text tags as fallback); diff view; background jobs; deploy.
+2. Build agent: diff view; background jobs; sub-agents; one-click deploy.
 3. RAG (pgvector) over chats/files; project knowledge bases.
 4. Tests for chat pipeline + Build agent with mocked providers/sandbox; eval suite; OpenTelemetry.
 5. CSP (Helmet has it disabled), secret scanning in CI, native reasoning controls, data-driven routing.

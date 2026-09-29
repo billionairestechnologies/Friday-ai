@@ -29,14 +29,14 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 
 | # | Upgrade | Why | Status |
 |---|---|---|---|
-| B1 | Build agent on native tool calling (keep the text-tag protocol as fallback for models without tools) | Reliability; no more malformed/cut-off tags | ⬜ |
+| B1 | Build agent on native tool calling (keep the text-tag protocol as fallback for models without tools) | Reliability; no more malformed/cut-off tags | ✅ (`projectBuild/tools.ts`; falls back to text tags automatically) |
 | B2 | `edit_file` (exact search/replace) instead of rewriting whole files | Big files, cheaper, fewer regressions | ✅ (text protocol `<friday-edit>`) |
 | B3 | `grep` / `list_files` tools in the sandbox | Navigate real codebases | ✅ (`<friday-grep>`, `<friday-ls>`) |
 | B4 | Import a GitHub repo into the sandbox (clone with the user's connector token) | Work on existing code, not only new apps | ✅ |
 | B5 | Commit, push a branch and open a PR from the sandbox | The Codex/Claude Code workflow | ✅ |
-| B6 | Run the project's tests/linters as a gate before "done" | Correctness, not just "it renders" | 🚧 prompted, not yet a hard gate |
+| B6 | Run the project's tests/linters as a gate before "done" | Correctness, not just "it renders" | ✅ hard gate: failed commands → typecheck/build/tests → browser |
 | B7 | Diff view of every change in the UI (web/Android/iOS) | Reviewability | ⬜ |
-| B8 | Context compaction by summarisation for long runs; raise the 45-iteration / 18-minute ceiling for background jobs | Long tasks | ⬜ |
+| B8 | Context compaction by summarisation for long runs; raise the 45-iteration / 18-minute ceiling for background jobs | Long tasks | 🚧 old file bodies/tool results compacted; 60 rounds / 25 min; no summarisation yet |
 | B9 | Background build jobs (queue + resumable progress, survives server restarts) | Tasks that take hours | ⬜ |
 | B10 | Sub-agents (parallel explore/test/review workers) | Speed and quality on large tasks | ⬜ |
 | B11 | Project instruction file (`FRIDAY.md` / `AGENTS.md`) read automatically | Repo-specific conventions | ✅ |

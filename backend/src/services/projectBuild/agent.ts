@@ -274,6 +274,13 @@ export async function runBuildAgent(opts: {
   let verifyRounds = 0;
   const normCmd = (cmd: string) =>
     cmd.trim().replace(/^(CI=\S+\s+)+/, "").replace(/^npm run test\b/, "npm test").replace(/\s+/g, " ");
+  // Last outcome per command: a build that failed and was never re-run successfully is unresolved.
+  // Keyed by the normalized command so `CI=true npm test` passing clears an earlier `npm test` failure.
+  const lastRunState = new Map<string, "ok" | "error">();
+  const recordRun = (cmd: string, ok: boolean) => {
+    lastRunState.set(normCmd(cmd), ok ? "ok" : "error");
+    if (ok) okRunAt.set(normCmd(cmd), writeSeq);
+  };
 
   /** Opens the running app in a real browser (+ a vision review). Returns a problem report, or "" if it looks right. */
   const inspectApp = async (label: string): Promise<string> => {
@@ -342,9 +349,8 @@ export async function runBuildAgent(opts: {
       step.state = out.ok ? "ok" : "error";
       step.detail = tail(out.output, 700);
       onEvent({ t: "step", ...step });
-      if (out.ok) {
-        okRunAt.set(normCmd(check.cmd), writeSeq);
-      } else {
+      recordRun(check.cmd, out.ok);
+      if (!out.ok) {
         failures.push(`$ ${check.cmd}  (exit ${out.exitCode})\n${tail(out.output, 2500)}`);
         break; // the later checks almost always fail for the same reason
       }
@@ -430,9 +436,6 @@ export async function runBuildAgent(opts: {
   let nudges = 0;
   let donePushbacks = 0;
   let appBroken = false;
-  // Last outcome per command: a build that failed and was never re-run successfully is unresolved.
-  const lastRunState = new Map<string, "ok" | "error">();
-
   /** Opens a live "Writing src/App.jsx…" row the moment the model starts an action, before its body finishes streaming. */
   const openLiveStep = (name: string, a: Record<string, string>): BuildStep => {
     const kind: BuildStep["kind"] = name === "edit" ? "write" : (name as BuildStep["kind"]);
@@ -579,8 +582,7 @@ export async function runBuildAgent(opts: {
       }
       if (action.kind === "run") {
         const out = await box.run(action.cmd, 5 * 60_000, signal);
-        lastRunState.set(action.cmd, out.ok ? "ok" : "error");
-        if (out.ok) okRunAt.set(normCmd(action.cmd), writeSeq);
+        recordRun(action.cmd, out.ok);
         if (out.ok && /\b(install|add|ci)\b/.test(action.cmd)) void saveProgress(true);
         finish(out.ok ? "ok" : "error", out.output);
         if (!out.ok) {
