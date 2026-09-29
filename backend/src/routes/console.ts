@@ -4,7 +4,7 @@ import * as p from "../controllers/plansController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { requirePermission as can, requireStaff } from "../services/console/permissions.js";
+import { requireAnyPermission, requirePermission as can, requireStaff } from "../services/console/permissions.js";
 
 /** Team Console API — staff only; every route names the permission it needs (see permissions.ts). */
 export const consoleRouter = Router();
@@ -14,6 +14,7 @@ consoleRouter.use(rateLimit({ name: "team-console", limit: 1200, windowMs: 15 * 
 const h = asyncHandler;
 
 consoleRouter.get("/me", h(c.me));
+consoleRouter.get("/staff", h(c.staffDirectory));
 consoleRouter.get("/overview", can("overview.view"), h(c.overview));
 
 consoleRouter.get("/users", can("users.view"), h(c.listUsers));
@@ -27,7 +28,7 @@ consoleRouter.delete("/team/:userId", can("team.manage"), h(c.removeMember));
 consoleRouter.post("/roles", can("team.manage"), h(c.saveRole));
 consoleRouter.delete("/roles/:roleId", can("team.manage"), h(c.deleteRole));
 
-consoleRouter.get("/mail", can("mail.manage"), h(c.listMail));
+consoleRouter.get("/mail", requireAnyPermission("mail.manage", "marketing.view", "support.view"), h(c.listMail));
 consoleRouter.post("/mail", can("mail.manage"), h(c.saveMail));
 consoleRouter.delete("/mail/:identityId", can("mail.manage"), h(c.deleteMail));
 

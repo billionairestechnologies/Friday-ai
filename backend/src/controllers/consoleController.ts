@@ -32,6 +32,17 @@ export async function me(req: Request, res: Response) {
   res.json({ staff: req.staff, permissionCatalog: PERMISSIONS, mailConfigured: mailConfigured() });
 }
 
+/** Teammates for assignee pickers — any staff member may read names/roles (not permissions). */
+export async function staffDirectory(_req: Request, res: Response) {
+  const [members, roles] = await Promise.all([team.listMembers(), team.listRoles()]);
+  const roleName = new Map(roles.map((r) => [r.id, r.name]));
+  res.json({
+    staff: members
+      .filter((m) => m.active)
+      .map((m) => ({ userId: m.userId, name: m.name || m.email?.split("@")[0] || "Teammate", email: m.email, roleName: roleName.get(m.roleId) ?? (m.roleId === "owner" ? "Owner" : m.roleId) })),
+  });
+}
+
 export async function overview(_req: Request, res: Response) {
   res.json(await overviewService.overview());
 }

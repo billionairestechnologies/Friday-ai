@@ -36,7 +36,7 @@ export function AdminGate() {
   return <AdminPage onLogout={logout} />;
 }
 
-function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
+export function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
@@ -126,8 +126,9 @@ function AdminLoginPage({ deniedMessage }: { deniedMessage?: string }) {
   );
 }
 
-function AdminPage({ onLogout }: { onLogout: () => void }) {
-  const [section, setSection] = useState<"providers" | "plans">("providers");
+/** The original admin panel. `embedded` renders one pane inside the Team Console (no page chrome). */
+export function AdminPage({ onLogout, embedded }: { onLogout?: () => void; embedded?: "providers" | "plans" }) {
+  const [section, setSection] = useState<"providers" | "plans">(embedded ?? "providers");
   const [providers, setProviders] = useState<ProviderWithStatus[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [models, setModels] = useState<Record<string, ProviderModelRow[]>>({});
@@ -227,8 +228,22 @@ function AdminPage({ onLogout }: { onLogout: () => void }) {
   }
 
   return (
-    <div className="min-h-dvh bg-background px-4 py-8 text-foreground md:px-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className={embedded ? "text-foreground" : "min-h-dvh bg-background px-4 py-8 text-foreground md:px-8"}>
+      <div className={cn("mx-auto flex flex-col gap-6", !embedded && "max-w-4xl")}>
+        {embedded ? (
+          section === "providers" && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={checkAll}
+                disabled={busy}
+                className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-chip disabled:opacity-60"
+              >
+                Check all keys
+              </button>
+            </div>
+          )
+        ) : (
         <header className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-semibold">Admin panel</h1>
@@ -281,6 +296,7 @@ function AdminPage({ onLogout }: { onLogout: () => void }) {
             </button>
           </div>
         </header>
+        )}
 
         {notice && (
           <div className="rounded-xl border border-border bg-elevated px-4 py-2.5 text-sm text-muted">{notice}</div>

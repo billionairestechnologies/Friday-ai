@@ -1,7 +1,7 @@
 import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
-import { AdminGate } from "@/routes/admin";
+import { lazy, Suspense } from "react";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
 import { TeamPage } from "@/routes/team";
@@ -80,11 +80,29 @@ const buildConversationRoute = createRoute({
   component: BuildShell,
 });
 
-// Hidden, standalone admin gate — not linked from anywhere in the regular app.
+// The Team Console (company back office) — hidden, standalone, not linked from the regular app.
+// Code-split: none of it ships in the chat app's bundle.
+const ConsoleApp = lazy(() => import("@/console/ConsoleApp").then((m) => ({ default: m.ConsoleApp })));
+
+function ConsoleRoute() {
+  const { section } = useParams({ strict: false }) as { section?: string };
+  return (
+    <Suspense fallback={<div className="h-dvh bg-background" />}>
+      <ConsoleApp section={section} />
+    </Suspense>
+  );
+}
+
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
-  component: AdminGate,
+  component: ConsoleRoute,
+});
+
+const adminSectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/$section",
+  component: ConsoleRoute,
 });
 
 const upgradeRoute = createRoute({
@@ -185,6 +203,7 @@ const routeTree = rootRoute.addChildren([
   buildRoute,
   buildConversationRoute,
   adminRoute,
+  adminSectionRoute,
   upgradeRoute,
   projectsRoute,
   projectDetailRoute,

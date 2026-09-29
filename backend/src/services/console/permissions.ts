@@ -129,3 +129,13 @@ export function requirePermission(needed: Permission) {
     next();
   };
 }
+
+/** Passes when the staff member has ANY of the listed permissions. */
+export function requireAnyPermission(...needed: Permission[]) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.staff || !needed.some((p) => hasPermission(req.staff!.permissions, p))) {
+      throw new HttpError(403, `You don't have permission for this (${needed.join(" or ")})`);
+    }
+    next();
+  };
+}
