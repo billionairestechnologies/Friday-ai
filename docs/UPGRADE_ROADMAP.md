@@ -80,7 +80,7 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 | # | Upgrade | Why | Status |
 |---|---|---|---|
 | F1 | Realtime speech-to-speech voice mode | GPT/Gemini Live parity | ⬜ |
-| F2 | File outputs (generate .docx / .pptx / .xlsx / .pdf) | Office work | ⬜ |
+| F2 | File outputs (generate .docx / .pptx / .xlsx / .pdf + md/xml/csv/json/html) | Office work | ✅ `create_document` tool, download cards, Library |
 | F3 | More image models (OpenAI, Gemini Imagen) + video understanding | Breadth | ⬜ |
 
 ## G. Automations
@@ -95,7 +95,7 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 | # | Upgrade | Why | Status |
 |---|---|---|---|
 | H1 | Public developer API with per-user API keys + usage billing | Platform revenue | ⬜ |
-| H2 | Custom assistants ("Friday Agents": instructions + tools + knowledge), shareable | GPTs / Claude Projects parity | ⬜ |
+| H2 | Custom assistants ("Friday Agents": instructions + tools + knowledge), shareable | GPTs / Claude Projects parity | 🚧 Skills: 16 built-in playbooks + user skills, auto-loaded via `use_skill` (not shareable yet) |
 | H3 | Shareable read-only chat links | Growth | ✅ |
 | H4 | Team collaboration on projects and chats | Enterprise | ⬜ |
 
@@ -118,15 +118,44 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 | J1 | Remove the committed scratch script with a hardcoded user id (`backend/e2e5.tmp.ts`) | Hygiene / data exposure | ✅ |
 | J2 | SSRF guard for any server-side URL fetch | Tool safety | ✅ |
 | J3 | Content-Security-Policy (currently disabled in Helmet) | XSS hardening | ⬜ |
-| J4 | Audit log entry per connector tool call | Enterprise compliance | ✅ |
+| J4 | Audit log entry per connector tool call | Enterprise compliance | ✅ (chat + Build Mode) |
 | J5 | Secret scanning + dependency audit in CI | Supply chain | ⬜ |
+
+## L. Business back office (Team Console, `/admin`)
+
+| # | Upgrade | Status |
+|---|---|---|
+| L1 | Staff logins with roles as data and permission-gated sections/APIs; audit log | ✅ |
+| L2 | Support center: tickets from app, email (inbound webhook) and /status, internal notes, assignment, priority | ✅ |
+| L3 | CRM (leads, clients, pipeline) and team tasks | ✅ |
+| L4 | Product updates shown once per account on web/Android/iOS (What's New) | ✅ |
+| L5 | Email campaigns to segments (all, paid, pro, premium, new) with scheduling and one-click unsubscribe | ✅ |
+| L6 | Team mail identities (support@, hello@…) | ✅ |
+
+## M. Monetisation
+
+| # | Upgrade | Status |
+|---|---|---|
+| M1 | Plan catalog edited in the console (price, copy, token limits, entitlements) — Plans page renders from it | ✅ |
+| M2 | Packages (individual / enterprise), public packages bought via Razorpay, access grants with expiry | ✅ |
+| M3 | Offer codes: plan grants, packages, checkout discounts, student passes with review queue | ✅ |
+| M4 | Entitlements enforced server-side (Build rounds, Deep Research/day, documents/day, skills, Library storage, Team Up size, MCP, automations, priority support) | ✅ |
+| M5 | Usage metered during the turn — stops exactly at the limit (no overshoot), enterprise pools and member caps included | ✅ |
+
+## N. Trust
+
+| # | Upgrade | Status |
+|---|---|---|
+| N1 | Public `/status`: probes, 90-day uptime, model success rates from real traffic, incidents | ✅ |
+| N2 | Automatic incidents + alert emails; problem reports → tickets; web crash reports grouped | ✅ |
+| N3 | Privacy policy + terms updated for all of the above (re-consent on every platform) | ✅ |
 
 ## K. Clients
 
 | # | Upgrade | Why | Status |
 |---|---|---|---|
 | K1 | Tool steps rendered on web / Android / iOS | Parity | ✅ |
-| K2 | Android / iOS parity for Memory, MCP servers, Automations, Deep Research toggle, Share and server search | Parity with web | ⬜ |
+| K2 | Android / iOS parity for Memory, MCP servers, Automations, Deep Research toggle, Share and server search | Parity with web | 🚧 What's New popup, Help & support, status links, Library documents (rest ⬜) |
 | K3 | Desktop app + browser extension | Reach | ⬜ |
 
 ---
@@ -151,3 +180,19 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 4. **Not verified here** (needs real keys / devices): live provider tool-calling calls, E2B git
    import/PR flow, Google/Notion/Vercel/Railway/Supabase/Razorpay APIs, Android/iOS builds (no SDKs in
    the build container — the mobile edits are small and were reviewed by hand).
+
+
+## Shipped on `v2` — deploy notes
+
+1. **Apply migrations `0028`–`0036`** in order: `0028` token-ledger cache columns, `0029` policy acceptance,
+   `0030` conversation workspace (Build), `0031_add_team_console`, `0032_add_packages_and_offers`,
+   `0033_add_plan_catalog_and_entitlements`, `0034_add_status_page`, `0035_add_generated_files`,
+   `0036_add_skills`. The `generated-files` storage bucket is created by the backend on first use.
+2. **Environment** — required as before; new optional: `STATUS_ALERT_EMAILS`, `SUPPORT_INBOUND_SECRET`,
+   and kill switches `FRIDAY_DISABLE_STATUS_MONITOR`, `FRIDAY_DISABLE_CAMPAIGNS`,
+   `FRIDAY_DISABLE_GRANT_EXPIRY` (see `docs/OPERATIONS.md`).
+3. **Behaviour changes**: everyone re-accepts the updated policy once (version `2026-09-29`); long
+   turns now stop at the usage limit instead of running past it; Build Mode length follows the plan's
+   entitlement (Free 30 rounds, Pro 100, Premium/Enterprise 150).
+4. **Not verified here** (needs real keys/devices): payments, Resend delivery, provider probes, E2B,
+   Android/iOS builds.

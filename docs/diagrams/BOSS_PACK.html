@@ -112,65 +112,74 @@ flowchart TB
     Browser[Web app - React Vite]
     Android[Android - Kotlin Compose]
     IOS[iOS - SwiftUI]
-    Public[Public share page /share/token]
+    Console[Team Console /admin - staff RBAC]
+    Public[Public pages - /status /plans /share]
   end
 
   subgraph api [Friday API - Express TypeScript]
-    MW[Helmet CORS request ID rate limits quota]
-    AuthR[&quot;/api/auth&quot;]
-    ChatR[&quot;/api/chat SSE + search + share&quot;]
-    Agent[Agent tool loop - native tool calling]
-    BuildR[&quot;/api/build - Build Mode coding agent&quot;]
-    AutoR[&quot;/api/automations + scheduler&quot;]
-    MemR[&quot;/api/memory&quot;]
-    McpR[&quot;/api/mcp&quot;]
-    BillR[&quot;/api/billing&quot;]
-    ConnR[&quot;/api/connectors&quot;]
-    OrgR[&quot;/api/organizations /usage /projects /voice&quot;]
-    Health[&quot;/api/health live+ready&quot;]
+    MW[Helmet CORS request ID rate limits quota pre-flight]
+    AuthR["/api/auth"]
+    ChatR["/api/chat SSE + search + share"]
+    Agent[Agent tool loop - native tool calling + usage meter]
+    Tools[Tools: web, run_code, create_document, use_skill, connectors, MCP, memory]
+    BuildR["/api/build - Build Mode coding agent"]
+    AutoR["/api/automations + scheduler"]
+    LibR["/api/library + /api/files"]
+    SkillR["/api/skills"]
+    StatusR["/api/status - probes, incidents, reports, crashes"]
+    ConsoleR["/api/console - support CRM tasks updates campaigns plans status"]
+    Engage["/api/updates /api/support /api/offers /api/email"]
+    BillR["/api/billing - catalog + packages"]
+    ConnR["/api/connectors /api/mcp /api/memory"]
+    OrgR["/api/organizations /usage /projects /voice"]
+  end
+
+  subgraph core [Shared services]
+    Quota[Quota metering - reserve, charge per round, reconcile]
+    Ent[Entitlements - plan &lt;- catalog &lt;- org &lt;- package]
+    Docs[Document renderers - pptx xlsx docx pdf text]
+    Sched[Schedulers - automations, campaigns, grant expiry, status probes]
   end
 
   subgraph data [Data plane]
     SB[(Supabase Postgres + Auth + Realtime)]
-    Store[Supabase Storage attachments]
-    Redis[(Redis optional)]
+    Store[Supabase Storage - attachments + generated files]
+    Redis[(Redis - quota counters, allowances, model health, leases)]
   end
 
   subgraph vendors [External services]
     Models[OpenAI Anthropic Gemini OpenRouter ScaleMax Sarvam Ollama]
     E2B[E2B sandboxes - code + builds]
     Web[Web search + page fetch - SSRF guarded]
-    GH[GitHub]
-    G[Google Gmail Drive Calendar]
-    Other[Notion Vercel Railway Supabase Razorpay]
-    MCP[User MCP servers]
-    Pay[Razorpay billing]
-    Mail[Resend OTP email]
+    Apps[GitHub Google Notion Vercel Railway Supabase Razorpay + user MCP]
+    Pay[Razorpay checkout + webhook]
+    Mail[Resend - OTP, support, campaigns, alerts]
   end
 
-  Browser --&gt; MW
-  Android --&gt; MW
-  IOS --&gt; MW
-  Public --&gt; ChatR
-  MW --&gt; AuthR &amp; ChatR &amp; BuildR &amp; AutoR &amp; MemR &amp; McpR &amp; BillR &amp; ConnR &amp; OrgR &amp; Health
-  ChatR --&gt; Agent
+  Browser &amp; Android &amp; IOS --&gt; MW
+  Console --&gt; ConsoleR
+  Public --&gt; StatusR &amp; BillR &amp; ChatR
+  MW --&gt; AuthR &amp; ChatR &amp; BuildR &amp; AutoR &amp; LibR &amp; SkillR &amp; Engage &amp; BillR &amp; ConnR &amp; OrgR
+  ChatR --&gt; Agent --&gt; Tools
+  BuildR --&gt; Tools
+  Tools --&gt; Models &amp; Web &amp; E2B &amp; Apps &amp; Docs
+  Agent --&gt; Quota
+  BuildR --&gt; Quota
+  Quota --&gt; Ent
+  ChatR --&gt; Ent
+  BillR --&gt; Ent
   AutoR --&gt; ChatR
-  Agent --&gt; Models
-  Agent --&gt; Web
-  Agent --&gt; E2B
-  Agent --&gt; GH &amp; G &amp; Other &amp; MCP
-  BuildR --&gt; E2B
-  BuildR --&gt; GH
-  ChatR --&gt; SB
-  ChatR --&gt; Store
-  AuthR --&gt; SB
-  AuthR --&gt; Mail
+  Docs --&gt; Store
+  LibR --&gt; SB &amp; Store
+  ConsoleR --&gt; SB
+  ConsoleR --&gt; Mail
+  StatusR --&gt; Mail
+  Engage --&gt; SB &amp; Mail
   BillR --&gt; Pay
-  ConnR --&gt; SB
-  MemR --&gt; SB
-  AutoR --&gt; SB
-  Health --&gt; SB
-  MW -.-&gt; Redis
+  AuthR --&gt; SB &amp; Mail
+  Sched --&gt; SB &amp; Mail &amp; Models
+  Quota --&gt; Redis
+  ChatR --&gt; SB
       </pre>
       <div class="diagram" id="render-01"></div>
     </section>
@@ -433,6 +442,59 @@ erDiagram
   messages ||--o{ message_attachments : files
   assistant_projects ||--o{ conversations : context
   automations }o--o| conversations : writes_to
+  profiles ||--o{ generated_files : creates
+  profiles ||--o{ user_skills : writes
+  profiles ||--o{ access_grants : receives
+  profiles ||--o{ support_tickets : opens
+  profiles ||--o| staff_members : is_staff
+  staff_roles ||--o{ staff_members : grants
+  support_tickets ||--o{ support_messages : thread
+  plan_packages ||--o{ access_grants : applied_as
+  offers ||--o{ offer_redemptions : redeemed
+  announcements ||--o{ announcement_views : seen_by
+  email_campaigns ||--o{ email_campaign_sends : sends
+  crm_stages ||--o{ crm_contacts : stage
+  status_incidents ||--o{ status_incident_updates : timeline
+
+  plan_catalog {
+    text id
+    bigint monthly_price_paise
+    bigint weekly_tokens
+    jsonb entitlements
+  }
+  plan_packages {
+    uuid id
+    text plan
+    bool public
+    jsonb entitlements
+  }
+  access_grants {
+    uuid id
+    text source
+    timestamptz ends_at
+    text status
+  }
+  generated_files {
+    uuid id
+    text format
+    text storage_path
+    bigint size_bytes
+  }
+  user_skills {
+    uuid id
+    text name
+    text instructions
+  }
+  status_checks {
+    text component
+    bool ok
+    int latency_ms
+  }
+  crash_reports {
+    text fingerprint
+    text message
+    text stack
+  }
 
   conversations {
     uuid id
@@ -664,6 +726,201 @@ sequenceDiagram
   API-&gt;&gt;API: Audit log entry
       </pre>
       <div class="diagram" id="render-14"></div>
+    </section>
+    <section>
+      <h2>15. Team Console (back office)</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('15','15-team-console.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('15','15-team-console.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="15">
+flowchart LR
+  subgraph people [Your team]
+    Owner[Owner / Admin - all permissions]
+    Roles[Roles as data: support, marketing, sales, operations, developer, custom]
+  end
+
+  subgraph console [Team Console /admin]
+    Overview[Overview KPIs]
+    Support[Support inbox - tickets, internal notes, assign]
+    CRM[CRM - leads, clients, pipeline stages]
+    Tasks[Tasks - assign teammates, due dates]
+    Updates[Product updates - What's New popups]
+    Campaigns[Email campaigns - audiences, schedule, unsubscribe]
+    Plans[Plans &amp; offers - catalog, packages, codes, student passes, grants]
+    Users[Users - plans, caps, entitlements]
+    Status[Status &amp; crashes - incidents, probes]
+    Team[Team &amp; roles - invite, permissions]
+    Mail[Team mail identities]
+    Models[Models &amp; keys]
+    Audit[Audit log]
+  end
+
+  subgraph users [Friday users - web, Android, iOS]
+    Popup[What's New - once per account]
+    Help[Help &amp; support + redeem codes]
+    Inbox[Emails - support replies, product news]
+    PlansPage[Plans page - catalog + public packages]
+  end
+
+  Owner --&gt; Team
+  Team --&gt; Roles
+  Roles --&gt;|permission strings e.g. support.reply, plans.manage| console
+  Updates --&gt; Popup
+  Campaigns --&gt; Inbox
+  Support &lt;--&gt; Help
+  Plans --&gt; PlansPage
+  Plans --&gt;|grant / package / pass| Users
+  console --&gt;|every action| Audit
+      </pre>
+      <div class="diagram" id="render-15"></div>
+    </section>
+
+    <section>
+      <h2>16. Plans, entitlements and usage metering</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('16','16-plans-entitlements-quota.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('16','16-plans-entitlements-quota.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="16">
+flowchart TB
+  subgraph define [Defined in the Team Console]
+    Catalog[Plan catalog - price, bullets, token limits, entitlements per plan]
+    Packages[Packages - public or private, duration, caps, entitlements]
+    Offers[Offer codes - plan grants, packages, discounts, student passes]
+  end
+
+  subgraph acquire [How a user gets access]
+    Buy[Buy plan or package - Razorpay order priced server-side]
+    Webhook[Payment webhook - applies plan or package]
+    Redeem[Redeem code - instant or reviewed]
+    Grant[Manual grant by staff]
+  end
+
+  AccessGrant[(access_grants - who, what, until when)]
+  Profile[(profiles.plan / custom_monthly_cap / entitlements)]
+  Org[(organizations - seats, pooled tokens, entitlements)]
+  Sweep[Hourly expiry sweep - reverts ended grants]
+
+  Catalog --&gt; Buy
+  Packages --&gt; Buy
+  Buy --&gt; Webhook --&gt; AccessGrant
+  Offers --&gt; Redeem --&gt; AccessGrant
+  Grant --&gt; AccessGrant
+  AccessGrant --&gt; Profile &amp; Org
+  Sweep --&gt; AccessGrant
+
+  subgraph resolve [Per request]
+    Ent[Entitlements = plan defaults &lt;- catalog &lt;- organization &lt;- personal package]
+    Limits[Token limits = catalog limits, scaled by a personal monthly cap]
+  end
+  Profile &amp; Org &amp; Catalog --&gt; Ent &amp; Limits
+
+  subgraph enforce [Enforced server-side]
+    E1[Build Mode on/off + rounds per run]
+    E2[Deep Research per day]
+    E3[Documents per day + Library storage]
+    E4[Custom skills, Team Up size, MCP servers, automations]
+    E5[Priority support tickets]
+  end
+  Ent --&gt; E1 &amp; E2 &amp; E3 &amp; E4 &amp; E5
+
+  subgraph meter [Usage metering - stops exactly at the limit]
+    Pre[Pre-flight: reserve message tokens]
+    Prompt[Charge the real prompt before the model runs]
+    Round[Charge each tool-loop / Build round atomically]
+    Stop[Limit crossed -&gt; stop cleanly, keep work]
+    Rec[Reconcile to the provider's real count]
+  end
+  Limits --&gt; Pre --&gt; Prompt --&gt; Round --&gt; Rec
+  Round --&gt;|over| Stop
+      </pre>
+      <div class="diagram" id="render-16"></div>
+    </section>
+
+    <section>
+      <h2>17. Status page, incidents, problem and crash reports</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('17','17-status-and-reports.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('17','17-status-and-reports.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="17">
+flowchart LR
+  subgraph monitor [Every 5 minutes - one instance via Redis lease]
+    Probes[Probe API, database, Redis, email, every model provider]
+    Checks[(status_checks)]
+  end
+  Traffic[Real chat turns - model answered or failed] --&gt; Health[(Redis hourly model counters)]
+  Probes --&gt; Checks
+  Checks --&gt;|2 failures in a row| AutoInc[Automatic incident + alert email]
+  Checks --&gt;|2 passes| Resolve[Auto-resolve incident]
+
+  subgraph public ["/status - public"]
+    Overall[Overall state]
+    Bars[90-day uptime bars per component]
+    ModelRates[Per-model 24h success rates]
+    Incidents[Current + past incidents with timeline]
+    Report[Report a problem]
+  end
+  Checks --&gt; Overall &amp; Bars
+  Health --&gt; ModelRates
+  AutoInc --&gt; Incidents
+
+  subgraph team [Team Console - Status &amp; crashes]
+    Manage[Post incidents and updates]
+    Crashes[Crash groups by fingerprint + stack]
+    RunNow[Run checks now]
+  end
+  Manage --&gt; Incidents
+
+  Report --&gt; Ticket[High-priority support ticket] --&gt; Inbox[Console Support inbox]
+  Report --&gt; Alert[Alert email to STATUS_ALERT_EMAILS / support identity / owners]
+  Ticket --&gt; Confirm[Confirmation email to the reporter]
+  App[Web app error screen + uncaught errors] --&gt; CrashAPI["/api/status/crash"] --&gt; Crashes
+      </pre>
+      <div class="diagram" id="render-17"></div>
+    </section>
+
+    <section>
+      <h2>18. Documents, Library and skills</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('18','18-documents-library-skills.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('18','18-documents-library-skills.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="18">
+flowchart TB
+  User[User asks: make a deck / sheet / report / PDF] --&gt; Agent[Agent tool loop]
+  Menu[Skill menu - enabled built-in + user skills] --&gt; Agent
+  Chosen[Skill picked in composer - pinned playbook] --&gt; Agent
+  Agent --&gt;|matching request| UseSkill[use_skill - loads the playbook]
+  Agent --&gt;|facts first| Research[web_search / run_code]
+  Agent --&gt; Create[create_document - model writes content only]
+
+  Create --&gt; Check{documentsPerDay + Library storage}
+  Check --&gt;|over| Refuse[Clear message - resets or upgrade]
+  Check --&gt;|ok| Render[Render server-side: pptxgenjs, exceljs, docx, pdfkit, text]
+  Render --&gt; Store[(Supabase Storage generated-files / inline fallback)]
+  Render --&gt; Rows[(generated_files)]
+  Rows --&gt; Card[Download card under the reply - SSE file event, saved on the message]
+  Rows --&gt; Library
+
+  subgraph Library [Library - private per user]
+    Docs[Documents]
+    Images[Images]
+    Code[Code]
+    Pages[Web pages]
+    Uploads[Uploads]
+  end
+  Replies[Assistant replies - code, pages, images auto-saved] --&gt; Library
+  Attach[User uploads] --&gt; Library
+
+  subgraph skills [Skills]
+    Builtin[16 built-in playbooks]
+    Own[User skills - create, edit, switch off]
+  end
+  skills --&gt; Menu
+      </pre>
+      <div class="diagram" id="render-18"></div>
     </section>
   </main>
 </body>

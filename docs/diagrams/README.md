@@ -1,6 +1,6 @@
 # Friday AI diagrams (downloadable)
 
-All architecture and product diagrams live in this folder (updated on branch `claude/architecture-analysis-p7x2lr` for the agent-platform upgrade: tools, MCP, coding agent, memory, automations, search, sharing).
+All architecture and product diagrams live in this folder (updated on branch `v2`: Team Console, plans & entitlements, usage metering, status page, documents, Library and skills — on top of the agent-platform upgrade).
 
 ## For your boss (one file)
 
@@ -28,6 +28,10 @@ Or download the zip: **[friday-ai-diagrams.zip](./friday-ai-diagrams.zip)**
 | 12 | Build Mode coding agent + GitHub PRs | [png](./12-build-mode-coding-agent.png) | [svg](./12-build-mode-coding-agent.svg) | [mmd](./12-build-mode-coding-agent.mmd) |
 | 13 | Automations scheduler | [png](./13-automations.png) | [svg](./13-automations.svg) | [mmd](./13-automations.mmd) |
 | 14 | MCP servers | [png](./14-mcp-servers.png) | [svg](./14-mcp-servers.svg) | [mmd](./14-mcp-servers.mmd) |
+| 15 | Team Console (back office) | [png](./15-team-console.png) | [svg](./15-team-console.svg) | [mmd](./15-team-console.mmd) |
+| 16 | Plans, entitlements and usage metering | [png](./16-plans-entitlements-quota.png) | [svg](./16-plans-entitlements-quota.svg) | [mmd](./16-plans-entitlements-quota.mmd) |
+| 17 | Status page, incidents, problem and crash reports | [png](./17-status-and-reports.png) | [svg](./17-status-and-reports.svg) | [mmd](./17-status-and-reports.mmd) |
+| 18 | Documents, Library and skills | [png](./18-documents-library-skills.png) | [svg](./18-documents-library-skills.svg) | [mmd](./18-documents-library-skills.mmd) |
 
 ## Regenerating
 

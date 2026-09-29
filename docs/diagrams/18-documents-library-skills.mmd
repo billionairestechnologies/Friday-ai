@@ -1,0 +1,31 @@
+flowchart TB
+  User[User asks: make a deck / sheet / report / PDF] --> Agent[Agent tool loop]
+  Menu[Skill menu - enabled built-in + user skills] --> Agent
+  Chosen[Skill picked in composer - pinned playbook] --> Agent
+  Agent -->|matching request| UseSkill[use_skill - loads the playbook]
+  Agent -->|facts first| Research[web_search / run_code]
+  Agent --> Create[create_document - model writes content only]
+
+  Create --> Check{documentsPerDay + Library storage}
+  Check -->|over| Refuse[Clear message - resets or upgrade]
+  Check -->|ok| Render[Render server-side: pptxgenjs, exceljs, docx, pdfkit, text]
+  Render --> Store[(Supabase Storage generated-files / inline fallback)]
+  Render --> Rows[(generated_files)]
+  Rows --> Card[Download card under the reply - SSE file event, saved on the message]
+  Rows --> Library
+
+  subgraph Library [Library - private per user]
+    Docs[Documents]
+    Images[Images]
+    Code[Code]
+    Pages[Web pages]
+    Uploads[Uploads]
+  end
+  Replies[Assistant replies - code, pages, images auto-saved] --> Library
+  Attach[User uploads] --> Library
+
+  subgraph skills [Skills]
+    Builtin[16 built-in playbooks]
+    Own[User skills - create, edit, switch off]
+  end
+  skills --> Menu

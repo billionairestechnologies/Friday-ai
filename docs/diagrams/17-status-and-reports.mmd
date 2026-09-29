@@ -1,0 +1,32 @@
+flowchart LR
+  subgraph monitor [Every 5 minutes - one instance via Redis lease]
+    Probes[Probe API, database, Redis, email, every model provider]
+    Checks[(status_checks)]
+  end
+  Traffic[Real chat turns - model answered or failed] --> Health[(Redis hourly model counters)]
+  Probes --> Checks
+  Checks -->|2 failures in a row| AutoInc[Automatic incident + alert email]
+  Checks -->|2 passes| Resolve[Auto-resolve incident]
+
+  subgraph public ["/status - public"]
+    Overall[Overall state]
+    Bars[90-day uptime bars per component]
+    ModelRates[Per-model 24h success rates]
+    Incidents[Current + past incidents with timeline]
+    Report[Report a problem]
+  end
+  Checks --> Overall & Bars
+  Health --> ModelRates
+  AutoInc --> Incidents
+
+  subgraph team [Team Console - Status & crashes]
+    Manage[Post incidents and updates]
+    Crashes[Crash groups by fingerprint + stack]
+    RunNow[Run checks now]
+  end
+  Manage --> Incidents
+
+  Report --> Ticket[High-priority support ticket] --> Inbox[Console Support inbox]
+  Report --> Alert[Alert email to STATUS_ALERT_EMAILS / support identity / owners]
+  Ticket --> Confirm[Confirmation email to the reporter]
+  App[Web app error screen + uncaught errors] --> CrashAPI["/api/status/crash"] --> Crashes

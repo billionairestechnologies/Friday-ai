@@ -6,9 +6,11 @@ architecture, commands or conventions.
 ## What Friday is
 
 A multi-model AI assistant platform (web + native Android + iOS) that is now an **agent platform**:
-models call real tools (web, code, the user's connected apps, MCP servers), remember users, run scheduled
-automations, and Build Mode works as a coding agent that can open GitHub pull requests. Friday owns no
-model — it orchestrates OpenAI, Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
+models call real tools (web, code, the user's connected apps, MCP servers, document generation, skills),
+remember users, run scheduled automations, and Build Mode works as a coding agent that can open GitHub
+pull requests. It also has a company back office (Team Console at `/admin`), an admin-edited plan
+catalog with entitlements, and a public `/status` page. Friday owns no model — it orchestrates OpenAI,
+Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
 
 ## Repo layout
 
@@ -16,7 +18,7 @@ model — it orchestrates OpenAI, Anthropic, Gemini, OpenRouter, ScaleMax, Sarva
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0030 (apply in order; RLS on, backend uses service role)
+supabase/   SQL migrations 0001…0036 (apply in order; RLS on, backend uses service role)
 docs/       OPERATIONS.md, PLATFORM_BRIEFING.md, UPGRADE_ROADMAP.md, diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -37,11 +39,21 @@ cd backend && npm run dev        # API on :4000   |   cd frontend && npm run dev
 Gotchas:
 - `frontend/tsconfig.tsbuildinfo` is tracked and changes on every typecheck/build — `git checkout` it, don't commit it.
 - No Android SDK / Swift toolchain in cloud containers: mobile edits can't be compiled there — keep them small and review by hand.
-- Don't `pkill -f <pattern>` in a shell whose own command line matches the pattern (kills your shell).
+- Don't `pkill -f <pattern>` in a shell whose own command line matches the pattern (kills your shell);
+  `ss` shows no PIDs here — kill by PID from `ps aux | grep …`.
+- Vite dev can 504 "Outdated Optimize Dep" after new lazy imports — for UI checks use
+  `npx vite build && npx vite preview --port 5199` (frontend/) and Playwright with mocked `/api/**`
+  (Playwright: `$(npm root -g)/playwright/index.mjs`; Chromium at `/opt/pw-browsers`). Mock users need
+  `policyVersion` = current POLICY_VERSION, `phone` and `birthday` or the consent/profile gates cover the page.
+- LibreOffice can't open files in this sandbox — verify generated documents by reading them back
+  (jszip / mammoth / exceljs / inflate the PDF streams), as `test/documents.test.ts` does.
+- Diagrams: `PUPPETEER_SKIP_DOWNLOAD=1 npx -p @mermaid-js/mermaid-cli@11 mmdc -p puppeteer.json …` with
+  `{"executablePath":"/opt/pw-browsers/chromium-1194/chrome-linux/chrome","args":["--no-sandbox"]}`.
+  Labels starting with `/` must be quoted (`["/status"]`).
 
 ## Backend map (backend/src)
 
-- `app.ts` routes: `/api/{health,auth,admin/providers,admin/quota,models,chat,share,push,library,memory,automations,mcp,build,voice,sandbox,usage,projects,billing,connectors,organizations,app}`
+- `app.ts` routes: `/api/{health,auth,admin/providers,admin/quota,models,chat,share,push,library,memory,automations,mcp,build,voice,sandbox,usage,projects,billing,connectors,organizations,app,console,updates,support,email,offers,status,files,skills}`
 - `services/providers/` — one adapter per vendor implementing `ProviderAdapter` (`types.ts`):
   `listModels`, `chat`, `chatStream`, `healthCheck`, optional **`chatStreamWithTools`**.
   `toolCalling.ts` holds the three tool dialects: OpenAI-compatible (openai, openrouter), Anthropic
@@ -79,7 +91,29 @@ Gotchas:
   "Builds" history in the sidebar (build sessions + chats with `has_build`), and the project panel
   (`BuildCanvas`: Preview / Files / Terminal) docked on the right.
 - `services/automations/` — schedule math (`schedule.ts`, DST-safe) + service/scheduler (atomic lease).
-- `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/quota/*`, `services/connectorService.ts`.
+- `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/connectorService.ts`.
+- `services/quota/` — `tierConfig.ts` (code defaults + pure `decideQuota`), `planCatalog.ts` (the
+  console-edited `plan_catalog`: prices, copy, limits, **entitlements**; `ENTITLEMENT_DEFS`,
+  sanitize/merge), `entitlements.ts` (`entitlementsFor(user)` = plan ← catalog ← org ← personal package;
+  `consumeDailyAllowance`), `tokenQuotaService.ts` (reserve → **`chargeProgress`** each round → reconcile
+  against what was charged; personal monthly caps; meters clamped at 100%). The chat turn charges the real
+  prompt before any model call; `runToolLoop`/`runBuildAgent` take a `budget` callback and stop at the limit.
+- `services/console/` — Team Console backend: `permissions.ts` (catalog, `requireStaff`/`requirePermission`;
+  `profiles.role='admin'` = owner), `mail.ts` (Resend, branded HTML, signed unsubscribe), support, CRM,
+  tasks, announcements (What's New), campaigns (scheduler + send ledger), `plansService.ts` (packages,
+  grants with expiry sweep, offers/student passes, public packages, checkout discounts).
+- `services/status/statusService.ts` — probes every 5 min (Redis lease), auto incidents + alert emails,
+  real-traffic model success (`recordModelOutcome`), public status payload, problem reports → tickets,
+  crash reports (fingerprinted). Routes: `routes/status.ts` (public) + `/api/console/status/*`.
+- `services/documents/` — `markdown.ts` (block parser), `render.ts` (pptxgenjs / exceljs / docx / pdfkit /
+  text — pure, no network), `documentService.ts` (entitlement checks, storage bucket `generated-files`,
+  inline fallback). Agent tool `tools/documents.ts` (`create_document`) → `onFile` → SSE `file` event →
+  `messages.files` → download cards. `/api/files` lists/downloads/deletes; the Library merges artifacts,
+  documents and uploads (`libraryService.listLibrary`).
+- `services/skills/` — `catalog.ts` (16 built-in playbooks), `skillService.ts` (user skills + per-user
+  toggles, `skillMenu` for the prompt, `activeSkillPrompt` for a composer-picked skill). Tool `use_skill`.
+- `services/billingService.ts` — prices from the catalog; `planId: "package"` checkout; webhook applies
+  plans, enterprise seats (catalog tokens/seat) or packages (as access grants).
 
 ## Conventions
 
@@ -92,7 +126,52 @@ Gotchas:
 - Tools must degrade, never break chat: a model rejecting tools falls back to plain streaming.
 - Clients (web/Android/iOS) must tolerate unknown SSE event fields/kinds; tool activity reuses `step` events with `kind: "tool"`.
 
+## Frontend map (frontend/src)
+
+- `routes/index.tsx` (chat + Build workspace), `routes/upgrade.tsx` (Plans page from `/billing/config`
+  catalog + packages), `routes/library.tsx` (sections, previews, storage meter), `routes/status.tsx`
+  (public, lazy), `routes/admin.tsx` + `console/` (Team Console: `ConsoleApp.tsx` SECTIONS registry,
+  `ui.tsx` kit, `sections/*`).
+- Chat pieces: `components/message-thread.tsx` (+ `file-card.tsx` download cards), `lib/chat/live-stream.ts`
+  (per-chat live state incl. files), `lib/chat/raf-batch.ts` (adaptive typewriter), `lib/chat/store.ts`
+  (zustand: `activeSkill`, `pluginsTab`/`openPlugins`), `components/plugins-drawer.tsx` (connectors by
+  category + `skills-panel.tsx`), `components/provider-logos.tsx` / `plugin-logos.tsx` (brand colours;
+  `mono` prop for single-colour), `whats-new-modal.tsx`, `support-center.tsx` (`?support=contact|redeem|<n>`),
+  `lib/crash.ts` (crash reporter → `/api/status/crash`).
+- Legal: `lib/site/legal.ts` — POLICY_VERSION must match backend `policyService.ts`, Android
+  `FridayViewModel.POLICY_VERSION` and iOS `FridayViewModel.policyVersion` (bump all four together).
+
+## Testing a branch / switching branches
+
+```bash
+git fetch origin && git checkout v2 && git pull       # or any feature branch
+npm --prefix backend ci && npm --prefix frontend ci   # deps changed on v2 (pptxgenjs, docx, pdfkit)
+npm run verify                                        # migrations + typechecks + 135 tests + builds
+```
+
+A fresh test environment (e.g. a Railway service "friday-test" + its own Supabase project) needs:
+all migrations `0001…0036` applied in order, the env vars in `docs/OPERATIONS.md` (at minimum Supabase
+URL/keys, `KEY_ENCRYPTION_SECRET`, `RESEND_API_KEY`, `CORS_ORIGIN`, `PUBLIC_APP_URL`/`PUBLIC_API_URL`;
+`REDIS_URL` for quota metering/allowances/status leases; Razorpay **test** keys for checkout; `E2B_API_KEY`
+for Build Mode/run_code), at least one provider key added in `/admin → Models & keys`, and one account
+with `profiles.role = 'admin'` to open the Team Console. Smoke-test list: sign up (policy gate), chat with
+tools, ask for a pptx/xlsx/pdf (download card + Library), pick a skill, Build a small app, `/status`,
+report a problem, `/plans` checkout (test mode), console: publish an update (popup shows once), send a
+test campaign to yourself, create a package/offer and redeem it, hit a usage limit on Free.
+
 ## Current state (branch `v2`)
+
+Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
+Team Console (`/admin`: support, CRM, tasks, product updates, email campaigns, plans & offers, users, team
+& roles, team mail, status & crashes, models, billing, audit) · What's New popups once per account (web,
+Android, iOS) · Help & support center · plan catalog + public packages + offers/student passes + access
+grants, with entitlements enforced server-side · exact usage cut-off (per-round metering, enterprise
+pools/member caps) · public `/status` with auto incidents, problem and crash reports · document
+generation (pptx/xlsx/docx/pdf/md/xml/csv/json/html) · redesigned Library · Skills (built-in + user,
+auto-loaded) · connector + MCP tools in Build Mode · colour model/plugin logos, plugins by category ·
+privacy/terms v2026-09-29 · Settings → Notifications (product-email opt-out).
+
+Before that on v2:
 
 v2 adds: a dedicated Build workspace (own history, docked Preview/Files/Terminal), live terminals and
 code/diff cards in chat while building, web lookups + FRIDAY.md memory + transcript summarisation in the
@@ -110,23 +189,26 @@ Automations (+ page) · full-text chat search · share links · Build Mode edit/
 AGENTS.md/FRIDAY.md/CLAUDE.md read by Build Mode · Team Up metered · current date in prompts ·
 connector audit log · fixed env-dependent tests · removed committed scratch script.
 
-Deploy requires migrations `0023`–`0030`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
-`FRIDAY_PROMPT_CACHE=off`, `FRIDAY_BUILD_NATIVE_TOOLS=off` (Build Mode back on the text protocol).
+Deploy requires migrations `0023`–`0036`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
+`FRIDAY_PROMPT_CACHE=off`, `FRIDAY_BUILD_NATIVE_TOOLS=off` (Build Mode back on the text protocol),
+`FRIDAY_DISABLE_STATUS_MONITOR=1`, `FRIDAY_DISABLE_CAMPAIGNS=1`, `FRIDAY_DISABLE_GRANT_EXPIRY=1`.
 
 Also shipped since: prompt caching restored (Anthropic/ScaleMax/OpenAI/OpenRouter/Gemini, with
 cache-aware cost accounting in `token_ledger` — migration `0028`) and Team Up now fans out to more
 than 3 models when the message itself calls for it (`chat/candidates.ts#teamUpProposerCount`).
 
 Not yet verified with real credentials: live provider tool calls, E2B clone/PR flow, connector APIs,
-mobile builds.
+Razorpay payments + webhook, Resend delivery (campaigns, support, alerts), mobile builds.
 
 ## Next up (highest value first)
 
-1. Android/iOS parity: Memory, MCP servers, Automations, Deep Research toggle, Share, server search.
-2. Build agent: diff view; background jobs; sub-agents; one-click deploy.
-3. RAG (pgvector) over chats/files; project knowledge bases.
-4. Tests for chat pipeline + Build agent with mocked providers/sandbox; eval suite; OpenTelemetry.
-5. CSP (Helmet has it disabled), secret scanning in CI, native reasoning controls, data-driven routing.
+1. Stand up the `friday-test` environment and run the smoke-test list above with real keys.
+2. Android/iOS parity: Memory, MCP servers, Automations, Deep Research toggle, Share, server search,
+   skills picker, native document downloads.
+3. Build agent: background jobs; sub-agents; one-click deploy.
+4. RAG (pgvector) over chats/files; project knowledge bases; shareable skills.
+5. Tests for chat pipeline + Build agent with mocked providers/sandbox; eval suite; OpenTelemetry.
+6. CSP (Helmet has it disabled), secret scanning in CI, native reasoning controls, data-driven routing.
 
 ## Git
 

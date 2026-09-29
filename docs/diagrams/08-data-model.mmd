@@ -12,6 +12,59 @@ erDiagram
   messages ||--o{ message_attachments : files
   assistant_projects ||--o{ conversations : context
   automations }o--o| conversations : writes_to
+  profiles ||--o{ generated_files : creates
+  profiles ||--o{ user_skills : writes
+  profiles ||--o{ access_grants : receives
+  profiles ||--o{ support_tickets : opens
+  profiles ||--o| staff_members : is_staff
+  staff_roles ||--o{ staff_members : grants
+  support_tickets ||--o{ support_messages : thread
+  plan_packages ||--o{ access_grants : applied_as
+  offers ||--o{ offer_redemptions : redeemed
+  announcements ||--o{ announcement_views : seen_by
+  email_campaigns ||--o{ email_campaign_sends : sends
+  crm_stages ||--o{ crm_contacts : stage
+  status_incidents ||--o{ status_incident_updates : timeline
+
+  plan_catalog {
+    text id
+    bigint monthly_price_paise
+    bigint weekly_tokens
+    jsonb entitlements
+  }
+  plan_packages {
+    uuid id
+    text plan
+    bool public
+    jsonb entitlements
+  }
+  access_grants {
+    uuid id
+    text source
+    timestamptz ends_at
+    text status
+  }
+  generated_files {
+    uuid id
+    text format
+    text storage_path
+    bigint size_bytes
+  }
+  user_skills {
+    uuid id
+    text name
+    text instructions
+  }
+  status_checks {
+    text component
+    bool ok
+    int latency_ms
+  }
+  crash_reports {
+    text fingerprint
+    text message
+    text stack
+  }
 
   conversations {
     uuid id

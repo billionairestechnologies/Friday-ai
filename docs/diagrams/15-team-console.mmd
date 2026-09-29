@@ -1,0 +1,38 @@
+flowchart LR
+  subgraph people [Your team]
+    Owner[Owner / Admin - all permissions]
+    Roles[Roles as data: support, marketing, sales, operations, developer, custom]
+  end
+
+  subgraph console [Team Console /admin]
+    Overview[Overview KPIs]
+    Support[Support inbox - tickets, internal notes, assign]
+    CRM[CRM - leads, clients, pipeline stages]
+    Tasks[Tasks - assign teammates, due dates]
+    Updates[Product updates - What's New popups]
+    Campaigns[Email campaigns - audiences, schedule, unsubscribe]
+    Plans[Plans & offers - catalog, packages, codes, student passes, grants]
+    Users[Users - plans, caps, entitlements]
+    Status[Status & crashes - incidents, probes]
+    Team[Team & roles - invite, permissions]
+    Mail[Team mail identities]
+    Models[Models & keys]
+    Audit[Audit log]
+  end
+
+  subgraph users [Friday users - web, Android, iOS]
+    Popup[What's New - once per account]
+    Help[Help & support + redeem codes]
+    Inbox[Emails - support replies, product news]
+    PlansPage[Plans page - catalog + public packages]
+  end
+
+  Owner --> Team
+  Team --> Roles
+  Roles -->|permission strings e.g. support.reply, plans.manage| console
+  Updates --> Popup
+  Campaigns --> Inbox
+  Support <--> Help
+  Plans --> PlansPage
+  Plans -->|grant / package / pass| Users
+  console -->|every action| Audit

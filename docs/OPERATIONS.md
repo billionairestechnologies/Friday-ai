@@ -37,6 +37,13 @@ Optional:
 - `FRIDAY_DISABLE_TOOLS=1` — kill switch: chat skips the agent tool loop (plain streaming)
 - `FRIDAY_DISABLE_AUTOMATIONS=1` — stop the in-process automation scheduler on this instance
 - `FRIDAY_PROMPT_CACHE=off` — disable Anthropic/OpenAI/Gemini prompt caching (on by default)
+- `FRIDAY_BUILD_NATIVE_TOOLS=off` — Build Mode back on the text-tag protocol
+- `STATUS_ALERT_EMAILS` — comma-separated inboxes for outage alerts and /status problem reports
+  (falls back to the team's `support` mail identity, then the console owners)
+- `SUPPORT_INBOUND_SECRET` — shared secret for the inbound-email webhook (`POST /api/support/inbound`)
+  that turns emails to your support address into tickets
+- `FRIDAY_DISABLE_STATUS_MONITOR=1`, `FRIDAY_DISABLE_CAMPAIGNS=1`, `FRIDAY_DISABLE_GRANT_EXPIRY=1` —
+  stop the status probes / campaign sender / access-grant expiry sweep on this instance
 
 Optional provider keys are managed through the admin panel. Missing provider keys should degrade
 model availability, not process startup.
@@ -44,7 +51,7 @@ model availability, not process startup.
 ## Migrations
 
 Apply every SQL file under `supabase/migrations/` in numeric order before deploying backend code
-that depends on it.
+that depends on it. Branch `v2` needs everything through `0036_add_skills.sql`.
 
 Recommended deploy order:
 
@@ -105,3 +112,28 @@ For failed deploys:
   Razorpay, Box, Canva, and Finance accept verified user tokens, encrypted at rest.
 - Google sign-in is live when `GOOGLE_CLIENT_*` are set (`GET /api/auth/google/start`).
 - SSO is entry-point ready via `SSO_ENABLED` / `SSO_ENTRY_URL` (and `/api/auth/sso`); configure the IdP in Supabase Auth. Team invites can be accepted from Settings or `?invite=`.
+
+
+## Team Console (/admin)
+
+- **First owner**: any account with `profiles.role = 'admin'` is an owner. Sign in at `/admin`, then
+  invite teammates from *Team & roles* (they need a Friday account first). Roles are data
+  (`staff_roles`); each grants permission strings like `support.reply` or `plans.manage`, and the API
+  enforces them on every console route.
+- **Mail**: set `RESEND_API_KEY`, then add your addresses under *Team mail* (e.g. support@, hello@).
+  Campaign and support mail send from the identity with the matching purpose. Unsubscribe links are
+  signed; `profiles.marketing_opt_out` is respected by every campaign audience.
+- **Plans & offers**: edit prices, limits and entitlements under *Plans & offers → Plans* (cached ~1
+  minute). Public packages appear on `/plans` and are bought through Razorpay; the webhook applies
+  them as access grants, and the hourly sweep reverts grants that end.
+
+## Status page and incidents
+
+- `/status` is public. Every 5 minutes one instance (Redis lease) probes the API, database, Redis,
+  email and each model provider; results live in `status_checks` (120-day retention, same as
+  `crash_reports`).
+- Two failed probes in a row open an automatic incident and email the alert list; two passes resolve
+  it. Post manual incidents and updates from *Status & crashes* in the console — they show on
+  `/status` immediately.
+- "Report a problem" on `/status` creates a high-priority support ticket, emails the reporter a
+  confirmation and alerts the team. Web crashes arrive grouped by fingerprint under *Crashes*.

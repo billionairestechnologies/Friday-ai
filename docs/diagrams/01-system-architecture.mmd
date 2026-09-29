@@ -3,62 +3,71 @@ flowchart TB
     Browser[Web app - React Vite]
     Android[Android - Kotlin Compose]
     IOS[iOS - SwiftUI]
-    Public[Public share page /share/token]
+    Console[Team Console /admin - staff RBAC]
+    Public[Public pages - /status /plans /share]
   end
 
   subgraph api [Friday API - Express TypeScript]
-    MW[Helmet CORS request ID rate limits quota]
+    MW[Helmet CORS request ID rate limits quota pre-flight]
     AuthR["/api/auth"]
     ChatR["/api/chat SSE + search + share"]
-    Agent[Agent tool loop - native tool calling]
+    Agent[Agent tool loop - native tool calling + usage meter]
+    Tools[Tools: web, run_code, create_document, use_skill, connectors, MCP, memory]
     BuildR["/api/build - Build Mode coding agent"]
     AutoR["/api/automations + scheduler"]
-    MemR["/api/memory"]
-    McpR["/api/mcp"]
-    BillR["/api/billing"]
-    ConnR["/api/connectors"]
+    LibR["/api/library + /api/files"]
+    SkillR["/api/skills"]
+    StatusR["/api/status - probes, incidents, reports, crashes"]
+    ConsoleR["/api/console - support CRM tasks updates campaigns plans status"]
+    Engage["/api/updates /api/support /api/offers /api/email"]
+    BillR["/api/billing - catalog + packages"]
+    ConnR["/api/connectors /api/mcp /api/memory"]
     OrgR["/api/organizations /usage /projects /voice"]
-    Health["/api/health live+ready"]
+  end
+
+  subgraph core [Shared services]
+    Quota[Quota metering - reserve, charge per round, reconcile]
+    Ent[Entitlements - plan <- catalog <- org <- package]
+    Docs[Document renderers - pptx xlsx docx pdf text]
+    Sched[Schedulers - automations, campaigns, grant expiry, status probes]
   end
 
   subgraph data [Data plane]
     SB[(Supabase Postgres + Auth + Realtime)]
-    Store[Supabase Storage attachments]
-    Redis[(Redis optional)]
+    Store[Supabase Storage - attachments + generated files]
+    Redis[(Redis - quota counters, allowances, model health, leases)]
   end
 
   subgraph vendors [External services]
     Models[OpenAI Anthropic Gemini OpenRouter ScaleMax Sarvam Ollama]
     E2B[E2B sandboxes - code + builds]
     Web[Web search + page fetch - SSRF guarded]
-    GH[GitHub]
-    G[Google Gmail Drive Calendar]
-    Other[Notion Vercel Railway Supabase Razorpay]
-    MCP[User MCP servers]
-    Pay[Razorpay billing]
-    Mail[Resend OTP email]
+    Apps[GitHub Google Notion Vercel Railway Supabase Razorpay + user MCP]
+    Pay[Razorpay checkout + webhook]
+    Mail[Resend - OTP, support, campaigns, alerts]
   end
 
-  Browser --> MW
-  Android --> MW
-  IOS --> MW
-  Public --> ChatR
-  MW --> AuthR & ChatR & BuildR & AutoR & MemR & McpR & BillR & ConnR & OrgR & Health
-  ChatR --> Agent
+  Browser & Android & IOS --> MW
+  Console --> ConsoleR
+  Public --> StatusR & BillR & ChatR
+  MW --> AuthR & ChatR & BuildR & AutoR & LibR & SkillR & Engage & BillR & ConnR & OrgR
+  ChatR --> Agent --> Tools
+  BuildR --> Tools
+  Tools --> Models & Web & E2B & Apps & Docs
+  Agent --> Quota
+  BuildR --> Quota
+  Quota --> Ent
+  ChatR --> Ent
+  BillR --> Ent
   AutoR --> ChatR
-  Agent --> Models
-  Agent --> Web
-  Agent --> E2B
-  Agent --> GH & G & Other & MCP
-  BuildR --> E2B
-  BuildR --> GH
-  ChatR --> SB
-  ChatR --> Store
-  AuthR --> SB
-  AuthR --> Mail
+  Docs --> Store
+  LibR --> SB & Store
+  ConsoleR --> SB
+  ConsoleR --> Mail
+  StatusR --> Mail
+  Engage --> SB & Mail
   BillR --> Pay
-  ConnR --> SB
-  MemR --> SB
-  AutoR --> SB
-  Health --> SB
-  MW -.-> Redis
+  AuthR --> SB & Mail
+  Sched --> SB & Mail & Models
+  Quota --> Redis
+  ChatR --> SB
