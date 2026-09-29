@@ -1,12 +1,17 @@
 import { Router } from "express";
 import * as controller from "../controllers/adminQuotaController.js";
-import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requirePermission, requireStaff } from "../services/console/permissions.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 
 export const adminQuotaRouter = Router();
 
-adminQuotaRouter.use(requireAuth, requireAdmin);
+// Team Console staff with the matching permission (admin accounts are owners and pass everything):
+// reads need users.view, changes need users.manage.
+adminQuotaRouter.use(requireAuth, requireStaff, (req, res, next) =>
+  requirePermission(req.method === "GET" ? "users.view" : "users.manage")(req, res, next),
+);
 adminQuotaRouter.use(
   rateLimit({
     name: "admin-quota-management",

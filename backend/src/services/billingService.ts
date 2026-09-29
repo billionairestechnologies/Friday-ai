@@ -1,3 +1,4 @@
+import { discountForCheckout, recordDiscountUse } from "./console/plansService.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
@@ -76,6 +77,8 @@ export type CreateOrderInput = {
   /** The org this enterprise purchase applies to — the user must already own/admin it (created
    *  via the existing self-serve /organizations flow) before checkout can start. */
   organizationId?: string;
+  /** A discount offer code (Team Console → Plans & Offers); validated and applied server-side. */
+  offerCode?: string;
 };
 
 export async function createRazorpayOrder(userId: string, input: CreateOrderInput) {
@@ -104,6 +107,15 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
     amountPaise = amountForCycle(plan.monthlyAmountPaise, input.billingCycle);
     name = plan.name;
     description = plan.description;
+  }
+
+  // The discount is computed here, never trusted from the client; the use is only recorded once the
+  // payment webhook confirms the order was paid.
+  let discount: { offerId: string; percent: number } | null = null;
+  if (input.offerCode?.trim()) {
+    discount = await discountForCheckout(userId, input.offerCode, input.planId);
+    amountPaise = Math.max(100, Math.round((amountPaise * (100 - discount.percent)) / 100));
+    description = `${description} · ${discount.percent}% off`;
   }
 
   const response = await fetch("https://api.razorpay.com/v1/orders", {
@@ -138,7 +150,7 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
       amount_paise: amountPaise,
       currency: "INR",
       razorpay_order_id: body.id,
-      metadata: { receipt, billingCycle: input.billingCycle, seats },
+      metadata: { receipt, billingCycle: input.billingCycle, seats, ...(discount ? { offerId: discount.offerId, discountPercent: discount.percent } : {}) },
     })
     .select()
     .single();
@@ -234,7 +246,8 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
 
   // This is the ONLY place a payment actually grants anything — without it, paying just marks
   // the order row "paid" with no effect on the user's actual limits.
-  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number } | null) ?? {};
+  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string } | null) ?? {};
+  if (metadata.offerId) await recordDiscountUse(metadata.offerId, order.user_id as string, orderId).catch(() => {});
   const renewsInDays = metadata.billingCycle === "annual" ? 365 : 30;
   const renewsAt = new Date(Date.now() + renewsInDays * 24 * 60 * 60 * 1000).toISOString();
 

@@ -17,6 +17,8 @@ import { pushRouter } from "./routes/push.js";
 import { libraryRouter } from "./routes/library.js";
 import { memoryRouter } from "./routes/memory.js";
 import { automationsRouter } from "./routes/automations.js";
+import { consoleRouter } from "./routes/console.js";
+import { emailRouter, offersRouter, supportRouter, updatesRouter } from "./routes/engagement.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { buildRouter } from "./routes/build.js";
 import { voiceRouter } from "./routes/voice.js";
@@ -92,6 +94,11 @@ export function createApp() {
   app.use("/api/connectors", connectorsRouter);
   app.use("/api/organizations", organizationsRouter);
   app.use("/api/app", appRouter);
+  app.use("/api/console", consoleRouter);
+  app.use("/api/updates", updatesRouter);
+  app.use("/api/support", supportRouter);
+  app.use("/api/email", emailRouter);
+  app.use("/api/offers", offersRouter);
 
   if (existsSync(frontendDist)) {
     const indexPath = path.join(frontendDist, "index.html");

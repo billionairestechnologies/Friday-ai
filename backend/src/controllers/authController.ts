@@ -1,3 +1,4 @@
+import { getStaff } from "../services/console/permissions.js";
 import { MESSAGE_COLUMNS } from "../services/chat/conversations.js";
 import type { Request, Response } from "express";
 import { z } from "zod";
@@ -70,7 +71,8 @@ export async function adminLogin(req: Request, res: Response) {
   if (error || !data.session) throw new HttpError(401, "Invalid email or password");
 
   const { role } = await getProfileExtras(data.user.id);
-  if (role !== "admin") throw new HttpError(403, "This account doesn't have admin access");
+  // Admin accounts and active Team Console staff (support, marketing, sales…) sign in here.
+  if (role !== "admin" && !(await getStaff(data.user.id))) throw new HttpError(403, "This account doesn't have Team Console access");
 
   const name = (data.user.user_metadata?.full_name as string | undefined) ?? "admin";
   await issueOtp(email, name, data.session);

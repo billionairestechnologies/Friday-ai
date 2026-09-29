@@ -1,12 +1,17 @@
 import { Router } from "express";
 import * as controller from "../controllers/adminProvidersController.js";
-import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requirePermission, requireStaff } from "../services/console/permissions.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 
 export const adminProvidersRouter = Router();
 
-adminProvidersRouter.use(requireAuth, requireAdmin);
+// Team Console staff with the matching permission (admin accounts are owners and pass everything):
+// reads need providers.view, changes need providers.manage.
+adminProvidersRouter.use(requireAuth, requireStaff, (req, res, next) =>
+  requirePermission(req.method === "GET" ? "providers.view" : "providers.manage")(req, res, next),
+);
 // A single bulk-management session (re-sync a provider, then enable + set a tier on ~20 newly
 // discovered models) fires several requests per model — the old limit of 60/15min was tripped
 // mid-session by exactly that workflow, leaving the Providers list permanently 429ing until the

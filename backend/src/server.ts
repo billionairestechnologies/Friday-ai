@@ -8,6 +8,8 @@ assertEnvironmentConfigured();
 
 const { createApp } = await import("./app.js");
 const { startAutomationScheduler, stopAutomationScheduler } = await import("./services/automations/automationService.js");
+const { startCampaignScheduler } = await import("./services/console/campaignService.js");
+const { startGrantExpirySweep } = await import("./services/console/plansService.js");
 const app = createApp();
 const sockets = new Set<Socket>();
 
@@ -17,6 +19,8 @@ const server = app.listen(env.port, () => {
     redis: env.redisUrl ? "configured" : "disabled",
   });
   startAutomationScheduler();
+  startCampaignScheduler();
+  startGrantExpirySweep();
 });
 
 server.on("connection", (socket) => {
