@@ -79,6 +79,12 @@ type ChatState = {
   webSearch: boolean;
   /** Deep Research: long multi-source research turns that end in a cited report. */
   research: boolean;
+  /** A skill the user picked from the Skills drawer — sent with every message until removed. */
+  activeSkill: { id: string; name: string; icon: string } | null;
+  setActiveSkill: (skill: { id: string; name: string; icon: string } | null) => void;
+  /** Which tab the Plugins drawer opens on. */
+  pluginsTab: "connectors" | "skills";
+  openPlugins: (tab: "connectors" | "skills") => void;
   canvas: boolean;
   canvasOpen: boolean;
   settingsTab: string;
@@ -217,6 +223,8 @@ export const useChat = create<ChatState>()(
       think: false,
       webSearch: false,
       research: false,
+      activeSkill: null,
+      pluginsTab: "connectors",
       canvas: false,
       canvasOpen: false,
       settingsTab: "account",
@@ -240,6 +248,8 @@ export const useChat = create<ChatState>()(
       setBehavior: (behavior) => set({ behavior }),
       setWebSearch: (webSearch) => set({ webSearch }),
       setResearch: (research) => set({ research }),
+      setActiveSkill: (activeSkill) => set({ activeSkill }),
+      openPlugins: (pluginsTab) => set({ pluginsTab, dialog: "plugins" }),
       // On mobile the canvas panel is a fullscreen overlay (`max-md:fixed max-md:inset-0`) — if
       // arming Canvas also opened it immediately, tapping the toggle buried the composer under an
       // empty panel before the user could even type a message. Only auto-open on desktop widths,

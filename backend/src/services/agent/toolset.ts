@@ -7,12 +7,13 @@ import { loadMcpTools } from "./mcpService.js";
 import { googleToolsForScopes } from "./tools/google.js";
 import { MEMORY_TOOLS } from "./tools/memory.js";
 import { createDocumentTool } from "./tools/documents.js";
+import { useSkillTool } from "./tools/skills.js";
 import type { FridayTool } from "./tools/types.js";
 import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
-  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), createDocumentTool];
+  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), createDocumentTool, useSkillTool];
   // Both lookups sit on the critical path before the first token — run them concurrently.
   const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());
@@ -55,7 +56,7 @@ export const DEEP_RESEARCH_PROMPT =
   "Keep researching until the sub-questions from your plan are genuinely answered with evidence, not assumed.";
 
 /** System guidance that goes with the tools: when to use them and how to treat what they return. */
-export function toolUsePrompt(tools: FridayTool[]): string {
+export function toolUsePrompt(tools: FridayTool[], skillMenu = ""): string {
   const names = tools.map((t) => t.spec.name);
   const connectors = [
     names.includes("github_read_file") ? "GitHub" : null,
@@ -94,6 +95,7 @@ export function toolUsePrompt(tools: FridayTool[]): string {
       "calling tools and give one clear, well-organized final answer — headings or bullet points for anything with " +
       "multiple parts, the concrete conclusion first, not a trailing list of half-finished observations. Don't leave " +
       "the reply as a string of 'I'm checking X now' updates with no synthesis at the end.",
+    names.includes("use_skill") && skillMenu ? skillMenu : null,
   ]
     .filter(Boolean)
     .join("\n");

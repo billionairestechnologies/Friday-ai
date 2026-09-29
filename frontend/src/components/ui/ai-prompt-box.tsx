@@ -22,6 +22,7 @@ import {
   Users,
   AudioLines,
   Telescope,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
@@ -537,6 +538,8 @@ export interface PromptInputBoxProps {
   canvas?: boolean;
   onCanvasChange?: (value: boolean) => void;
   research?: boolean;
+  /** Opens the Skills drawer (pick a skill for this chat). */
+  onOpenSkills?: () => void;
   onResearchChange?: (value: boolean) => void;
   model?: string;
   onModelChange?: (id: string) => void;
@@ -558,6 +561,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       canvas,
       onCanvasChange,
       research,
+      onOpenSkills,
       onResearchChange,
       model,
       onModelChange,
@@ -942,6 +946,15 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                           {research && <Check className="ml-auto size-3.5 text-canvas" />}
                         </DropdownMenu.Item>
                       </>
+                    )}
+                    {onOpenSkills && (
+                      <DropdownMenu.Item
+                        onSelect={onOpenSkills}
+                        className="flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-foreground outline-none data-[highlighted]:bg-chip"
+                      >
+                        <Sparkles className="size-4 text-muted" />
+                        Skills
+                      </DropdownMenu.Item>
                     )}
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>

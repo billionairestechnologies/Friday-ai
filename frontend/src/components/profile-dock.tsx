@@ -9,6 +9,7 @@ export function ProfileDock() {
   const { user } = useCurrentUserState();
   const navigate = useNavigate();
   const setDialog = useChat((s) => s.setDialog);
+  const openPlugins = useChat((s) => s.openPlugins);
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -48,7 +49,14 @@ export function ProfileDock() {
           </p>
           <div className="my-1 h-px bg-border" />
           <MenuItem icon={<Settings className="size-4" />} label="Settings" onClick={() => go("settings")} />
-          <MenuItem icon={<Puzzle className="size-4" />} label="Plugins" onClick={() => go("plugins")} />
+          <MenuItem
+            icon={<Puzzle className="size-4" />}
+            label="Plugins"
+            onClick={() => {
+              setOpen(false);
+              openPlugins("connectors");
+            }}
+          />
           <MenuItem icon={<CircleHelp className="size-4" />} label="Help & support" onClick={() => go("help")} />
           <MenuItem
             icon={<Activity className="size-4" />}

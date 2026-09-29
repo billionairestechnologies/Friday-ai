@@ -53,6 +53,7 @@ import type { ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
+import { activeSkillPrompt, getSkill, listSkills, skillMenu, type Skill } from "../skills/skillService.js";
 import type { GeneratedFile } from "../documents/documentService.js";
 import {
   chargeProgress,
@@ -175,7 +176,7 @@ export async function streamMessage(
   canvas = false,
   attachments: ChatImage[] = [],
   reservation?: Reservation,
-  options: { research?: boolean } = {},
+  options: { research?: boolean; skillId?: string } = {},
 ): Promise<void> {
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
@@ -188,6 +189,9 @@ export async function streamMessage(
   };
   // What the user's plan / package unlocks (Build Mode, rounds, Deep Research, Team Up size…).
   const entitlementsPromise = entitlementsFor(userId);
+  // Skills: the menu the agent can auto-load from, and the one the user explicitly picked (if any).
+  const skillsPromise = listSkills(userId).catch(() => [] as Skill[]);
+  const activeSkillPromise = options.skillId ? getSkill(userId, options.skillId).catch(() => null) : Promise.resolve(null);
   try {
     const conversation = await getOwnedConversation(userId, conversationId);
     mark("conversation loaded");
@@ -423,9 +427,11 @@ export async function streamMessage(
 
     // Memory + project context are pinned AFTER trimming, so a long chat can never trim them away.
     const memoryPrompt = await memoryPromptPromise;
+    const activeSkill = await activeSkillPromise;
     const pinnedContext: ChatMessage[] = [
       ...(memoryPrompt ? [{ role: "system" as const, content: memoryPrompt }] : []),
       ...projectContext,
+      ...(activeSkill ? [{ role: "system" as const, content: activeSkillPrompt(activeSkill) }] : []),
     ];
     const history = appendExtractedText(
       attachImages(
@@ -703,7 +709,9 @@ export async function streamMessage(
       if (research) onEvent({ t: "status", s: "searching" });
       const tools = await (toolsetPromise ?? buildToolset(userId));
       const citedUrls = new Set(searchResults.map((r) => r.url));
-      const guidance = toolUsePrompt(tools) + (research ? `\n\n${DEEP_RESEARCH_PROMPT}` : "");
+      // An explicitly chosen skill is already pinned — don't also offer the menu (it would compete).
+      const menu = activeSkill ? "" : skillMenu(await skillsPromise);
+      const guidance = toolUsePrompt(tools, menu) + (research ? `\n\n${DEEP_RESEARCH_PROMPT}` : "");
       toolRun = await runToolLoop({
         candidates: candidates.filter(supportsTools),
         history: withToolPreamble(history, guidance),

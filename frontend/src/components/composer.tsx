@@ -1,3 +1,5 @@
+import { AnimatePresence, motion } from "framer-motion";
+import { X } from "lucide-react";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { useChat } from "@/lib/chat/store";
 
@@ -24,8 +26,25 @@ export function Composer({
   const setResearch = useChat((s) => s.setResearch);
   const model = useChat((s) => s.model);
   const setModel = useChat((s) => s.setModel);
+  const activeSkill = useChat((s) => s.activeSkill);
+  const setActiveSkill = useChat((s) => s.setActiveSkill);
+  const openPlugins = useChat((s) => s.openPlugins);
 
   return (
+    <>
+    <AnimatePresence>
+      {activeSkill && (
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} className="mb-2 flex">
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-canvas/40 bg-canvas/10 pr-1 pl-3 text-xs font-medium text-foreground">
+            <span aria-hidden>{activeSkill.icon}</span>
+            <span className="text-muted">Skill:</span> {activeSkill.name}
+            <button type="button" onClick={() => setActiveSkill(null)} aria-label="Stop using this skill" className="ml-0.5 flex size-6 items-center justify-center rounded-full text-muted hover:bg-chip hover:text-foreground">
+              <X className="size-3.5" />
+            </button>
+          </span>
+        </motion.div>
+      )}
+    </AnimatePresence>
     <PromptInputBox
       isLoading={streaming}
       disabled={disabled}
@@ -41,7 +60,9 @@ export function Composer({
       onModelChange={setModel}
       onStop={onStop}
       onSend={onSend}
+      onOpenSkills={() => openPlugins("skills")}
       placeholder="What do you want to know?"
     />
+    </>
   );
 }

@@ -13,6 +13,7 @@ import {
   Trash2,
   Workflow,
   X,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
@@ -59,6 +60,7 @@ export function Sidebar() {
   const newChat = useChat((s) => s.newChat);
   const setActiveProjectId = useChat((s) => s.setActiveProjectId);
   const setDialog = useChat((s) => s.setDialog);
+  const openPlugins = useChat((s) => s.openPlugins);
   const workspace = useChat((s) => s.workspace);
   const buildMode = workspace === "build";
   const isEnterprise = usePlan((s) => s.isEnterprise);
@@ -384,7 +386,15 @@ export function Sidebar() {
           )}
           <button
             type="button"
-            onClick={() => setDialog("plugins")}
+            onClick={() => openPlugins("skills")}
+            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted transition-colors hover:bg-chip-on hover:text-foreground"
+          >
+            <Sparkles className="size-4" />
+            Skills
+          </button>
+          <button
+            type="button"
+            onClick={() => openPlugins("connectors")}
             className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted transition-colors hover:bg-chip-on hover:text-foreground"
           >
             <Puzzle className="size-4" />

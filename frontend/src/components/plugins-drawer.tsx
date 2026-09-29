@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Search, X } from "lucide-react";
-import { FEATURED_PLUGINS, type PluginItem } from "@/lib/plugins";
-import { PLUGIN_LOGOS, PluginLogo } from "@/components/plugin-logos";
+import { Check, Landmark, Search, X } from "lucide-react";
+import { FEATURED_PLUGINS, PLUGIN_CATEGORIES, type PluginItem } from "@/lib/plugins";
+import { PLUGIN_LOGOS, PluginLogo, pluginTileStyle } from "@/components/plugin-logos";
+import { SkillsPanel } from "@/components/skills-panel";
 import { useChat } from "@/lib/chat/store";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { api } from "@/lib/api";
@@ -47,7 +48,10 @@ export function PluginsDrawer() {
   const setDialog = useChat((s) => s.setDialog);
   const { user } = useCurrentUserState();
   const signedIn = Boolean(user && !user.isDevFallback);
-  const [tab, setTab] = useState<"connectors" | "skills">("connectors");
+  // The tab lives in the store so the composer's "Skills" item can open the drawer right on it.
+  const tab = useChat((s) => s.pluginsTab);
+  const openPlugins = useChat((s) => s.openPlugins);
+  const setTab = (t: "connectors" | "skills") => openPlugins(t);
   const [q, setQ] = useState("");
   const [active, setActive] = useState<PluginItem | null>(null);
   const [accounts, setAccounts] = useState<ConnectorAccount[]>([]);
@@ -199,7 +203,7 @@ export function PluginsDrawer() {
                 <X className="size-4" />
               </Dialog.Close>
             </div>
-            <Dialog.Title className="sr-only">Plugins</Dialog.Title>
+            <Dialog.Title className="sr-only">{tab === "skills" ? "Skills" : "Plugins"}</Dialog.Title>
             <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-5">
               {tab === "connectors" ? (
                 <>
@@ -218,9 +222,7 @@ export function PluginsDrawer() {
                                 onClick={() => setActive(plugin)}
                                 className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
                               >
-                                <span className="grid size-9 place-items-center rounded-lg bg-chip">
-                                  {PLUGIN_LOGOS[plugin.id] ? <PluginLogo id={plugin.id} className="size-4.5" /> : plugin.name.charAt(0)}
-                                </span>
+                                <PluginTile plugin={plugin} />
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-sm font-medium">{plugin.name}</span>
                                   <span className="block truncate text-xs text-muted">
@@ -237,9 +239,14 @@ export function PluginsDrawer() {
                       </ul>
                     </>
                   )}
-                  <p className="mb-3 text-sm font-semibold">Featured</p>
+                  {PLUGIN_CATEGORIES.map((category) => {
+                    const inCategory = featured.filter((p) => (p.category ?? "Productivity") === category);
+                    if (!inCategory.length) return null;
+                    return (
+                  <section key={category} className="mb-6">
+                  <p className="mb-2 text-sm font-semibold">{category}</p>
                   <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {featured.map((p) => {
+                    {inCategory.map((p) => {
                       const provider = pluginProvider.get(p.id);
                       const connected = Boolean(provider && accounts.some((account) => account.provider === provider));
                       return (
@@ -249,9 +256,7 @@ export function PluginsDrawer() {
                             onClick={() => setActive(p)}
                             className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-chip"
                           >
-                            <span className="grid size-9 place-items-center rounded-lg bg-chip text-sm font-semibold">
-                              {PLUGIN_LOGOS[p.id] ? <PluginLogo id={p.id} className="size-4.5" /> : p.name.charAt(0)}
-                            </span>
+                            <PluginTile plugin={p} />
                             <span className="min-w-0 flex-1">
                               <span className="block text-sm font-medium">{p.name}</span>
                               <span className="block truncate text-xs text-muted">{p.desc}</span>
@@ -264,12 +269,12 @@ export function PluginsDrawer() {
                       );
                     })}
                   </ul>
+                  </section>
+                    );
+                  })}
                 </>
               ) : (
-                <div className="text-sm text-muted">
-                  <p className="mb-2 font-semibold text-foreground">Skills</p>
-                  <p>Think, Search and Deep Research live right in the composer — Canvas opens automatically, or toggle it from the top-right icon.</p>
-                </div>
+                <SkillsPanel query={q} />
               )}
             </div>
           </div>
@@ -363,5 +368,20 @@ export function PluginsDrawer() {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** Real brand mark on a tile tinted with the brand colour. */
+function PluginTile({ plugin }: { plugin: PluginItem }) {
+  return (
+    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-chip text-sm font-semibold" style={pluginTileStyle(plugin.id)}>
+      {PLUGIN_LOGOS[plugin.id] ? (
+        <PluginLogo id={plugin.id} className="size-4.5" />
+      ) : plugin.id === "finance" ? (
+        <Landmark className="size-4.5" style={{ color: "#10B981" }} />
+      ) : (
+        plugin.name.charAt(0)
+      )}
+    </span>
   );
 }

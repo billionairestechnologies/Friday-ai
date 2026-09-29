@@ -103,8 +103,30 @@ export const PLUGIN_LOGOS: Record<string, (props: SVGProps<SVGSVGElement>) => Re
   canva: CanvaMonogram,
 };
 
-export function PluginLogo({ id, className }: { id?: string; className?: string }) {
+/**
+ * Brand colours for the marks above. GitHub, Notion, Railway and Vercel are monochrome brands —
+ * they stay in the text colour (a coloured version would not be their real logo).
+ */
+export const PLUGIN_COLORS: Record<string, string> = {
+  supabase: "#3ECF8E",
+  razorpay: "#3395FF",
+  calendar: "#4285F4",
+  gmail: "#EA4335",
+  drive: "#1FA463",
+  box: "#0061D5",
+  canva: "#00C4CC",
+  finance: "#10B981",
+};
+
+export function PluginLogo({ id, className, mono = false }: { id?: string; className?: string; mono?: boolean }) {
   const Logo = id ? PLUGIN_LOGOS[id] : undefined;
   if (!Logo) return null;
-  return <Logo className={className} aria-hidden />;
+  const color = mono || !id ? undefined : PLUGIN_COLORS[id];
+  return <Logo className={className} aria-hidden style={color ? { color } : undefined} />;
+}
+
+/** Tile background tinted with the brand colour (neutral for monochrome brands). */
+export function pluginTileStyle(id: string): { background: string } | undefined {
+  const color = PLUGIN_COLORS[id];
+  return color ? { background: `${color}1F` } : undefined;
 }

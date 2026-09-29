@@ -371,7 +371,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
           // Build Mode produced a running app — open the panel on it, same as an auto-opened artifact.
           useChat.getState().setCanvasOpen(true);
         } else if (ev.t === "err") batch.error(ev.c);
-      }, ac.signal, { research: s.research });
+      }, ac.signal, { research: s.research, ...(s.activeSkill ? { skillId: s.activeSkill.id } : {}) });
     } catch (err) {
       if ((err as { name?: string }).name !== "AbortError") {
         applyLive(chatId, {
