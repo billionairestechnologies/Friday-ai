@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError } from "../middleware/errorHandler.js";
+import { resolveAttachmentDataUrl } from "./attachmentStorage.js";
+import { listFiles } from "./documents/documentService.js";
 
 export type LibraryCategory =
   | "Web pages"
@@ -12,6 +14,9 @@ export type LibraryCategory =
   | "Data"
   | "Other code"
   | "Images";
+
+/** Categories that aren't extracted from replies: generated documents and the user's own uploads. */
+export const VIRTUAL_CATEGORIES = ["Documents", "Uploads"] as const;
 
 export const LIBRARY_CATEGORIES: LibraryCategory[] = [
   "Web pages",
@@ -159,6 +164,92 @@ export async function listItems(userId: string, category?: string) {
     ...rest,
     preview: rest.kind === "image" ? String(content) : String(content).slice(0, 240),
   }));
+}
+
+export type LibraryEntry = {
+  id: string;
+  source: "artifact" | "document" | "upload";
+  conversation_id: string | null;
+  title: string;
+  kind: string;
+  lang: string | null;
+  category: string;
+  created_at: string;
+  preview: string;
+  size?: number;
+  filename?: string;
+  mime?: string;
+};
+
+async function listUploads(userId: string, limit = 200): Promise<LibraryEntry[]> {
+  const { data, error } = await supabaseAdmin
+    .from("message_attachments")
+    .select("id, name, mime, size_bytes, kind, created_at, messages!inner(conversation_id, conversations!inner(user_id))")
+    .eq("messages.conversations.user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return (data ?? []).map((row) => {
+    const message = (Array.isArray(row.messages) ? row.messages[0] : row.messages) as { conversation_id?: string } | null;
+    return {
+      id: row.id as string,
+      source: "upload" as const,
+      conversation_id: message?.conversation_id ?? null,
+      title: row.name as string,
+      kind: row.kind === "image" ? "image" : "file",
+      lang: null,
+      category: "Uploads",
+      created_at: row.created_at as string,
+      preview: "",
+      size: Number(row.size_bytes ?? 0),
+      mime: row.mime as string,
+    };
+  });
+}
+
+/**
+ * Everything a user made or shared, in one place: code / pages / images extracted from replies,
+ * generated documents, and files they uploaded — newest first, optionally one category.
+ */
+export async function listLibrary(userId: string, category?: string): Promise<LibraryEntry[]> {
+  const wantArtifacts = !category || !(VIRTUAL_CATEGORIES as readonly string[]).includes(category);
+  const [artifacts, documents, uploads] = await Promise.all([
+    wantArtifacts ? listItems(userId, category) : Promise.resolve([]),
+    !category || category === "Documents" ? listFiles(userId) : Promise.resolve([]),
+    !category || category === "Uploads" ? listUploads(userId) : Promise.resolve([]),
+  ]);
+  const entries: LibraryEntry[] = [
+    ...artifacts.map((a) => ({ ...(a as Omit<LibraryEntry, "source">), source: "artifact" as const })),
+    ...documents.map((d) => ({
+      id: d.id as string,
+      source: "document" as const,
+      conversation_id: (d.conversation_id as string | null) ?? null,
+      title: d.title as string,
+      kind: "document",
+      lang: d.format as string,
+      category: "Documents",
+      created_at: d.created_at as string,
+      preview: d.summary as string,
+      size: Number(d.size_bytes ?? 0),
+      filename: d.filename as string,
+    })),
+    ...uploads,
+  ];
+  return entries.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 600);
+}
+
+/** A viewable URL for one of the user's uploads (signed, short-lived) — ownership checked. */
+export async function uploadUrl(userId: string, id: string): Promise<{ url: string; name: string; mime: string }> {
+  const { data, error } = await supabaseAdmin
+    .from("message_attachments")
+    .select("name, mime, data_url, storage_bucket, storage_path, messages!inner(conversations!inner(user_id))")
+    .eq("id", id)
+    .eq("messages.conversations.user_id", userId)
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!data) throw new HttpError(404, "Upload not found");
+  const row = data as unknown as { name: string; mime: string; data_url: string | null; storage_bucket: string | null; storage_path: string | null };
+  return { url: await resolveAttachmentDataUrl(row), name: row.name, mime: row.mime };
 }
 
 export async function getItem(userId: string, id: string) {

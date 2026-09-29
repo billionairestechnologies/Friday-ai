@@ -11,6 +11,7 @@ import { shouldShowPlan, toolOnlySteps } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
 import { AskCard } from "@/components/ask-panel";
 import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
+import { FileCards } from "@/components/file-card";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
 import type { ChatMessage } from "@/lib/chat/types";
@@ -214,6 +215,8 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
           {message.error}
         </p>
       )}
+
+      {message.files?.length ? <FileCards files={message.files} /> : null}
 
       {message.build?.zipBytes && !message.streaming && <ProjectZipCard build={message.build} conversationId={conversationId} />}
 

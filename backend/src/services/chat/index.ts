@@ -53,6 +53,7 @@ import type { ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
+import type { GeneratedFile } from "../documents/documentService.js";
 import {
   chargeProgress,
   QUOTA_STOP_MESSAGE,
@@ -687,6 +688,7 @@ export async function streamMessage(
     // tool loop. If that path can't start at all (e.g. a model that rejects tools), fall back to the
     // plain streaming path below, so tools can only ever add capability, never break chat.
     const extraCitations: { url: string; title?: string }[] = [];
+    const createdFiles: GeneratedFile[] = [];
     let toolRun: ToolLoopResult | null = null;
     const toolStarted = Date.now();
     // Deep Research in Auto/Team-Up prefers a tool-capable, frontier-grade model — the same
@@ -712,6 +714,10 @@ export async function streamMessage(
           userId,
           conversationId,
           signal,
+          onFile: (file) => {
+            createdFiles.push(file);
+            onEvent({ t: "file", file });
+          },
           onCite: (url, title) => {
             if (citedUrls.has(url)) return;
             citedUrls.add(url);
@@ -822,6 +828,7 @@ export async function streamMessage(
       usedCanvas: canvas,
       ...(toolSteps.length ? { build: { steps: toolSteps, elapsedMs: Date.now() - toolStarted } } : {}),
       ...(toolRun?.error ? { error: toolRun.error } : {}),
+      ...(createdFiles.length ? { files: createdFiles } : {}),
     });
     await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
     onEvent({ t: "done" });

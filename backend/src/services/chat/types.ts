@@ -4,6 +4,8 @@ export type StreamEvent =
   | { t: "text"; c: string }
   | { t: "think"; c: string }
   | { t: "cite"; u: string; title?: string }
+  /** A file a tool created this turn (create_document) — rendered as a download card. */
+  | { t: "file"; file: import("../documents/documentService.js").GeneratedFile }
   | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }

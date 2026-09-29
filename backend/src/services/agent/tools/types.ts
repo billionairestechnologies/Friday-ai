@@ -6,6 +6,8 @@ export type ToolContext = {
   signal?: AbortSignal;
   /** Lets a tool surface a source link (shown as a citation chip under the reply). */
   onCite?: (url: string, title?: string) => void;
+  /** Lets a tool attach a file it created (shown as a download card under the reply). */
+  onFile?: (file: import("../../documents/documentService.js").GeneratedFile) => void;
 };
 
 /** A tool the chat agent can call. `run` returns plain text for the model; throwing reports an error

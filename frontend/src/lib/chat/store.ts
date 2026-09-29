@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import { DEFAULT_MODEL_ID } from "./models";
-import type { AgentStatus, Attachment, BuildInfo, Chat, ChatMessage, Citation } from "./types";
+import type { AgentStatus, Attachment, BuildInfo, Chat, ChatMessage, Citation, GeneratedFile } from "./types";
 import { uid } from "../utils";
 
 const TITLE_FROM = 48;
@@ -31,6 +31,7 @@ export type TurnCommit = {
   usedCanvas?: boolean;
   /** Build Mode steps + preview for this turn (see BuildInfo). */
   build?: BuildInfo;
+  files?: GeneratedFile[];
 };
 
 export type ServerConversation = {
@@ -55,6 +56,7 @@ export type ServerMessage = {
   used_canvas?: boolean | null;
   error?: string | null;
   build?: BuildInfo | null;
+  files?: GeneratedFile[] | null;
   message_attachments?: {
     id: string;
     name: string;
@@ -363,6 +365,7 @@ export const useChat = create<ChatState>()(
                           usedSearch: m.usedSearch || data.usedSearch,
                           usedCanvas: m.usedCanvas || data.usedCanvas,
                           build: data.build ?? m.build,
+                          files: data.files?.length ? data.files : m.files,
                           streaming: false,
                           status: null,
                         }
@@ -497,6 +500,7 @@ export const useChat = create<ChatState>()(
                       usedCanvas: Boolean(m.used_canvas),
                       error: m.error ?? undefined,
                       build: m.build ?? undefined,
+                      files: m.files?.length ? m.files : undefined,
                       attachments: m.message_attachments?.map((a) => ({
                         id: a.id,
                         name: a.name,

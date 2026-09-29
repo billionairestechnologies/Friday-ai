@@ -6,12 +6,13 @@ import { GITHUB_TOOLS } from "./tools/github.js";
 import { loadMcpTools } from "./mcpService.js";
 import { googleToolsForScopes } from "./tools/google.js";
 import { MEMORY_TOOLS } from "./tools/memory.js";
+import { createDocumentTool } from "./tools/documents.js";
 import type { FridayTool } from "./tools/types.js";
 import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
-  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools()];
+  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), createDocumentTool];
   // Both lookups sit on the critical path before the first token — run them concurrently.
   const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());
@@ -83,6 +84,10 @@ export function toolUsePrompt(tools: FridayTool[]): string {
       ? "Use run_code for exact arithmetic, data work and checking code — report the real output, never invented output."
       : null,
     "When you rely on a web page, cite it inline as a markdown link.",
+    names.includes("create_document")
+      ? "When the user wants a presentation, spreadsheet, Word document, PDF or another file, make the real file with create_document " +
+        "(after gathering the facts it needs) instead of pasting its content into the chat."
+      : null,
     "Between tool calls, narrate what you're doing in at most one short sentence ('Checking the repo's package.json…') " +
       "— never multiple paragraphs of running commentary. The user sees every tool call as its own step already, so " +
       "narrating what a step found is redundant; save your words for the answer. Once you have what you need, STOP " +

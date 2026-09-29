@@ -15,6 +15,7 @@ export type MessageMetadata = {
   usedCanvas?: boolean;
   error?: string;
   build?: import("./types.js").BuildMeta;
+  files?: import("../documents/documentService.js").GeneratedFile[];
 };
 
 export type PageOptions = {
@@ -214,7 +215,7 @@ export async function listMessages(userId: string, conversationId: string, page:
  * every history load huge and chats open blank on the clients.
  */
 export const MESSAGE_COLUMNS =
-  "id, conversation_id, role, content, input_mode, created_at, model_label, thinking, citations, agents, used_think, used_search, used_canvas, error, extracted_text, build";
+  "id, conversation_id, role, content, input_mode, created_at, model_label, thinking, citations, agents, used_think, used_search, used_canvas, error, extracted_text, build, files";
 
 const DEFAULT_TITLES = ["New chat", "Auto chat", "Team Up chat"];
 
@@ -288,6 +289,8 @@ export async function insertAssistantMessage(
       used_canvas: metadata.usedCanvas ?? false,
       error: metadata.error ?? null,
       build: metadata.build ?? null,
+      // Only written when present, so a reply without files never depends on migration 0035.
+      ...(metadata.files?.length ? { files: metadata.files } : {}),
     })
     .select(MESSAGE_COLUMNS)
     .single();

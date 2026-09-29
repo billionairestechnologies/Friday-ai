@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { StreamAcc } from "./raf-batch";
-import type { AgentStatus, AssistantStatus, BuildPlan, BuildStep, ChatMessage, Citation } from "./types";
+import type { AgentStatus, AssistantStatus, BuildPlan, BuildStep, ChatMessage, Citation, GeneratedFile } from "./types";
 
 export type LiveSnapshot = {
   chatId: string;
@@ -19,6 +19,7 @@ export type LiveSnapshot = {
    *  until the first step exists, even though narration text flips status to "writing" meanwhile. */
   buildStarted?: boolean;
   plan?: BuildPlan;
+  files?: GeneratedFile[];
 };
 
 type Draft = LiveSnapshot;
@@ -53,6 +54,7 @@ function emit(chatId: string) {
           meta: draft.meta,
           buildStarted: draft.buildStarted,
           plan: draft.plan,
+          files: draft.files?.slice(),
         }
       : null,
   );
@@ -139,6 +141,13 @@ export function setLiveBuildMeta(chatId: string, meta: { elapsedMs?: number; zip
   emit(chatId);
 }
 
+export function addLiveFile(chatId: string, file: GeneratedFile) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  draft.files = [...(draft.files ?? []).filter((f) => f.id !== file.id), file];
+  emit(chatId);
+}
+
 export function setLivePreview(chatId: string, url: string, port: number) {
   const draft = drafts.get(chatId);
   if (!draft) return;
@@ -204,6 +213,7 @@ export function overlayLive(
       // send time, so the chain-of-thought panel/sources still render for it.
       usedSearch: m.usedSearch || live.status === "searching" || live.cites.length > 0,
       usedCanvas: m.usedCanvas || live.canvasOn,
+      files: live.files?.length ? live.files : m.files,
       build: live.steps.length || live.preview || live.buildStarted || live.plan
         ? { plan: live.plan, steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
         : m.build,

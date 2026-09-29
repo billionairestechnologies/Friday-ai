@@ -71,6 +71,9 @@ export type BuildInfo = {
   prUrl?: string;
 };
 
+/** A file Friday generated for this reply (create_document) — shown as a download card. */
+export type GeneratedFile = { id: string; title: string; filename: string; format: string; size: number; summary?: string; createdAt?: string };
+
 export type ChatMessage = {
   id: string;
   role: Role;
@@ -90,6 +93,7 @@ export type ChatMessage = {
   /** Live per-model progress during a Team Up run — which models are answering and how it went. */
   agents?: AgentStatus[];
   build?: BuildInfo;
+  files?: GeneratedFile[];
 };
 
 export type Chat = {
@@ -124,6 +128,7 @@ export type StreamEvent =
   | { t: "think"; c: string }
   | { t: "text"; c: string }
   | { t: "cite"; u: string; title?: string }
+  | { t: "file"; file: GeneratedFile }
   | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
