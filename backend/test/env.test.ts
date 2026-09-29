@@ -55,3 +55,18 @@ test("partial GitHub and SSO config are rejected", () => {
     }).some((error) => error.includes("SSO_ENTRY_URL")),
   );
 });
+
+test("FRIDAY_ENV_JSON (AWS Secrets Manager) fills unset variables without overriding explicit ones", async () => {
+  const { expandJsonEnv } = await import("../src/config/env.js");
+  const target: NodeJS.ProcessEnv = { REDIS_URL: "redis://from-stack:6379", EMPTY: "" };
+  const applied = expandJsonEnv(JSON.stringify({ SUPABASE_URL: "https://x.supabase.co", REDIS_URL: "redis://from-secret", EMPTY: "filled", PORT: 4000, bad_key: "x", FCM: { a: 1 } }), target);
+  assert.equal(target.SUPABASE_URL, "https://x.supabase.co");
+  assert.equal(target.REDIS_URL, "redis://from-stack:6379");
+  assert.equal(target.EMPTY, "filled");
+  assert.equal(target.PORT, "4000");
+  assert.equal(target.bad_key, undefined);
+  assert.equal(target.FCM, '{"a":1}');
+  assert.equal(applied, 4);
+  assert.equal(expandJsonEnv(undefined, target), 0);
+  assert.throws(() => expandJsonEnv("{nope", target), /not valid JSON/);
+});

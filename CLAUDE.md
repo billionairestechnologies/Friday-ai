@@ -159,6 +159,14 @@ tools, ask for a pptx/xlsx/pdf (download card + Library), pick a skill, Build a 
 report a problem, `/plans` checkout (test mode), console: publish an update (popup shows once), send a
 test campaign to yourself, create a package/offer and redeem it, hit a usage limit on Free.
 
+## Deploying on AWS
+
+`docs/AWS_DEPLOY.md` + `infra/aws/`: ECS Fargate behind an ALB (1 h idle timeout for SSE), ElastiCache
+Redis, image built in CodeBuild (`friday-build.yaml`, `buildspec.yml`), settings in ONE Secrets Manager
+JSON secret read at startup as `FRIDAY_ENV_JSON` (`config/env.ts#expandJsonEnv`; explicit env wins).
+Deploy: `infra/aws/deploy.sh [--env-file infra/aws/app.env]` (deploys the committed HEAD). Lint the
+templates with `cfn-lint infra/aws/*.yaml` (install in a venv — debian's PyYAML blocks a global pip install).
+
 ## Current state (branch `v2`)
 
 Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):

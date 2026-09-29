@@ -15,6 +15,8 @@ CI runs the same checks on pull requests and pushes to `main`.
 
 ## Environment
 
+On AWS, see `docs/AWS_DEPLOY.md` — all of the settings below go into one Secrets Manager secret.
+
 Production must set:
 
 - `NODE_ENV=production`

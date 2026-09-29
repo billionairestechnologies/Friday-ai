@@ -1,5 +1,32 @@
 import "dotenv/config";
 
+/**
+ * On AWS (ECS) every setting arrives as ONE JSON secret from Secrets Manager in FRIDAY_ENV_JSON
+ * ({"SUPABASE_URL": "...", ...}) instead of dozens of separately-wired variables — a missing key in
+ * a per-variable ECS secret mapping stops the task from starting at all. Values set directly on the
+ * process (task-definition env, e.g. REDIS_URL from the stack) win over the JSON. This runs when this
+ * module is first imported, before anything reads process.env.
+ */
+export function expandJsonEnv(raw: string | undefined, target: NodeJS.ProcessEnv = process.env): number {
+  if (!raw?.trim()) return 0;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("FRIDAY_ENV_JSON is not valid JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("FRIDAY_ENV_JSON must be a JSON object");
+  let applied = 0;
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!/^[A-Z][A-Z0-9_]*$/.test(key) || value === null || value === undefined) continue;
+    if (target[key] !== undefined && target[key] !== "") continue;
+    target[key] = typeof value === "string" ? value : typeof value === "object" ? JSON.stringify(value) : String(value);
+    applied++;
+  }
+  return applied;
+}
+expandJsonEnv(process.env.FRIDAY_ENV_JSON);
+
 const INSECURE_ENCRYPTION_SECRETS = new Set([
   "",
   "change-me",

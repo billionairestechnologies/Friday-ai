@@ -10,3 +10,6 @@ coverage/
 .vercel/
 .turbo/
 .playwright-cli/
+
+# AWS deploy settings (real secrets)
+infra/aws/app.env

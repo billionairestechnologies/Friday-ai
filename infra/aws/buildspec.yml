@@ -1,0 +1,23 @@
+version: 0.2
+# Builds the Friday image inside CodeBuild (see friday-build.yaml). The web app's public build-time
+# values (Supabase URL + anon key) come from the same secret the API reads at runtime.
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${REPOSITORY_URI%%/*}"
+      - SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$APP_SECRET_ARN" --query SecretString --output text)
+      - export VITE_SUPABASE_URL=$(echo "$SECRET_JSON" | jq -r '.VITE_SUPABASE_URL // .SUPABASE_URL // empty')
+      - export VITE_SUPABASE_ANON_KEY=$(echo "$SECRET_JSON" | jq -r '.VITE_SUPABASE_ANON_KEY // .SUPABASE_ANON_KEY // empty')
+      - unset SECRET_JSON
+  build:
+    commands:
+      - >-
+        docker build
+        --build-arg NODE_IMAGE=public.ecr.aws/docker/library/node:22-bookworm-slim
+        --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL"
+        --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY"
+        --build-arg VITE_APP_VERSION="$IMAGE_TAG"
+        -t "$REPOSITORY_URI:$IMAGE_TAG" .
+  post_build:
+    commands:
+      - docker push "$REPOSITORY_URI:$IMAGE_TAG"

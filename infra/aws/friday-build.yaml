@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Friday AI build pipeline — ECR repository for the app image, an S3 bucket for source uploads, and a
+  CodeBuild project that builds the Docker image inside AWS (so deploys need no local Docker).
+
+Parameters:
+  AppSecretArn:
+    Type: String
+    Description: The app settings secret (read at build time for the web app's public VITE_* values)
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AWS::StackName}-app"
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: >-
+          {"rules":[{"rulePriority":1,"description":"keep the last 20 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }]
+      LifecycleConfiguration:
+        Rules: [{ Id: expire-sources, Status: Enabled, ExpirationInDays: 14 }]
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{ Effect: Allow, Principal: { Service: codebuild.amazonaws.com }, Action: sts:AssumeRole }]
+      Policies:
+        - PolicyName: friday-build
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: "*"
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub "${SourceBucket.Arn}/*"
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload, ecr:PutImage, ecr:BatchGetImage, ecr:GetDownloadUrlForLayer]
+                Resource: !GetAtt Repository.Arn
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref AppSecretArn
+  Project:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-image"
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 40
+      Artifacts: { Type: NO_ARTIFACTS }
+      Source:
+        Type: S3
+        Location: !Sub "${SourceBucket}/source.zip"
+        BuildSpec: infra/aws/buildspec.yml
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - { Name: REPOSITORY_URI, Value: !GetAtt Repository.RepositoryUri }
+          - { Name: APP_SECRET_ARN, Value: !Ref AppSecretArn }
+          - { Name: IMAGE_TAG, Value: latest }
+
+Outputs:
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri
+  SourceBucket:
+    Value: !Ref SourceBucket
+  ProjectName:
+    Value: !Ref Project
