@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, ExternalLink, GitBranch, GitPullRequest, Github, Gauge, Hammer, X } from "lucide-react";
-import { STATUS_META, relativeTime, useBuildSessions, type BuildSession } from "@/lib/build/sessions";
-import { EFFORT_OPTIONS, useBuildPrefs } from "@/lib/build/prefs";
+import { STATUS_META, relativeTime, useBuildSessions, type BuildSession } from "@/lib/build-mode/sessions";
+import { EFFORT_OPTIONS, useBuildPrefs } from "@/lib/build-mode/prefs";
 import { useChat } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 

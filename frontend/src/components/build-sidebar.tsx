@@ -4,7 +4,7 @@ import { Code2, LibraryBig, MessageSquare, Plus, Puzzle, Search, Trash2, X } fro
 import { BrandWordmark } from "@/components/brand-mark";
 import { ProfileDock } from "@/components/profile-dock";
 import { api } from "@/lib/api";
-import { STATUS_META, useBuildSessions } from "@/lib/build/sessions";
+import { STATUS_META, useBuildSessions } from "@/lib/build-mode/sessions";
 import { filteredChats, useChat, type ServerConversation } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 
