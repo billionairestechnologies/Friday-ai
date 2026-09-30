@@ -12,6 +12,15 @@ func buildStatusMeta(_ status: String?) -> (color: Color, label: String)? {
     }
 }
 
+/// Starting points on the Build home — each starts the question/plan round (nothing is built until
+/// the plan is approved).
+let buildTemplates: [(label: String, hint: String, prompt: String)] = [
+    ("Next.js app", "App Router · TypeScript · Tailwind", "Start a new Next.js app (App Router, TypeScript, Tailwind CSS)."),
+    ("React + Vite", "TypeScript · Tailwind", "Start a new React + Vite app (TypeScript, Tailwind CSS)."),
+    ("Python API", "FastAPI · pytest", "Start a new Python API with FastAPI (uvicorn, pydantic models, pytest tests)."),
+    ("Landing page", "Hero · pricing · waitlist", "Build a modern, responsive landing page with a hero, features, pricing, FAQ and a waitlist form."),
+]
+
 func buildRelativeTime(_ date: Date?) -> String {
     guard let date else { return "" }
     let m = Int(Date().timeIntervalSince(date) / 60)
@@ -43,6 +52,22 @@ struct BuildHomeView: View {
                         .frame(width: 34, height: 34).background(FridayColor.surface).cornerRadius(10)
                     Text(firstName.map { "Welcome back, \($0)" } ?? "Welcome to Build")
                         .font(.system(size: 22, weight: .semibold)).foregroundColor(FridayColor.text)
+                }
+
+                Text("Start from a template").font(.system(size: 14, weight: .medium)).foregroundColor(FridayColor.text)
+                    .padding(.top, 24).padding(.bottom, 8)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(buildTemplates, id: \.label) { t in
+                        Button { vm.send(text: t.prompt) } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(t.label).font(.system(size: 13.5, weight: .medium)).foregroundColor(FridayColor.text)
+                                Text(t.hint).font(.system(size: 11.5)).foregroundColor(FridayColor.muted).lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12).padding(.vertical, 10)
+                            .background(FridayColor.surface).cornerRadius(12)
+                        }
+                    }
                 }
 
                 HStack {

@@ -46,7 +46,7 @@ struct BuildPanel: View {
         VStack(spacing: 0) {
             // Icon tabs: globe = running preview, stack = project files.
             HStack(spacing: 4) {
-                ForEach([("preview", "globe"), ("files", "square.stack.3d.up"), ("diff", "plusminus")], id: \.0) { id, icon in
+                ForEach([("preview", "globe"), ("files", "square.stack.3d.up"), ("diff", "plusminus"), ("secrets", "key")], id: \.0) { id, icon in
                     Button { tab = id } label: {
                         Image(systemName: icon).font(.system(size: 17))
                             .foregroundColor(tab == id ? FridayColor.text : FridayColor.muted)
@@ -56,6 +56,7 @@ struct BuildPanel: View {
                     }
                 }
                 Spacer()
+                DeployButton(conversationId: conversationId)
                 Button { withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) { vm.canvasOpen = false } } label: {
                     Image(systemName: "xmark").foregroundColor(FridayColor.text).padding(8)
                 }
@@ -69,6 +70,9 @@ struct BuildPanel: View {
                     Spacer()
                     if let url, let u = URL(string: url) { Button { UIApplication.shared.open(u) } label: { Image(systemName: "safari") } }
                     Button { mobile.toggle() } label: { Image(systemName: "iphone").foregroundColor(mobile ? FridayColor.text : FridayColor.muted) }
+                } else if tab == "secrets" {
+                    Text("Project secrets").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                    Spacer()
                 } else if tab == "diff" {
                     Text("Changes in this build").font(.system(size: 12)).foregroundColor(FridayColor.muted)
                     Spacer()
@@ -83,7 +87,9 @@ struct BuildPanel: View {
             .padding(.horizontal, 16).padding(.vertical, 6)
             Divider().background(FridayColor.hairline)
 
-            if tab == "diff" {
+            if tab == "secrets" {
+                SecretsTab(conversationId: conversationId)
+            } else if tab == "diff" {
                 BuildDiffList(steps: vm.currentChat?.messages.flatMap { $0.build?.steps ?? [] } ?? [])
             } else if tab == "preview" {
                 if loading {
@@ -298,5 +304,124 @@ struct BuildDiffList: View {
                 }
             }
         }
+    }
+}
+
+/// One-click deploy to Vercel (connected account). Opens the live URL, or shows what went wrong.
+private struct DeployButton: View {
+    let conversationId: String
+    @State private var busy = false
+    @State private var message: String?
+
+    var body: some View {
+        Button {
+            busy = true
+            Task {
+                do {
+                    let url = try await BuildApi.deploy(conversationId: conversationId)
+                    if let u = URL(string: url) { await UIApplication.shared.open(u) }
+                    message = "Live on Vercel: \(url)"
+                } catch {
+                    message = error.localizedDescription
+                }
+                busy = false
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if busy { ProgressView().scaleEffect(0.7) } else { Image(systemName: "paperplane.fill").font(.system(size: 11)) }
+                Text(busy ? "Deploying…" : "Deploy").font(.system(size: 12.5, weight: .medium))
+            }
+            .foregroundColor(busy ? FridayColor.text : FridayColor.bg)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(busy ? FridayColor.surface : FridayColor.text).cornerRadius(10)
+        }
+        .disabled(busy)
+        .alert("Deploy", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(message ?? "")
+        }
+    }
+}
+
+/// Project secrets (names only — values are write-only): env vars for the app, set on Vercel on deploy,
+/// never shown to the AI or printed in output.
+private struct SecretsTab: View {
+    let conversationId: String
+    @State private var names: [String]?
+    @State private var name = ""
+    @State private var value = ""
+    @State private var error: String?
+    @State private var busy = false
+
+    private var validName: Bool { name.range(of: "^[A-Z][A-Z0-9_]{0,63}$", options: .regularExpression) != nil }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("API keys and other private values for this project. The app reads them as environment variables; they're also set on Vercel when you deploy, and never shown to the AI.")
+                    .font(.system(size: 12.5)).foregroundColor(FridayColor.muted)
+                TextField("NAME (e.g. OPENAI_API_KEY)", text: $name)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .font(.system(size: 13, design: .monospaced))
+                    .padding(10).background(FridayColor.surface).cornerRadius(10)
+                    .onChange(of: name) { v in
+                        let cleaned = String(v.uppercased().map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" })
+                        if cleaned != v { name = cleaned }
+                    }
+                SecureField("Value", text: $value)
+                    .padding(10).background(FridayColor.surface).cornerRadius(10)
+                Button {
+                    busy = true
+                    Task {
+                        do {
+                            try await BuildApi.setSecret(conversationId: conversationId, name: name, value: value)
+                            name = ""
+                            value = ""
+                            error = nil
+                            await reload()
+                        } catch {
+                            self.error = error.localizedDescription
+                        }
+                        busy = false
+                    }
+                } label: {
+                    Text(busy ? "Saving…" : "Save secret").font(.system(size: 13.5, weight: .semibold))
+                        .frame(maxWidth: .infinity).padding(.vertical, 9)
+                        .foregroundColor(FridayColor.bg).background(FridayColor.text).cornerRadius(10)
+                }
+                .disabled(busy || !validName || value.isEmpty)
+                .opacity(busy || !validName || value.isEmpty ? 0.4 : 1)
+                if let error { Text(error).font(.system(size: 12)).foregroundColor(FridayColor.error) }
+                if let names {
+                    if names.isEmpty {
+                        Text("No secrets yet.").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                    }
+                    ForEach(names, id: \.self) { n in
+                        HStack {
+                            Text(n).font(.system(size: 12.5, design: .monospaced)).foregroundColor(FridayColor.text)
+                            Spacer()
+                            Text("••••••").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                            Button {
+                                Task {
+                                    do { try await BuildApi.deleteSecret(conversationId: conversationId, name: n) } catch { self.error = error.localizedDescription }
+                                    await reload()
+                                }
+                            } label: { Image(systemName: "trash").font(.system(size: 12)).foregroundColor(FridayColor.muted) }
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(FridayColor.surface).cornerRadius(8)
+                    }
+                } else {
+                    Text("Loading…").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                }
+            }
+            .padding(16)
+        }
+        .task { await reload() }
+    }
+
+    private func reload() async {
+        do { names = try await BuildApi.secrets(conversationId: conversationId) } catch { self.error = "Couldn't load secrets: \(error.localizedDescription)" }
     }
 }

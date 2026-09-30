@@ -7,6 +7,9 @@ import {
   FileCode2,
   FileDiff,
   Folder,
+  KeyRound,
+  Rocket,
+  Trash2,
   FolderOpen,
   Globe,
   ListTree,
@@ -261,6 +264,147 @@ function DiffView({ steps }: { steps: BuildStep[] }) {
   );
 }
 
+/** Project secrets (names only — values are write-only): injected as env vars into the sandbox and
+ *  redacted from anything the model or the user sees. */
+function SecretsView({ conversationId }: { conversationId?: string }) {
+  const [list, setList] = useState<{ name: string; updatedAt: string }[] | null>(null);
+  const [name, setName] = useState("");
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    if (!conversationId) return;
+    api
+      .get<{ secrets: { name: string; updatedAt: string }[] }>(`/build/${conversationId}/secrets`)
+      .then((r) => setList(r.secrets))
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't load secrets"));
+  }, [conversationId]);
+  useEffect(load, [load]);
+
+  if (!conversationId) return <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted">Start the build first, then add its secrets here.</div>;
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/build/${conversationId}/secrets`, { name: name.trim(), value });
+      setName("");
+      setValue("");
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save the secret");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(n: string) {
+    setError(null);
+    try {
+      await api.delete(`/build/${conversationId}/secrets/${encodeURIComponent(n)}`);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete the secret");
+    }
+  }
+
+  return (
+    <div className="h-full overflow-auto p-4">
+      <p className="text-xs leading-relaxed text-muted">
+        API keys and other private values for this project. They're available to the app as environment variables (e.g. <code className="font-mono">process.env.STRIPE_KEY</code>), are also set on Vercel when you deploy, and are never shown to the AI or printed in the terminal.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-border bg-composer p-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
+          placeholder="NAME (e.g. OPENAI_API_KEY)"
+          className="h-9 rounded-lg border border-border bg-background px-2.5 font-mono text-xs text-foreground outline-none"
+        />
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Value"
+          autoComplete="off"
+          className="h-9 rounded-lg border border-border bg-background px-2.5 text-xs text-foreground outline-none"
+        />
+        <button
+          type="button"
+          disabled={busy || !/^[A-Z][A-Z0-9_]{0,63}$/.test(name.trim()) || !value}
+          onClick={() => void save()}
+          className="h-9 rounded-lg bg-foreground text-xs font-medium text-background disabled:opacity-40"
+        >
+          {busy ? "Saving…" : "Save secret"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      <ul className="mt-3 flex flex-col gap-1">
+        {list === null ? (
+          <li className="text-xs text-subtle">Loading…</li>
+        ) : list.length === 0 ? (
+          <li className="text-xs text-subtle">No secrets yet.</li>
+        ) : (
+          list.map((sct) => (
+            <li key={sct.name} className="flex items-center gap-2 rounded-lg bg-chip/50 px-3 py-2">
+              <KeyRound className="size-3.5 text-subtle" />
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{sct.name}</span>
+              <span className="text-[11px] text-subtle">••••••</span>
+              <button type="button" aria-label={`Delete ${sct.name}`} onClick={() => void remove(sct.name)} className="rounded p-1 text-subtle hover:text-danger">
+                <Trash2 className="size-3.5" />
+              </button>
+            </li>
+          ))
+        )}
+      </ul>
+    </div>
+  );
+}
+
+/** One-click deploy to Vercel (the user's connected account). Shows the live URL or what went wrong. */
+function DeployButton({ conversationId, disabled }: { conversationId?: string; disabled: boolean }) {
+  const [state, setState] = useState<{ busy: boolean; url?: string; error?: string }>({ busy: false });
+  if (!conversationId) return null;
+  async function deploy() {
+    setState({ busy: true });
+    try {
+      const res = await api.post<{ url: string }>(`/build/${conversationId}/deploy`, {});
+      setState({ busy: false, url: res.url });
+    } catch (e) {
+      setState({ busy: false, error: e instanceof Error ? e.message : "Deploy failed" });
+    }
+  }
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => void deploy()}
+        disabled={disabled || state.busy}
+        title={disabled ? "Wait for the build to finish" : "Deploy to Vercel"}
+        className="premium-control flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-medium text-background disabled:opacity-40"
+      >
+        {state.busy ? <Loader2 className="size-3.5 animate-spin" /> : <Rocket className="size-3.5" />}
+        <span className="max-sm:hidden">{state.busy ? "Deploying…" : "Deploy"}</span>
+      </button>
+      {(state.url || state.error) && (
+        <div className="absolute top-10 right-0 z-30 w-72 rounded-xl border border-border bg-elevated p-3 text-xs shadow-[var(--shadow-panel)]">
+          {state.url ? (
+            <>
+              <p className="text-foreground">Live on Vercel 🎉</p>
+              <a href={state.url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-sky-600 underline dark:text-sky-400">
+                {state.url}
+              </a>
+            </>
+          ) : (
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-danger">{state.error}</pre>
+          )}
+          <button type="button" onClick={() => setState({ busy: false })} className="mt-2 text-muted hover:text-foreground">
+            Close
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The Build workspace panel: Preview (the running app in a browser frame), Files (tree + code) and
  *  Terminal (the whole session's commands and output). The sandbox is short-lived, so unless the
  *  URL just came from the live turn the backend is asked to make sure it's alive (it restores the
@@ -287,7 +431,7 @@ export function BuildCanvas({
   const [url, setUrl] = useState<string | null>(liveUrl ?? null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(liveUrl ? "ready" : "idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [view, setView] = useState<"preview" | "files" | "diff" | "terminal">(liveUrl || hasPreview ? "preview" : "terminal");
+  const [view, setView] = useState<"preview" | "files" | "diff" | "terminal" | "secrets">(liveUrl || hasPreview ? "preview" : "terminal");
   const [files, setFiles] = useState<ProjectFiles | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showTree, setShowTree] = useState(true);
@@ -377,6 +521,7 @@ export function BuildCanvas({
             ["files", SquareStack, "Files"],
             ["diff", FileDiff, "Diff"],
             ["terminal", TerminalSquare, "Terminal"],
+            ["secrets", KeyRound, "Secrets"],
           ] as const
         ).map(([id, Icon, label]) => (
           <button
@@ -396,6 +541,7 @@ export function BuildCanvas({
           </button>
         ))}
         <span className="flex-1" />
+        <DeployButton conversationId={conversationId} disabled={building} />
         {building && (
           <span className="mr-1 flex items-center gap-1.5 text-xs text-muted">
             <span className="build-orb scale-75" aria-hidden /> <span className="max-sm:hidden">Building</span>
@@ -421,7 +567,7 @@ export function BuildCanvas({
             <Smartphone className="size-3.5" />
           </button>
         </div>
-      ) : view === "diff" ? null : view === "files" ? (
+      ) : view === "diff" || view === "secrets" ? null : view === "files" ? (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/80 px-3">
           <button type="button" aria-label="Toggle file list" aria-pressed={showTree} onClick={() => setShowTree((v) => !v)} className={cn(iconBtn, showTree && "bg-chip text-foreground")}>
             <ListTree className="size-3.5" />
@@ -447,6 +593,8 @@ export function BuildCanvas({
           <SessionTerminal steps={steps} building={building} />
         ) : view === "diff" ? (
           <DiffView steps={steps} />
+        ) : view === "secrets" ? (
+          <SecretsView conversationId={conversationId} />
         ) : view === "preview" ? (
           status === "ready" && url ? (
             <div className={cn("flex h-full w-full justify-center", mobile && "bg-chip/40")}>

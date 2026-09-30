@@ -41,8 +41,17 @@ function SessionRow({ s, onOpen }: { s: BuildSession; onOpen: () => void }) {
   );
 }
 
-/** Build workspace home (/build with nothing open): welcome, Sessions with live status, Pull requests. */
-export function BuildHome({ firstName }: { firstName?: string }) {
+/** Starting points on the Build home — each starts the question/plan round (nothing is built until
+ *  the plan is approved). */
+export const BUILD_TEMPLATES: { label: string; hint: string; prompt: string }[] = [
+  { label: "Next.js app", hint: "App Router · TypeScript · Tailwind", prompt: "Start a new Next.js app (App Router, TypeScript, Tailwind CSS)." },
+  { label: "React + Vite", hint: "TypeScript · Tailwind", prompt: "Start a new React + Vite app (TypeScript, Tailwind CSS)." },
+  { label: "Python API", hint: "FastAPI · pytest", prompt: "Start a new Python API with FastAPI (uvicorn, pydantic models, pytest tests)." },
+  { label: "Landing page", hint: "Hero · pricing · waitlist", prompt: "Build a modern, responsive landing page with a hero, features, pricing, FAQ and a waitlist form." },
+];
+
+/** Build workspace home (/build with nothing open): welcome, templates, Sessions with live status, Pull requests. */
+export function BuildHome({ firstName, onTemplate }: { firstName?: string; onTemplate?: (prompt: string) => void }) {
   const navigate = useNavigate();
   const sessions = useBuildSessions((s) => s.sessions);
   const loaded = useBuildSessions((s) => s.loaded);
@@ -71,6 +80,25 @@ export function BuildHome({ firstName }: { firstName?: string }) {
         </span>
         {firstName ? `Welcome back, ${firstName}` : "Welcome to Build"}
       </h1>
+
+      {onTemplate && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-sm font-medium text-foreground">Start from a template</h2>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {BUILD_TEMPLATES.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => onTemplate(t.prompt)}
+                className="premium-control flex flex-col rounded-xl bg-chip/60 px-3.5 py-3 text-left hover:bg-chip"
+              >
+                <span className="text-sm font-medium text-foreground">{t.label}</span>
+                <span className="text-xs text-muted">{t.hint}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-10">
         <div className="mb-2 flex items-center justify-between">

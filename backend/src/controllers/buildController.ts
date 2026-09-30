@@ -6,6 +6,8 @@ import { listBuildSessions } from "../services/projectBuild/sessions.js";
 import { listPendingApprovals, resolveApproval } from "../services/projectBuild/approvals.js";
 import { listCheckpoints, restoreCheckpoint } from "../services/projectBuild/checkpoints.js";
 import { readEvents } from "../services/projectBuild/events.js";
+import { deleteSecret, listSecretNames, setSecret, SECRET_NAME } from "../services/projectBuild/secrets.js";
+import { deployToVercel } from "../services/projectBuild/deploy.js";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler.js";
 
@@ -44,6 +46,33 @@ export async function events(req: Request, res: Response) {
   await getOwnedConversation(req.user!.id, req.params.conversationId!);
   const { after } = z.object({ after: z.coerce.number().int().min(0).default(0) }).parse(req.query);
   res.json(await readEvents(req.params.conversationId!, after));
+}
+
+/** Secret NAMES for this project (values are never returned). */
+export async function secrets(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  res.json({ secrets: await listSecretNames(req.params.conversationId!) });
+}
+
+const secretSchema = z.object({ name: z.string().trim().regex(SECRET_NAME, "Use UPPER_CASE letters, digits and _"), value: z.string().min(1).max(8000) });
+
+export async function putSecret(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  const { name, value } = secretSchema.parse(req.body);
+  await setSecret(req.params.conversationId!, name, value);
+  res.json({ ok: true });
+}
+
+export async function removeSecret(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  await deleteSecret(req.params.conversationId!, String(req.params.name ?? ""));
+  res.json({ ok: true });
+}
+
+/** One-click deploy to Vercel with the user's connected account. */
+export async function deploy(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  res.json(await deployToVercel(req.user!.id, req.params.conversationId!));
 }
 
 /** Which user messages have a restore point (the files before that turn). */

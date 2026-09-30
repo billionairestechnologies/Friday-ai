@@ -2,6 +2,27 @@ import Foundation
 
 /// Build Mode project endpoints (backend /api/build/:conversationId/…).
 enum BuildApi {
+    /// GET /api/build/:id/secrets — secret NAMES (values are write-only).
+    static func secrets(conversationId: String) async throws -> [String] {
+        let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/secrets", authed: true)
+        return (json["secrets"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
+    }
+
+    static func setSecret(conversationId: String, name: String, value: String) async throws {
+        _ = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/secrets", method: "POST", body: ["name": name, "value": value], authed: true)
+    }
+
+    static func deleteSecret(conversationId: String, name: String) async throws {
+        let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        _ = try await ApiClient.shared.request(path: "build/\(conversationId)/secrets/\(encoded)", method: "DELETE", authed: true)
+    }
+
+    /// One-click deploy to Vercel with the connected account. Returns the live URL. Can take minutes.
+    static func deploy(conversationId: String) async throws -> String {
+        let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/deploy", method: "POST", body: [:], authed: true)
+        return json["url"] as? String ?? ""
+    }
+
     /// GET /api/build/:id/events?after= — the current turn's logged frames (id, frame) and whether it's running.
     static func events(conversationId: String, after: Int) async throws -> (events: [(Int, [String: Any])], running: Bool) {
         let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/events?after=\(after)", authed: true)

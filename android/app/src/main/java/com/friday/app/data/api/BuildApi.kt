@@ -10,6 +10,51 @@ import java.io.File
 
 /** Build Mode project endpoints (backend /api/build/:conversationId/…). */
 object BuildApi {
+    private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
+
+    private fun errorOf(body: String, code: Int, fallback: String) =
+        runCatching { JSONObject(body).optString("error") }.getOrNull().orEmpty().ifBlank { "$fallback ($code)" }
+
+    /** GET /api/build/:id/secrets — secret NAMES (values are write-only). Null on failure. */
+    suspend fun secrets(conversationId: String): List<String>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/secrets").get().build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val arr = JSONObject(resp.body?.string().orEmpty()).optJSONArray("secrets") ?: return@use emptyList()
+                (0 until arr.length()).map { arr.getJSONObject(it).optString("name") }
+            }
+        }.getOrNull()
+    }
+
+    /** Saves a project secret. Returns an error message or null. */
+    suspend fun setSecret(conversationId: String, name: String, value: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = JSONObject().put("name", name).put("value", value).toString().toRequestBody(JSON_TYPE)
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/secrets").post(body).build()
+            ApiClient.authed.newCall(request).execute().use { resp -> if (resp.isSuccessful) null else errorOf(resp.body?.string().orEmpty(), resp.code, "Couldn't save the secret") }
+        }.getOrElse { it.message ?: "Couldn't save the secret" }
+    }
+
+    suspend fun deleteSecret(conversationId: String, name: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/secrets/" + java.net.URLEncoder.encode(name, "UTF-8")).delete().build()
+            ApiClient.authed.newCall(request).execute().use { resp -> if (resp.isSuccessful) null else errorOf(resp.body?.string().orEmpty(), resp.code, "Couldn't delete the secret") }
+        }.getOrElse { it.message ?: "Couldn't delete the secret" }
+    }
+
+    /** One-click deploy to Vercel. Result: url on success, error message otherwise. Can take minutes. */
+    suspend fun deploy(conversationId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/deploy").post("{}".toRequestBody(JSON_TYPE)).build()
+            ApiClient.streaming.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw Exception(errorOf(body, resp.code, "Deploy failed"))
+                JSONObject(body).optString("url")
+            }
+        }
+    }
+
     /** GET /api/build/:id/events?after= — the current turn's logged stream frames (id, frame) and
      *  whether it's still running. Null on failure. */
     suspend fun events(conversationId: String, after: Long): Pair<List<Pair<Long, JSONObject>>, Boolean>? = withContext(Dispatchers.IO) {

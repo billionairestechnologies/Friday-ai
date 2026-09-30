@@ -84,6 +84,8 @@ fun BuildHome(
     onOpen: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Starts a build from a template prompt (question/plan round first — nothing built until approved). */
+    onTemplate: (String) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     var showAll by remember { mutableStateOf(false) }
@@ -100,7 +102,21 @@ fun BuildHome(
             Text(if (firstName.isNullOrBlank()) "Welcome to Build" else "Welcome back, $firstName", color = FridayText, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
         }
 
-        Row(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Start from a template", color = FridayText, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 24.dp, bottom = 8.dp))
+        TEMPLATES.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { (label, hint, prompt) ->
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(FridaySurface).clickable { onTemplate(prompt) }.padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(label, color = FridayText, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+                        Text(hint, color = FridayMuted, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+
+        Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Sessions", color = FridayText, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             if (ordered.size > 3) {
                 Text(if (showAll) "Show less" else "Show ${ordered.size - 3} more", color = FridayMuted, fontSize = 12.sp, modifier = Modifier.clickable { showAll = !showAll })
@@ -157,6 +173,13 @@ fun BuildHome(
         }
     }
 }
+
+private val TEMPLATES = listOf(
+    Triple("Next.js app", "App Router · TypeScript · Tailwind", "Start a new Next.js app (App Router, TypeScript, Tailwind CSS)."),
+    Triple("React + Vite", "TypeScript · Tailwind", "Start a new React + Vite app (TypeScript, Tailwind CSS)."),
+    Triple("Python API", "FastAPI · pytest", "Start a new Python API with FastAPI (uvicorn, pydantic models, pytest tests)."),
+    Triple("Landing page", "Hero · pricing · waitlist", "Build a modern, responsive landing page with a hero, features, pricing, FAQ and a waitlist form."),
+)
 
 private val PERMISSIONS = listOf(
     "full_auto" to "Full auto · runs everything in the sandbox",

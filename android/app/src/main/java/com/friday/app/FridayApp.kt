@@ -735,6 +735,7 @@ private fun ChatShell(
                         error = ui.buildSessionsError,
                         onOpen = { id -> vm.openChat(id) },
                         onRetry = vm::loadBuildSessions,
+                        onTemplate = { prompt -> vm.send(prompt) },
                     )
                 } else if (empty) {
                     Box(

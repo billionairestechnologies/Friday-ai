@@ -557,7 +557,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
               className="flex min-h-0 flex-1 flex-col"
             >
               <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-                <BuildHome firstName={firstName} />
+                <BuildHome firstName={firstName} onTemplate={(prompt) => void send(prompt)} />
               </div>
               <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
                 <div className="mx-auto w-full max-w-3xl">

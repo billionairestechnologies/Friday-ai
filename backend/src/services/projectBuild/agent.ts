@@ -19,6 +19,7 @@ import { SUMMARY_PROMPT, applySummary, planSummaryCut, renderTranscript, transcr
 import { approvedPlanNote, isPlanApproval } from "./plan.js";
 import { approvalFor, requestApproval, type PermissionMode } from "./approvals.js";
 import { notifyBuildNeedsInput } from "./notify.js";
+import { loadSecrets, redactSecrets } from "./secrets.js";
 
 // A native tool round can carry several calls (write 4 files at once), so the round budget goes
 // further than a text-protocol iteration did. The wall clock is the real ceiling; the sandbox TTL
@@ -232,6 +233,11 @@ export async function runBuildAgent(opts: {
     return { text: "", build, usage, candidate: null, error: err instanceof Error ? err.message : "Couldn't start the sandbox" };
   }
 
+  // Project secrets: injected as env vars into the sandbox, never shown to the model (names only),
+  // and scrubbed from every output below.
+  const secrets = await loadSecrets(conversationId);
+  box.useEnv(secrets);
+  const scrub = (text: string) => redactSecrets(text, secrets);
   let project = await getProject(conversationId);
   // The actual request — not the "Approved — build it as planned." click that started this run.
   const userRequestText = [...opts.history].reverse().find((m) => m.role === "user" && !isPlanApproval(m.content))?.content ?? "";
@@ -281,9 +287,12 @@ export async function runBuildAgent(opts: {
           : "") +
         instructionFile
       : "This is a new, empty project directory.";
+  const secretsNote = Object.keys(secrets).length
+    ? `\n\nPROJECT SECRETS: ${Object.keys(secrets).join(", ")} are set as environment variables in every command and the dev server (the user stored them in the project's Secrets). Read them from process.env / os.environ — never hard-code, print or log their values, and never ask the user to paste them into chat.`
+    : "";
 
   const conversation: ChatMessage[] = [
-    { role: "system", content: `${BUILD_SYSTEM_PROMPT}\n\n${stateNote}` },
+    { role: "system", content: `${BUILD_SYSTEM_PROMPT}\n\n${stateNote}${secretsNote}` },
     ...opts.history.filter((m) => m.role !== "system"),
   ];
 
@@ -407,7 +416,8 @@ export async function runBuildAgent(opts: {
         step.output = output;
         onEvent({ t: "step", ...step });
       });
-      const out = await box.run(check.cmd, 5 * 60_000, signal, (chunk) => live.push(chunk));
+      const out = await box.run(check.cmd, 5 * 60_000, signal, (chunk) => live.push(scrub(chunk)));
+      out.output = scrub(out.output);
       live.stop();
       step.state = out.ok ? "ok" : "error";
       step.detail = tail(out.output, 700);
@@ -682,8 +692,9 @@ export async function runBuildAgent(opts: {
           step.output = output;
           onEvent({ t: "step", ...step });
         });
-        const out = await box.run(action.cmd, 5 * 60_000, signal, (chunk) => live.push(chunk));
+        const out = await box.run(action.cmd, 5 * 60_000, signal, (chunk) => live.push(scrub(chunk)));
         live.stop();
+        out.output = scrub(out.output);
         recordRun(action.cmd, out.ok);
         if (out.ok && /\b(install|add|ci)\b/.test(action.cmd)) void saveProgress(true);
         step.output = tailText(out.output, SAVED_OUTPUT_CHARS);
@@ -697,6 +708,7 @@ export async function runBuildAgent(opts: {
       }
       if (action.kind === "start") {
         const res = await box.start(action.cmd, action.port);
+        res.log = scrub(res.log);
         if (res.ready && res.url) {
           last.start = { cmd: action.cmd, port: action.port };
           void saveProgress(true);
@@ -804,7 +816,7 @@ export async function runBuildAgent(opts: {
     : "";
   const buildToolSpecs = [...BUILD_TOOL_SPECS, ...extTools.map((t) => t.spec)];
   let nativeMessages: AgentMessage[] = [
-    { role: "system", content: `${NATIVE_BUILD_PROMPT}${extNote}\n\n${stateNote}${planNote}` },
+    { role: "system", content: `${NATIVE_BUILD_PROMPT}${extNote}\n\n${stateNote}${secretsNote}${planNote}` },
     ...opts.history.filter((m) => m.role !== "system"),
   ];
   let nativeRounds = 0;

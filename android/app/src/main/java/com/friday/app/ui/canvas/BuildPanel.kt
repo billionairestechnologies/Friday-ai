@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Difference
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
@@ -119,7 +122,7 @@ fun BuildPanel(
     Column(modifier.fillMaxSize().background(FridayBg)) {
         // Icon tabs: globe = running preview, stack = project files; close on the right.
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            listOf("preview" to Icons.Default.Language, "files" to Icons.Default.Layers, "diff" to Icons.Default.Difference).forEach { (id, icon) ->
+            listOf("preview" to Icons.Default.Language, "files" to Icons.Default.Layers, "diff" to Icons.Default.Difference, "secrets" to Icons.Default.Key).forEach { (id, icon) ->
                 Icon(
                     icon, contentDescription = id,
                     tint = if (tab == id) FridayText else FridayMuted,
@@ -132,6 +135,31 @@ fun BuildPanel(
                 Spacer(Modifier.width(4.dp))
             }
             Spacer(Modifier.weight(1f))
+            // One-click deploy to Vercel (connected account). Result shows as a toast + opens the URL.
+            var deploying by remember { mutableStateOf(false) }
+            Row(
+                Modifier.clip(RoundedCornerShape(10.dp)).background(if (deploying) FridaySurface else FridayText)
+                    .clickable(enabled = !deploying) {
+                        deploying = true
+                        scope.launch {
+                            BuildApi.deploy(conversationId)
+                                .onSuccess { u ->
+                                    Toast.makeText(ctx, "Live on Vercel: $u", Toast.LENGTH_LONG).show()
+                                    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                }
+                                .onFailure { Toast.makeText(ctx, it.message ?: "Deploy failed", Toast.LENGTH_LONG).show() }
+                            deploying = false
+                        }
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (deploying) CircularProgressIndicator(strokeWidth = 2.dp, color = FridayText, modifier = Modifier.size(14.dp))
+                else Icon(Icons.Default.RocketLaunch, null, tint = FridayBg, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (deploying) "Deploying…" else "Deploy", color = if (deploying) FridayText else FridayBg, fontSize = 12.5.sp)
+            }
+            Spacer(Modifier.width(4.dp))
             HeaderIcon(Icons.Default.Close, "Close", onClose)
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -144,6 +172,8 @@ fun BuildPanel(
                     }
                 }
                 HeaderIcon(Icons.Default.PhoneAndroid, if (mobile) "Desktop view" else "Mobile view") { mobile = !mobile }
+            } else if (tab == "secrets") {
+                Text("Project secrets", color = FridayMuted, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
             } else if (tab == "diff") {
                 Text("Changes in this build", color = FridayMuted, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
             } else {
@@ -202,6 +232,8 @@ fun BuildPanel(
             }
         } else if (tab == "diff") {
             DiffList(steps)
+        } else if (tab == "secrets") {
+            SecretsTab(conversationId)
         } else {
             val list = files
             if (list == null) {
@@ -222,6 +254,67 @@ fun BuildPanel(
                                 Text("${i + 1}", color = FridayMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 17.sp, modifier = Modifier.width(34.dp).padding(end = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
                                 Text(line.ifEmpty { " " }, color = FridayText, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 17.sp, softWrap = false)
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Project secrets (names only — values are write-only): env vars for the app, set on Vercel on deploy,
+ *  never shown to the AI or printed in output. */
+@Composable
+private fun SecretsTab(conversationId: String) {
+    val scope = rememberCoroutineScope()
+    var names by remember(conversationId) { mutableStateOf<List<String>?>(null) }
+    var name by remember { mutableStateOf("") }
+    var value by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    suspend fun reload() {
+        val r = BuildApi.secrets(conversationId)
+        if (r == null) error = "Couldn't load secrets — check your connection." else names = r
+    }
+    LaunchedEffect(conversationId) { reload() }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+        Text(
+            "API keys and other private values for this project. The app reads them as environment variables; they're also set on Vercel when you deploy, and never shown to the AI.",
+            color = FridayMuted, fontSize = 12.5.sp, lineHeight = 17.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        androidx.compose.material3.OutlinedTextField(
+            value = name, onValueChange = { v -> name = v.uppercase().replace(Regex("[^A-Z0-9_]"), "_") },
+            label = { Text("NAME (e.g. OPENAI_API_KEY)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = value, onValueChange = { value = it }, label = { Text("Value") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        )
+        TextButton(
+            enabled = !busy && Regex("^[A-Z][A-Z0-9_]{0,63}$").matches(name) && value.isNotEmpty(),
+            onClick = {
+                busy = true
+                scope.launch {
+                    error = BuildApi.setSecret(conversationId, name, value)
+                    if (error == null) { name = ""; value = ""; reload() }
+                    busy = false
+                }
+            },
+        ) { Text(if (busy) "Saving…" else "Save secret") }
+        error?.let { Text(it, color = com.friday.app.ui.theme.FridayError, fontSize = 12.sp) }
+        Spacer(Modifier.height(8.dp))
+        when {
+            names == null -> Text("Loading…", color = FridayMuted, fontSize = 12.sp)
+            names!!.isEmpty() -> Text("No secrets yet.", color = FridayMuted, fontSize = 12.sp)
+            else -> names!!.forEach { n ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).background(FridaySurface).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(n, color = FridayText, fontFamily = FontFamily.Monospace, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
+                    Text("••••••  ", color = FridayMuted, fontSize = 12.sp)
+                    HeaderIcon(Icons.Default.Delete, "Delete $n") {
+                        scope.launch {
+                            error = BuildApi.deleteSecret(conversationId, n)
+                            reload()
                         }
                     }
                 }

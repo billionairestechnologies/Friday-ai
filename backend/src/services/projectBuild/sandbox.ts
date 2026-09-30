@@ -1,5 +1,6 @@
 import { Sandbox } from "@e2b/code-interpreter";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { loadSecrets } from "./secrets.js";
 import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 
@@ -62,6 +63,12 @@ export async function saveProject(userId: string, conversationId: string, patch:
 export class BuildSandbox {
   /** Mutable so a stale/expired connection can be swapped out transparently — see `withReconnect`. */
   private sandbox: Sandbox;
+  /** The project's secrets (secrets.ts), exposed to its commands and dev server as env vars. */
+  private projectEnv: Record<string, string> = {};
+
+  useEnv(env: Record<string, string>) {
+    this.projectEnv = env;
+  }
 
   private constructor(
     sandbox: Sandbox,
@@ -175,7 +182,7 @@ export class BuildSandbox {
       const result = await this.withReconnect(() =>
         this.sandbox.commands.run(`bash -lc ${JSON.stringify(`cd ${PROJECT_DIR} && ${cmd}`)}`, {
           timeoutMs,
-          envs: { CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
+          envs: { ...this.projectEnv, CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
           ...(onOutput ? { onStdout: (d: string) => onOutput(d), onStderr: (d: string) => onOutput(d) } : {}),
         }),
       );
@@ -255,7 +262,7 @@ export class BuildSandbox {
       // Vite (5.4.12+) rejects unknown Host headers by default; the preview is served from *.e2b.app.
       // No PORT is injected on purpose: it leaked into multi-process stacks (an API that reads PORT
       // grabbed the frontend's port). Ports are set explicitly in the command / config.
-      envs: { HOST: "0.0.0.0", BROWSER: "none", __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ".e2b.app", FORCE_COLOR: "0" },
+      envs: { ...this.projectEnv, HOST: "0.0.0.0", BROWSER: "none", __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ".e2b.app", FORCE_COLOR: "0" },
     });
 
     const deadline = Date.now() + 90_000;
@@ -408,6 +415,7 @@ export async function ensurePreview(userId: string, conversationId: string): Pro
     return { url: null, port: null, message: "Nothing has been built here yet — send “build it” in the chat to start." };
   }
   const box = await BuildSandbox.open(userId, conversationId);
+  box.useEnv(await loadSecrets(conversationId));
   const { port, start_cmd: startCmd } = project;
 
   if (!box.fresh && (await box.isServing(port))) {
