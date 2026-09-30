@@ -57,6 +57,8 @@ final class FridayViewModel: ObservableObject {
     @Published var approvalError: String?
     /// Build: ids of user messages with a restore point, per chat id.
     @Published var checkpoints: [String: Set<String>] = [:]
+    /// Build home: the GitHub repo + branch a new build should work on (nil = a new project).
+    @Published var buildRepo: (repo: String, branch: String)?
     @Published var restoreError: String?
 
     func loadCheckpoints(_ chatId: String) async {
@@ -350,7 +352,14 @@ final class FridayViewModel: ObservableObject {
             draft = ""
             pendingAttachments = []
         }
-        return startTurn(chatId: currentId, text: text, attachments: attachmentsForSend, modes: modesSnapshot)
+        // A new build with a repo picked: say which repo + branch the way the backend recognises it
+        // (it clones github.com/owner/repo/tree/<branch> before the agent starts).
+        var content = text
+        if currentId == nil, workspace == "build", let pick = buildRepo, !text.contains("github.com/") {
+            content = "Work on https://github.com/\(pick.repo)/tree/\(pick.branch) (branch \(pick.branch)) — \(text)"
+            buildRepo = nil
+        }
+        return startTurn(chatId: currentId, text: content, attachments: attachmentsForSend, modes: modesSnapshot)
     }
 
     func removeQueued(chatId: String, id: String) {

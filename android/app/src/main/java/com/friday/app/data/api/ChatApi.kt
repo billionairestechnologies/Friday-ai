@@ -172,7 +172,9 @@ object ChatApi {
         try {
             call.execute().use { resp ->
                 if (!resp.isSuccessful) {
-                    emit(ChatEvent.Token("Sorry, something went wrong talking to Friday (${resp.code})."))
+                    // Show the server's reason (usage limit, plan gate…) — "(429)" alone told the user nothing.
+                    val reason = runCatching { JSONObject(resp.body?.string().orEmpty()).optString("error") }.getOrNull().orEmpty()
+                    emit(ChatEvent.Token(reason.ifBlank { "Sorry, something went wrong talking to Friday (${resp.code})." }))
                     return@use
                 }
                 val source = resp.body?.source() ?: return@use

@@ -103,6 +103,8 @@ data class FridayUiState(
     val approvalError: String? = null,
     /** Build: ids of user messages with a restore point, per chat id. */
     val checkpoints: Map<String, Set<String>> = emptyMap(),
+    /** Build home: the GitHub repo + branch a new build should work on (null = a new project). */
+    val buildRepo: Pair<String, String>? = null,
     val restoreError: String? = null,
 )
 
@@ -626,6 +628,8 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun consumeRestoreError() = _state.update { it.copy(restoreError = null) }
 
+    fun setBuildRepo(repo: String?, branch: String?) = _state.update { it.copy(buildRepo = if (repo != null && branch != null) repo to branch else null) }
+
     fun setBuildEffort(effort: String) {
         buildPrefs.edit().putString("effort", effort).apply()
         _state.update { it.copy(buildEffort = effort) }
@@ -773,7 +777,14 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         _state.update { it.copy(draft = "", pendingAttachments = emptyList()) }
-        startTurn(activeChatId, text, attachments, _state.value.modes)
+        // A new build with a repo picked: say which repo + branch the way the backend recognises it
+        // (it clones github.com/owner/repo/tree/<branch> before the agent starts).
+        val repo = _state.value.buildRepo
+        val content = if (activeChatId == null && _state.value.workspace == "build" && repo != null && !text.contains("github.com/")) {
+            _state.update { it.copy(buildRepo = null) }
+            "Work on https://github.com/${repo.first}/tree/${repo.second} (branch ${repo.second}) — $text"
+        } else text
+        startTurn(activeChatId, content, attachments, _state.value.modes)
     }
 
     fun removeQueued(chatId: String, id: String) {

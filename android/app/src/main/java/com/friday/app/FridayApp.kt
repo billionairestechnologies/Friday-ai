@@ -836,6 +836,9 @@ private fun ChatShell(
                 if (pendingApproval != null) {
                     com.friday.app.ui.chat.ApprovalBar(pendingApproval, ui.approvalError, onDecide = vm::answerApproval)
                 }
+                if (ui.workspace == "build" && ui.currentId == null) {
+                    com.friday.app.ui.buildmode.GitHubPicker(ui.buildRepo?.first, ui.buildRepo?.second, vm::setBuildRepo)
+                }
                 if (ui.workspace == "build") {
                     LaunchedEffect(ui.currentId) {
                         while (true) {

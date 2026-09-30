@@ -148,6 +148,10 @@ private struct ChatShell: View {
                         ApprovalBar(approval: approval).padding(.horizontal, 12)
                     }
 
+                    if vm.workspace == "build" && vm.currentId == nil {
+                        GitHubPicker().padding(.horizontal, 16)
+                    }
+
                     if vm.workspace == "build" {
                         HStack(spacing: 8) {
                             BuildPermissionChip()

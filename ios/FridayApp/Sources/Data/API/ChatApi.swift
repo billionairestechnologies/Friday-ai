@@ -115,7 +115,11 @@ enum ChatApi {
                         path: "chat/conversations/\(conversationId)/messages/stream", body: body
                     )
                     guard (200...299).contains(http.statusCode) else {
-                        continuation.yield(.text("Connection lost: server returned \(http.statusCode)"))
+                        // Show the server's reason (usage limit, plan gate…) — a bare status code told the user nothing.
+                        var raw = ""
+                        for try await line in bytes.lines { raw += line; if raw.count > 4000 { break } }
+                        let reason = (try? JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])?["error"] as? String
+                        continuation.yield(.text(reason ?? "Something went wrong talking to Friday (\(http.statusCode))."))
                         continuation.yield(.done)
                         continuation.finish()
                         return
