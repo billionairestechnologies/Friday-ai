@@ -102,7 +102,27 @@ import com.friday.app.ui.theme.FridayThink
 import kotlinx.coroutines.delay
 
 @Composable
-fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier, onOpenPreview: () -> Unit = {}, conversationId: String? = null, onOpenInBuild: (String) -> Unit = {}) {
+fun ChatThread(
+    messages: List<ChatMessage>,
+    modifier: Modifier = Modifier,
+    onOpenPreview: () -> Unit = {},
+    conversationId: String? = null,
+    onOpenInBuild: (String) -> Unit = {},
+    /** Build: user message ids with a restore point, and what to do on "Restore to before this". */
+    restorable: Set<String> = emptySet(),
+    onRestore: (String) -> Unit = {},
+) {
+    val busy = messages.any { it.isStreaming }
+    var confirmRestore by remember { mutableStateOf<String?>(null) }
+    confirmRestore?.let { id ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmRestore = null },
+            title = { Text("Restore to before this message?") },
+            text = { Text("The project files go back to how they were before this message, and this message and everything after it are removed.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { onRestore(id); confirmRestore = null }) { Text("Restore") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmRestore = null }) { Text("Cancel") } },
+        )
+    }
     val list = rememberLazyListState()
     // Whether the last item is the (or nearly the) last one visible — used to gate auto-scroll
     // during streaming so it doesn't fight a user who scrolled up to read earlier messages. Every
@@ -134,7 +154,18 @@ fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier, onOpe
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         items(messages, key = { it.id }) { msg ->
-            if (msg.role == Role.User) UserBubble(msg.content) else AssistantBlock(msg, onOpenPreview, conversationId, onOpenInBuild)
+            if (msg.role == Role.User) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                    UserBubble(msg.content)
+                    if (!busy && msg.id in restorable) {
+                        Text(
+                            "↺ Restore to before this",
+                            color = FridayMuted, fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(50)).clickable { confirmRestore = msg.id }.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            } else AssistantBlock(msg, onOpenPreview, conversationId, onOpenInBuild)
         }
     }
 }

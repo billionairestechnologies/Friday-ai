@@ -46,6 +46,7 @@ import { streamWithHedging } from "./hedgedStream.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
+import { createCheckpoint } from "../projectBuild/checkpoints.js";
 import { PLAN_MARKER, draftPlan, findPendingPlan, isPlanApproval, needsPlan, renderPlan, setPlanStatus } from "../projectBuild/plan.js";
 import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
 import { getProject } from "../projectBuild/sandbox.js";
@@ -216,6 +217,7 @@ export async function streamMessage(
     const buildWorkspace = (conversation as { workspace?: string }).workspace === "build" && mode !== "teamup" && !canvas && !research;
 
     const userMessageRow = await insertUserMessage(conversationId, content, inputMode, attachments, userId);
+    onEvent({ t: "meta", userMessageId: userMessageRow.id as string });
 
     // Intent probes are small model calls (≤2-3s each). They used to run one after the other, on the
     // critical path, before the real reply could start. They depend only on the message text, so kick
@@ -685,6 +687,8 @@ export async function streamMessage(
         }
         // No usable plan from the model: build anyway rather than leave the user stuck.
       }
+      // Restore point: the project's files as they are before this turn changes anything.
+      await createCheckpoint(conversationId, userMessageRow.id as string);
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
       // only now, not during a question/plan round, which never touches the sandbox.
       onEvent({ t: "status", s: "building" });

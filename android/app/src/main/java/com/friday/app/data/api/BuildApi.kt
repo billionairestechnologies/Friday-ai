@@ -10,6 +10,30 @@ import java.io.File
 
 /** Build Mode project endpoints (backend /api/build/:conversationId/…). */
 object BuildApi {
+    /** GET /api/build/:id/checkpoints — ids of the user messages that have a restore point. Null on failure. */
+    suspend fun checkpoints(conversationId: String): Set<String>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/checkpoints").get().build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val arr = JSONObject(resp.body?.string().orEmpty()).optJSONArray("checkpoints") ?: return@use emptySet()
+                (0 until arr.length()).map { arr.getJSONObject(it).optString("messageId") }.toSet()
+            }
+        }.getOrNull()
+    }
+
+    /** POST /api/build/:id/restore — files back to before that message, conversation rewound. Error or null. */
+    suspend fun restore(conversationId: String, messageId: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = JSONObject().put("messageId", messageId).toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/restore").post(body).build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (resp.isSuccessful) null
+                else runCatching { JSONObject(resp.body?.string().orEmpty()).optString("error") }.getOrNull().orEmpty().ifBlank { "Couldn't restore (${resp.code})" }
+            }
+        }.getOrElse { it.message ?: "Couldn't restore — check your connection." }
+    }
+
     /** GET /api/build/:id/approvals — prompts this build is waiting on. Null on failure. */
     suspend fun approvals(conversationId: String): List<com.friday.app.data.BuildApproval>? = withContext(Dispatchers.IO) {
         runCatching {

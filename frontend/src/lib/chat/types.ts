@@ -157,6 +157,7 @@ export type StreamEvent =
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
   | { t: "suggest_build"; prompt: string }
+  | { t: "meta"; userMessageId: string }
   | ({ t: "approval" } & BuildApproval)
   | { t: "err"; c: string }
   | { t: "done" };

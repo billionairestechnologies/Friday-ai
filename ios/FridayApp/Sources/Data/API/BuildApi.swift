@@ -2,6 +2,17 @@ import Foundation
 
 /// Build Mode project endpoints (backend /api/build/:conversationId/…).
 enum BuildApi {
+    /// GET /api/build/:id/checkpoints — ids of the user messages that have a restore point.
+    static func checkpoints(conversationId: String) async throws -> Set<String> {
+        let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/checkpoints", authed: true)
+        return Set((json["checkpoints"] as? [[String: Any]] ?? []).compactMap { $0["messageId"] as? String })
+    }
+
+    /// POST /api/build/:id/restore — files back to before that message, conversation rewound.
+    static func restore(conversationId: String, messageId: String) async throws {
+        _ = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/restore", method: "POST", body: ["messageId": messageId], authed: true)
+    }
+
     /// GET /api/build/:id/approvals — prompts this build is waiting on.
     static func approvals(conversationId: String) async throws -> [BuildApproval] {
         let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/approvals", authed: true)

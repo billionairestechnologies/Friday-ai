@@ -46,6 +46,12 @@ private struct MessageRow: View {
     @EnvironmentObject var vm: FridayViewModel
     let message: ChatMessage
     @State private var copied = false
+    @State private var confirmRestore = false
+
+    private var restorable: Bool {
+        guard vm.workspace == "build", let id = vm.currentId, !(vm.currentChat?.messages.contains { $0.isStreaming } ?? false) else { return false }
+        return vm.checkpoints[id]?.contains(message.id) == true
+    }
 
     private var isPlanRound: Bool {
         message.build?.plan?.status != nil && message.content.hasPrefix(planMarker)
@@ -53,6 +59,7 @@ private struct MessageRow: View {
 
     var body: some View {
         if message.role == .user {
+            VStack(alignment: .trailing, spacing: 4) {
             HStack {
                 Spacer(minLength: 40)
                 Text(message.content)
@@ -64,6 +71,23 @@ private struct MessageRow: View {
                     .cornerRadius(FridayRadius.bubble)
                     .frame(maxWidth: 320, alignment: .trailing)
             }
+                if restorable {
+                    Button { confirmRestore = true } label: {
+                        Label("Restore to before this", systemImage: "arrow.counterclockwise")
+                            .font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                    }
+                    .alert("Restore to before this message?", isPresented: $confirmRestore) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Restore", role: .destructive) { Task { await vm.restore(to: message.id) } }
+                    } message: {
+                        Text("The project files go back to how they were before this message, and this message and everything after it are removed.")
+                    }
+                }
+                if let err = vm.restoreError, restorable {
+                    Text(err).font(.system(size: 12)).foregroundColor(FridayColor.error)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 if message.isStreaming, let build = message.build, build.steps.isEmpty, build.plan == nil {

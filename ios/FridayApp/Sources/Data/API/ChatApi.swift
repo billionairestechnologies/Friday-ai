@@ -17,6 +17,8 @@ enum ChatEvent {
     case suggestBuild(String)
     /// Build permission prompt: pending until the user answers (from {"t":"approval",...}).
     case approval(BuildApproval)
+    /// The saved user message's real id (sent first) — Build restore points key off it.
+    case meta(userMessageId: String)
     case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
     /// The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a server
     /// failure. The backend keeps generating and persists the full reply regardless (see
@@ -167,6 +169,8 @@ enum ChatApi {
                             continuation.yield(.suggestBuild(json["prompt"] as? String ?? ""))
                         case "approval":
                             continuation.yield(.approval(BuildApproval.parse(json)))
+                        case "meta":
+                            if let id = json["userMessageId"] as? String, !id.isEmpty { continuation.yield(.meta(userMessageId: id)) }
                         case "ask":
                             continuation.yield(.ask(ChatApi.parseAsk(json["questions"])))
                         case "build":

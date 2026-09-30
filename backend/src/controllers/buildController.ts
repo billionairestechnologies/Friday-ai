@@ -4,6 +4,7 @@ import { getOwnedConversation } from "../services/chat/conversations.js";
 import { ensurePreview, getProject } from "../services/projectBuild/sandbox.js";
 import { listBuildSessions } from "../services/projectBuild/sessions.js";
 import { listPendingApprovals, resolveApproval } from "../services/projectBuild/approvals.js";
+import { listCheckpoints, restoreCheckpoint } from "../services/projectBuild/checkpoints.js";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler.js";
 
@@ -35,6 +36,19 @@ export async function approve(req: Request, res: Response) {
     throw new HttpError(409, "That request is no longer waiting — the build may have moved on or been stopped.");
   }
   res.json({ ok: true });
+}
+
+/** Which user messages have a restore point (the files before that turn). */
+export async function checkpoints(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  res.json({ checkpoints: await listCheckpoints(req.params.conversationId!) });
+}
+
+/** "Restore to before this message": files back to that point, conversation rewound to just before it. */
+export async function restore(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  const { messageId } = z.object({ messageId: z.string().uuid() }).parse(req.body);
+  res.json({ ok: true, ...(await restoreCheckpoint(req.user!.id, req.params.conversationId!, messageId)) });
 }
 
 /** Restores/refreshes the live preview (sandboxes are short-lived) and returns its URL. */

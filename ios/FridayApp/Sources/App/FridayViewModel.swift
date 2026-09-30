@@ -55,6 +55,31 @@ final class FridayViewModel: ObservableObject {
     /// Pending Build permission prompts per chat id (from the live stream or polled from the server).
     @Published var approvals: [String: [BuildApproval]] = [:]
     @Published var approvalError: String?
+    /// Build: ids of user messages with a restore point, per chat id.
+    @Published var checkpoints: [String: Set<String>] = [:]
+    @Published var restoreError: String?
+
+    func loadCheckpoints(_ chatId: String) async {
+        guard UUID(uuidString: chatId) != nil, let ids = try? await BuildApi.checkpoints(conversationId: chatId) else { return }
+        checkpoints[chatId] = ids
+    }
+
+    /// "Restore to before this message" — then reloads the rewound conversation.
+    func restore(to messageId: String) async {
+        guard let chatId = currentId else { return }
+        do {
+            try await BuildApi.restore(conversationId: chatId, messageId: messageId)
+            restoreError = nil
+            if let messages = try? await ConversationsApi.messages(conversationId: chatId),
+               let idx = chats.firstIndex(where: { $0.id == chatId }) {
+                chats[idx].messages = messages
+            }
+            await loadCheckpoints(chatId)
+            await loadBuildSessions()
+        } catch {
+            restoreError = "Couldn't restore: \(error.localizedDescription)"
+        }
+    }
 
     private func upsertApproval(_ chatId: String, _ a: BuildApproval) {
         var list = (approvals[chatId] ?? []).filter { $0.id != a.id }
@@ -391,7 +416,10 @@ final class FridayViewModel: ObservableObject {
             appendError(localId: realId, assistantMessageId: assistantMessageId, message: "Connection lost: \(error.localizedDescription)")
         }
         setStreaming(false, chatId: realId, assistantMessageId: assistantMessageId)
-        if chats.first(where: { $0.id == realId })?.isBuild == true { await loadBuildSessions() }
+        if chats.first(where: { $0.id == realId })?.isBuild == true {
+            await loadBuildSessions()
+            await loadCheckpoints(realId)
+        }
     }
 
     private func apply(event: ChatEvent, chatId: String, assistantMessageId: String) {
@@ -441,6 +469,12 @@ final class FridayViewModel: ObservableObject {
             chats[ci].messages[mi].suggestBuildPrompt = prompt.isEmpty ? nil : prompt
         case .approval(let a):
             upsertApproval(chatId, a)
+        case .meta(let userMessageId):
+            // Swap the optimistic id of this turn's user message (just before the assistant one).
+            if mi > 0, chats[ci].messages[mi - 1].role == .user {
+                let old = chats[ci].messages[mi - 1]
+                chats[ci].messages[mi - 1] = ChatMessage(id: userMessageId, role: .user, content: old.content, attachments: old.attachments)
+            }
         case .buildMeta(let elapsedMs, let zipBytes, let zipName):
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.elapsedMs = elapsedMs
@@ -534,6 +568,7 @@ final class FridayViewModel: ObservableObject {
         currentId = id
         drawerOpen = false
         workspace = chats.first(where: { $0.id == id })?.workspace == "build" ? "build" : "chat"
+        if chats.first(where: { $0.id == id })?.isBuild == true { Task { await loadCheckpoints(id) } }
         // Nothing else loads a synced chat's history on open — without this, a chat only ever
         // gets messages if a realtime event happens to arrive while this screen is on screen.
         guard UUID(uuidString: id) != nil, streamJobs[id] == nil else { return }

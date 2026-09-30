@@ -754,7 +754,20 @@ private fun ChatShell(
                         )
                     }
                 } else {
-                    ChatThread(chat?.messages.orEmpty(), onOpenPreview = { buildOpen = true }, conversationId = chat?.id, onOpenInBuild = vm::openInBuild)
+                    ChatThread(
+                        chat?.messages.orEmpty(),
+                        onOpenPreview = { buildOpen = true },
+                        conversationId = chat?.id,
+                        onOpenInBuild = vm::openInBuild,
+                        restorable = if (ui.workspace == "build") chat?.id?.let { ui.checkpoints[it] }.orEmpty() else emptySet(),
+                        onRestore = vm::restoreTo,
+                    )
+                    ui.restoreError?.let { err ->
+                        LaunchedEffect(err) {
+                            android.widget.Toast.makeText(ctx, err, android.widget.Toast.LENGTH_LONG).show()
+                            vm.consumeRestoreError()
+                        }
+                    }
                 }
             }
             Box(

@@ -12,6 +12,8 @@ export type StreamEvent =
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
   | { t: "suggest_build"; prompt: string }
+  /** Sent first: the saved user message's real id (clients swap their local id for it — Build restore points key off it). */
+  | { t: "meta"; userMessageId: string }
   /** Build permission prompt (projectBuild/approvals.ts): pending until the user answers. */
   | { t: "approval"; id: string; kind: "file" | "command" | "connector" | "pr"; title: string; detail?: string; always?: boolean; createdAt: number; state: "pending" | "allowed" | "denied" }
   | { t: "err"; c: string }

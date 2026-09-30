@@ -101,6 +101,9 @@ data class FridayUiState(
     /** Pending Build permission prompts per chat id (from the live stream or polled from the server). */
     val approvals: Map<String, List<com.friday.app.data.BuildApproval>> = emptyMap(),
     val approvalError: String? = null,
+    /** Build: ids of user messages with a restore point, per chat id. */
+    val checkpoints: Map<String, Set<String>> = emptyMap(),
+    val restoreError: String? = null,
 )
 
 data class QueuedMessage(
@@ -598,6 +601,31 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun loadCheckpoints(chatId: String) {
+        if (!isServerConversationId(chatId) || !tokenStore.hasSession()) return
+        viewModelScope.launch {
+            val ids = com.friday.app.data.api.BuildApi.checkpoints(chatId) ?: return@launch
+            _state.update { it.copy(checkpoints = it.checkpoints + (chatId to ids)) }
+        }
+    }
+
+    /** "Restore to before this message" — then reloads the rewound conversation. */
+    fun restoreTo(messageId: String) {
+        val chatId = _state.value.currentId ?: return
+        viewModelScope.launch {
+            val err = com.friday.app.data.api.BuildApi.restore(chatId, messageId)
+            _state.update { it.copy(restoreError = err) }
+            if (err == null) {
+                val msgs = ConversationsApi.messages(chatId)
+                patchChat(chatId) { it.copy(messages = msgs) }
+                loadCheckpoints(chatId)
+                loadBuildSessions()
+            }
+        }
+    }
+
+    fun consumeRestoreError() = _state.update { it.copy(restoreError = null) }
+
     fun setBuildEffort(effort: String) {
         buildPrefs.edit().putString("effort", effort).apply()
         _state.update { it.copy(buildEffort = effort) }
@@ -631,6 +659,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                 workspace = if (chat.workspace == "build") "build" else "chat",
             )
         }
+        if (_state.value.chats.find { it.id == id }?.isBuild == true) loadCheckpoints(id)
         val chat = _state.value.chats.find { it.id == id }
         // Local synthetic ids ("c-...") never have remote history; anything else is a synced thread.
         // Besides the empty-history case, also refetch when the chat was left with a trailing user
@@ -870,6 +899,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             it.copy(suggestBuildPrompt = event.prompt)
                         }
                         is ChatEvent.Approval -> upsertApproval(chatId!!, event.approval)
+                        is ChatEvent.Meta -> patchChat(chatId!!) { c ->
+                            c.copy(messages = c.messages.map { if (it.id == userMsg.id) it.copy(id = event.userMessageId) else it })
+                        }
                         ChatEvent.Disconnected -> patchMessage(chatId!!, asstId) {
                             it.copy(disconnected = true)
                         }
@@ -881,7 +913,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 patchMessage(chatId!!, asstId) { it.copy(isStreaming = false) }
                 streamJobs.remove(chatId)
-                if (_state.value.chats.find { it.id == chatId }?.isBuild == true) loadBuildSessions()
+                if (_state.value.chats.find { it.id == chatId }?.isBuild == true) {
+                    loadBuildSessions()
+                    loadCheckpoints(chatId!!)
+                }
                 val next = _state.value.queued[chatId]?.firstOrNull()
                 if (next != null && tokenStore.hasSession()) {
                     removeQueued(chatId!!, next.id)

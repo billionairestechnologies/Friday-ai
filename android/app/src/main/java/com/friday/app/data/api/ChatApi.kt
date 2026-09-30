@@ -176,6 +176,7 @@ object ChatApi {
                                 "plan" -> com.friday.app.data.parseBuildPlan(json)?.let { emit(ChatEvent.Plan(it)) }
                                 "suggest_build" -> emit(ChatEvent.SuggestBuild(json.optString("prompt")))
                                 "approval" -> emit(ChatEvent.Approval(com.friday.app.data.parseBuildApproval(json)))
+                                "meta" -> json.optString("userMessageId").ifBlank { null }?.let { emit(ChatEvent.Meta(it)) }
                                 "build" -> emit(
                                     ChatEvent.BuildMeta(
                                         elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },

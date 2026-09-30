@@ -1,6 +1,9 @@
 import { memo, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, Check, Copy, Download, FileText } from "lucide-react";
+import { ArrowDown, Check, Copy, Download, FileText, Loader2, RotateCcw } from "lucide-react";
+import { api } from "@/lib/api";
+import { useBuildCheckpoints } from "@/lib/build-mode/checkpoints";
+import { useBuildSessions } from "@/lib/build-mode/sessions";
 import { LiveChainOfThought } from "@/components/chain-of-thought-live";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -8,7 +11,7 @@ import { saveFile } from "@/lib/chat/download";
 import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan, toolOnlySteps } from "@/lib/chat/planning";
-import { useChat } from "@/lib/chat/store";
+import { useChat, type ServerMessage } from "@/lib/chat/store";
 import { AskCard } from "@/components/ask-panel";
 import { PLAN_MARKER, SuggestBuildCard } from "@/components/plan-approval";
 import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
@@ -31,6 +34,12 @@ export function MessageThread() {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const { away, onScroll, jump } = useStickToBottom(scroller, content);
+  // Build sessions: user messages with a restore point get "Restore to before this".
+  const buildMode = useChat((s) => s.workspace === "build");
+  const conversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
+  const checkpointIds = useBuildCheckpoints((s) => (conversationId ? s.byConversation[conversationId] : undefined));
+  const restorable = useMemo(() => new Set(buildMode ? (checkpointIds ?? []) : []), [buildMode, checkpointIds]);
+  const busy = messages.some((m) => m.streaming);
 
   return (
     <div className="relative z-20 min-h-0 flex-1">
@@ -42,7 +51,11 @@ export function MessageThread() {
         <div ref={content} className="flex flex-col gap-6">
           {messages.map((m) =>
             m.role === "user" ? (
-              <UserBubble key={m.id} message={m} />
+              <UserBubble
+                key={m.id}
+                message={m}
+                restore={restorable.has(m.id) && conversationId && !busy ? { conversationId, chatId: activeId! } : undefined}
+              />
             ) : (
               <AssistantBlock key={m.id} message={m} />
             ),
@@ -70,9 +83,57 @@ export function MessageThread() {
   );
 }
 
-const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage }) {
+/** "Restore to before this message": files back to that point, conversation rewound (Build only). */
+function RestoreAction({ messageId, conversationId, chatId }: { messageId: string; conversationId: string; chatId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function restore() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/build/${conversationId}/restore`, { messageId });
+      const res = await api.get<{ messages: ServerMessage[] }>(`/chat/conversations/${conversationId}/messages`);
+      useChat.getState().loadMessagesInto(chatId, res.messages);
+      void useBuildCheckpoints.getState().load(conversationId);
+      void useBuildSessions.getState().load();
+      setConfirming(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't restore — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-subtle opacity-100 transition-opacity hover:bg-chip hover:text-foreground sm:opacity-0 sm:group-hover/user:opacity-100"
+      >
+        <RotateCcw className="size-3" /> Restore to before this
+      </button>
+    );
+  }
   return (
-    <div className="msg-enter flex flex-col items-end gap-2">
+    <div className="flex max-w-md flex-col items-end gap-1.5 rounded-xl border border-border bg-composer px-3 py-2 text-xs">
+      <p className="text-right text-muted">Put the project files back to how they were before this message and remove this message and everything after it?</p>
+      {error && <p className="text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="rounded-full border border-border px-3 py-1 text-foreground hover:bg-chip">
+          Cancel
+        </button>
+        <button type="button" disabled={busy} onClick={() => void restore()} className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1 font-medium text-background">
+          {busy && <Loader2 className="size-3 animate-spin" />} Restore
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const UserBubble = memo(function UserBubble({ message, restore }: { message: ChatMessage; restore?: { conversationId: string; chatId: string } }) {
+  return (
+    <div className="msg-enter group/user flex flex-col items-end gap-2">
       {message.attachments && message.attachments.length > 0 && (
         <div className="flex flex-wrap justify-end gap-2">
           {message.attachments.map((a) =>
@@ -112,6 +173,7 @@ const UserBubble = memo(function UserBubble({ message }: { message: ChatMessage 
           {message.content}
         </div>
       )}
+      {restore && <RestoreAction messageId={message.id} conversationId={restore.conversationId} chatId={restore.chatId} />}
     </div>
   );
 });

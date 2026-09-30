@@ -24,6 +24,7 @@ import { takeBuildHandoff } from "@/lib/chat/build-handoff";
 import { BuildComposerFooter, BuildHome, BuildRepoChip } from "@/components/build-home";
 import { useBuildSessions, useBuildSessionsSync } from "@/lib/build-mode/sessions";
 import { ApprovalPanel } from "@/components/build-approval";
+import { useBuildCheckpoints } from "@/lib/build-mode/checkpoints";
 import type { BuildApproval } from "@/lib/chat/types";
 import { useBuildPrefs } from "@/lib/build-mode/prefs";
 import { fileToAttachment } from "@/lib/chat/files";
@@ -130,6 +131,12 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     };
   }, [buildMode, activeConversationId, live, sessionStatus]);
   const pendingApproval = liveApproval ?? remoteApprovals[0] ?? null;
+
+  // Restore points for this Build session's messages — refreshed when it opens and after each turn.
+  const loadCheckpoints = useBuildCheckpoints((s) => s.load);
+  useEffect(() => {
+    if (buildMode && activeConversationId && !streaming) void loadCheckpoints(activeConversationId);
+  }, [buildMode, activeConversationId, streaming, loadCheckpoints]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
@@ -423,6 +430,13 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
         else if (ev.t === "ask") askQuestions = ev.questions;
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items, summary: ev.summary, status: ev.status });
         else if (ev.t === "suggest_build") setLiveSuggestBuild(chatId, ev.prompt);
+        else if (ev.t === "meta") {
+          // Swap the optimistic id for the saved one (Build restore points are keyed by it).
+          const localId = user.id;
+          useChat.setState((st) => ({
+            chats: st.chats.map((c) => (c.id !== chatId ? c : { ...c, messages: c.messages.map((m) => (m.id === localId ? { ...m, id: ev.userMessageId } : m)) })),
+          }));
+        }
         else if (ev.t === "approval") {
           const { t: _t, ...approval } = ev;
           upsertLiveApproval(chatId, approval);

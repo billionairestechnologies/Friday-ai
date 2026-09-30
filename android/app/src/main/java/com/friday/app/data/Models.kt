@@ -241,6 +241,8 @@ sealed class ChatEvent {
     data class SuggestBuild(val prompt: String) : ChatEvent()
     /** Build permission prompt: pending until the user answers (from {"t":"approval",...}). */
     data class Approval(val approval: BuildApproval) : ChatEvent()
+    /** The saved user message's real id (sent first) — Build restore points key off it. */
+    data class Meta(val userMessageId: String) : ChatEvent()
     /** The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a
      *  server-side failure. The backend keeps generating and persists the full reply regardless
      *  (see activeGenerations.ts), so this must never overwrite whatever text already streamed in;
