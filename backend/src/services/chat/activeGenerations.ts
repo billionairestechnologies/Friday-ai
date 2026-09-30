@@ -19,6 +19,11 @@ export function finishGeneration(conversationId: string, controller: AbortContro
   if (active.get(conversationId)?.controller === controller) active.delete(conversationId);
 }
 
+/** True while a reply/build for this conversation is still being generated (Build sessions list). */
+export function isGenerating(conversationId: string): boolean {
+  return active.has(conversationId);
+}
+
 export function stopGeneration(conversationId: string, userId: string): boolean {
   const entry = active.get(conversationId);
   if (!entry || entry.userId !== userId) return false;

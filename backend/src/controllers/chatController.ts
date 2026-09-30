@@ -94,6 +94,8 @@ const sendMessageSchema = z
     research: z.boolean().optional().default(false),
     // A skill the user picked in the composer (built-in id or "u_<uuid>") — pinned into the turn.
     skillId: z.string().trim().max(80).optional(),
+    // Build workspace's effort picker: how hard the Build agent works (rounds + verification).
+    effort: z.enum(["low", "medium", "high"]).optional(),
     attachments: z.array(attachmentSchema).max(4).optional().default([]),
   })
   // The composer already allows sending an attachment with no caption text (an image with
@@ -106,7 +108,7 @@ const sendMessageSchema = z
   });
 
 export async function streamMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, attachments } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -164,7 +166,7 @@ export async function streamMessage(req: Request, res: Response) {
       canvas,
       attachments,
       req.quotaReservation,
-      { research, skillId },
+      { research, skillId, effort },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong";

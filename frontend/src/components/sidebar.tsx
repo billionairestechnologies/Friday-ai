@@ -17,6 +17,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
+import { BuildSidebar } from "@/components/build-sidebar";
 import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { filteredChats, useChat, type ServerConversation } from "@/lib/chat/store";
@@ -154,6 +155,10 @@ export function Sidebar() {
           open ? "translate-x-0" : "-translate-x-full md:hidden",
         )}
       >
+        {buildMode ? (
+          <BuildSidebar onClose={() => setOpen(false)} />
+        ) : (
+        <>
         <div className="flex h-14 items-center justify-between px-3">
           <div className="flex items-center gap-2 px-1 text-foreground">
             <BrandWordmark className="text-xl" />
@@ -393,6 +398,8 @@ export function Sidebar() {
           </button>
         </div>
         <ProfileDock />
+        </>
+        )}
       </aside>
     </>
   );

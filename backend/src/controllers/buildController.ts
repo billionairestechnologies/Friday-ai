@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import JSZip from "jszip";
 import { getOwnedConversation } from "../services/chat/conversations.js";
 import { ensurePreview, getProject } from "../services/projectBuild/sandbox.js";
+import { listBuildSessions } from "../services/projectBuild/sessions.js";
 import { HttpError } from "../middleware/errorHandler.js";
 
 async function ownedProject(req: Request) {
@@ -9,6 +10,11 @@ async function ownedProject(req: Request) {
   const project = await getProject(req.params.conversationId!);
   if (!project) throw new HttpError(404, "No project has been built in this chat yet");
   return project;
+}
+
+/** The Build workspace's session list (home screen + sidebar), with live status per session. */
+export async function sessions(req: Request, res: Response) {
+  res.json({ sessions: await listBuildSessions(req.user!.id) });
 }
 
 /** Restores/refreshes the live preview (sandboxes are short-lived) and returns its URL. */

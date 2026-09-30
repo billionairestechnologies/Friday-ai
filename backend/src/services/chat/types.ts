@@ -17,6 +17,10 @@ export type StreamEvent =
 
 export type ConversationMode = "single" | "auto" | "teamup";
 
+/** Build workspace effort picker. low = quick (fewer rounds, no browser review), medium = default,
+ *  high = the plan's full round budget plus extra verification passes. */
+export type BuildEffort = "low" | "medium" | "high";
+
 export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
 
 /** What a Build Mode turn did — persisted on the message (`messages.build`) so it survives reloads. */

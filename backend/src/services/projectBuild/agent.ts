@@ -4,7 +4,7 @@ import type { ChatMessage } from "../providers/types.js";
 import { compactToolResults, supportsTools } from "../agent/toolLoop.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
-import type { BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
+import type { BuildEffort, BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
 import { ActionParser, applySearchReplace, compactAssistantTurn, type BuildAction } from "./protocol.js";
 import { findGitHubRepoUrl, importRepo, openPullRequest } from "./github.js";
 import JSZip from "jszip";
@@ -175,11 +175,19 @@ export async function runBuildAgent(opts: {
   /** The plan the user approved (plan.ts) — executed item by item and kept live as progress.
    *  Absent for small follow-ups on an existing project, which run without a plan round. */
   approvedPlan?: BuildPlan;
+  /** Build workspace effort picker (default medium). */
+  effort?: BuildEffort;
 }): Promise<BuildAgentResult> {
   const { userId, conversationId, onEvent, signal } = opts;
   // Plans buy longer runs: rounds come from the entitlement, and the wall clock stretches with them
   // (~24s a round) so a Premium 150-round build isn't cut off by the 40-minute default.
-  const maxIterations = Math.max(5, Math.min(300, opts.maxRounds ?? MAX_ITERATIONS));
+  // Effort trades thoroughness for time/cost: low caps the rounds and skips the browser review,
+  // high allows extra verify / visual passes. The plan's round budget stays the ceiling either way.
+  const effort = opts.effort ?? "medium";
+  const planRounds = opts.maxRounds ?? MAX_ITERATIONS;
+  const maxIterations = Math.max(5, Math.min(300, effort === "low" ? Math.min(planRounds, 40) : planRounds));
+  const maxVisualRounds = effort === "low" ? 0 : effort === "high" ? 3 : 2;
+  const maxVerifyRounds = effort === "low" ? 1 : effort === "high" ? 4 : 3;
   const maxWallMs = Math.max(MAX_WALL_MS, maxIterations * 24_000);
   const started = Date.now();
   const steps: BuildStep[] = [];
@@ -352,7 +360,7 @@ export async function runBuildAgent(opts: {
 
   /** Last gate before "done": look at the page in a browser, unless the agent already did since its last change. */
   const qualityGate = async (): Promise<string> => {
-    if (!last.start || visualRounds >= 2 || signal?.aborted || appCheckedOkAt === writeSeq) return "";
+    if (!last.start || visualRounds >= maxVisualRounds || signal?.aborted || appCheckedOkAt === writeSeq) return "";
     visualRounds++;
     return inspectApp("Checking how it looks in a browser");
   };
@@ -363,7 +371,7 @@ export async function runBuildAgent(opts: {
    * over a build that doesn't compile. Checks the agent already passed since its last edit are skipped.
    */
   const verifyProject = async (): Promise<string> => {
-    if (verifyRounds >= 3 || signal?.aborted) return "";
+    if (verifyRounds >= maxVerifyRounds || signal?.aborted) return "";
     let scripts: Record<string, string> = {};
     try {
       const pkg = await box.read("package.json").catch(() => "");

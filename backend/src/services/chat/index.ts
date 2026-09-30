@@ -50,7 +50,7 @@ import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
-import type { BuildPlan, ConversationMode, StreamEvent } from "./types.js";
+import type { BuildEffort, BuildPlan, ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
@@ -177,7 +177,7 @@ export async function streamMessage(
   canvas = false,
   attachments: ChatImage[] = [],
   reservation?: Reservation,
-  options: { research?: boolean; skillId?: string } = {},
+  options: { research?: boolean; skillId?: string; effort?: BuildEffort } = {},
 ): Promise<void> {
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
@@ -687,7 +687,7 @@ export async function streamMessage(
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
       // only now, not during a question/plan round, which never touches the sandbox.
       onEvent({ t: "status", s: "building" });
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan });
+      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });
         onEvent({ t: "done" });

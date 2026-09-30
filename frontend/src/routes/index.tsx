@@ -21,6 +21,9 @@ import type { AskQuestion, ChatMessage } from "@/lib/chat/types";
 import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
 import { PlanApprovalPanel, PLAN_APPROVE_TEXT, PLAN_MARKER } from "@/components/plan-approval";
 import { takeBuildHandoff } from "@/lib/chat/build-handoff";
+import { BuildComposerFooter, BuildHome, BuildRepoChip } from "@/components/build-home";
+import { useBuildSessionsSync } from "@/lib/build/sessions";
+import { useBuildPrefs } from "@/lib/build/prefs";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
@@ -96,6 +99,10 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     return last && !last.streaming && last.build?.plan?.status === "pending" ? last : null;
   }, [lastAssistantMessage]);
   const queued = useQueue((s) => (activeId ? s.byChat[activeId] : undefined)) ?? [];
+  // Build home: the GitHub repo a brand-new build should work on (the chip above the composer).
+  const [buildRepo, setBuildRepo] = useState<string | null>(null);
+  // Build sessions list (home + sidebar statuses) — refreshed whenever a turn starts or ends.
+  useBuildSessionsSync(buildMode && Boolean(user) && !isPending, streaming);
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
@@ -292,11 +299,18 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
 
     const model = s.model;
     s.clearDraft();
+    // A new build started from the home screen with a repo chip: say which repo, the way the backend
+    // recognises it ("work on github.com/owner/repo") — it clones it before the agent starts.
+    let content = trimmed;
+    if (buildMode && buildRepo && !s.chats.find((c) => c.id === s.activeId)?.conversationId && !/github\.com\//i.test(trimmed)) {
+      content = `Work on https://github.com/${buildRepo} — ${trimmed}`;
+      setBuildRepo(null);
+    }
 
     const user: ChatMessage = {
       id: uid(),
       role: "user",
-      content: trimmed,
+      content,
       attachments: attachments.length ? attachments : undefined,
       createdAt: Date.now(),
     };
@@ -364,7 +378,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
 
     let askQuestions: AskQuestion[] | undefined;
     try {
-      await streamMessage(conversationId, trimmed, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
+      await streamMessage(conversationId, content, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
         if (ev.t === "status" && ev.s === "building") applyLive(chatId, { text: "", think: "", cites: [], agents: [], status: "building" });
         else if (ev.t === "status") batch.status(ev.s);
         else if (ev.t === "think") batch.think(ev.c);
@@ -388,7 +402,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
           // Build Mode produced a running app — open the panel on it, same as an auto-opened artifact.
           useChat.getState().setCanvasOpen(true);
         } else if (ev.t === "err") batch.error(ev.c);
-      }, ac.signal, { research: s.research, ...(s.activeSkill ? { skillId: s.activeSkill.id } : {}) });
+      }, ac.signal, {
+        research: s.research,
+        ...(s.activeSkill ? { skillId: s.activeSkill.id } : {}),
+        ...(buildMode ? { effort: useBuildPrefs.getState().effort } : {}),
+      });
     } catch (err) {
       if ((err as { name?: string }).name !== "AbortError") {
         applyLive(chatId, {
@@ -479,7 +497,35 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
         )}
 
         <AnimatePresence mode="wait" initial={false}>
-          {empty ? (
+          {empty && buildMode && available ? (
+            // Build home, laid out like Claude Code: welcome + Sessions + Pull requests scrolling
+            // above, the composer (repo chip · input · effort) pinned at the bottom.
+            <motion.div
+              key="build-home"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+                <BuildHome firstName={firstName} />
+              </div>
+              <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
+                <div className="mx-auto w-full max-w-3xl">
+                  <BuildRepoChip repo={buildRepo} onChange={setBuildRepo} />
+                  <Composer
+                    onSend={(message, files) => void send(message, files)}
+                    onStop={stop}
+                    streaming={streaming}
+                    disabled={!available}
+                    placeholder="Describe what to build, or what to change in the repo…"
+                  />
+                  <BuildComposerFooter />
+                </div>
+              </div>
+            </motion.div>
+          ) : empty ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0, y: 8 }}
@@ -647,11 +693,15 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     onStop={stop}
                     streaming={streaming}
                     disabled={!available}
-                    placeholder={pendingPlan ? "Tell me what to change in the plan…" : undefined}
+                    placeholder={pendingPlan ? "Tell me what to change in the plan…" : buildMode ? "Ask for a change, or reply to Friday…" : undefined}
                   />
-                  <p className="pt-2 pb-1 text-center text-xs text-subtle">
-                    Friday can be wrong. Check anything important.
-                  </p>
+                  {buildMode ? (
+                    <BuildComposerFooter />
+                  ) : (
+                    <p className="pt-2 pb-1 text-center text-xs text-subtle">
+                      Friday can be wrong. Check anything important.
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>

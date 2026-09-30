@@ -5,6 +5,7 @@ import {
   Download,
   ExternalLink,
   FileCode2,
+  FileDiff,
   Folder,
   FolderOpen,
   Globe,
@@ -173,6 +174,93 @@ function SessionTerminal({ steps, building }: { steps: BuildStep[]; building: bo
   );
 }
 
+type FileChange = { path: string; code: string; added: number; removed: number; isNew: boolean; count: number };
+
+/** Every file the agent wrote or edited in this session, newest change per file first. The steps
+ *  already carry the change itself (a code preview for a new file, +/- lines for an edit), so this
+ *  needs no extra round trip. */
+function collectChanges(steps: BuildStep[]): FileChange[] {
+  const byPath = new Map<string, FileChange>();
+  for (const st of steps) {
+    if (st.kind !== "write" || st.state !== "ok" || !st.path) continue;
+    const prev = byPath.get(st.path);
+    const isNew = /^Wrote /.test(st.label) && !prev;
+    byPath.delete(st.path);
+    byPath.set(st.path, {
+      path: st.path,
+      code: st.code ?? "",
+      added: (prev?.added ?? 0) + (st.added ?? 0),
+      removed: (prev?.removed ?? 0) + (st.removed ?? 0),
+      isNew: prev ? prev.isNew : isNew,
+      count: (prev?.count ?? 0) + 1,
+    });
+  }
+  return [...byPath.values()].reverse();
+}
+
+function DiffView({ steps }: { steps: BuildStep[] }) {
+  const changes = useMemo(() => collectChanges(steps), [steps]);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  if (changes.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-sm text-muted">
+        <FileDiff className="size-5" />
+        No changes yet — files Friday writes or edits show up here.
+      </div>
+    );
+  }
+  const totalAdded = changes.reduce((n, c) => n + c.added, 0);
+  const totalRemoved = changes.reduce((n, c) => n + c.removed, 0);
+  return (
+    <div className="h-full overflow-auto">
+      <div className="flex items-center gap-2 border-b border-border/80 px-4 py-2 text-xs text-muted">
+        {changes.length} file{changes.length === 1 ? "" : "s"} changed
+        <span className="text-emerald-600 dark:text-emerald-400">+{totalAdded}</span>
+        <span className="text-danger">−{totalRemoved}</span>
+      </div>
+      {changes.map((c) => {
+        const expanded = open[c.path] ?? changes.length <= 3;
+        return (
+          <div key={c.path} className="border-b border-border/60">
+            <button
+              type="button"
+              onClick={() => setOpen((o) => ({ ...o, [c.path]: !expanded }))}
+              className="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-chip/60"
+            >
+              <ChevronRight className={cn("size-3.5 shrink-0 text-subtle transition-transform", expanded && "rotate-90")} />
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{c.path}</span>
+              {c.isNew && <span className="rounded-full bg-chip px-1.5 py-0.5 text-[10px] text-muted">new</span>}
+              <span className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400">+{c.added}</span>
+              <span className="font-mono text-[11px] text-danger">−{c.removed}</span>
+            </button>
+            {expanded && c.code && (
+              <pre className="overflow-x-auto bg-composer/40 py-1.5 font-mono text-xs leading-relaxed">
+                {c.code.split("\n").map((line, i) => {
+                  const kind = c.isNew ? "+" : line.startsWith("+ ") ? "+" : line.startsWith("- ") ? "-" : " ";
+                  const text = !c.isNew && (kind === "+" || kind === "-") ? line.slice(2) : line;
+                  return (
+                    <div
+                      key={i}
+                      className={cn(
+                        "flex px-4",
+                        kind === "+" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                        kind === "-" && "bg-danger/10 text-danger",
+                      )}
+                    >
+                      <span className="w-4 shrink-0 select-none opacity-60">{kind === " " ? "" : kind}</span>
+                      <span className="whitespace-pre">{text || " "}</span>
+                    </div>
+                  );
+                })}
+              </pre>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** The Build workspace panel: Preview (the running app in a browser frame), Files (tree + code) and
  *  Terminal (the whole session's commands and output). The sandbox is short-lived, so unless the
  *  URL just came from the live turn the backend is asked to make sure it's alive (it restores the
@@ -199,7 +287,7 @@ export function BuildCanvas({
   const [url, setUrl] = useState<string | null>(liveUrl ?? null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(liveUrl ? "ready" : "idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [view, setView] = useState<"preview" | "files" | "terminal">(liveUrl || hasPreview ? "preview" : "terminal");
+  const [view, setView] = useState<"preview" | "files" | "diff" | "terminal">(liveUrl || hasPreview ? "preview" : "terminal");
   const [files, setFiles] = useState<ProjectFiles | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showTree, setShowTree] = useState(true);
@@ -287,6 +375,7 @@ export function BuildCanvas({
           [
             ["preview", Globe, "Preview"],
             ["files", SquareStack, "Files"],
+            ["diff", FileDiff, "Diff"],
             ["terminal", TerminalSquare, "Terminal"],
           ] as const
         ).map(([id, Icon, label]) => (
@@ -332,7 +421,7 @@ export function BuildCanvas({
             <Smartphone className="size-3.5" />
           </button>
         </div>
-      ) : view === "files" ? (
+      ) : view === "diff" ? null : view === "files" ? (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/80 px-3">
           <button type="button" aria-label="Toggle file list" aria-pressed={showTree} onClick={() => setShowTree((v) => !v)} className={cn(iconBtn, showTree && "bg-chip text-foreground")}>
             <ListTree className="size-3.5" />
@@ -356,6 +445,8 @@ export function BuildCanvas({
       <div className="min-h-0 flex-1 overflow-hidden">
         {view === "terminal" ? (
           <SessionTerminal steps={steps} building={building} />
+        ) : view === "diff" ? (
+          <DiffView steps={steps} />
         ) : view === "preview" ? (
           status === "ready" && url ? (
             <div className={cn("flex h-full w-full justify-center", mobile && "bg-chip/40")}>

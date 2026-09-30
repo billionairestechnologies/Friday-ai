@@ -11,7 +11,7 @@ export type OutgoingAttachment = {
 };
 
 /** Per-turn options beyond the classic toggles. */
-export type StreamOptions = { research?: boolean; skillId?: string };
+export type StreamOptions = { research?: boolean; skillId?: string; effort?: "low" | "medium" | "high" };
 
 async function fetchStream(
   conversationId: string,
