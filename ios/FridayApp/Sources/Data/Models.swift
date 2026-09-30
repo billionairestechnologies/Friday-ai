@@ -53,10 +53,27 @@ struct BuildPlanItem: Hashable {
 }
 
 /// Architecture + todo checklist Build Mode drafts before coding, updated live as items finish.
+/// `summary` = plain-language "what I'll build"; `status` = the approval round: "pending" (waiting
+/// for approve / changes), "approved", "revised" (replaced by a newer plan); nil on older plans.
 struct BuildPlan: Hashable {
     var architecture: String
     var items: [BuildPlanItem]
+    var summary: String?
+    var status: String?
+
+    static func parse(_ p: [String: Any]?) -> BuildPlan? {
+        guard let p else { return nil }
+        let items = (p["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
+        let summary = (p["summary"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let status = (p["status"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        return BuildPlan(architecture: p["architecture"] as? String ?? "", items: items, summary: summary, status: status)
+    }
 }
+
+/// The server stores a plan message as this line + the plan text; the thread shows only the card.
+let planMarker = "Here's the plan. Approve it to start building, or tell me what to change."
+/// The Approve button sends exactly this (backend plan.ts keys off it).
+let planApproveText = "Approved — build it as planned."
 
 struct BuildAskOption: Hashable {
     let label: String
@@ -101,6 +118,8 @@ struct ChatMessage: Identifiable, Hashable {
     var modesUsed: Set<Mode> = []
     var agents: [AgentStatus] = []
     var build: BuildInfo?
+    /// Normal chat answered a build request — shows "Open in Build" carrying this prompt.
+    var suggestBuildPrompt: String?
 }
 
 struct ChatThread: Identifiable, Hashable {
@@ -108,6 +127,12 @@ struct ChatThread: Identifiable, Hashable {
     var title: String
     var messages: [ChatMessage] = []
     var updatedAt: Date = Date()
+    /// "build" = a Build workspace session (listed under Build; every message goes to the Build agent).
+    var workspace: String?
+    /// Build Mode made a project here (from before Build moved to its own tab) — also listed under Build.
+    var hasBuild: Bool = false
+
+    var isBuild: Bool { workspace == "build" || hasBuild }
 }
 
 struct FridayUser: Hashable {

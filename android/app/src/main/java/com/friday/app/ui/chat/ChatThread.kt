@@ -102,7 +102,7 @@ import com.friday.app.ui.theme.FridayThink
 import kotlinx.coroutines.delay
 
 @Composable
-fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier, onOpenPreview: () -> Unit = {}, conversationId: String? = null) {
+fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier, onOpenPreview: () -> Unit = {}, conversationId: String? = null, onOpenInBuild: (String) -> Unit = {}) {
     val list = rememberLazyListState()
     // Whether the last item is the (or nearly the) last one visible — used to gate auto-scroll
     // during streaming so it doesn't fight a user who scrolled up to read earlier messages. Every
@@ -134,7 +134,7 @@ fun ChatThread(messages: List<ChatMessage>, modifier: Modifier = Modifier, onOpe
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         items(messages, key = { it.id }) { msg ->
-            if (msg.role == Role.User) UserBubble(msg.content) else AssistantBlock(msg, onOpenPreview, conversationId)
+            if (msg.role == Role.User) UserBubble(msg.content) else AssistantBlock(msg, onOpenPreview, conversationId, onOpenInBuild)
         }
     }
 }
@@ -157,7 +157,10 @@ private fun UserBubble(text: String) {
 }
 
 @Composable
-private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, conversationId: String? = null) {
+private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, conversationId: String? = null, onOpenInBuild: (String) -> Unit = {}) {
+    // A plan-round message stores the marker + the plan as text (so the model sees it later); the plan
+    // card already shows all of it, so the text isn't repeated under it.
+    val planRound = msg.build?.plan?.status != null && msg.content.startsWith(com.friday.app.data.PLAN_MARKER)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (msg.isStreaming && msg.build != null && msg.build.steps.isEmpty() && msg.build.plan == null) BuildBanner()
         msg.build?.takeIf { it.ask.isNotEmpty() }?.let { AskCard(it.ask) }
@@ -197,11 +200,12 @@ private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, con
         AnimatedVisibility(visible = generatingImage, enter = fadeIn(tween(180)), exit = fadeOut(tween(180))) {
             GeneratingImagePill()
         }
-        AnimatedVisibility(visible = msg.content.isNotEmpty(), enter = fadeIn(tween(220)), exit = fadeOut(tween(0))) {
+        AnimatedVisibility(visible = msg.content.isNotEmpty() && !planRound, enter = fadeIn(tween(220)), exit = fadeOut(tween(0))) {
             MarkdownBody(msg.content)
         }
+        if (!msg.isStreaming) msg.suggestBuildPrompt?.let { prompt -> SuggestBuildCard { onOpenInBuild(prompt) } }
         if (!msg.isStreaming && conversationId != null) msg.build?.takeIf { it.zipBytes != null }?.let { ProjectZipCard(it, conversationId) }
-        if (msg.content.isNotEmpty() && !msg.isStreaming) {
+        if (msg.content.isNotEmpty() && !msg.isStreaming && !planRound) {
             MessageActions(msg.content)
         }
     }

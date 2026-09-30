@@ -45,7 +45,7 @@ struct ComposerBar: View {
                 recordingRow
             } else {
                 VStack(spacing: 6) {
-                    TextField("", text: $vm.draft, prompt: Text(placeholderFor(vm.modes)).foregroundColor(FridayColor.muted), axis: .vertical)
+                    TextField("", text: $vm.draft, prompt: Text(vm.pendingPlanMessage != nil ? "Tell me what to change in the plan…" : vm.workspace == "build" ? "Describe what to build…" : placeholderFor(vm.modes)).foregroundColor(FridayColor.muted), axis: .vertical)
                         .font(.system(size: 16))
                         .foregroundColor(FridayColor.text)
                         .lineLimit(1...6)
@@ -92,9 +92,13 @@ struct ComposerBar: View {
                     ModeChip(icon: "gearshape", label: "Think", color: FridayColor.think, active: vm.modes.contains(.think)) {
                         vm.toggleMode(.think)
                     }
-                    Rectangle().fill(FridayColor.hairline).frame(width: 1, height: 18)
-                    ModeChip(icon: "magnifyingglass", label: "Research", color: FridayColor.canvas, active: vm.modes.contains(.research)) {
-                        vm.toggleMode(.research)
+                    // Deep Research is switched on from the "+" menu (like the web); the chip only shows
+                    // while it's on, so it's visible and one tap turns it off again.
+                    if vm.modes.contains(.research) {
+                        Rectangle().fill(FridayColor.hairline).frame(width: 1, height: 18)
+                        ModeChip(icon: "magnifyingglass", label: "Research", color: FridayColor.canvas, active: true) {
+                            vm.toggleMode(.research)
+                        }
                     }
                 }
             }

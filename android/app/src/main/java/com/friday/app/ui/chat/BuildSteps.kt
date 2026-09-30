@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
@@ -131,39 +132,65 @@ private fun formatDuration(totalSeconds: Long): String {
 private fun formatBytes(bytes: Long): String =
     if (bytes >= 1024 * 1024) "%.2f MB".format(bytes / 1024.0 / 1024.0) else "%.2f KB".format(bytes / 1024.0)
 
-/** The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish. */
+/** The plan Build Mode drafts before coding. As a proposal (pending/revised, nothing built yet) it
+ *  reads as a full plan to judge — what gets built, the architecture, numbered steps; once a build
+ *  runs it becomes the live checklist, ticked off as items finish. */
 @Composable
 private fun PlanCard(plan: com.friday.app.data.BuildPlan) {
-    var showArch by remember { mutableStateOf(false) }
+    val proposal = plan.status == "pending" || plan.status == "revised" || (plan.status == "approved" && plan.items.all { it.state == "todo" })
+    var showArch by remember { mutableStateOf(plan.status == "pending") }
     val done = plan.items.count { it.state == "done" }
+    val badge = when {
+        plan.status == "pending" -> "Waiting for your approval"
+        plan.status == "revised" -> "Replaced by a newer plan"
+        plan.status == "approved" && proposal -> "Approved"
+        else -> null
+    }
     Column(
-        Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(16.dp)).background(FridaySurface).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(16.dp)).background(FridaySurface)
+            .alpha(if (plan.status == "revised") 0.6f else 1f).padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Plan", color = FridayText, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text("$done/${plan.items.size}", color = FridayMuted, fontSize = 12.sp)
+            Text(if (proposal) "Build plan" else "Plan", color = FridayText, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (badge != null) {
+                Text(
+                    badge, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                    color = if (plan.status == "pending") FridaySurface else FridayMuted,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (plan.status == "pending") FridayText else com.friday.app.ui.theme.FridayChip).padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            } else {
+                Text("$done/${plan.items.size}", color = FridayMuted, fontSize = 12.sp)
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(com.friday.app.ui.theme.FridayChip)) {
-            Box(Modifier.fillMaxWidth(if (plan.items.isEmpty()) 0f else done.toFloat() / plan.items.size).height(4.dp).clip(RoundedCornerShape(50)).background(FridayText))
+        if (!proposal) {
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(com.friday.app.ui.theme.FridayChip)) {
+                Box(Modifier.fillMaxWidth(if (plan.items.isEmpty()) 0f else done.toFloat() / plan.items.size).height(4.dp).clip(RoundedCornerShape(50)).background(FridayText))
+            }
+        }
+        if (!plan.summary.isNullOrBlank()) {
+            Text("What I'll build", color = FridayMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 10.dp))
+            Text(plan.summary, color = FridayText, fontSize = 13.5.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 2.dp))
         }
         if (plan.architecture.isNotBlank()) {
-            Row(Modifier.padding(top = 8.dp).clickable { showArch = !showArch }, verticalAlignment = Alignment.CenterVertically) {
-                Text("Architecture", color = FridayMuted, fontSize = 12.sp)
+            Row(Modifier.padding(top = 10.dp).clickable { showArch = !showArch }, verticalAlignment = Alignment.CenterVertically) {
+                Text("Architecture", color = FridayMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Icon(Icons.Default.ChevronRight, null, tint = FridayMuted, modifier = Modifier.size(14.dp).rotate(if (showArch) 90f else 0f))
             }
             if (showArch) Text(plan.architecture, color = FridayMuted, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 4.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        plan.items.forEach { item ->
+        if (proposal) Text("Steps", color = FridayMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 10.dp))
+        Spacer(Modifier.height(if (proposal) 4.dp else 8.dp))
+        plan.items.forEachIndexed { index, item ->
             Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
                 Box(Modifier.padding(top = 2.dp).size(16.dp), contentAlignment = Alignment.Center) {
-                    when (item.state) {
-                        "done" -> Icon(
+                    when {
+                        proposal -> Text("${index + 1}.", color = FridayMuted, fontSize = 12.sp)
+                        item.state == "done" -> Icon(
                             Icons.Default.Check, null, tint = FridaySurface,
                             modifier = Modifier.size(16.dp).clip(androidx.compose.foundation.shape.CircleShape).background(FridayText).padding(2.dp),
                         )
-                        "doing" -> BuildOrb(14.dp)
+                        item.state == "doing" -> BuildOrb(14.dp)
                         else -> Box(Modifier.size(14.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.friday.app.ui.theme.FridayChip))
                     }
                 }
@@ -205,6 +232,11 @@ fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Un
     }
     // A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
     val toolsOnly = build.steps.isNotEmpty() && build.steps.all { it.kind == "tool" } && build.plan == null
+    // A plan-round message (no build steps yet) is just the plan — no "0 steps" row under it.
+    if (build.plan != null && build.steps.isEmpty() && build.previewUrl == null) {
+        PlanCard(build.plan)
+        return
+    }
     Column(Modifier.fillMaxWidth().animateContentSize()) {
         build.plan?.let { PlanCard(it) }
         if (streaming) {

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
@@ -78,6 +79,9 @@ fun DrawerPane(
     currentId: String?,
     onNewChat: () -> Unit,
     onOpenChat: (String) -> Unit,
+    /** "chat" or "build": which workspace's history the list shows. */
+    workspace: String = "chat",
+    onNewBuild: () -> Unit = {},
     onDeleteChat: (String) -> Unit = {},
     onOpenSheet: (Sheet) -> Unit,
     onNavigate: (String) -> Unit,
@@ -92,7 +96,8 @@ fun DrawerPane(
     }
     var query by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<ChatThread?>(null) }
-    val filtered = recents.filter { it.title.contains(query, ignoreCase = true) }
+    // Build sessions (and older chats that made a project) are listed under Build; chats under Chat.
+    val filtered = recents.filter { it.title.contains(query, ignoreCase = true) && if (workspace == "build") it.isBuild else it.workspace != "build" }
     var hits by remember { mutableStateOf<List<com.friday.app.data.api.SearchHit>>(emptyList()) }
     var searchError by remember { mutableStateOf<String?>(null) }
     var actionChat by remember { mutableStateOf<ChatThread?>(null) }
@@ -173,6 +178,7 @@ fun DrawerPane(
 
         Column(Modifier.padding(horizontal = 12.dp)) {
             PlainRow(Icons.Default.Edit, "New chat", onNewChat)
+            PlainRow(Icons.Default.Build, "Build", onNewBuild)
             PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
             PlainRow(Icons.AutoMirrored.Filled.LibraryBooks, "Library") { onNavigate("library") }
             PlainRow(Icons.Default.Folder, "Projects") { onNavigate("projects") }
@@ -183,7 +189,7 @@ fun DrawerPane(
 
         Spacer(Modifier.height(16.dp))
         Text(
-            "Conversations",
+            if (workspace == "build") "Builds" else "Conversations",
             color = FridayMuted,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
@@ -262,7 +268,7 @@ fun DrawerPane(
                 Spacer(Modifier.height(8.dp))
             }
             if (filtered.isEmpty()) {
-                Text(if (query.isBlank()) "No conversations yet" else "No matching titles", color = FridayMuted, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
+                Text(if (query.isNotBlank()) "No matching titles" else if (workspace == "build") "No builds yet — describe an app to start one" else "No conversations yet", color = FridayMuted, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
             } else {
                 filtered.forEach { chat ->
                     val active = chat.id == currentId

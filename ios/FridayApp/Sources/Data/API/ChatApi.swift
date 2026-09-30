@@ -13,6 +13,8 @@ enum ChatEvent {
     case preview(url: String, port: Int)
     case plan(BuildPlan)
     case ask([BuildAskQuestion])
+    /// Normal chat got a build request: offer "Open in Build" (from {"t":"suggest_build",...}).
+    case suggestBuild(String)
     case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
     /// The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a server
     /// failure. The backend keeps generating and persists the full reply regardless (see
@@ -41,8 +43,10 @@ enum ChatApi {
         let kind: String
     }
 
-    static func createConversation(mode: String, modelId: String?, providerSlug: String?) async throws -> String {
+    static func createConversation(mode: String, modelId: String?, providerSlug: String?, workspace: String? = nil) async throws -> String {
         var body: [String: Any] = ["mode": mode]
+        // "build" = a Build workspace session: every message goes to the Build agent.
+        if workspace == "build" { body["workspace"] = "build" }
         if mode == "single" {
             if let modelId { body["modelId"] = modelId }
             if let providerSlug { body["providerSlug"] = providerSlug }
@@ -157,8 +161,9 @@ enum ChatApi {
                         case "preview":
                             continuation.yield(.preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0))
                         case "plan":
-                            let items = (json["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
-                            continuation.yield(.plan(BuildPlan(architecture: json["architecture"] as? String ?? "", items: items)))
+                            if let plan = BuildPlan.parse(json) { continuation.yield(.plan(plan)) }
+                        case "suggest_build":
+                            continuation.yield(.suggestBuild(json["prompt"] as? String ?? ""))
                         case "ask":
                             continuation.yield(.ask(ChatApi.parseAsk(json["questions"])))
                         case "build":
@@ -204,13 +209,15 @@ enum ConversationsApi {
         let id: String
         let title: String
         let updatedAt: String?
+        var workspace: String?
+        var hasBuild: Bool = false
     }
 
     static func list() async throws -> [Summary] {
         let json = try await ApiClient.shared.requestJSON(path: "chat/conversations", authed: true)
         guard let arr = json["conversations"] as? [[String: Any]] else { return [] }
         return arr.map {
-            Summary(id: $0["id"] as? String ?? "", title: $0["title"] as? String ?? "New chat", updatedAt: $0["updated_at"] as? String)
+            Summary(id: $0["id"] as? String ?? "", title: $0["title"] as? String ?? "New chat", updatedAt: $0["updated_at"] as? String, workspace: $0["workspace"] as? String, hasBuild: $0["has_build"] as? Bool ?? false)
         }
     }
 
@@ -233,16 +240,14 @@ enum ConversationsApi {
                         detail: $0["detail"] as? String
                     )
                 }
-                var plan: BuildPlan?
-                if let p = b["plan"] as? [String: Any] {
-                    plan = BuildPlan(
-                        architecture: p["architecture"] as? String ?? "",
-                        items: (p["items"] as? [[String: Any]] ?? []).map { BuildPlanItem(text: $0["text"] as? String ?? "", state: $0["state"] as? String ?? "todo") }
-                    )
-                }
+                let plan = BuildPlan.parse(b["plan"] as? [String: Any])
                 let ask = ChatApi.parseAsk(b["ask"])
-                build = BuildInfo(plan: plan, steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String, ask: ask.isEmpty ? nil : ask)
+                // A suggestion-only build object (no steps/plan/ask/preview) isn't a Build turn.
+                if !(steps.isEmpty && plan == nil && ask.isEmpty && b["previewUrl"] == nil && b["zipBytes"] == nil) {
+                    build = BuildInfo(plan: plan, steps: steps, previewUrl: b["previewUrl"] as? String, port: b["port"] as? Int, elapsedMs: b["elapsedMs"] as? Int, zipBytes: b["zipBytes"] as? Int, zipName: b["zipName"] as? String, ask: ask.isEmpty ? nil : ask)
+                }
             }
+            let suggest = ((row["build"] as? [String: Any])?["suggestBuild"] as? [String: Any])?["prompt"] as? String
             // A turn the server rejected before generating anything (e.g. the plan/tier gate) is
             // persisted with empty content and the message in `error` instead — the live stream
             // already folds this into content as it arrives (the .err case below), so a reload
@@ -260,7 +265,8 @@ enum ConversationsApi {
                 role: (row["role"] as? String) == "user" ? .user : .assistant,
                 content: content,
                 sources: sources,
-                build: build
+                build: build,
+                suggestBuildPrompt: (suggest?.isEmpty ?? true) ? nil : suggest
             )
         }
     }

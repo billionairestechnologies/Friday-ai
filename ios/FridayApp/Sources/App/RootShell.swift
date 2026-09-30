@@ -136,6 +136,12 @@ private struct ChatShell: View {
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
 
+                    if vm.pendingPlanMessage != nil, !vm.isStreamingCurrent {
+                        PlanApprovalBar()
+                            .padding(.horizontal, 12)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
                     ComposerBar()
                         .padding(.bottom, 8)
                         .opacity(composerIn ? 1 : 0)
@@ -272,7 +278,7 @@ private struct ChatShell: View {
     private var emptyState: some View {
         VStack {
             Spacer()
-            Text(greeting)
+            Text(vm.workspace == "build" ? "What should we build?" : greeting)
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(FridayColor.text)
                 .opacity(greetingIn ? 1 : 0)
@@ -354,6 +360,11 @@ private struct ChatShell: View {
             PopoverRow(icon: "doc.fill", title: "Files", subtitle: nil, circularIcon: true) {
                 vm.sheet = .none
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { triggerFilesPicker = true }
+            }
+            // Deep Research on/off for the next message — same place as the web's "+" menu.
+            PopoverRow(icon: "binoculars.fill", title: "Deep research", subtitle: nil, selected: vm.modes.contains(.research), circularIcon: true) {
+                vm.toggleMode(.research)
+                vm.sheet = .none
             }
             PopoverRow(icon: "puzzlepiece.extension.fill", title: "Plugins", subtitle: nil, circularIcon: true) {
                 vm.sheet = .plugins

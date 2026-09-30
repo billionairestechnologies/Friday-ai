@@ -58,19 +58,51 @@ private func formatBytes(_ bytes: Int) -> String {
     bytes >= 1024 * 1024 ? String(format: "%.2f MB", Double(bytes) / 1024 / 1024) : String(format: "%.2f KB", Double(bytes) / 1024)
 }
 
-/// The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish.
+/// The plan Build Mode drafts before coding. As a proposal (pending/revised, nothing built yet) it
+/// reads as a full plan to judge — what gets built, the architecture, numbered steps; once a build
+/// runs it becomes the live checklist, ticked off as items finish.
 private struct PlanCard: View {
     let plan: BuildPlan
-    @State private var showArch = false
+    @State private var showArch: Bool
+
+    init(plan: BuildPlan) {
+        self.plan = plan
+        _showArch = State(initialValue: plan.status == "pending")
+    }
+
+    private var proposal: Bool {
+        plan.status == "pending" || plan.status == "revised" || (plan.status == "approved" && plan.items.allSatisfy { $0.state == "todo" })
+    }
+
+    private var badge: String? {
+        switch plan.status {
+        case "pending": return "Waiting for your approval"
+        case "revised": return "Replaced by a newer plan"
+        case "approved" where proposal: return "Approved"
+        default: return nil
+        }
+    }
 
     var body: some View {
         let done = plan.items.filter { $0.state == "done" }.count
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Plan").font(.system(size: 14.5, weight: .semibold)).foregroundColor(FridayColor.text)
+                Text(proposal ? "Build plan" : "Plan").font(.system(size: 14.5, weight: .semibold)).foregroundColor(FridayColor.text)
                 Spacer()
-                Text("\(done)/\(plan.items.count)").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                if let badge {
+                    Text(badge).font(.system(size: 11, weight: .medium))
+                        .foregroundColor(plan.status == "pending" ? FridayColor.bg : FridayColor.muted)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(plan.status == "pending" ? FridayColor.text : FridayColor.chip).clipShape(Capsule())
+                } else {
+                    Text("\(done)/\(plan.items.count)").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                }
             }
+            if let summary = plan.summary, !summary.isEmpty {
+                Text("What I'll build").font(.system(size: 12, weight: .medium)).foregroundColor(FridayColor.muted)
+                Text(summary).font(.system(size: 13.5)).foregroundColor(FridayColor.text)
+            }
+            if !proposal {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(FridayColor.chip)
@@ -80,6 +112,7 @@ private struct PlanCard: View {
                 }
             }
             .frame(height: 4)
+            }
             if !plan.architecture.isEmpty {
                 Button { withAnimation(.easeOut(duration: 0.15)) { showArch.toggle() } } label: {
                     HStack(spacing: 4) {
@@ -89,11 +122,14 @@ private struct PlanCard: View {
                 }
                 if showArch { Text(plan.architecture).font(.system(size: 12)).foregroundColor(FridayColor.muted) }
             }
+            if proposal { Text("Steps").font(.system(size: 12, weight: .medium)).foregroundColor(FridayColor.muted) }
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(plan.items.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(plan.items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .top, spacing: 8) {
                         Group {
-                            if item.state == "done" {
+                            if proposal {
+                                Text("\(index + 1).").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                            } else if item.state == "done" {
                                 Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundColor(FridayColor.text)
                             } else if item.state == "doing" {
                                 BuildOrb(size: 14)
@@ -113,6 +149,7 @@ private struct PlanCard: View {
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(FridayColor.surface)
         .cornerRadius(16)
+        .opacity(plan.status == "revised" ? 0.6 : 1)
     }
 }
 
@@ -159,6 +196,15 @@ struct BuildStepsCard: View {
     }
 
     var body: some View {
+        // A plan-round message (no build steps yet) is just the plan — no "0 steps" row under it.
+        if let plan = build.plan, build.steps.isEmpty, build.previewUrl == nil {
+            PlanCard(plan: plan)
+        } else {
+            stepsBody
+        }
+    }
+
+    private var stepsBody: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let plan = build.plan { PlanCard(plan: plan) }
             if streaming {

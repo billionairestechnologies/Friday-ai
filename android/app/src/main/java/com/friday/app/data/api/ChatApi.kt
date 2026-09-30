@@ -1,8 +1,6 @@
 package com.friday.app.data.api
 
 import com.friday.app.data.AgentStatus
-import com.friday.app.data.BuildPlan
-import com.friday.app.data.BuildPlanItem
 import com.friday.app.data.BuildStep
 import com.friday.app.data.ChatEvent
 import com.friday.app.data.Mode
@@ -28,10 +26,12 @@ object ChatApi {
     /** POST /api/chat/conversations — a real conversation id is required before streaming into it.
      *  [mode] "single" needs [modelId]/[providerSlug]; "auto"/"teamup" need neither — the backend
      *  picks/consults models itself for those. */
-    suspend fun createConversation(modelId: String? = null, providerSlug: String? = null, mode: String = "single"): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+    suspend fun createConversation(modelId: String? = null, providerSlug: String? = null, mode: String = "single", workspace: String? = null): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
         runCatching {
             val body = JSONObject().apply {
                 put("mode", mode)
+                // "build" = a Build workspace session: every message goes to the Build agent.
+                if (workspace == "build") put("workspace", "build")
                 if (mode == "single") {
                     if (!modelId.isNullOrBlank()) put("modelId", modelId)
                     if (!providerSlug.isNullOrBlank()) put("providerSlug", providerSlug)
@@ -176,16 +176,8 @@ object ChatApi {
                                     ),
                                 )
                                 "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))
-                                "plan" -> emit(
-                                    ChatEvent.Plan(
-                                        BuildPlan(
-                                            architecture = json.optString("architecture"),
-                                            items = json.optJSONArray("items")?.let { arr ->
-                                                (0 until arr.length()).map { k -> arr.getJSONObject(k).let { BuildPlanItem(it.optString("text"), it.optString("state")) } }
-                                            } ?: emptyList(),
-                                        ),
-                                    ),
-                                )
+                                "plan" -> com.friday.app.data.parseBuildPlan(json)?.let { emit(ChatEvent.Plan(it)) }
+                                "suggest_build" -> emit(ChatEvent.SuggestBuild(json.optString("prompt")))
                                 "build" -> emit(
                                     ChatEvent.BuildMeta(
                                         elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },

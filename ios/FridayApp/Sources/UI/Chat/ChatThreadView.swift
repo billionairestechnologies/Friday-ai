@@ -47,6 +47,10 @@ private struct MessageRow: View {
     let message: ChatMessage
     @State private var copied = false
 
+    private var isPlanRound: Bool {
+        message.build?.plan?.status != nil && message.content.hasPrefix(planMarker)
+    }
+
     var body: some View {
         if message.role == .user {
             HStack {
@@ -78,9 +82,15 @@ private struct MessageRow: View {
                     ThinkingPill(modes: message.modesUsed)
                 }
 
-                if !message.content.isEmpty {
+                // A plan-round message stores the marker + the plan as text (so the model sees it later);
+                // the plan card already shows all of it, so the text isn't repeated under it.
+                if !message.content.isEmpty && !isPlanRound {
                     MarkdownBody(text: message.content)
                         .transition(.opacity)
+                }
+
+                if !message.isStreaming, let prompt = message.suggestBuildPrompt {
+                    SuggestBuildCard(prompt: prompt)
                 }
 
                 if let ask = message.build?.ask, !ask.isEmpty {
@@ -91,7 +101,7 @@ private struct MessageRow: View {
                     ProjectZipCard(build: build, conversationId: conversationId)
                 }
 
-                if !message.content.isEmpty && !message.isStreaming {
+                if !message.content.isEmpty && !message.isStreaming && !isPlanRound {
                     HStack(spacing: 4) {
                         Button {
                             UIPasteboard.general.string = message.content

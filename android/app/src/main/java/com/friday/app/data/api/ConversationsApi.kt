@@ -1,8 +1,6 @@
 package com.friday.app.data.api
 
 import com.friday.app.data.BuildInfo
-import com.friday.app.data.BuildPlan
-import com.friday.app.data.BuildPlanItem
 import com.friday.app.data.BuildStep
 import com.friday.app.data.ChatMessage
 import com.friday.app.data.ChatThread
@@ -34,6 +32,8 @@ object ConversationsApi {
                         messages = emptyList(),
                         updatedAt = runCatching { java.time.Instant.parse(o.optString("updated_at")).toEpochMilli() }
                             .getOrDefault(System.currentTimeMillis()),
+                        workspace = o.optString("workspace").ifBlank { null },
+                        hasBuild = o.optBoolean("has_build", false),
                     )
                 }
             }
@@ -63,10 +63,7 @@ object ConversationsApi {
                     val build = buildObj?.let { b ->
                         val stepArr = b.optJSONArray("steps") ?: JSONArray()
                         BuildInfo(
-                            plan = b.optJSONObject("plan")?.let { po ->
-                                val arr = po.optJSONArray("items") ?: JSONArray()
-                                BuildPlan(po.optString("architecture"), (0 until arr.length()).map { k -> arr.getJSONObject(k).let { BuildPlanItem(it.optString("text"), it.optString("state")) } })
-                            },
+                            plan = com.friday.app.data.parseBuildPlan(b.optJSONObject("plan")),
                             ask = com.friday.app.data.parseBuildAsk(b.optJSONArray("ask")),
                             steps = (0 until stepArr.length()).map { k ->
                                 val st = stepArr.getJSONObject(k)
@@ -96,7 +93,9 @@ object ConversationsApi {
                         role = role,
                         content = if (errorText == null) rawContent else if (rawContent.isBlank()) errorText else "$rawContent\n\n$errorText",
                         sources = sources,
-                        build = build,
+                        // A suggestion-only build object (no steps/plan/ask) isn't a Build turn.
+                        build = build?.takeUnless { it.steps.isEmpty() && it.plan == null && it.ask.isEmpty() && it.previewUrl == null && it.zipBytes == null },
+                        suggestBuildPrompt = buildObj?.optJSONObject("suggestBuild")?.optString("prompt")?.ifBlank { null },
                     )
                 }
             }

@@ -12,7 +12,8 @@ struct DrawerPane: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
-                    navRow(icon: "square.and.pencil", label: "New chat") { vm.newChat() }
+                    navRow(icon: "square.and.pencil", label: "New chat") { vm.newChat(); vm.page = "chat" }
+                    navRow(icon: "hammer", label: "Build") { vm.newBuild(); vm.page = "chat" }
                     navRow(icon: "arrow.triangle.2.circlepath", label: "Automations") { vm.page = "automations" }
                     navRow(icon: "books.vertical", label: "Library") { vm.page = "library" }
                     navRow(icon: "folder", label: "Projects") { vm.page = "projects" }
@@ -20,7 +21,7 @@ struct DrawerPane: View {
                     navRow(icon: "questionmark.bubble", label: "Help & support") { openWeb("/?support=contact") }
                     navRow(icon: "waveform.path.ecg", label: "System status") { openWeb("/status") }
 
-                    Text("Conversations")
+                    Text(vm.workspace == "build" ? "Builds" : "Conversations")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(FridayColor.muted)
                         .padding(.top, 16).padding(.horizontal, 16).padding(.bottom, 4)
@@ -47,7 +48,7 @@ struct DrawerPane: View {
                     }
 
                     if filteredChats.isEmpty {
-                        Text(search.isEmpty ? "No conversations yet" : "No matching titles")
+                        Text(!search.isEmpty ? "No matching titles" : vm.workspace == "build" ? "No builds yet — describe an app to start one" : "No conversations yet")
                             .font(.system(size: 13))
                             .foregroundColor(FridayColor.muted)
                             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -136,7 +137,9 @@ struct DrawerPane: View {
     }
 
     private var filteredChats: [ChatThread] {
-        search.isEmpty ? vm.chats : vm.chats.filter { $0.title.localizedCaseInsensitiveContains(search) }
+        // Build sessions (and older chats that made a project) are listed under Build; chats under Chat.
+        let inWorkspace = vm.chats.filter { vm.workspace == "build" ? $0.isBuild : $0.workspace != "build" }
+        return search.isEmpty ? inWorkspace : inWorkspace.filter { $0.title.localizedCaseInsensitiveContains(search) }
     }
 
     private var header: some View {

@@ -121,6 +121,8 @@ fun ComposerBar(
     attachments: List<PendingAttachment> = emptyList(),
     onRemoveAttachment: (String) -> Unit = {},
     focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
+    /** Overrides the mode-based prompt text (Build workspace, a plan waiting for feedback). */
+    placeholder: String? = null,
 ) {
     val shape = RoundedCornerShape(ComposerCorner)
     val hasText = draft.trim().isNotEmpty()
@@ -224,7 +226,7 @@ fun ComposerBar(
                         Box {
                             if (draft.isEmpty()) {
                                 Text(
-                                    placeholderFor(modes),
+                                    placeholder ?: placeholderFor(modes),
                                     color = FridayMuted,
                                     fontSize = 16.sp,
                                 )
@@ -251,8 +253,12 @@ fun ComposerBar(
                         ModeChip(Icons.Outlined.Language, "Search", Mode.Search, FridaySearch, modes, onToggleMode)
                         ComposerDivider()
                         ModeChip(Icons.Outlined.Settings, "Think", Mode.Think, FridayThink, modes, onToggleMode)
-                        ComposerDivider()
-                        ModeChip(Icons.Outlined.Search, "Research", Mode.Research, FridayCanvas, modes, onToggleMode)
+                        // Deep Research is switched on from the "+" menu (like the web); the chip only
+                        // shows while it's on, so it's visible and one tap turns it off again.
+                        if (Mode.Research in modes) {
+                            ComposerDivider()
+                            ModeChip(Icons.Outlined.Search, "Research", Mode.Research, FridayCanvas, modes, onToggleMode)
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AnimatedVisibility(!hasText && modes.isEmpty(), enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {

@@ -207,6 +207,11 @@ fun FridayApp(
                         vm.newChat()
                         page = "chat"
                     },
+                    workspace = ui.workspace,
+                    onNewBuild = {
+                        vm.newBuild()
+                        page = "chat"
+                    },
                     onOpenChat = {
                         vm.openChat(it)
                         page = "chat"
@@ -465,6 +470,11 @@ fun FridayApp(
                         )
                     },
                     onPlugins = { vm.openSheet(Sheet.Plugins) },
+                    researchOn = Mode.Research in ui.modes,
+                    onToggleResearch = {
+                        vm.toggleMode(Mode.Research)
+                        vm.closeSheet()
+                    },
                 )
                 else -> {}
             }
@@ -724,7 +734,7 @@ private fun ChatShell(
                             .padding(horizontal = 28.dp),
                     ) {
                         Text(
-                            mainLineFor(ui.user?.name),
+                            if (ui.workspace == "build") "What should we build?" else mainLineFor(ui.user?.name),
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = FridayText,
@@ -733,7 +743,7 @@ private fun ChatShell(
                         )
                     }
                 } else {
-                    ChatThread(chat?.messages.orEmpty(), onOpenPreview = { buildOpen = true }, conversationId = chat?.id)
+                    ChatThread(chat?.messages.orEmpty(), onOpenPreview = { buildOpen = true }, conversationId = chat?.id, onOpenInBuild = vm::openInBuild)
                 }
             }
             Box(
@@ -787,7 +797,18 @@ private fun ChatShell(
                         onSubmit = { text -> dismissedAskFor = lastMsg.id; vm.send(text) },
                     )
                 }
+                val pendingPlan = lastMsg?.takeIf { it.role == com.friday.app.data.Role.Assistant && !it.isStreaming && it.build?.plan?.status == "pending" }
+                if (pendingPlan != null && !isGenerating) {
+                    com.friday.app.ui.chat.PlanApprovalBar(
+                        onApprove = vm::approvePlan,
+                        onRequestChanges = {
+                            composerFocus.requestFocus()
+                            keyboardController?.show()
+                        },
+                    )
+                }
                 ComposerBar(
+                    placeholder = if (pendingPlan != null) "Tell me what to change in the plan…" else if (ui.workspace == "build") "Describe what to build…" else null,
                     draft = ui.draft,
                     onDraft = vm::setDraft,
                     modes = ui.modes,

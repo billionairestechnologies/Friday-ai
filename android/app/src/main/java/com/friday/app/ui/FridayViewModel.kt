@@ -87,6 +87,9 @@ data class FridayUiState(
     /** Messages typed while a reply was still generating, per chat id. They send one at a time,
      *  in order, as each turn finishes. */
     val queued: Map<String, List<QueuedMessage>> = emptyMap(),
+    /** "chat" or "build" — which workspace the main screen is in. Build Mode only runs in "build"
+     *  (a new chat there is created as a Build session); the drawer lists that workspace's history. */
+    val workspace: String = "chat",
 )
 
 data class QueuedMessage(
@@ -521,7 +524,29 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun newChat() {
         cancelLocalStream()
-        _state.update { it.copy(currentId = null, draft = "", drawerOpen = false) }
+        _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "chat") }
+    }
+
+    /** Opens the Build workspace on a fresh build session (created on the first send). */
+    fun newBuild() {
+        cancelLocalStream()
+        _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "build") }
+    }
+
+    /** "Open in Build" under a normal-chat reply: a fresh Build session starting with that request.
+     *  Sending it only starts the question/plan round — nothing is built until the plan is approved. */
+    fun openInBuild(prompt: String) {
+        newBuild()
+        send(prompt)
+    }
+
+    /** "Approve & build" on a pending plan: mark it approved locally (the server does too) and go. */
+    fun approvePlan() {
+        val chatId = _state.value.currentId ?: return
+        val pending = _state.value.chats.find { it.id == chatId }?.messages?.lastOrNull()
+            ?.takeIf { it.role == Role.Assistant && !it.isStreaming && it.build?.plan?.status == "pending" } ?: return
+        patchMessage(chatId, pending.id) { m -> m.copy(build = m.build?.copy(plan = m.build.plan?.copy(status = "approved"))) }
+        send(com.friday.app.data.PLAN_APPROVE_TEXT)
     }
 
     fun openChat(id: String) {
@@ -533,6 +558,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                 currentId = id,
                 drawerOpen = false,
                 chats = s.chats.map { if (it.id == id) filled else it },
+                workspace = if (chat.workspace == "build") "build" else "chat",
             )
         }
         val chat = _state.value.chats.find { it.id == id }
@@ -660,7 +686,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         var chatId = existingChatId
         if (chatId == null) {
             chatId = "c-${System.currentTimeMillis()}"
-            val thread = ChatThread(id = chatId, title = titleFrom(text), messages = emptyList())
+            val thread = ChatThread(id = chatId, title = titleFrom(text), messages = emptyList(), workspace = _state.value.workspace.takeIf { it == "build" })
             _state.update { it.copy(chats = listOf(thread) + it.chats, currentId = chatId) }
         }
         val userMsg = ChatMessage(id = "u-${System.currentTimeMillis()}", role = Role.User, content = text, attachments = attachments)
@@ -695,7 +721,8 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         existingId
                     } else {
-                        ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode)
+                        val workspace = _state.value.chats.find { it.id == chatId }?.workspace
+                        ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode, workspace)
                             ?.also { conversationModels[it] = selectedId }
                     }
                     if (remoteId != null) {
@@ -767,6 +794,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         is ChatEvent.Ask -> patchMessage(chatId!!, asstId) { msg ->
                             msg.copy(build = (msg.build ?: BuildInfo()).copy(ask = event.questions))
+                        }
+                        is ChatEvent.SuggestBuild -> patchMessage(chatId!!, asstId) {
+                            it.copy(suggestBuildPrompt = event.prompt)
                         }
                         ChatEvent.Disconnected -> patchMessage(chatId!!, asstId) {
                             it.copy(disconnected = true)

@@ -59,8 +59,31 @@ data class BuildStep(
 /** One line of the Build Mode plan — todo | doing | done. */
 data class BuildPlanItem(val text: String, val state: String)
 
-/** Architecture + todo checklist Build Mode drafts before coding, updated live as items finish. */
-data class BuildPlan(val architecture: String, val items: List<BuildPlanItem>)
+/** Architecture + todo checklist Build Mode drafts before coding, updated live as items finish.
+ *  [summary] = plain-language "what I'll build"; [status] = the approval round: "pending" (waiting
+ *  for approve / changes), "approved", "revised" (replaced by a newer plan); null on older plans. */
+data class BuildPlan(
+    val architecture: String,
+    val items: List<BuildPlanItem>,
+    val summary: String? = null,
+    val status: String? = null,
+)
+
+/** The server stores a plan message as this line + the plan text; the thread shows only the card. */
+const val PLAN_MARKER = "Here's the plan. Approve it to start building, or tell me what to change."
+/** The Approve button sends exactly this (backend plan.ts keys off it). */
+const val PLAN_APPROVE_TEXT = "Approved — build it as planned."
+
+fun parseBuildPlan(po: org.json.JSONObject?): BuildPlan? {
+    if (po == null) return null
+    val arr = po.optJSONArray("items") ?: org.json.JSONArray()
+    return BuildPlan(
+        architecture = po.optString("architecture"),
+        items = (0 until arr.length()).map { k -> arr.getJSONObject(k).let { BuildPlanItem(it.optString("text"), it.optString("state")) } },
+        summary = po.optString("summary").ifBlank { null },
+        status = po.optString("status").ifBlank { null },
+    )
+}
 
 data class BuildAskOption(val label: String, val description: String, val recommended: Boolean)
 data class BuildAskQuestion(val id: String, val question: String, val options: List<BuildAskOption>)
@@ -116,6 +139,8 @@ data class ChatMessage(
      *  consulted, upserted by (slug, model) as its state changes. */
     val agents: List<AgentStatus> = emptyList(),
     val build: BuildInfo? = null,
+    /** Normal chat answered a build request — shows "Open in Build" carrying this prompt. */
+    val suggestBuildPrompt: String? = null,
 )
 
 enum class Role { User, Assistant }
@@ -125,7 +150,13 @@ data class ChatThread(
     val title: String,
     val messages: List<ChatMessage> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis(),
-)
+    /** "build" = a Build workspace session (listed under Build, every message goes to the Build agent). */
+    val workspace: String? = null,
+    /** Build Mode made a project in this chat (from before Build moved to its own tab) — also listed under Build. */
+    val hasBuild: Boolean = false,
+) {
+    val isBuild: Boolean get() = workspace == "build" || hasBuild
+}
 
 data class FridayUser(
     val name: String,
@@ -156,6 +187,8 @@ sealed class ChatEvent {
     data class Plan(val plan: BuildPlan) : ChatEvent()
     data class BuildMeta(val elapsedMs: Long?, val zipBytes: Long?, val zipName: String?) : ChatEvent()
     data class Ask(val questions: List<BuildAskQuestion>) : ChatEvent()
+    /** Normal chat got a build request: offer "Open in Build" (from {"t":"suggest_build",...}). */
+    data class SuggestBuild(val prompt: String) : ChatEvent()
     /** The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a
      *  server-side failure. The backend keeps generating and persists the full reply regardless
      *  (see activeGenerations.ts), so this must never overwrite whatever text already streamed in;

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material3.Icon
@@ -149,18 +150,22 @@ fun AttachSheet(
     onPhotos: () -> Unit,
     onFiles: () -> Unit,
     onPlugins: () -> Unit,
+    /** Deep Research on/off for the next message — same place as the web's "+" menu. */
+    researchOn: Boolean = false,
+    onToggleResearch: () -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
         AttachRow(Icons.Default.CameraAlt, "Camera", onCamera)
         AttachRow(Icons.Default.Photo, "Photos", onPhotos)
         AttachRow(Icons.AutoMirrored.Filled.InsertDriveFile, "Files", onFiles)
+        AttachRow(Icons.Default.TravelExplore, "Deep research", onToggleResearch, checked = researchOn)
         AttachRow(Icons.Default.Extension, "Plugins", onPlugins)
         Spacer(Modifier.height(8.dp))
     }
 }
 
 @Composable
-private fun AttachRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun AttachRow(icon: ImageVector, label: String, onClick: () -> Unit, checked: Boolean = false) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -176,7 +181,8 @@ private fun AttachRow(icon: ImageVector, label: String, onClick: () -> Unit) {
         ) {
             Icon(icon, null, tint = FridayText, modifier = Modifier.size(20.dp))
         }
-        Text(label, color = FridayText, fontSize = 17.sp)
+        Text(label, color = FridayText, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        if (checked) Icon(Icons.Default.Check, "On", tint = com.friday.app.ui.theme.FridayCanvas, modifier = Modifier.size(20.dp))
     }
 }
 

@@ -36,6 +36,9 @@ final class FridayViewModel: ObservableObject {
 
     // Navigation / UI
     @Published var page: String = "chat"
+    /// "chat" or "build" — which workspace the main screen is in. Build Mode only runs in "build"
+    /// (a new chat there is created as a Build session); the drawer lists that workspace's history.
+    @Published var workspace: String = "chat"
     @Published var drawerOpen = false
     /// Bumped to ask the composer to grab focus (swipe-up on the start screen opens the keyboard).
     @Published var composerFocusTick = 0
@@ -147,9 +150,11 @@ final class FridayViewModel: ObservableObject {
         for s in summaries {
             if var existing = chats.first(where: { $0.id == s.id }) {
                 existing.title = s.title
+                existing.workspace = s.workspace ?? existing.workspace
+                existing.hasBuild = s.hasBuild
                 next.append(existing)
             } else {
-                next.append(ChatThread(id: s.id, title: s.title))
+                next.append(ChatThread(id: s.id, title: s.title, workspace: s.workspace, hasBuild: s.hasBuild))
             }
         }
         // A chat being created/streamed locally isn't on the server list yet — dropping it would orphan the stream.
@@ -231,7 +236,7 @@ final class FridayViewModel: ObservableObject {
         var localId = chatId
         if localId == nil {
             localId = "c-\(Int(Date().timeIntervalSince1970 * 1000))"
-            chats.insert(ChatThread(id: localId!, title: titleFrom(text)), at: 0)
+            chats.insert(ChatThread(id: localId!, title: titleFrom(text), workspace: workspace == "build" ? "build" : nil), at: 0)
             currentId = localId
         }
         let workingId = localId!
@@ -289,7 +294,8 @@ final class FridayViewModel: ObservableObject {
                     }
                 }
             } else {
-                realId = try await ChatApi.createConversation(mode: mode, modelId: modelId, providerSlug: providerSlug)
+                let chatWorkspace = chats.first(where: { $0.id == localId })?.workspace
+                realId = try await ChatApi.createConversation(mode: mode, modelId: modelId, providerSlug: providerSlug, workspace: chatWorkspace)
                 conversationModels[realId] = selectedModelId
             }
         } catch {
@@ -371,6 +377,8 @@ final class FridayViewModel: ObservableObject {
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.ask = questions
             chats[ci].messages[mi].build = build
+        case .suggestBuild(let prompt):
+            chats[ci].messages[mi].suggestBuildPrompt = prompt.isEmpty ? nil : prompt
         case .buildMeta(let elapsedMs, let zipBytes, let zipName):
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.elapsedMs = elapsedMs
@@ -401,7 +409,7 @@ final class FridayViewModel: ObservableObject {
         chats.removeAll { $0.id == to }
         guard let idx = chats.firstIndex(where: { $0.id == from }) else { return }
         var chat = chats[idx]
-        let newChat = ChatThread(id: to, title: chat.title, messages: chat.messages, updatedAt: chat.updatedAt)
+        let newChat = ChatThread(id: to, title: chat.title, messages: chat.messages, updatedAt: chat.updatedAt, workspace: chat.workspace, hasBuild: chat.hasBuild)
         chats[idx] = newChat
         if let q = queued[from] { queued[from] = nil; queued[to] = q }
         if currentId == from { currentId = to }
@@ -425,11 +433,44 @@ final class FridayViewModel: ObservableObject {
     func newChat() {
         currentId = nil
         drawerOpen = false
+        workspace = "chat"
+    }
+
+    /// Opens the Build workspace on a fresh build session (created on the first send).
+    func newBuild() {
+        currentId = nil
+        drawerOpen = false
+        workspace = "build"
+    }
+
+    /// "Open in Build" under a normal-chat reply: a fresh Build session starting with that request.
+    /// Sending it only starts the question/plan round — nothing is built until the plan is approved.
+    func openInBuild(_ prompt: String) {
+        newBuild()
+        page = "chat"
+        send(text: prompt)
+    }
+
+    /// The newest message of the open chat, when it's a Build plan waiting for approve / changes.
+    var pendingPlanMessage: ChatMessage? {
+        guard let id = currentId, let last = chats.first(where: { $0.id == id })?.messages.last,
+              last.role == .assistant, !last.isStreaming, last.build?.plan?.status == "pending" else { return nil }
+        return last
+    }
+
+    /// "Approve & build" on a pending plan: mark it approved locally (the server does too) and go.
+    func approvePlan() {
+        guard let id = currentId, let pending = pendingPlanMessage,
+              let ci = chats.firstIndex(where: { $0.id == id }),
+              let mi = chats[ci].messages.firstIndex(where: { $0.id == pending.id }) else { return }
+        chats[ci].messages[mi].build?.plan?.status = "approved"
+        send(text: planApproveText)
     }
 
     func selectChat(_ id: String) {
         currentId = id
         drawerOpen = false
+        workspace = chats.first(where: { $0.id == id })?.workspace == "build" ? "build" : "chat"
         // Nothing else loads a synced chat's history on open — without this, a chat only ever
         // gets messages if a realtime event happens to arrive while this screen is on screen.
         guard UUID(uuidString: id) != nil, streamJobs[id] == nil else { return }
