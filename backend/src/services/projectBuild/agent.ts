@@ -16,6 +16,7 @@ import { buildToolset } from "../agent/toolset.js";
 import type { FridayTool } from "../agent/tools/types.js";
 import { recordAdminAuditLog } from "../usageService.js";
 import { SUMMARY_PROMPT, applySummary, planSummaryCut, renderTranscript, transcriptChars } from "./summarize.js";
+import { approvedPlanNote, isPlanApproval } from "./plan.js";
 
 // A native tool round can carry several calls (write 4 files at once), so the round budget goes
 // further than a text-protocol iteration did. The wall clock is the real ceiling; the sandbox TTL
@@ -46,18 +47,9 @@ const NATIVE_MAX_TOKENS = 16_000;
 const REFLECT_AT = 2;
 const STUCK_REPEATS = 5;
 
-const PLAN_PROMPT = `You are the tech lead of a coding agent that will build the user's request as a real, runnable project in a Linux sandbox (Node.js, npm, Python 3). Before any code is written, produce the plan. Reply in EXACTLY this format and nothing else:
-<architecture>
-3-8 short lines: the stack and why, the folder structure (key folders/files), how the pieces talk (ports: frontend 5173, API 4000 if any), and the main design decisions.
-</architecture>
-- [ ] first concrete step
-- [ ] second concrete step
-(5-9 checklist items in execution order: scaffold/config, each major feature or module, integration, then a final item "Run it, verify it in a browser and fix any issues". Concrete and short — each item one line.)
-If the user is asking to change/fix an existing project, keep the plan small and specific to that change.`;
-
 const BUILD_SYSTEM_PROMPT = `You are Friday's Build agent. You have a real Linux sandbox (Node.js LTS + npm, Python 3, git, curl, internet access) and you build the user's project inside it for real: write every file, install dependencies, run it, read the errors and fix them until it works. You are NOT limited to snippets — deliver a complete, runnable project with a proper folder structure.
 
-WORKFLOW (like a senior engineer): a PLAN (architecture + todo checklist) has already been drafted for you and is shown to the user. Execute it item by item. After you finish an item — or start the next one — send the checklist with updated markers so the user sees live progress:
+WORKFLOW (like a senior engineer): when an APPROVED PLAN (what to build + architecture + todo checklist) is included below, the user reviewed and approved exactly that plan — execute it item by item and don't drift from it. (Small follow-ups on an existing project come without a plan: just do them.) After you finish an item — or start the next one — send the checklist with updated markers so the user sees live progress:
 <friday-progress>
 - [x] finished item text
 - [~] item you are working on now
@@ -106,7 +98,7 @@ const NATIVE_BUILD_PROMPT = `You are Friday's Build agent — a senior software 
 
 THE LOOP — work like this until the job is truly done:
 1. Understand — for an existing project, explore before changing anything (list_files, grep, read_file) and follow its conventions.
-2. Plan — a plan (architecture + checklist) is below and is shown to the user. Keep it current with update_progress whenever an item starts or finishes (every item, same order and wording).
+2. Plan — when an APPROVED PLAN is below, the user approved exactly that: follow it and don't drift from it. Keep it current with update_progress whenever an item starts or finishes (every item, same order and wording).
 3. Build — write_file for new files or full rewrites, edit_file for targeted changes to existing files. Call several independent tools in the SAME turn when you can (e.g. write all the config + source files at once) — it is much faster.
 4. Run — run_command to install/build/test; start_server for web apps and APIs.
 5. Verify — read every result. For a web app call check_app after start_server; for an API curl its endpoints; run the project's own tests/build when it has them.
@@ -180,6 +172,9 @@ export async function runBuildAgent(opts: {
   budget?: (totalTokensSoFar: number) => Promise<string | null>;
   /** Rounds this user's plan allows (entitlement buildMaxRounds); default MAX_ITERATIONS. */
   maxRounds?: number;
+  /** The plan the user approved (plan.ts) — executed item by item and kept live as progress.
+   *  Absent for small follow-ups on an existing project, which run without a plan round. */
+  approvedPlan?: BuildPlan;
 }): Promise<BuildAgentResult> {
   const { userId, conversationId, onEvent, signal } = opts;
   // Plans buy longer runs: rounds come from the entitlement, and the wall clock stretches with them
@@ -220,7 +215,8 @@ export async function runBuildAgent(opts: {
   }
 
   let project = await getProject(conversationId);
-  const userRequestText = [...opts.history].reverse().find((m) => m.role === "user")?.content ?? "";
+  // The actual request — not the "Approved — build it as planned." click that started this run.
+  const userRequestText = [...opts.history].reverse().find((m) => m.role === "user" && !isPlanApproval(m.content))?.content ?? "";
 
   // "Work on github.com/owner/repo": a brand-new project whose request links a GitHub repo starts
   // from a clone of that repo instead of an empty folder.
@@ -416,7 +412,7 @@ export async function runBuildAgent(opts: {
   const emitPlan = () => {
     if (!plan) return;
     build.plan = plan;
-    onEvent({ t: "plan", architecture: plan.architecture, items: plan.items.map((i) => ({ ...i })) });
+    onEvent({ t: "plan", architecture: plan.architecture, summary: plan.summary, status: plan.status, items: plan.items.map((i) => ({ ...i })) });
   };
   const applyProgress = (body: string) => {
     if (!plan) return;
@@ -433,34 +429,12 @@ export async function runBuildAgent(opts: {
     });
     emitPlan();
   };
-  // A short follow-up on an existing project ("run it", "fix the header") needs no plan card.
-  const smallFollowUp =
-    existingFiles.length > 0 &&
-    userRequest.length <= 160 &&
-    !/\b(build|create|implement|redesign|rewrite|from scratch|integrate|add (a |an )?(new )?(page|feature|module|system|auth|login|dashboard|database))\b/i.test(userRequest);
-  try {
-    const planner = smallFollowUp ? null : opts.candidates[0];
-    if (planner) {
-      const adapter = getProviderAdapter(planner.slug);
-      const apiKey = await getWorkingKeyForProvider(planner.slug);
-      const planMessages: ChatMessage[] = [
-        { role: "system", content: `${PLAN_PROMPT}\n\n${stateNote}` },
-        ...opts.history.filter((m) => m.role !== "system").slice(-6),
-      ];
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("planning timed out")), 75_000));
-      const planText = await Promise.race([adapter.chat(apiKey, planner.modelId, planMessages), timeout]);
-      usage = mergeTokenUsage(usage, estimateTokenUsageFromText(planMessages.reduce((n, m) => n + m.content.length, 0), planText.length));
-      const architecture = planText.match(/<architecture>([\s\S]*?)<\/architecture>/i)?.[1]?.trim() ?? "";
-      const items = [...planText.matchAll(/^\s*[-*]\s*\[[ xX~]?\]\s*(.+)$/gm)].map((m) => m[1]!.trim()).filter(Boolean).slice(0, 12);
-      if (items.length >= 2) {
-        plan = { architecture, items: items.map((text, i) => ({ text, state: i === 0 ? "doing" : "todo" })) };
-        emitPlan();
-        planNote = `\n\nAPPROVED PLAN\nArchitecture:\n${architecture || "(none)"}\nTodo:\n${items.map((t) => `- [ ] ${t}`).join("\n")}`;
-        conversation[0] = { role: "system", content: `${conversation[0]!.content}${planNote}` };
-      }
-    }
-  } catch (err) {
-    console.error("[build] planning skipped:", err instanceof Error ? err.message : err);
+  // The plan was drafted and approved in an earlier turn (plan.ts) — execute exactly that one.
+  if (opts.approvedPlan) {
+    plan = { ...opts.approvedPlan, status: "approved", items: opts.approvedPlan.items.map((it, i) => ({ text: it.text, state: i === 0 ? "doing" : "todo" })) };
+    emitPlan();
+    planNote = approvedPlanNote(plan);
+    conversation[0] = { role: "system", content: `${conversation[0]!.content}${planNote}` };
   }
 
   // Save the project to our database as work progresses (not only at the end) so a dropped connection

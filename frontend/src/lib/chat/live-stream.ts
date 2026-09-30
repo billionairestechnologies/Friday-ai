@@ -20,6 +20,8 @@ export type LiveSnapshot = {
   buildStarted?: boolean;
   plan?: BuildPlan;
   files?: GeneratedFile[];
+  /** Normal chat answered a build request — committed onto the message as build.suggestBuild. */
+  suggestBuild?: { prompt: string };
 };
 
 type Draft = LiveSnapshot;
@@ -55,6 +57,7 @@ function emit(chatId: string) {
           buildStarted: draft.buildStarted,
           plan: draft.plan,
           files: draft.files?.slice(),
+          suggestBuild: draft.suggestBuild,
         }
       : null,
   );
@@ -131,6 +134,13 @@ export function setLivePlan(chatId: string, plan: BuildPlan) {
   const draft = drafts.get(chatId);
   if (!draft) return;
   draft.plan = plan;
+  emit(chatId);
+}
+
+export function setLiveSuggestBuild(chatId: string, prompt: string) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  draft.suggestBuild = { prompt };
   emit(chatId);
 }
 

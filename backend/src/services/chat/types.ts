@@ -10,7 +10,8 @@ export type StreamEvent =
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
-  | { t: "plan"; architecture: string; items: BuildPlanItem[] }
+  | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
+  | { t: "suggest_build"; prompt: string }
   | { t: "err"; c: string }
   | { t: "done" };
 
@@ -51,7 +52,15 @@ export type BuildStep = {
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
 
 /** The architecture + todo checklist Build Mode drafts before it starts (updated live as items finish). */
-export type BuildPlan = { architecture: string; items: BuildPlanItem[] };
+export type BuildPlan = {
+  architecture: string;
+  items: BuildPlanItem[];
+  /** Plain-language "what I'll build" for the user (plans drafted for approval; absent on older ones). */
+  summary?: string;
+  /** Approval round: "pending" = waiting for the user; "approved" = the build ran it; "revised" = a
+   *  newer plan replaced it. Absent = drafted and executed in one go (older messages). */
+  status?: "pending" | "approved" | "revised";
+};
 
 /** A clarifying question Build Mode asks before it starts. The first option is the recommended one;
  *  the client always adds a free-text "Other" after the listed options. */
@@ -72,4 +81,7 @@ export type BuildMeta = {
   zipName?: string;
   /** Pull request opened by the agent (GitHub-imported projects). */
   prUrl?: string;
+  /** A normal-chat reply to something that looked like a build request: Build Mode only runs in the
+   *  Build workspace, so the client offers "Open in Build" with this prompt. */
+  suggestBuild?: { prompt: string };
 };

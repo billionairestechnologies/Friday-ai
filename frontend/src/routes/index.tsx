@@ -10,7 +10,7 @@ import { useGreeting, useHeroLine } from "@/hooks/use-greeting";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { addLiveFile, applyLive, applyLiveStep, clearLive, markLiveCanvasOn, peekLive, setLiveBuildMeta, setLivePlan, setLivePreview, startLive } from "@/lib/chat/live-stream";
+import { addLiveFile, applyLive, applyLiveStep, clearLive, markLiveCanvasOn, peekLive, setLiveBuildMeta, setLivePlan, setLivePreview, setLiveSuggestBuild, startLive } from "@/lib/chat/live-stream";
 import { beginStream, endStream, isStreamActive, stopStream } from "@/lib/chat/active-streams";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/chat/models";
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
@@ -19,6 +19,8 @@ import { useChat, type ServerConversation, type ServerMessage } from "@/lib/chat
 import { extractArtifact } from "@/lib/chat/artifact";
 import type { AskQuestion, ChatMessage } from "@/lib/chat/types";
 import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
+import { PlanApprovalPanel, PLAN_APPROVE_TEXT, PLAN_MARKER } from "@/components/plan-approval";
+import { takeBuildHandoff } from "@/lib/chat/build-handoff";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
@@ -88,6 +90,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     return last && !last.streaming && last.build?.ask?.length ? { id: last.id, questions: last.build.ask } : null;
   }, [lastAssistantMessage]);
   const [dismissedAsk, setDismissedAsk] = useState<string | null>(null);
+  // Build plan round: the newest message is a plan waiting for approve / request changes.
+  const pendingPlan = useMemo(() => {
+    const last = lastAssistantMessage;
+    return last && !last.streaming && last.build?.plan?.status === "pending" ? last : null;
+  }, [lastAssistantMessage]);
   const queued = useQueue((s) => (activeId ? s.byChat[activeId] : undefined)) ?? [];
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -125,6 +132,15 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     const active = s.chats.find((c) => c.id === s.activeId);
     if (active && (active.workspace === "build") !== buildMode) s.newChat();
   }, [workspace, buildMode, conversationId]);
+
+  // "Open in Build" from a normal chat: the workspace starts a fresh build session with that request.
+  // Sending it only starts the question/plan round — nothing is built until the plan is approved.
+  useEffect(() => {
+    if (!buildMode || conversationId || !available || isPending || !user) return;
+    const prompt = takeBuildHandoff();
+    if (prompt) void send(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildMode, conversationId, available, isPending, user]);
 
   // The Build workspace docks the project panel (preview / files / terminal) on the right as soon as
   // there is something to show — on desktop only; on mobile it's a full-screen overlay the user opens.
@@ -364,7 +380,8 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
           applyLiveStep(chatId, step);
         }
         else if (ev.t === "ask") askQuestions = ev.questions;
-        else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items });
+        else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items, summary: ev.summary, status: ev.status });
+        else if (ev.t === "suggest_build") setLiveSuggestBuild(chatId, ev.prompt);
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });
         else if (ev.t === "preview") {
           setLivePreview(chatId, ev.url, ev.port);
@@ -388,7 +405,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       else await batch.drain();
       const live = peekLive(chatId);
       useChat.getState().commitTurn(chatId, assistantId, {
-        content: live?.text || (askQuestions ? ASK_MARKER : ""),
+        content: live?.text || (askQuestions ? ASK_MARKER : live?.plan?.status === "pending" ? PLAN_MARKER : ""),
         thinking: live?.think,
         citations: live?.cites,
         agents: live?.agents,
@@ -404,6 +421,8 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
           ? { steps: [], ask: askQuestions }
           : live && (live.steps.length || live.preview || live.plan)
           ? { plan: live.plan, steps: live.steps, previewUrl: live.preview?.url, port: live.preview?.port, ...live.meta }
+          : live?.suggestBuild
+          ? { steps: [], suggestBuild: live.suggestBuild }
           : undefined,
       });
       clearLive(chatId);
@@ -419,6 +438,20 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     // The server keeps generating after a disconnect, so aborting the fetch is no longer enough.
     const conversationId = useChat.getState().chats.find((c) => c.id === activeId)?.conversationId;
     if (conversationId) void api.post(`/chat/conversations/${conversationId}/stop`, {}).catch(() => {});
+  }
+
+  function approvePlan() {
+    if (!pendingPlan || !activeId) return;
+    // The server marks it approved too (plan.ts); mirror it so the card's badge updates right away.
+    const id = pendingPlan.id;
+    useChat.setState((st) => ({
+      chats: st.chats.map((c) =>
+        c.id !== activeId
+          ? c
+          : { ...c, messages: c.messages.map((m) => (m.id === id && m.build?.plan ? { ...m, build: { ...m.build, plan: { ...m.build.plan, status: "approved" as const } } } : m)) },
+      ),
+    }));
+    void send(PLAN_APPROVE_TEXT);
   }
 
   function usePrompt(text: string) {
@@ -603,11 +636,18 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   {pendingAsk && dismissedAsk !== pendingAsk.id && (
                     <AskPanel questions={pendingAsk.questions} onSubmit={(text) => void send(text)} onDismiss={() => setDismissedAsk(pendingAsk.id)} />
                   )}
+                  {pendingPlan && !streaming && (
+                    <PlanApprovalPanel
+                      onApprove={approvePlan}
+                      onRequestChanges={() => document.querySelector<HTMLTextAreaElement>("textarea")?.focus()}
+                    />
+                  )}
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
                     streaming={streaming}
                     disabled={!available}
+                    placeholder={pendingPlan ? "Tell me what to change in the plan…" : undefined}
                   />
                   <p className="pt-2 pb-1 text-center text-xs text-subtle">
                     Friday can be wrong. Check anything important.

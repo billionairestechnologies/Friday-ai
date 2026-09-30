@@ -307,24 +307,41 @@ function currentActivity(steps: BuildStep[]): string | null {
   return null;
 }
 
-/** The architecture + todo checklist Build Mode drafts before coding, ticked off live as items finish. */
-function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
-  const [showArch, setShowArch] = useState(false);
+/** The plan Build Mode drafts before coding. As a proposal (status pending/revised, nothing built yet)
+ *  it reads as a full plan to judge — what gets built, the architecture, numbered steps; once a build
+ *  runs it becomes the live checklist, ticked off as items finish. */
+export function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
+  const proposal = plan.status === "pending" || plan.status === "revised" || (plan.status === "approved" && plan.items.every((i) => i.state === "todo"));
+  const [showArch, setShowArch] = useState(plan.status === "pending");
   const done = plan.items.filter((i) => i.state === "done").length;
+  const badge =
+    plan.status === "pending" ? "Waiting for your approval" : plan.status === "revised" ? "Replaced by a newer plan" : plan.status === "approved" && proposal ? "Approved" : null;
   return (
-    <div className="mb-3 w-full rounded-2xl border border-border bg-composer px-4 py-3">
+    <div className={cn("mb-3 w-full rounded-2xl border border-border bg-composer px-4 py-3", plan.status === "revised" && "opacity-60")}>
       <div className="flex items-center gap-2 text-sm font-semibold">
-        <ListChecks className="size-4" /> Plan
-        <span className="ml-auto text-xs font-normal text-muted">
-          {done}/{plan.items.length}
-        </span>
+        <ListChecks className="size-4" /> {proposal ? "Build plan" : "Plan"}
+        {badge ? (
+          <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium", plan.status === "pending" ? "bg-foreground text-background" : "bg-chip text-muted")}>{badge}</span>
+        ) : (
+          <span className="ml-auto text-xs font-normal text-muted">
+            {done}/{plan.items.length}
+          </span>
+        )}
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-chip">
-        <div className="h-full rounded-full bg-foreground transition-all duration-500" style={{ width: `${(done / plan.items.length) * 100}%` }} />
-      </div>
+      {!proposal && (
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-chip">
+          <div className="h-full rounded-full bg-foreground transition-all duration-500" style={{ width: `${(done / plan.items.length) * 100}%` }} />
+        </div>
+      )}
+      {plan.summary && (
+        <div className="mt-3">
+          <p className="text-xs font-medium text-subtle">What I'll build</p>
+          <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-foreground">{plan.summary}</p>
+        </div>
+      )}
       {plan.architecture && (
-        <div className="mt-2">
-          <button type="button" onClick={() => setShowArch((v) => !v)} className="flex items-center gap-1 text-xs text-muted hover:text-foreground">
+        <div className="mt-3">
+          <button type="button" onClick={() => setShowArch((v) => !v)} className="flex items-center gap-1 text-xs font-medium text-subtle hover:text-foreground">
             Architecture <ChevronRight className={cn("size-3 transition-transform", showArch && "rotate-90")} />
           </button>
           <Collapse open={showArch}>
@@ -332,11 +349,14 @@ function PlanCard({ plan }: { plan: NonNullable<BuildInfo["plan"]> }) {
           </Collapse>
         </div>
       )}
-      <ul className="mt-2 space-y-1">
+      {proposal && <p className="mt-3 text-xs font-medium text-subtle">Steps</p>}
+      <ul className={cn("space-y-1", proposal ? "mt-1" : "mt-2")}>
         {plan.items.map((item, i) => (
           <li key={i} className="flex items-start gap-2 text-sm">
             <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
-              {item.state === "done" ? (
+              {proposal ? (
+                <span className="text-xs text-subtle tabular-nums">{i + 1}.</span>
+              ) : item.state === "done" ? (
                 <span className="plan-check flex size-4 items-center justify-center rounded-full bg-foreground text-background">
                   <Check className="size-3" strokeWidth={3} />
                 </span>
@@ -439,6 +459,8 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
       </div>
     );
   }
+
+  if (build.plan && build.steps.length === 0 && !build.previewUrl) return <PlanCard plan={build.plan} />;
 
   const seconds = build.elapsedMs != null ? build.elapsedMs / 1000 : 0;
   return (

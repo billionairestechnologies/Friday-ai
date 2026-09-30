@@ -45,11 +45,12 @@ import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
+import { PLAN_MARKER, draftPlan, findPendingPlan, isPlanApproval, needsPlan, renderPlan, setPlanStatus } from "../projectBuild/plan.js";
 import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
-import type { ConversationMode, StreamEvent } from "./types.js";
+import type { BuildPlan, ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
@@ -251,11 +252,17 @@ export async function streamMessage(
     // Long-term memory rides along on every turn (all modes); loaded in parallel, never fatal.
     const memoryPromptPromise = loadMemoryPrompt(userId);
     effectivePlanPromise.catch(() => {}); // surfaced where it is awaited; avoids an unhandled rejection on early returns
+    // Build Mode runs only in the Build workspace. In normal chat a build-shaped request gets an
+    // ordinary answer plus an "Open in Build" offer (suggestBuild) — except in an older chat that
+    // already has a project from before the split, which keeps building where it started.
+    const chatBuildable = !buildWorkspace && !canvas && !research && mode !== "teamup";
+    const chatProjectPromise = chatBuildable ? getProject(conversationId).catch(() => null) : Promise.resolve(null);
     const buildIntentPromise: Promise<boolean> = buildWorkspace
       ? Promise.resolve(true)
-      : !canvas && !research && mode !== "teamup"
-        ? getProject(conversationId).then((project) => detectBuildIntent(content, Boolean(project))).catch(() => false)
-        : Promise.resolve(false);
+      : chatProjectPromise.then((project) => (project ? detectBuildIntent(content, true) : false)).catch(() => false);
+    const suggestBuildPromise: Promise<boolean> = chatBuildable
+      ? chatProjectPromise.then((project) => (project ? false : detectBuildIntent(content, false))).catch(() => false)
+      : Promise.resolve(false);
     void recordUsageEvent(userId, "chat_message", 1, { mode, inputMode });
     if (attachments.length > 0) {
       void recordUsageEvent(userId, "attachment_upload", attachments.length, {
@@ -613,25 +620,74 @@ export async function streamMessage(
         onEvent({ t: "done" });
         return;
       }
-      // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode.
-      onEvent({ t: "status", s: "building" });
+      onEvent({ t: "status", s: "thinking" });
       // A real build (and the judgment call on whether to ask first) needs a frontier-grade model,
       // not whatever Auto ranked first for a plain chat reply — same bias as Deep Research.
       const buildWorthy = candidates.filter(isFrontierModel);
       if (buildWorthy.length > 0) candidates = buildWorthy;
-      // A brand-new project (no files yet, no question round yet) may be missing details that change
-      // what gets built — ask first, with a recommended option per question, instead of guessing.
-      if (!alreadyAsked(history) && Object.keys((await getProject(conversationId))?.files ?? {}).length === 0) {
-        const questions = await clarifyRequest(history, candidates);
-        if (questions.length > 0 && !signal?.aborted) {
-          onEvent({ t: "ask", questions });
-          await insertAssistantMessage(conversationId, ASK_MARKER, "Build", { usedCanvas: false, usedSearch: false, usedThink: false, build: { steps: [], ask: questions } });
+      const projectFiles = Object.keys((await getProject(conversationId))?.files ?? {});
+      const pendingPlan = await findPendingPlan(conversationId);
+      let approvedPlan: BuildPlan | undefined;
+      if (pendingPlan && isPlanApproval(content)) {
+        // The user approved the plan on screen: build exactly that.
+        approvedPlan = pendingPlan.plan;
+        await setPlanStatus(pendingPlan.messageId, pendingPlan.plan, "approved");
+      } else if (pendingPlan || needsPlan(projectFiles.length, content)) {
+        // A brand-new project (no files yet, no question round yet) may be missing details that change
+        // what gets built — ask first, with a recommended option per question, instead of guessing.
+        if (!pendingPlan && !alreadyAsked(history) && projectFiles.length === 0) {
+          const questions = await clarifyRequest(history, candidates);
+          if (questions.length > 0 && !signal?.aborted) {
+            onEvent({ t: "ask", questions });
+            await insertAssistantMessage(conversationId, ASK_MARKER, "Build", { usedCanvas: false, usedSearch: false, usedThink: false, build: { steps: [], ask: questions } });
+            await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+            onEvent({ t: "done" });
+            return;
+          }
+        }
+        // Plan round: draft (or, when a plan is waiting, revise it with this message as the feedback)
+        // and stop. Nothing is built — no sandbox, no cost — until the user approves.
+        const stateNote = projectFiles.length
+          ? `EXISTING PROJECT (${projectFiles.length} files): ${projectFiles.slice(0, 60).join(", ")}${projectFiles.length > 60 ? ", …" : ""}.`
+          : "This is a new, empty project.";
+        const drafted = await draftPlan({
+          history,
+          candidates,
+          stateNote,
+          ...(pendingPlan ? { revise: { plan: pendingPlan.plan, feedback: content } } : {}),
+        });
+        if (drafted && !signal?.aborted) {
+          if (pendingPlan) await setPlanStatus(pendingPlan.messageId, pendingPlan.plan, "revised");
+          const { plan } = drafted;
+          onEvent({ t: "plan", architecture: plan.architecture, summary: plan.summary, status: plan.status, items: plan.items });
+          await insertAssistantMessage(conversationId, `${PLAN_MARKER}\n\n${renderPlan(plan)}`, "Build", {
+            usedCanvas: false,
+            usedSearch: false,
+            usedThink: false,
+            build: { steps: [], plan },
+          });
           await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+          const planner = candidates[0];
+          if (planner) {
+            reconcileTokens = drafted.usage.totalTokens;
+            void recordTokenUsage(userId, planner.slug, planner.modelId, drafted.usage, { conversationId, mode });
+            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0);
+          }
           onEvent({ t: "done" });
           return;
         }
+        if (pendingPlan) {
+          // Couldn't revise it — keep the current plan on screen rather than building something unapproved.
+          onEvent({ t: "err", c: "Couldn't update the plan just now. Try again, or approve the current plan to start." });
+          onEvent({ t: "done" });
+          return;
+        }
+        // No usable plan from the model: build anyway rather than leave the user stuck.
       }
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds });
+      // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
+      // only now, not during a question/plan round, which never touches the sandbox.
+      onEvent({ t: "status", s: "building" });
+      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });
         onEvent({ t: "done" });
@@ -662,6 +718,20 @@ export async function streamMessage(
       if (built.error) onEvent({ t: "err", c: built.error });
       onEvent({ t: "done" });
       return;
+    }
+
+    // A build-shaped request in normal chat: Build Mode lives in the Build workspace now, so answer
+    // it here as a normal reply and offer to take it there (the client renders "Open in Build").
+    const suggestBuild = await suggestBuildPromise;
+    if (suggestBuild) {
+      onEvent({ t: "suggest_build", prompt: content });
+      history.push({
+        role: "system",
+        volatile: true,
+        content:
+          "This message asks for a real project to be built. Friday's Build workspace (the Build tab in the sidebar) is where that happens: it plans the project, the user approves the plan, then it writes the code, runs it in a sandbox and shows a live preview. " +
+          "In this chat, help directly — outline the approach, or give the code if it's small — and keep it reasonably short. The app shows an \"Open in Build\" button under your reply, so you don't need to explain how to get there beyond one short line.",
+      });
     }
 
     // Non-build tasks can hide missing specifics too — who to send/message, a real date or name,
@@ -834,7 +904,15 @@ export async function streamMessage(
       usedThink: think || Boolean(thinking),
       usedSearch: searchActuallyRan || extraCitations.length > 0,
       usedCanvas: canvas,
-      ...(toolSteps.length ? { build: { steps: toolSteps, elapsedMs: Date.now() - toolStarted } } : {}),
+      ...(toolSteps.length || suggestBuild
+        ? {
+            build: {
+              steps: toolSteps,
+              ...(toolSteps.length ? { elapsedMs: Date.now() - toolStarted } : {}),
+              ...(suggestBuild ? { suggestBuild: { prompt: content.slice(0, 4000) } } : {}),
+            },
+          }
+        : {}),
       ...(toolRun?.error ? { error: toolRun.error } : {}),
       ...(createdFiles.length ? { files: createdFiles } : {}),
     });

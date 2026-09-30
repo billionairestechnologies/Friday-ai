@@ -51,7 +51,15 @@ export type BuildStep = {
 };
 
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
-export type BuildPlan = { architecture: string; items: BuildPlanItem[] };
+export type BuildPlan = {
+  architecture: string;
+  items: BuildPlanItem[];
+  /** Plain-language "what I'll build" (plans drafted for approval; absent on older ones). */
+  summary?: string;
+  /** Approval round: "pending" = waiting for the user to approve or ask for changes; "approved" =
+   *  the build ran it; "revised" = a newer plan replaced it. Absent on older messages. */
+  status?: "pending" | "approved" | "revised";
+};
 
 /** What Build Mode did for a message: the steps it ran and the live preview it produced. */
 export type AskOption = { label: string; description?: string; recommended?: boolean };
@@ -69,6 +77,8 @@ export type BuildInfo = {
   zipName?: string;
   /** Pull request Build Mode opened (GitHub-imported projects). */
   prUrl?: string;
+  /** Normal chat answered a build-shaped request — offer "Open in Build" with this prompt. */
+  suggestBuild?: { prompt: string };
 };
 
 /** A file Friday generated for this reply (create_document) — shown as a download card. */
@@ -133,6 +143,7 @@ export type StreamEvent =
   | { t: "preview"; url: string; port: number }
   | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
   | { t: "ask"; questions: AskQuestion[] }
-  | { t: "plan"; architecture: string; items: BuildPlanItem[] }
+  | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
+  | { t: "suggest_build"; prompt: string }
   | { t: "err"; c: string }
   | { t: "done" };

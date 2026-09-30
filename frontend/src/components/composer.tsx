@@ -8,6 +8,8 @@ type ComposerProps = {
   onStop: () => void;
   streaming: boolean;
   disabled?: boolean;
+  /** Overrides the default prompt text, e.g. while a Build plan waits for feedback. */
+  placeholder?: string;
 };
 
 export function Composer({
@@ -15,6 +17,7 @@ export function Composer({
   onStop,
   streaming,
   disabled,
+  placeholder,
 }: ComposerProps) {
   const think = useChat((s) => s.think);
   const setThink = useChat((s) => s.setThink);
@@ -28,7 +31,6 @@ export function Composer({
   const setModel = useChat((s) => s.setModel);
   const activeSkill = useChat((s) => s.activeSkill);
   const setActiveSkill = useChat((s) => s.setActiveSkill);
-  const openPlugins = useChat((s) => s.openPlugins);
 
   return (
     <>
@@ -60,8 +62,7 @@ export function Composer({
       onModelChange={setModel}
       onStop={onStop}
       onSend={onSend}
-      onOpenSkills={() => openPlugins("skills")}
-      placeholder="What do you want to know?"
+      placeholder={placeholder ?? "What do you want to know?"}
     />
     </>
   );

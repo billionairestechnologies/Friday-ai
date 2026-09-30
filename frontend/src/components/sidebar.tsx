@@ -13,7 +13,6 @@ import {
   Trash2,
   Workflow,
   X,
-  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
@@ -384,14 +383,6 @@ export function Sidebar() {
               Team
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => openPlugins("skills")}
-            className="flex h-10 w-full items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted transition-colors hover:bg-chip-on hover:text-foreground"
-          >
-            <Sparkles className="size-4" />
-            Skills
-          </button>
           <button
             type="button"
             onClick={() => openPlugins("connectors")}

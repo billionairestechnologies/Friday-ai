@@ -10,6 +10,7 @@ import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan, toolOnlySteps } from "@/lib/chat/planning";
 import { useChat } from "@/lib/chat/store";
 import { AskCard } from "@/components/ask-panel";
+import { PLAN_MARKER, SuggestBuildCard } from "@/components/plan-approval";
 import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
 import { FileCards } from "@/components/file-card";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
@@ -200,6 +201,9 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
           into the chat bubble too was redundant clutter, so it's cut out here (see
           stripVisualArtifactForChat's own comment; no-op for any other kind of reply). */}
       {(() => {
+        // A plan-round message stores the marker + the plan as text (so the model sees it on later
+        // turns); the plan card above already shows all of it, so the text itself isn't repeated.
+        if (message.build?.plan?.status && message.content.startsWith(PLAN_MARKER)) return null;
         const displayContent = message.content ? stripVisualArtifactForChat(message.content) : "";
         if (displayContent) {
           return <StreamingMarkdown text={displayContent} streaming={Boolean(message.streaming)} />;
@@ -217,6 +221,8 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
       )}
 
       {message.files?.length ? <FileCards files={message.files} /> : null}
+
+      {message.build?.suggestBuild && !message.streaming && <SuggestBuildCard prompt={message.build.suggestBuild.prompt} />}
 
       {message.build?.zipBytes && !message.streaming && <ProjectZipCard build={message.build} conversationId={conversationId} />}
 
