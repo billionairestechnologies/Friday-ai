@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronDown, ChevronRight, ExternalLink, GitBranch, GitPullRequest, Github, Gauge, Hammer, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, GitBranch, GitPullRequest, Github, Gauge, Hammer, ShieldCheck, X } from "lucide-react";
 import { STATUS_META, relativeTime, useBuildSessions, type BuildSession } from "@/lib/build-mode/sessions";
-import { EFFORT_OPTIONS, useBuildPrefs } from "@/lib/build-mode/prefs";
+import { EFFORT_OPTIONS, PERMISSION_OPTIONS, useBuildPrefs } from "@/lib/build-mode/prefs";
 import { useChat } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 
@@ -195,14 +195,26 @@ export function BuildRepoChip({ repo, onChange }: { repo: string | null; onChang
   );
 }
 
-/** Under the Build composer: effort picker (the model picker lives in the composer itself). */
-export function BuildComposerFooter() {
-  const effort = useBuildPrefs((s) => s.effort);
-  const setEffort = useBuildPrefs((s) => s.setEffort);
+/** A small dropdown in the Build composer footer (permission mode, effort). */
+function FooterPicker<T extends string>({
+  icon: Icon,
+  value,
+  options,
+  onChange,
+  suffix = "",
+  align = "right",
+}: {
+  icon: typeof Gauge;
+  value: T;
+  options: { id: T; label: string; hint: string }[];
+  onChange: (v: T) => void;
+  suffix?: string;
+  align?: "left" | "right";
+}) {
   const [open, setOpen] = useState(false);
-  const current = EFFORT_OPTIONS.find((o) => o.id === effort)!;
+  const current = options.find((o) => o.id === value) ?? options[0]!;
   return (
-    <div className="relative flex items-center justify-end gap-2 pt-1.5 text-xs text-muted">
+    <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -210,23 +222,24 @@ export function BuildComposerFooter() {
         aria-expanded={open}
         className="inline-flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-chip hover:text-foreground"
       >
-        <Gauge className="size-3.5" /> {current.label} effort <ChevronDown className="size-3" />
+        <Icon className="size-3.5" /> {current.label}
+        {suffix} <ChevronDown className="size-3" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <ul role="listbox" className="absolute right-0 bottom-9 z-30 w-60 rounded-xl border border-border bg-elevated p-1 shadow-[var(--shadow-panel)]">
-            {EFFORT_OPTIONS.map((o) => (
+          <ul role="listbox" className={cn("absolute bottom-9 z-30 w-64 rounded-xl border border-border bg-elevated p-1 shadow-[var(--shadow-panel)]", align === "right" ? "right-0" : "left-0")}>
+            {options.map((o) => (
               <li key={o.id}>
                 <button
                   type="button"
                   role="option"
-                  aria-selected={o.id === effort}
+                  aria-selected={o.id === value}
                   onClick={() => {
-                    setEffort(o.id);
+                    onChange(o.id);
                     setOpen(false);
                   }}
-                  className={cn("flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-chip", o.id === effort && "bg-chip")}
+                  className={cn("flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-chip", o.id === value && "bg-chip")}
                 >
                   <span className="text-sm text-foreground">{o.label}</span>
                   <span className="text-xs text-muted">{o.hint}</span>
@@ -236,6 +249,21 @@ export function BuildComposerFooter() {
           </ul>
         </>
       )}
+    </div>
+  );
+}
+
+/** Under the Build composer: permission mode (left) and effort (right) — the model picker lives in
+ *  the composer itself. */
+export function BuildComposerFooter() {
+  const effort = useBuildPrefs((s) => s.effort);
+  const setEffort = useBuildPrefs((s) => s.setEffort);
+  const permissionMode = useBuildPrefs((s) => s.permissionMode);
+  const setPermissionMode = useBuildPrefs((s) => s.setPermissionMode);
+  return (
+    <div className="flex items-center justify-between gap-2 pt-1.5 text-xs text-muted">
+      <FooterPicker icon={ShieldCheck} value={permissionMode} options={PERMISSION_OPTIONS} onChange={setPermissionMode} align="left" />
+      <FooterPicker icon={Gauge} value={effort} options={EFFORT_OPTIONS} onChange={setEffort} suffix=" effort" />
     </div>
   );
 }

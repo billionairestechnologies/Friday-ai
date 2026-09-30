@@ -144,8 +144,23 @@ private struct ChatShell: View {
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
 
+                    if let id = vm.currentId, let approval = vm.approvals[id]?.last {
+                        ApprovalBar(approval: approval).padding(.horizontal, 12)
+                    }
+
                     if vm.workspace == "build" {
-                        BuildEffortChip().padding(.horizontal, 16)
+                        HStack(spacing: 8) {
+                            BuildPermissionChip()
+                            BuildEffortChip()
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .task(id: vm.currentId) {
+                            while !Task.isCancelled {
+                                await vm.pollApprovals()
+                                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                            }
+                        }
                     }
 
                     ComposerBar()

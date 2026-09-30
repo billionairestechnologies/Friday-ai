@@ -74,6 +74,26 @@ fun parseBuildStep(st: org.json.JSONObject): BuildStep = BuildStep(
     removed = if (st.has("removed")) st.optInt("removed") else null,
 )
 
+/** A Build permission prompt (backend projectBuild/approvals.ts). kind: file | command | connector | pr;
+ *  state: pending | allowed | denied. [always] = asks even in Full auto. */
+data class BuildApproval(
+    val id: String,
+    val kind: String,
+    val title: String,
+    val detail: String?,
+    val always: Boolean,
+    val state: String,
+)
+
+fun parseBuildApproval(o: org.json.JSONObject, defaultState: String = "pending") = BuildApproval(
+    id = o.optString("id"),
+    kind = o.optString("kind"),
+    title = o.optString("title"),
+    detail = o.optString("detail").ifBlank { null },
+    always = o.optBoolean("always", false),
+    state = o.optString("state").ifBlank { defaultState },
+)
+
 /** One row of the Build home / drawer (backend GET /api/build/sessions). status: running |
  *  needs_input | done | error | idle. */
 data class BuildSessionSummary(
@@ -219,6 +239,8 @@ sealed class ChatEvent {
     data class Ask(val questions: List<BuildAskQuestion>) : ChatEvent()
     /** Normal chat got a build request: offer "Open in Build" (from {"t":"suggest_build",...}). */
     data class SuggestBuild(val prompt: String) : ChatEvent()
+    /** Build permission prompt: pending until the user answers (from {"t":"approval",...}). */
+    data class Approval(val approval: BuildApproval) : ChatEvent()
     /** The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a
      *  server-side failure. The backend keeps generating and persists the full reply regardless
      *  (see activeGenerations.ts), so this must never overwrite whatever text already streamed in;

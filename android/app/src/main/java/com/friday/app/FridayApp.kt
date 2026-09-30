@@ -818,8 +818,21 @@ private fun ChatShell(
                         },
                     )
                 }
+                val pendingApproval = ui.currentId?.let { ui.approvals[it] }?.lastOrNull()
+                if (pendingApproval != null) {
+                    com.friday.app.ui.chat.ApprovalBar(pendingApproval, ui.approvalError, onDecide = vm::answerApproval)
+                }
                 if (ui.workspace == "build") {
-                    com.friday.app.ui.buildmode.BuildEffortChip(effort = ui.buildEffort, onChange = vm::setBuildEffort)
+                    LaunchedEffect(ui.currentId) {
+                        while (true) {
+                            vm.pollApprovals()
+                            kotlinx.coroutines.delay(4000)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.friday.app.ui.buildmode.BuildPermissionChip(mode = ui.buildPermissionMode, onChange = vm::setBuildPermissionMode)
+                        com.friday.app.ui.buildmode.BuildEffortChip(effort = ui.buildEffort, onChange = vm::setBuildEffort)
+                    }
                 }
                 ComposerBar(
                     placeholder = if (pendingPlan != null) "Tell me what to change in the plan…" else if (ui.workspace == "build") "Describe what to build…" else null,

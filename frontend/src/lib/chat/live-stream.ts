@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { StreamAcc } from "./raf-batch";
-import type { AgentStatus, AssistantStatus, BuildPlan, BuildStep, ChatMessage, Citation, GeneratedFile } from "./types";
+import type { AgentStatus, AssistantStatus, BuildApproval, BuildPlan, BuildStep, ChatMessage, Citation, GeneratedFile } from "./types";
 
 export type LiveSnapshot = {
   chatId: string;
@@ -22,6 +22,8 @@ export type LiveSnapshot = {
   files?: GeneratedFile[];
   /** Normal chat answered a build request — committed onto the message as build.suggestBuild. */
   suggestBuild?: { prompt: string };
+  /** Build permission prompts seen this turn (pending ones show the Allow / Deny panel). */
+  approvals?: BuildApproval[];
 };
 
 type Draft = LiveSnapshot;
@@ -58,6 +60,7 @@ function emit(chatId: string) {
           plan: draft.plan,
           files: draft.files?.slice(),
           suggestBuild: draft.suggestBuild,
+          approvals: draft.approvals?.slice(),
         }
       : null,
   );
@@ -134,6 +137,16 @@ export function setLivePlan(chatId: string, plan: BuildPlan) {
   const draft = drafts.get(chatId);
   if (!draft) return;
   draft.plan = plan;
+  emit(chatId);
+}
+
+/** Upserts a permission prompt by id (it arrives pending, then again as allowed / denied). */
+export function upsertLiveApproval(chatId: string, approval: BuildApproval) {
+  const draft = drafts.get(chatId);
+  if (!draft) return;
+  const list = draft.approvals ?? [];
+  const i = list.findIndex((a) => a.id === approval.id);
+  draft.approvals = i === -1 ? [...list, approval] : list.map((a, k) => (k === i ? approval : a));
   emit(chatId);
 }
 

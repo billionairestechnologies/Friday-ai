@@ -96,6 +96,11 @@ data class FridayUiState(
     val buildSessionsError: String? = null,
     /** Build composer effort picker: low | medium | high (remembered on this device). */
     val buildEffort: String = "medium",
+    /** Build permission mode: full_auto | auto_edit | ask (remembered on this device). */
+    val buildPermissionMode: String = "full_auto",
+    /** Pending Build permission prompts per chat id (from the live stream or polled from the server). */
+    val approvals: Map<String, List<com.friday.app.data.BuildApproval>> = emptyMap(),
+    val approvalError: String? = null,
 )
 
 data class QueuedMessage(
@@ -131,7 +136,12 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     private val conversationModels = mutableMapOf<String, String?>()
 
     init {
-        _state.update { it.copy(buildEffort = buildPrefs.getString("effort", "medium") ?: "medium") }
+        _state.update {
+            it.copy(
+                buildEffort = buildPrefs.getString("effort", "medium") ?: "medium",
+                buildPermissionMode = buildPrefs.getString("permissionMode", "full_auto") ?: "full_auto",
+            )
+        }
         viewModelScope.launch {
             val models = ModelsApi.list()
             if (models.isNotEmpty()) {
@@ -554,6 +564,40 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setBuildPermissionMode(mode: String) {
+        buildPrefs.edit().putString("permissionMode", mode).apply()
+        _state.update { it.copy(buildPermissionMode = mode) }
+    }
+
+    private fun upsertApproval(chatId: String, a: com.friday.app.data.BuildApproval) = _state.update { s ->
+        val list = s.approvals[chatId].orEmpty().filterNot { it.id == a.id }
+        s.copy(approvals = s.approvals + (chatId to if (a.state == "pending") list + a else list))
+    }
+
+    /** Allow / Deny / Allow all for this build on the chat's pending prompt. Failure shows a message. */
+    fun answerApproval(decision: String) {
+        val chatId = _state.value.currentId ?: return
+        val a = _state.value.approvals[chatId]?.lastOrNull() ?: return
+        viewModelScope.launch {
+            val err = com.friday.app.data.api.BuildApi.approve(chatId, a.id, decision)
+            if (err == null) upsertApproval(chatId, a.copy(state = if (decision == "deny") "denied" else "allowed"))
+            _state.update { it.copy(approvalError = err) }
+        }
+    }
+
+    /** A build started on another device (or before the app restarted) can be waiting on a prompt:
+     *  poll for it while the open build session is running / waiting and this device isn't streaming. */
+    fun pollApprovals() {
+        val chatId = _state.value.currentId ?: return
+        if (streamJobs[chatId]?.isActive == true || !isServerConversationId(chatId)) return
+        val status = _state.value.buildSessions.firstOrNull { it.id == chatId }?.status
+        if (status != "running" && status != "needs_input") return
+        viewModelScope.launch {
+            val list = com.friday.app.data.api.BuildApi.approvals(chatId) ?: return@launch
+            _state.update { it.copy(approvals = it.approvals + (chatId to list)) }
+        }
+    }
+
     fun setBuildEffort(effort: String) {
         buildPrefs.edit().putString("effort", effort).apply()
         _state.update { it.copy(buildEffort = effort) }
@@ -770,7 +814,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             chatId = remoteId
                         }
                         val isBuild = _state.value.chats.find { it.id == remoteId }?.workspace == "build"
-                        ChatApi.streamMessage(remoteId, text, modes, attachments, effort = if (isBuild) _state.value.buildEffort else null)
+                        ChatApi.streamMessage(remoteId, text, modes, attachments, effort = if (isBuild) _state.value.buildEffort else null, permissionMode = if (isBuild) _state.value.buildPermissionMode else null)
                     } else {
                         repo.send(text, modes)
                     }
@@ -825,6 +869,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         is ChatEvent.SuggestBuild -> patchMessage(chatId!!, asstId) {
                             it.copy(suggestBuildPrompt = event.prompt)
                         }
+                        is ChatEvent.Approval -> upsertApproval(chatId!!, event.approval)
                         ChatEvent.Disconnected -> patchMessage(chatId!!, asstId) {
                             it.copy(disconnected = true)
                         }

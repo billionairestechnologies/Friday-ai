@@ -3,6 +3,8 @@ import JSZip from "jszip";
 import { getOwnedConversation } from "../services/chat/conversations.js";
 import { ensurePreview, getProject } from "../services/projectBuild/sandbox.js";
 import { listBuildSessions } from "../services/projectBuild/sessions.js";
+import { listPendingApprovals, resolveApproval } from "../services/projectBuild/approvals.js";
+import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler.js";
 
 async function ownedProject(req: Request) {
@@ -15,6 +17,24 @@ async function ownedProject(req: Request) {
 /** The Build workspace's session list (home screen + sidebar), with live status per session. */
 export async function sessions(req: Request, res: Response) {
   res.json({ sessions: await listBuildSessions(req.user!.id) });
+}
+
+/** Approval prompts this build is waiting on (for a device that wasn't watching when they appeared). */
+export async function approvals(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  res.json({ approvals: listPendingApprovals(req.params.conversationId!, req.user!.id) });
+}
+
+const approveSchema = z.object({ id: z.string().min(1).max(64), decision: z.enum(["allow", "deny", "allow_all"]) });
+
+/** The user's Allow / Deny (or Allow all for this build) on a pending prompt. */
+export async function approve(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  const { id, decision } = approveSchema.parse(req.body);
+  if (!resolveApproval(req.params.conversationId!, req.user!.id, id, decision)) {
+    throw new HttpError(409, "That request is no longer waiting — the build may have moved on or been stopped.");
+  }
+  res.json({ ok: true });
 }
 
 /** Restores/refreshes the live preview (sandboxes are short-lived) and returns its URL. */

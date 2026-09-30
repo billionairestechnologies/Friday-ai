@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { isGenerating } from "../chat/activeGenerations.js";
+import { hasPendingApproval } from "./approvals.js";
 import type { BuildMeta } from "../chat/types.js";
 
 /**
@@ -83,7 +84,10 @@ export async function listBuildSessions(userId: string): Promise<BuildSessionSum
     const build = msg?.build ?? null;
     let status: BuildSessionStatus;
     let activity: string;
-    if (isGenerating(id)) {
+    if (hasPendingApproval(id)) {
+      status = "needs_input";
+      activity = "Waiting for your permission to continue";
+    } else if (isGenerating(id)) {
       status = "running";
       activity = "Working on it…";
     } else if (msg?.role === "assistant" && build?.plan?.status === "pending") {

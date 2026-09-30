@@ -15,6 +15,8 @@ enum ChatEvent {
     case ask([BuildAskQuestion])
     /// Normal chat got a build request: offer "Open in Build" (from {"t":"suggest_build",...}).
     case suggestBuild(String)
+    /// Build permission prompt: pending until the user answers (from {"t":"approval",...}).
+    case approval(BuildApproval)
     case buildMeta(elapsedMs: Int?, zipBytes: Int?, zipName: String?)
     /// The local socket dropped (network blip, app backgrounded/killed mid-stream) — NOT a server
     /// failure. The backend keeps generating and persists the full reply regardless (see
@@ -85,7 +87,8 @@ enum ChatApi {
         canvas: Bool,
         research: Bool = false,
         attachments: [StreamAttachment],
-        effort: String? = nil
+        effort: String? = nil,
+        permissionMode: String? = nil
     ) -> AsyncThrowingStream<ChatEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -100,6 +103,7 @@ enum ChatApi {
                     ]
                     // Build workspace effort picker (low | medium | high) — ignored outside Build sessions.
                     if let effort { body["effort"] = effort }
+                    if let permissionMode { body["permissionMode"] = permissionMode }
                     if !attachments.isEmpty {
                         body["attachments"] = attachments.map {
                             ["mime": $0.mime, "dataUrl": $0.dataUrl, "name": $0.name, "size": $0.size, "kind": $0.kind]
@@ -161,6 +165,8 @@ enum ChatApi {
                             if let plan = BuildPlan.parse(json) { continuation.yield(.plan(plan)) }
                         case "suggest_build":
                             continuation.yield(.suggestBuild(json["prompt"] as? String ?? ""))
+                        case "approval":
+                            continuation.yield(.approval(BuildApproval.parse(json)))
                         case "ask":
                             continuation.yield(.ask(ChatApi.parseAsk(json["questions"])))
                         case "build":

@@ -84,7 +84,7 @@ object ChatApi {
     /** POST /api/chat/conversations/:id/messages/stream — text/event-stream, "t"-discriminated JSON frames.
      * [attachments] (max 4, enforced server-side) ride inline in this same request body as base64 data
      * URLs — the backend has no separate upload endpoint for chat attachments. */
-    fun streamMessage(conversationId: String, content: String, modes: Set<Mode>, attachments: List<PendingAttachment> = emptyList(), effort: String? = null): Flow<ChatEvent> = flow {
+    fun streamMessage(conversationId: String, content: String, modes: Set<Mode>, attachments: List<PendingAttachment> = emptyList(), effort: String? = null, permissionMode: String? = null): Flow<ChatEvent> = flow {
         val body = JSONObject().apply {
             put("content", content)
             put("inputMode", "text")
@@ -94,6 +94,7 @@ object ChatApi {
             put("research", Mode.Research in modes)
             // Build workspace effort picker (low | medium | high) — ignored outside Build sessions.
             if (effort != null) put("effort", effort)
+            if (permissionMode != null) put("permissionMode", permissionMode)
             if (attachments.isNotEmpty()) {
                 put(
                     "attachments",
@@ -174,6 +175,7 @@ object ChatApi {
                                 "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))
                                 "plan" -> com.friday.app.data.parseBuildPlan(json)?.let { emit(ChatEvent.Plan(it)) }
                                 "suggest_build" -> emit(ChatEvent.SuggestBuild(json.optString("prompt")))
+                                "approval" -> emit(ChatEvent.Approval(com.friday.app.data.parseBuildApproval(json)))
                                 "build" -> emit(
                                     ChatEvent.BuildMeta(
                                         elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },

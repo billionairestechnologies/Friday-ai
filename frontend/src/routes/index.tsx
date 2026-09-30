@@ -10,7 +10,7 @@ import { useGreeting, useHeroLine } from "@/hooks/use-greeting";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { addLiveFile, applyLive, applyLiveStep, clearLive, markLiveCanvasOn, peekLive, setLiveBuildMeta, setLivePlan, setLivePreview, setLiveSuggestBuild, startLive } from "@/lib/chat/live-stream";
+import { addLiveFile, applyLive, applyLiveStep, clearLive, markLiveCanvasOn, peekLive, setLiveBuildMeta, setLivePlan, setLivePreview, setLiveSuggestBuild, startLive, upsertLiveApproval, useLiveStream } from "@/lib/chat/live-stream";
 import { beginStream, endStream, isStreamActive, stopStream } from "@/lib/chat/active-streams";
 import { AUTO_MODEL_ID, TEAMUP_MODEL_ID, decodeModelId, useModels } from "@/lib/chat/models";
 import { createStreamBatcher } from "@/lib/chat/raf-batch";
@@ -22,7 +22,9 @@ import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
 import { PlanApprovalPanel, PLAN_APPROVE_TEXT, PLAN_MARKER } from "@/components/plan-approval";
 import { takeBuildHandoff } from "@/lib/chat/build-handoff";
 import { BuildComposerFooter, BuildHome, BuildRepoChip } from "@/components/build-home";
-import { useBuildSessionsSync } from "@/lib/build-mode/sessions";
+import { useBuildSessions, useBuildSessionsSync } from "@/lib/build-mode/sessions";
+import { ApprovalPanel } from "@/components/build-approval";
+import type { BuildApproval } from "@/lib/chat/types";
 import { useBuildPrefs } from "@/lib/build-mode/prefs";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
@@ -103,6 +105,31 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
   const [buildRepo, setBuildRepo] = useState<string | null>(null);
   // Build sessions list (home + sidebar statuses) — refreshed whenever a turn starts or ends.
   useBuildSessionsSync(buildMode && Boolean(user) && !isPending, streaming);
+
+  // Permission prompts (Build): from this tab's live stream, or — when the build was started on another
+  // device / before a reload — polled from the server while that session is running or waiting.
+  const live = useLiveStream(activeId);
+  const liveApproval = live?.approvals?.filter((a) => a.state === "pending").at(-1) ?? null;
+  const activeConversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
+  const sessionStatus = useBuildSessions((s) => s.sessions.find((x) => x.id === activeConversationId)?.status);
+  const [remoteApprovals, setRemoteApprovals] = useState<BuildApproval[]>([]);
+  useEffect(() => {
+    setRemoteApprovals([]);
+    if (!buildMode || !activeConversationId || live || (sessionStatus !== "running" && sessionStatus !== "needs_input")) return;
+    let cancelled = false;
+    const load = () =>
+      api
+        .get<{ approvals: Omit<BuildApproval, "state">[] }>(`/build/${activeConversationId}/approvals`)
+        .then((res) => !cancelled && setRemoteApprovals(res.approvals.map((a) => ({ ...a, state: "pending" as const }))))
+        .catch(() => {});
+    void load();
+    const id = window.setInterval(load, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [buildMode, activeConversationId, live, sessionStatus]);
+  const pendingApproval = liveApproval ?? remoteApprovals[0] ?? null;
   const [sendError, setSendError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
@@ -396,6 +423,10 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
         else if (ev.t === "ask") askQuestions = ev.questions;
         else if (ev.t === "plan") setLivePlan(chatId, { architecture: ev.architecture, items: ev.items, summary: ev.summary, status: ev.status });
         else if (ev.t === "suggest_build") setLiveSuggestBuild(chatId, ev.prompt);
+        else if (ev.t === "approval") {
+          const { t: _t, ...approval } = ev;
+          upsertLiveApproval(chatId, approval);
+        }
         else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });
         else if (ev.t === "preview") {
           setLivePreview(chatId, ev.url, ev.port);
@@ -405,7 +436,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       }, ac.signal, {
         research: s.research,
         ...(s.activeSkill ? { skillId: s.activeSkill.id } : {}),
-        ...(buildMode ? { effort: useBuildPrefs.getState().effort } : {}),
+        ...(buildMode ? { effort: useBuildPrefs.getState().effort, permissionMode: useBuildPrefs.getState().permissionMode } : {}),
       });
     } catch (err) {
       if ((err as { name?: string }).name !== "AbortError") {
@@ -681,6 +712,14 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   )}
                   {pendingAsk && dismissedAsk !== pendingAsk.id && (
                     <AskPanel questions={pendingAsk.questions} onSubmit={(text) => void send(text)} onDismiss={() => setDismissedAsk(pendingAsk.id)} />
+                  )}
+                  {pendingApproval && activeConversationId && (
+                    <ApprovalPanel
+                      key={pendingApproval.id}
+                      approval={pendingApproval}
+                      conversationId={activeConversationId}
+                      onDecided={(id) => setRemoteApprovals((list) => list.filter((a) => a.id !== id))}
+                    />
                   )}
                   {pendingPlan && !streaming && (
                     <PlanApprovalPanel

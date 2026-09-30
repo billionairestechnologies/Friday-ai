@@ -45,6 +45,7 @@ import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { runBuildAgent } from "../projectBuild/agent.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
+import type { PermissionMode } from "../projectBuild/approvals.js";
 import { PLAN_MARKER, draftPlan, findPendingPlan, isPlanApproval, needsPlan, renderPlan, setPlanStatus } from "../projectBuild/plan.js";
 import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
 import { getProject } from "../projectBuild/sandbox.js";
@@ -177,7 +178,7 @@ export async function streamMessage(
   canvas = false,
   attachments: ChatImage[] = [],
   reservation?: Reservation,
-  options: { research?: boolean; skillId?: string; effort?: BuildEffort } = {},
+  options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode } = {},
 ): Promise<void> {
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
@@ -687,7 +688,7 @@ export async function streamMessage(
       // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
       // only now, not during a question/plan round, which never touches the sandbox.
       onEvent({ t: "status", s: "building" });
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort });
+      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode });
       if (built.error && !built.text && built.build.steps.length === 0) {
         onEvent({ t: "err", c: built.error });
         onEvent({ t: "done" });

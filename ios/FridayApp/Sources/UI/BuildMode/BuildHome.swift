@@ -134,6 +134,33 @@ struct BuildHomeView: View {
     }
 }
 
+/// Above the Build composer: what the agent may do without asking.
+struct BuildPermissionChip: View {
+    @EnvironmentObject var vm: FridayViewModel
+    private let options: [(id: String, label: String)] = [
+        ("full_auto", "Full auto · runs everything in the sandbox"), ("auto_edit", "Auto-edit · asks before commands"), ("ask", "Ask every time"),
+    ]
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.id) { o in
+                Button { vm.buildPermissionMode = o.id } label: {
+                    if o.id == vm.buildPermissionMode { Label(o.label, systemImage: "checkmark") } else { Text(o.label) }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "shield").font(.system(size: 12))
+                Text(vm.buildPermissionMode == "ask" ? "Ask every time" : vm.buildPermissionMode == "auto_edit" ? "Auto-edit" : "Full auto").font(.system(size: 12.5))
+                Image(systemName: "chevron.down").font(.system(size: 9))
+            }
+            .foregroundColor(FridayColor.text)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(FridayColor.surface).cornerRadius(10)
+        }
+    }
+}
+
 /// Above the Build composer: how hard the agent works (the model picker is in the composer).
 struct BuildEffortChip: View {
     @EnvironmentObject var vm: FridayViewModel
@@ -158,6 +185,5 @@ struct BuildEffortChip: View {
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(FridayColor.surface).cornerRadius(10)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

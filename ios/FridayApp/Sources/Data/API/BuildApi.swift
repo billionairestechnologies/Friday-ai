@@ -2,6 +2,17 @@ import Foundation
 
 /// Build Mode project endpoints (backend /api/build/:conversationId/…).
 enum BuildApi {
+    /// GET /api/build/:id/approvals — prompts this build is waiting on.
+    static func approvals(conversationId: String) async throws -> [BuildApproval] {
+        let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/approvals", authed: true)
+        return (json["approvals"] as? [[String: Any]] ?? []).map { BuildApproval.parse($0) }
+    }
+
+    /// POST /api/build/:id/approve — decision: allow | deny | allow_all.
+    static func approve(conversationId: String, id: String, decision: String) async throws {
+        _ = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/approve", method: "POST", body: ["id": id, "decision": decision], authed: true)
+    }
+
     /// GET /api/build/sessions — the Build home + drawer list with live status. Throws on failure.
     static func sessions() async throws -> [BuildSessionSummary] {
         let json = try await ApiClient.shared.requestJSON(path: "build/sessions", authed: true)

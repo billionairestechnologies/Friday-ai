@@ -6,6 +6,8 @@ import { asyncHandler } from "../middleware/errorHandler.js";
 export const buildRouter = Router();
 buildRouter.use(requireAuth);
 buildRouter.get("/sessions", asyncHandler(controller.sessions));
+buildRouter.get("/:conversationId/approvals", asyncHandler(controller.approvals));
+buildRouter.post("/:conversationId/approve", asyncHandler(controller.approve));
 buildRouter.post("/:conversationId/preview", asyncHandler(controller.preview));
 buildRouter.get("/:conversationId/files", asyncHandler(controller.files));
 buildRouter.get("/:conversationId/download", asyncHandler(controller.download));

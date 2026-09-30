@@ -59,3 +59,61 @@ struct SuggestBuildCard: View {
         .cornerRadius(16)
     }
 }
+
+/// Above the composer while the Build agent is paused on a permission prompt. The build waits
+/// server-side, so this works from any device.
+struct ApprovalBar: View {
+    @EnvironmentObject var vm: FridayViewModel
+    let approval: BuildApproval
+    @State private var busy = false
+    private let amber = Color(red: 0.85, green: 0.47, blue: 0.02)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Friday wants to").font(.system(size: 12, weight: .medium)).foregroundColor(amber)
+            Text(approval.title).font(.system(size: 15, weight: .semibold)).foregroundColor(FridayColor.text)
+            if let detail = approval.detail {
+                Text(detail).font(.system(size: 12, design: .monospaced)).foregroundColor(FridayColor.muted).lineLimit(6)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(8).background(FridayColor.chip).cornerRadius(8)
+            }
+            if approval.always {
+                Text("Always asks — this reaches outside the sandbox or can't be undone.").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+            }
+            if let err = vm.approvalError { Text(err).font(.system(size: 12)).foregroundColor(FridayColor.error) }
+            HStack(spacing: 8) {
+                action("Deny", "deny")
+                if !approval.always { action("Allow all", "allow_all") }
+                Spacer()
+                Button {
+                    decide("allow")
+                } label: {
+                    Text("Allow").font(.system(size: 13.5, weight: .semibold)).foregroundColor(FridayColor.bg)
+                        .padding(.horizontal, 18).padding(.vertical, 8).background(FridayColor.text).clipShape(Capsule())
+                }
+                .disabled(busy)
+            }
+            .padding(.top, 4)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(FridayColor.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(amber.opacity(0.4), lineWidth: 1))
+        .cornerRadius(18)
+    }
+
+    private func action(_ label: String, _ decision: String) -> some View {
+        Button { decide(decision) } label: {
+            Text(label).font(.system(size: 13.5)).foregroundColor(FridayColor.text)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .overlay(Capsule().stroke(FridayColor.hairline, lineWidth: 1))
+        }
+        .disabled(busy)
+    }
+
+    private func decide(_ decision: String) {
+        busy = true
+        Task {
+            await vm.answerApproval(decision)
+            busy = false
+        }
+    }
+}

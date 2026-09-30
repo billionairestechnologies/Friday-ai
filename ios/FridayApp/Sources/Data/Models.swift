@@ -66,6 +66,28 @@ struct BuildStep: Identifiable, Hashable {
     }
 }
 
+/// A Build permission prompt (backend projectBuild/approvals.ts). kind: file | command | connector | pr;
+/// state: pending | allowed | denied. `always` = asks even in Full auto.
+struct BuildApproval: Identifiable, Hashable {
+    let id: String
+    let kind: String
+    let title: String
+    let detail: String?
+    let always: Bool
+    var state: String
+
+    static func parse(_ j: [String: Any], defaultState: String = "pending") -> BuildApproval {
+        BuildApproval(
+            id: j["id"] as? String ?? UUID().uuidString,
+            kind: j["kind"] as? String ?? "command",
+            title: j["title"] as? String ?? "",
+            detail: (j["detail"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+            always: j["always"] as? Bool ?? false,
+            state: j["state"] as? String ?? defaultState
+        )
+    }
+}
+
 /// One row of the Build home / drawer (backend GET /api/build/sessions).
 /// status: running | needs_input | done | error | idle.
 struct BuildSessionSummary: Identifiable, Hashable {

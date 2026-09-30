@@ -50,6 +50,18 @@ export type BuildStep = {
   ms?: number;
 };
 
+/** A Build permission prompt (backend projectBuild/approvals.ts). */
+export type BuildApproval = {
+  id: string;
+  kind: "file" | "command" | "connector" | "pr";
+  title: string;
+  detail?: string;
+  /** Asks even in Full auto (pull requests, deploys, recursive deletes). */
+  always?: boolean;
+  createdAt: number;
+  state: "pending" | "allowed" | "denied";
+};
+
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
 export type BuildPlan = {
   architecture: string;
@@ -145,5 +157,6 @@ export type StreamEvent =
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
   | { t: "suggest_build"; prompt: string }
+  | ({ t: "approval" } & BuildApproval)
   | { t: "err"; c: string }
   | { t: "done" };

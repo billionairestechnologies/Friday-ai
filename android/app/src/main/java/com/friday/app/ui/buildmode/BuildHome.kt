@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -152,6 +153,38 @@ fun BuildHome(
                     }
                     Icon(Icons.Default.ChevronRight, null, tint = FridayMuted, modifier = Modifier.size(18.dp))
                 }
+            }
+        }
+    }
+}
+
+private val PERMISSIONS = listOf(
+    "full_auto" to "Full auto · runs everything in the sandbox",
+    "auto_edit" to "Auto-edit · asks before commands",
+    "ask" to "Ask every time",
+)
+
+/** Above the Build composer: what the agent may do without asking. */
+@Composable
+fun BuildPermissionChip(mode: String, onChange: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val label = when (mode) { "ask" -> "Ask every time"; "auto_edit" -> "Auto-edit"; else -> "Full auto" }
+    Box(Modifier.padding(bottom = 6.dp)) {
+        Row(
+            Modifier.clip(RoundedCornerShape(10.dp)).background(FridaySurface).clickable { open = true }.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(Icons.Default.Shield, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+            Text(label, color = FridayText, fontSize = 12.5.sp)
+            Icon(Icons.Default.ExpandMore, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            PERMISSIONS.forEach { (id, text) ->
+                DropdownMenuItem(
+                    text = { Text(text, fontWeight = if (id == mode) FontWeight.SemiBold else FontWeight.Normal) },
+                    onClick = { onChange(id); open = false },
+                )
             }
         }
     }

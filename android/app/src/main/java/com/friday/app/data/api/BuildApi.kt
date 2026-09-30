@@ -3,12 +3,38 @@ package com.friday.app.data.api
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 
 /** Build Mode project endpoints (backend /api/build/:conversationId/…). */
 object BuildApi {
+    /** GET /api/build/:id/approvals — prompts this build is waiting on. Null on failure. */
+    suspend fun approvals(conversationId: String): List<com.friday.app.data.BuildApproval>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/approvals").get().build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val arr = JSONObject(resp.body?.string().orEmpty()).optJSONArray("approvals") ?: return@use emptyList()
+                (0 until arr.length()).map { com.friday.app.data.parseBuildApproval(arr.getJSONObject(it)) }
+            }
+        }.getOrNull()
+    }
+
+    /** POST /api/build/:id/approve — decision: allow | deny | allow_all. Returns an error message or null. */
+    suspend fun approve(conversationId: String, id: String, decision: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = JSONObject().put("id", id).put("decision", decision).toString()
+                .toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/approve").post(body).build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (resp.isSuccessful) null
+                else runCatching { JSONObject(resp.body?.string().orEmpty()).optString("error") }.getOrNull().orEmpty().ifBlank { "Couldn't send your answer (${resp.code})" }
+            }
+        }.getOrElse { it.message ?: "Couldn't send your answer — check your connection." }
+    }
+
     /** GET /api/build/sessions — the Build home + drawer list with live status. Null on failure. */
     suspend fun sessions(): List<com.friday.app.data.BuildSessionSummary>? = withContext(Dispatchers.IO) {
         runCatching {

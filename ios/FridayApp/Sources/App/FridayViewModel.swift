@@ -48,6 +48,43 @@ final class FridayViewModel: ObservableObject {
         didSet { UserDefaults.standard.set(buildEffort, forKey: "friday.build.effort") }
     }
 
+    /// Build permission mode: full_auto | auto_edit | ask (remembered on this device).
+    @Published var buildPermissionMode: String = UserDefaults.standard.string(forKey: "friday.build.permissionMode") ?? "full_auto" {
+        didSet { UserDefaults.standard.set(buildPermissionMode, forKey: "friday.build.permissionMode") }
+    }
+    /// Pending Build permission prompts per chat id (from the live stream or polled from the server).
+    @Published var approvals: [String: [BuildApproval]] = [:]
+    @Published var approvalError: String?
+
+    private func upsertApproval(_ chatId: String, _ a: BuildApproval) {
+        var list = (approvals[chatId] ?? []).filter { $0.id != a.id }
+        if a.state == "pending" { list.append(a) }
+        approvals[chatId] = list
+    }
+
+    /// Allow / Deny / Allow all for this build on the open chat's pending prompt.
+    func answerApproval(_ decision: String) async {
+        guard let chatId = currentId, let a = approvals[chatId]?.last else { return }
+        do {
+            try await BuildApi.approve(conversationId: chatId, id: a.id, decision: decision)
+            var done = a
+            done.state = decision == "deny" ? "denied" : "allowed"
+            upsertApproval(chatId, done)
+            approvalError = nil
+        } catch {
+            approvalError = "Couldn't send your answer: \(error.localizedDescription)"
+        }
+    }
+
+    /// A build started on another device (or before the app restarted) can be waiting on a prompt:
+    /// poll for it while the open build session is running / waiting and this device isn't streaming.
+    func pollApprovals() async {
+        guard let chatId = currentId, streamJobs[chatId] == nil, UUID(uuidString: chatId) != nil else { return }
+        let status = buildSessions.first(where: { $0.id == chatId })?.status
+        guard status == "running" || status == "needs_input" else { return }
+        if let list = try? await BuildApi.approvals(conversationId: chatId) { approvals[chatId] = list }
+    }
+
     /// Refreshes the Build home / drawer statuses. A failure keeps the last list and says so.
     func loadBuildSessions() async {
         guard TokenStore.shared.hasSession() else { return }
@@ -341,7 +378,8 @@ final class FridayViewModel: ObservableObject {
             think: modes.contains(.think), webSearch: modes.contains(.search), canvas: modes.contains(.canvas),
             research: modes.contains(.research),
             attachments: streamAttachments,
-            effort: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildEffort : nil
+            effort: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildEffort : nil,
+            permissionMode: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildPermissionMode : nil
         )
 
         do {
@@ -401,6 +439,8 @@ final class FridayViewModel: ObservableObject {
             chats[ci].messages[mi].build = build
         case .suggestBuild(let prompt):
             chats[ci].messages[mi].suggestBuildPrompt = prompt.isEmpty ? nil : prompt
+        case .approval(let a):
+            upsertApproval(chatId, a)
         case .buildMeta(let elapsedMs, let zipBytes, let zipName):
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.elapsedMs = elapsedMs

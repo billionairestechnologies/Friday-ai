@@ -17,6 +17,7 @@ import type { FridayTool } from "../agent/tools/types.js";
 import { recordAdminAuditLog } from "../usageService.js";
 import { SUMMARY_PROMPT, applySummary, planSummaryCut, renderTranscript, transcriptChars } from "./summarize.js";
 import { approvedPlanNote, isPlanApproval } from "./plan.js";
+import { approvalFor, requestApproval, type PermissionMode } from "./approvals.js";
 
 // A native tool round can carry several calls (write 4 files at once), so the round budget goes
 // further than a text-protocol iteration did. The wall clock is the real ceiling; the sandbox TTL
@@ -177,6 +178,8 @@ export async function runBuildAgent(opts: {
   approvedPlan?: BuildPlan;
   /** Build workspace effort picker (default medium). */
   effort?: BuildEffort;
+  /** Build workspace permission mode (default full_auto — the sandbox is isolated). */
+  permissionMode?: PermissionMode;
 }): Promise<BuildAgentResult> {
   const { userId, conversationId, onEvent, signal } = opts;
   // Plans buy longer runs: rounds come from the entitlement, and the wall clock stretches with them
@@ -188,6 +191,12 @@ export async function runBuildAgent(opts: {
   const maxIterations = Math.max(5, Math.min(300, effort === "low" ? Math.min(planRounds, 40) : planRounds));
   const maxVisualRounds = effort === "low" ? 0 : effort === "high" ? 3 : 2;
   const maxVerifyRounds = effort === "low" ? 1 : effort === "high" ? 4 : 3;
+  const permissionMode: PermissionMode = opts.permissionMode ?? "full_auto";
+  // "Allow all for this build" from an approval prompt: the rest of this run asks only for the
+  // always-ask actions (pull requests, deploys, recursive deletes).
+  let allowAll = false;
+  // Time spent waiting on the user doesn't count against the build's wall clock.
+  let waitedMs = 0;
   const maxWallMs = Math.max(MAX_WALL_MS, maxIterations * 24_000);
   const started = Date.now();
   const steps: BuildStep[] = [];
@@ -506,6 +515,26 @@ export async function runBuildAgent(opts: {
       return problems
         ? `[check_app] problems found:\n${tail(problems, 3000)}`
         : "[check_app] the page loads with no console errors, has content, and the visual review passed.";
+    }
+    // Permission gate: pause for the user's Allow / Deny when the mode (or the action) calls for it.
+    const ask = approvalFor(action, allowAll ? "full_auto" : permissionMode);
+    if (ask) {
+      const { request, decision } = requestApproval(conversationId, userId, ask, signal);
+      onEvent({ t: "approval", ...request, state: "pending" });
+      const waitStart = Date.now();
+      const d = await decision;
+      waitedMs += Date.now() - waitStart;
+      onEvent({ t: "approval", ...request, state: d === "deny" ? "denied" : "allowed" });
+      if (d === "allow_all") allowAll = true;
+      pushNote(`${d === "deny" ? "You denied" : "You allowed"}: ${ask.title}`);
+      if (d === "deny") {
+        if (live) {
+          live.state = "error";
+          live.detail = "Denied by you";
+          onEvent({ t: "step", ...live });
+        }
+        return `[denied] The user did not allow this: ${ask.title}. Do not retry the same action — continue another way if you can, otherwise explain what you need and finish.`;
+      }
     }
     if (action.kind === "web" || action.kind === "ext") {
       const tool = action.kind === "ext" ? extByName.get(action.tool)! : action.tool === "web_search" ? webSearchTool : fetchUrlTool;
@@ -900,7 +929,7 @@ export async function runBuildAgent(opts: {
         break;
       }
     }
-    if (Date.now() - started > maxWallMs) {
+    if (Date.now() - started - waitedMs > maxWallMs) {
       emitText("\n\nI ran out of time before finishing — send another message and I'll continue from where the project stands.");
       break;
     }
