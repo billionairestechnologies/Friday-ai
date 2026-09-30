@@ -37,12 +37,12 @@ import org.json.JSONObject
 object SupabaseRealtime {
     private const val TAG = "SupabaseRealtime"
 
-    private const val REALTIME_HOST = "kqrokhxgsaufpgszuzkf.supabase.co"
+    private const val REALTIME_HOST = "friday.billionairestechnologies.com"
     private const val REALTIME_URL = "wss://$REALTIME_HOST/realtime/v1/websocket"
 
     // Public anon/publishable key — safe to embed, every row it can see is still gated by RLS.
     private const val ANON_KEY =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxcm9raHhnc2F1ZnBnc3p1emtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzIwNjgsImV4cCI6MjEwNDk0ODA2OH0.VGlwSRLI61QD7H9cEtZ4e_m8BUjzjuUsYvXNBqPUc_A"
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwNzQ4Njc1LCJleHAiOjE5NDg0Mjg2NzV9.xdKM4esMqUgxauygQ7G7AzEiLjvAStYrHrXgLaqCkr4"
 
     private const val HEARTBEAT_INTERVAL_MS = 25_000L
     private const val DEBOUNCE_MS = 400L

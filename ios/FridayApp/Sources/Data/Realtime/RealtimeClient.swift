@@ -6,8 +6,8 @@ import Foundation
 actor RealtimeClient {
     static let shared = RealtimeClient()
 
-    private static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxcm9raHhnc2F1ZnBnc3p1emtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzIwNjgsImV4cCI6MjEwNDk0ODA2OH0.VGlwSRLI61QD7H9cEtZ4e_m8BUjzjuUsYvXNBqPUc_A"
-    private static let wsURL = URL(string: "wss://kqrokhxgsaufpgszuzkf.supabase.co/realtime/v1/websocket?apikey=\(anonKey)&vsn=1.0.0&log_level=info")!
+    private static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwNzQ4Njc1LCJleHAiOjE5NDg0Mjg2NzV9.xdKM4esMqUgxauygQ7G7AzEiLjvAStYrHrXgLaqCkr4"
+    private static let wsURL = URL(string: "wss://friday.billionairestechnologies.com/realtime/v1/websocket?apikey=\(anonKey)&vsn=1.0.0&log_level=info")!
 
     private var task: URLSessionWebSocketTask?
     private var userId: String?
