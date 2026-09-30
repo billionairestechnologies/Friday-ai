@@ -46,7 +46,7 @@ struct BuildPanel: View {
         VStack(spacing: 0) {
             // Icon tabs: globe = running preview, stack = project files.
             HStack(spacing: 4) {
-                ForEach([("preview", "globe"), ("files", "square.stack.3d.up")], id: \.0) { id, icon in
+                ForEach([("preview", "globe"), ("files", "square.stack.3d.up"), ("diff", "plusminus")], id: \.0) { id, icon in
                     Button { tab = id } label: {
                         Image(systemName: icon).font(.system(size: 17))
                             .foregroundColor(tab == id ? FridayColor.text : FridayColor.muted)
@@ -69,6 +69,9 @@ struct BuildPanel: View {
                     Spacer()
                     if let url, let u = URL(string: url) { Button { UIApplication.shared.open(u) } label: { Image(systemName: "safari") } }
                     Button { mobile.toggle() } label: { Image(systemName: "iphone").foregroundColor(mobile ? FridayColor.text : FridayColor.muted) }
+                } else if tab == "diff" {
+                    Text("Changes in this build").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                    Spacer()
                 } else {
                     Button { showTree.toggle() } label: { Image(systemName: "list.bullet.indent").foregroundColor(showTree ? FridayColor.text : FridayColor.muted) }
                     Text(selected ?? "").font(.system(size: 13)).foregroundColor(FridayColor.text).lineLimit(1)
@@ -80,7 +83,9 @@ struct BuildPanel: View {
             .padding(.horizontal, 16).padding(.vertical, 6)
             Divider().background(FridayColor.hairline)
 
-            if tab == "preview" {
+            if tab == "diff" {
+                BuildDiffList(steps: vm.currentChat?.messages.flatMap { $0.build?.steps ?? [] } ?? [])
+            } else if tab == "preview" {
                 if loading {
                     VStack(spacing: 12) {
                         Spacer()
@@ -209,6 +214,89 @@ private struct BuildWebView: UIViewRepresentable {
         if webView.accessibilityIdentifier != tag, let u = URL(string: url) {
             webView.accessibilityIdentifier = tag
             webView.load(URLRequest(url: u))
+        }
+    }
+}
+
+/// Every file the agent wrote or edited, newest first, with +/- counts and the changed lines —
+/// built from the steps already streamed (same as the web's Diff tab).
+struct BuildDiffList: View {
+    let steps: [BuildStep]
+    @State private var open: [String: Bool] = [:]
+
+    private struct Change: Identifiable {
+        let path: String
+        let code: String
+        let added: Int
+        let removed: Int
+        let isNew: Bool
+        var id: String { path }
+    }
+
+    private var changes: [Change] {
+        var order: [String] = []
+        var byPath: [String: Change] = [:]
+        for st in steps where st.kind == "write" && st.state == "ok" {
+            guard let path = st.path else { continue }
+            let prev = byPath[path]
+            order.removeAll { $0 == path }
+            order.append(path)
+            byPath[path] = Change(
+                path: path, code: st.code ?? "",
+                added: (prev?.added ?? 0) + (st.added ?? 0),
+                removed: (prev?.removed ?? 0) + (st.removed ?? 0),
+                isNew: prev?.isNew ?? st.label.hasPrefix("Wrote ")
+            )
+        }
+        return order.reversed().compactMap { byPath[$0] }
+    }
+
+    var body: some View {
+        let list = changes
+        if list.isEmpty {
+            VStack {
+                Spacer()
+                Text("No changes yet — files Friday writes or edits show up here.")
+                    .font(.system(size: 13)).foregroundColor(FridayColor.muted).multilineTextAlignment(.center).padding(.horizontal, 32)
+                Spacer()
+            }
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("\(list.count) file\(list.count == 1 ? "" : "s") changed  +\(list.reduce(0) { $0 + $1.added })  −\(list.reduce(0) { $0 + $1.removed })")
+                        .font(.system(size: 12)).foregroundColor(FridayColor.muted).padding(.horizontal, 16).padding(.vertical, 8)
+                    ForEach(list) { c in
+                        let expanded = open[c.path] ?? (list.count <= 3)
+                        Button { open[c.path] = !expanded } label: {
+                            HStack(spacing: 6) {
+                                Text(c.path).font(.system(size: 12, design: .monospaced)).foregroundColor(FridayColor.text).lineLimit(1)
+                                Spacer()
+                                if c.isNew { Text("new").font(.system(size: 11)).foregroundColor(FridayColor.muted) }
+                                Text("+\(c.added)").font(.system(size: 11, design: .monospaced)).foregroundColor(.green)
+                                Text("−\(c.removed)").font(.system(size: 11, design: .monospaced)).foregroundColor(FridayColor.error)
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 8)
+                        }
+                        if expanded && !c.code.isEmpty {
+                            ScrollView(.horizontal) {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(Array(c.code.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                                        let kind: Character = c.isNew ? "+" : line.hasPrefix("+ ") ? "+" : line.hasPrefix("- ") ? "-" : " "
+                                        let text = !c.isNew && kind != " " ? String(line.dropFirst(2)) : line
+                                        Text("\(String(kind)) \(text)")
+                                            .font(.system(size: 11.5, design: .monospaced))
+                                            .foregroundColor(kind == "+" ? .green : kind == "-" ? FridayColor.error : FridayColor.text)
+                                            .fixedSize()
+                                    }
+                                }
+                                .padding(.horizontal, 16).padding(.vertical, 6)
+                            }
+                            .background(FridayColor.surface)
+                        }
+                        Divider().background(FridayColor.hairline)
+                    }
+                }
+            }
         }
     }
 }

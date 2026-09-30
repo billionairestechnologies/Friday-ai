@@ -99,6 +99,8 @@ private struct ChatShell: View {
                     ZStack {
                         if let chat = vm.currentChat, !chat.messages.isEmpty {
                             ChatThreadView(messages: chat.messages)
+                        } else if vm.workspace == "build" {
+                            BuildHomeView()
                         } else {
                             emptyState
                         }
@@ -140,6 +142,10 @@ private struct ChatShell: View {
                         PlanApprovalBar()
                             .padding(.horizontal, 12)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    if vm.workspace == "build" {
+                        BuildEffortChip().padding(.horizontal, 16)
                     }
 
                     ComposerBar()

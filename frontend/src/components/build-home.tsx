@@ -24,7 +24,7 @@ function SessionRow({ s, onOpen }: { s: BuildSession; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="premium-control flex w-full items-center gap-3 rounded-xl bg-composer px-4 py-3 text-left text-sm hover:bg-chip-on"
+      className="premium-control flex w-full items-center gap-3 rounded-xl bg-chip/60 px-4 py-3 text-left text-sm hover:bg-chip"
     >
       <span className={cn("flex shrink-0 items-center gap-1.5 text-xs font-medium", meta.text)}>
         <span className={cn("size-1.5 rounded-full", meta.dot)} />
@@ -86,11 +86,11 @@ export function BuildHome({ firstName }: { firstName?: string }) {
         ) : !loaded ? (
           <div className="flex flex-col gap-2">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-xl bg-composer" />
+              <div key={i} className="h-12 animate-pulse rounded-xl bg-chip/60" />
             ))}
           </div>
         ) : shown.length === 0 ? (
-          <p className="rounded-xl bg-composer px-4 py-6 text-center text-sm text-muted">
+          <p className="rounded-xl bg-chip/60 px-4 py-6 text-center text-sm text-muted">
             No builds yet. Describe an app below — Friday plans it with you, then builds, runs and previews it.
           </p>
         ) : (
@@ -112,7 +112,7 @@ export function BuildHome({ firstName }: { firstName?: string }) {
                 href={s.prUrl!}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="premium-control flex items-center gap-3 rounded-xl bg-composer px-4 py-3 text-sm hover:bg-chip-on"
+                className="premium-control flex items-center gap-3 rounded-xl bg-chip/60 px-4 py-3 text-sm hover:bg-chip"
               >
                 <GitPullRequest className="size-4 shrink-0 text-muted" />
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground">{s.title}</span>

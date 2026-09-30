@@ -2,6 +2,25 @@ import Foundation
 
 /// Build Mode project endpoints (backend /api/build/:conversationId/…).
 enum BuildApi {
+    /// GET /api/build/sessions — the Build home + drawer list with live status. Throws on failure.
+    static func sessions() async throws -> [BuildSessionSummary] {
+        let json = try await ApiClient.shared.requestJSON(path: "build/sessions", authed: true)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return (json["sessions"] as? [[String: Any]] ?? []).map {
+            let updated = $0["updatedAt"] as? String
+            return BuildSessionSummary(
+                id: $0["id"] as? String ?? "",
+                title: ($0["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "New build",
+                updatedAt: updated.flatMap { iso.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) },
+                status: $0["status"] as? String ?? "done",
+                activity: $0["activity"] as? String ?? "",
+                repo: $0["repo"] as? String,
+                prUrl: $0["prUrl"] as? String
+            )
+        }
+    }
+
     enum Preview {
         case ready(String)
         case failed(String)

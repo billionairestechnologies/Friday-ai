@@ -9,6 +9,29 @@ import java.io.File
 
 /** Build Mode project endpoints (backend /api/build/:conversationId/…). */
 object BuildApi {
+    /** GET /api/build/sessions — the Build home + drawer list with live status. Null on failure. */
+    suspend fun sessions(): List<com.friday.app.data.BuildSessionSummary>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/sessions").get().build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val arr = JSONObject(resp.body?.string().orEmpty()).optJSONArray("sessions") ?: return@use emptyList()
+                (0 until arr.length()).map { i ->
+                    val o = arr.getJSONObject(i)
+                    com.friday.app.data.BuildSessionSummary(
+                        id = o.optString("id"),
+                        title = o.optString("title").ifBlank { "New build" },
+                        updatedAt = runCatching { java.time.Instant.parse(o.optString("updatedAt")).toEpochMilli() }.getOrDefault(0L),
+                        status = o.optString("status"),
+                        activity = o.optString("activity"),
+                        repo = o.optString("repo").takeIf { it.isNotBlank() && it != "null" },
+                        prUrl = o.optString("prUrl").takeIf { it.isNotBlank() && it != "null" },
+                    )
+                }
+            }
+        }.getOrNull()
+    }
+
     sealed class Preview {
         data class Ready(val url: String) : Preview()
         data class Failed(val message: String) : Preview()

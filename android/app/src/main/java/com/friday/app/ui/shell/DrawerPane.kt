@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -82,6 +83,8 @@ fun DrawerPane(
     /** "chat" or "build": which workspace's history the list shows. */
     workspace: String = "chat",
     onNewBuild: () -> Unit = {},
+    /** Build session id → status, for the status dot next to each build in the list. */
+    buildStatuses: Map<String, String> = emptyMap(),
     onDeleteChat: (String) -> Unit = {},
     onOpenSheet: (Sheet) -> Unit,
     onNavigate: (String) -> Unit,
@@ -280,14 +283,21 @@ fun DrawerPane(
                             .combinedClickable(onClick = { onOpenChat(chat.id) }, onLongClick = { actionChat = chat })
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
-                        Text(
-                            chat.title,
-                            color = FridayText,
-                            fontSize = 15.sp,
-                            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val dot = if (workspace == "build") com.friday.app.ui.buildmode.buildStatusMeta(buildStatuses[chat.id]) else null
+                            if (dot != null) {
+                                Box(Modifier.size(7.dp).clip(CircleShape).background(dot.first))
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(
+                                chat.title,
+                                color = FridayText,
+                                fontSize = 15.sp,
+                                fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         Text(relativeDay(chat.updatedAt), color = FridayMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     }
                 }

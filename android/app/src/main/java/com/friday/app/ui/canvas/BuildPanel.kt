@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Difference
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
@@ -78,6 +79,8 @@ fun BuildPanel(
     liveUrl: String?,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Every build step in the chat — drives the Diff tab. */
+    steps: List<com.friday.app.data.BuildStep> = emptyList(),
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -116,7 +119,7 @@ fun BuildPanel(
     Column(modifier.fillMaxSize().background(FridayBg)) {
         // Icon tabs: globe = running preview, stack = project files; close on the right.
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            listOf("preview" to Icons.Default.Language, "files" to Icons.Default.Layers).forEach { (id, icon) ->
+            listOf("preview" to Icons.Default.Language, "files" to Icons.Default.Layers, "diff" to Icons.Default.Difference).forEach { (id, icon) ->
                 Icon(
                     icon, contentDescription = id,
                     tint = if (tab == id) FridayText else FridayMuted,
@@ -141,6 +144,8 @@ fun BuildPanel(
                     }
                 }
                 HeaderIcon(Icons.Default.PhoneAndroid, if (mobile) "Desktop view" else "Mobile view") { mobile = !mobile }
+            } else if (tab == "diff") {
+                Text("Changes in this build", color = FridayMuted, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
             } else {
                 HeaderIcon(Icons.AutoMirrored.Filled.List, "Toggle file list") { showTree = !showTree }
                 Text(selected.orEmpty(), color = FridayText, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
@@ -195,6 +200,8 @@ fun BuildPanel(
                     )
                 }
             }
+        } else if (tab == "diff") {
+            DiffList(steps)
         } else {
             val list = files
             if (list == null) {
@@ -219,6 +226,67 @@ fun BuildPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Every file the agent wrote or edited, newest first, with +/- counts and the changed lines —
+ *  built from the steps already streamed (same as the web's Diff tab). */
+@Composable
+private fun DiffList(steps: List<com.friday.app.data.BuildStep>) {
+    data class Change(val path: String, val code: String, val added: Int, val removed: Int, val isNew: Boolean)
+    val changes = remember(steps) {
+        val byPath = LinkedHashMap<String, Change>()
+        steps.filter { it.kind == "write" && it.state == "ok" && it.path != null }.forEach { st ->
+            val prev = byPath.remove(st.path!!)
+            byPath[st.path] = Change(
+                path = st.path,
+                code = st.code.orEmpty(),
+                added = (prev?.added ?: 0) + (st.added ?: 0),
+                removed = (prev?.removed ?: 0) + (st.removed ?: 0),
+                isNew = prev?.isNew ?: st.label.startsWith("Wrote "),
+            )
+        }
+        byPath.values.reversed()
+    }
+    if (changes.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Text("No changes yet — files Friday writes or edits show up here.", color = FridayMuted, fontSize = 13.sp)
+        }
+        return
+    }
+    val green = androidx.compose.ui.graphics.Color(0xFF16A34A)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Text(
+            "${changes.size} file${if (changes.size == 1) "" else "s"} changed  +${changes.sumOf { it.added }}  −${changes.sumOf { it.removed }}",
+            color = FridayMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+        changes.forEach { c ->
+            var open by remember(c.path) { mutableStateOf(changes.size <= 3) }
+            Row(
+                Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(c.path, color = FridayText, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (c.isNew) Text("new  ", color = FridayMuted, fontSize = 11.sp)
+                Text("+${c.added} ", color = green, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                Text("−${c.removed}", color = com.friday.app.ui.theme.FridayError, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+            }
+            if (open && c.code.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).background(FridaySurface).padding(vertical = 6.dp)) {
+                    c.code.split("\n").forEach { line ->
+                        val kind = if (c.isNew) '+' else if (line.startsWith("+ ")) '+' else if (line.startsWith("- ")) '-' else ' '
+                        val text = if (!c.isNew && kind != ' ') line.drop(2) else line
+                        Text(
+                            "$kind $text".ifBlank { " " },
+                            color = when (kind) { '+' -> green; '-' -> com.friday.app.ui.theme.FridayError; else -> FridayText },
+                            fontFamily = FontFamily.Monospace, fontSize = 11.5.sp, lineHeight = 17.sp, softWrap = false,
+                            modifier = Modifier.padding(horizontal = 14.dp),
+                        )
+                    }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(com.friday.app.ui.theme.FridayHairline))
         }
     }
 }

@@ -67,13 +67,7 @@ object ConversationsApi {
                             ask = com.friday.app.data.parseBuildAsk(b.optJSONArray("ask")),
                             steps = (0 until stepArr.length()).map { k ->
                                 val st = stepArr.getJSONObject(k)
-                                BuildStep(
-                                    id = st.optString("id"),
-                                    kind = st.optString("kind"),
-                                    label = st.optString("label"),
-                                    state = st.optString("state"),
-                                    detail = st.optString("detail").ifBlank { null },
-                                )
+                                com.friday.app.data.parseBuildStep(st)
                             },
                             previewUrl = b.optString("previewUrl").ifBlank { null },
                             port = b.optInt("port").takeIf { it > 0 },

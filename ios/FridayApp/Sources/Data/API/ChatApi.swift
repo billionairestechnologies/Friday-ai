@@ -84,7 +84,8 @@ enum ChatApi {
         webSearch: Bool,
         canvas: Bool,
         research: Bool = false,
-        attachments: [StreamAttachment]
+        attachments: [StreamAttachment],
+        effort: String? = nil
     ) -> AsyncThrowingStream<ChatEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -97,6 +98,8 @@ enum ChatApi {
                         "canvas": canvas,
                         "research": research,
                     ]
+                    // Build workspace effort picker (low | medium | high) — ignored outside Build sessions.
+                    if let effort { body["effort"] = effort }
                     if !attachments.isEmpty {
                         body["attachments"] = attachments.map {
                             ["mime": $0.mime, "dataUrl": $0.dataUrl, "name": $0.name, "size": $0.size, "kind": $0.kind]
@@ -151,13 +154,7 @@ enum ChatApi {
                             )
                             continuation.yield(.agent(status))
                         case "step":
-                            continuation.yield(.step(BuildStep(
-                                id: json["id"] as? String ?? UUID().uuidString,
-                                kind: json["kind"] as? String ?? "run",
-                                label: json["label"] as? String ?? "",
-                                state: json["state"] as? String ?? "running",
-                                detail: json["detail"] as? String
-                            )))
+                            continuation.yield(.step(BuildStep.parse(json, defaultState: "running")))
                         case "preview":
                             continuation.yield(.preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0))
                         case "plan":
@@ -232,13 +229,7 @@ enum ConversationsApi {
             var build: BuildInfo?
             if let b = row["build"] as? [String: Any] {
                 let steps = (b["steps"] as? [[String: Any]] ?? []).map {
-                    BuildStep(
-                        id: $0["id"] as? String ?? UUID().uuidString,
-                        kind: $0["kind"] as? String ?? "run",
-                        label: $0["label"] as? String ?? "",
-                        state: $0["state"] as? String ?? "ok",
-                        detail: $0["detail"] as? String
-                    )
+                    BuildStep.parse($0, defaultState: "ok")
                 }
                 let plan = BuildPlan.parse(b["plan"] as? [String: Any])
                 let ask = ChatApi.parseAsk(b["ask"])

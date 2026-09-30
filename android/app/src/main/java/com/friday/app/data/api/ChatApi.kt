@@ -84,7 +84,7 @@ object ChatApi {
     /** POST /api/chat/conversations/:id/messages/stream — text/event-stream, "t"-discriminated JSON frames.
      * [attachments] (max 4, enforced server-side) ride inline in this same request body as base64 data
      * URLs — the backend has no separate upload endpoint for chat attachments. */
-    fun streamMessage(conversationId: String, content: String, modes: Set<Mode>, attachments: List<PendingAttachment> = emptyList()): Flow<ChatEvent> = flow {
+    fun streamMessage(conversationId: String, content: String, modes: Set<Mode>, attachments: List<PendingAttachment> = emptyList(), effort: String? = null): Flow<ChatEvent> = flow {
         val body = JSONObject().apply {
             put("content", content)
             put("inputMode", "text")
@@ -92,6 +92,8 @@ object ChatApi {
             put("webSearch", Mode.Search in modes)
             put("canvas", Mode.Canvas in modes)
             put("research", Mode.Research in modes)
+            // Build workspace effort picker (low | medium | high) — ignored outside Build sessions.
+            if (effort != null) put("effort", effort)
             if (attachments.isNotEmpty()) {
                 put(
                     "attachments",
@@ -166,13 +168,7 @@ object ChatApi {
                                 )
                                 "step" -> emit(
                                     ChatEvent.Step(
-                                        BuildStep(
-                                            id = json.optString("id"),
-                                            kind = json.optString("kind"),
-                                            label = json.optString("label"),
-                                            state = json.optString("state"),
-                                            detail = json.optString("detail").ifBlank { null },
-                                        ),
+                                        com.friday.app.data.parseBuildStep(json),
                                     ),
                                 )
                                 "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))

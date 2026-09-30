@@ -56,7 +56,10 @@ struct DrawerPane: View {
 
                     ForEach(filteredChats) { chat in
                         Button { vm.selectChat(chat.id) } label: {
-                            HStack {
+                            HStack(spacing: 8) {
+                                if vm.workspace == "build", let dot = buildStatusMeta(vm.buildSessions.first(where: { $0.id == chat.id })?.status) {
+                                    Circle().fill(dot.color).frame(width: 7, height: 7)
+                                }
                                 Text(chat.title).font(.system(size: 14, weight: chat.id == vm.currentId ? .medium : .regular)).lineLimit(2)
                                 Spacer()
                             }

@@ -54,6 +54,36 @@ data class BuildStep(
     val label: String,
     val state: String, // running | ok | error
     val detail: String? = null,
+    /** File steps: which file, and the change itself (code for a new file, "- "/"+ " lines for an edit). */
+    val path: String? = null,
+    val code: String? = null,
+    val added: Int? = null,
+    val removed: Int? = null,
+)
+
+/** A step from the stream or a saved message — shared so both keep the file-change fields. */
+fun parseBuildStep(st: org.json.JSONObject): BuildStep = BuildStep(
+    id = st.optString("id"),
+    kind = st.optString("kind"),
+    label = st.optString("label"),
+    state = st.optString("state"),
+    detail = st.optString("detail").ifBlank { null },
+    path = st.optString("path").ifBlank { null },
+    code = st.optString("code").ifBlank { null },
+    added = if (st.has("added")) st.optInt("added") else null,
+    removed = if (st.has("removed")) st.optInt("removed") else null,
+)
+
+/** One row of the Build home / drawer (backend GET /api/build/sessions). status: running |
+ *  needs_input | done | error | idle. */
+data class BuildSessionSummary(
+    val id: String,
+    val title: String,
+    val updatedAt: Long,
+    val status: String,
+    val activity: String,
+    val repo: String?,
+    val prUrl: String?,
 )
 
 /** One line of the Build Mode plan — todo | doing | done. */

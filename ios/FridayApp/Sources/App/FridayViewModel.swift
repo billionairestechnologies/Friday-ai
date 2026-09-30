@@ -39,6 +39,26 @@ final class FridayViewModel: ObservableObject {
     /// "chat" or "build" — which workspace the main screen is in. Build Mode only runs in "build"
     /// (a new chat there is created as a Build session); the drawer lists that workspace's history.
     @Published var workspace: String = "chat"
+    /// Build home + drawer: every build session with its live status (GET /api/build/sessions).
+    @Published var buildSessions: [BuildSessionSummary] = []
+    @Published var buildSessionsLoaded = false
+    @Published var buildSessionsError: String?
+    /// Build composer effort picker: low | medium | high (remembered on this device).
+    @Published var buildEffort: String = UserDefaults.standard.string(forKey: "friday.build.effort") ?? "medium" {
+        didSet { UserDefaults.standard.set(buildEffort, forKey: "friday.build.effort") }
+    }
+
+    /// Refreshes the Build home / drawer statuses. A failure keeps the last list and says so.
+    func loadBuildSessions() async {
+        guard TokenStore.shared.hasSession() else { return }
+        do {
+            buildSessions = try await BuildApi.sessions()
+            buildSessionsError = nil
+        } catch {
+            buildSessionsError = "Couldn't load your builds — tap to retry."
+        }
+        buildSessionsLoaded = true
+    }
     @Published var drawerOpen = false
     /// Bumped to ask the composer to grab focus (swipe-up on the start screen opens the keyboard).
     @Published var composerFocusTick = 0
@@ -320,7 +340,8 @@ final class FridayViewModel: ObservableObject {
             conversationId: realId, content: content,
             think: modes.contains(.think), webSearch: modes.contains(.search), canvas: modes.contains(.canvas),
             research: modes.contains(.research),
-            attachments: streamAttachments
+            attachments: streamAttachments,
+            effort: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildEffort : nil
         )
 
         do {
@@ -332,6 +353,7 @@ final class FridayViewModel: ObservableObject {
             appendError(localId: realId, assistantMessageId: assistantMessageId, message: "Connection lost: \(error.localizedDescription)")
         }
         setStreaming(false, chatId: realId, assistantMessageId: assistantMessageId)
+        if chats.first(where: { $0.id == realId })?.isBuild == true { await loadBuildSessions() }
     }
 
     private func apply(event: ChatEvent, chatId: String, assistantMessageId: String) {
@@ -441,6 +463,7 @@ final class FridayViewModel: ObservableObject {
         currentId = nil
         drawerOpen = false
         workspace = "build"
+        Task { await loadBuildSessions() }
     }
 
     /// "Open in Build" under a normal-chat reply: a fresh Build session starting with that request.

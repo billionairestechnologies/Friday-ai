@@ -208,6 +208,7 @@ fun FridayApp(
                         page = "chat"
                     },
                     workspace = ui.workspace,
+                    buildStatuses = ui.buildSessions.associate { it.id to it.status },
                     onNewBuild = {
                         vm.newBuild()
                         page = "chat"
@@ -725,7 +726,17 @@ private fun ChatShell(
                     },
                 contentAlignment = if (empty) Alignment.Center else Alignment.TopStart,
             ) {
-                if (empty) {
+                if (empty && ui.workspace == "build") {
+                    LaunchedEffect(Unit) { vm.loadBuildSessions() }
+                    com.friday.app.ui.buildmode.BuildHome(
+                        firstName = ui.user?.name?.split(" ")?.firstOrNull(),
+                        sessions = ui.buildSessions,
+                        loaded = ui.buildSessionsLoaded,
+                        error = ui.buildSessionsError,
+                        onOpen = { id -> vm.openChat(id) },
+                        onRetry = vm::loadBuildSessions,
+                    )
+                } else if (empty) {
                     Box(
                         Modifier
                             .alpha(heroA)
@@ -807,6 +818,9 @@ private fun ChatShell(
                         },
                     )
                 }
+                if (ui.workspace == "build") {
+                    com.friday.app.ui.buildmode.BuildEffortChip(effort = ui.buildEffort, onChange = vm::setBuildEffort)
+                }
                 ComposerBar(
                     placeholder = if (pendingPlan != null) "Tell me what to change in the plan…" else if (ui.workspace == "build") "Describe what to build…" else null,
                     draft = ui.draft,
@@ -880,6 +894,7 @@ private fun ChatShell(
                 // Just-built (this device is watching it) → known-good URL; a loaded-from-history
                 // build gets re-verified/restored by the backend first.
                 liveUrl = buildMsg.build?.previewUrl?.takeIf { buildMsg.id.startsWith("a-") },
+                steps = chat.messages.flatMap { it.build?.steps.orEmpty() },
                 onClose = { buildOpen = false },
                 modifier = panelModifier,
             )

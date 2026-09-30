@@ -90,6 +90,12 @@ data class FridayUiState(
     /** "chat" or "build" — which workspace the main screen is in. Build Mode only runs in "build"
      *  (a new chat there is created as a Build session); the drawer lists that workspace's history. */
     val workspace: String = "chat",
+    /** Build home + drawer: every build session with its live status (GET /api/build/sessions). */
+    val buildSessions: List<com.friday.app.data.BuildSessionSummary> = emptyList(),
+    val buildSessionsLoaded: Boolean = false,
+    val buildSessionsError: String? = null,
+    /** Build composer effort picker: low | medium | high (remembered on this device). */
+    val buildEffort: String = "medium",
 )
 
 data class QueuedMessage(
@@ -119,11 +125,13 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     // chats "getting stuck" when switching screens or opening a new chat mid-reply. Each chat now
     // owns its own job and can run fully independently of every other chat.
     private val streamJobs = mutableMapOf<String, Job>()
+    private val buildPrefs = app.getSharedPreferences("friday_build", android.content.Context.MODE_PRIVATE)
     // Model last applied to each server conversation, so a send only PATCHes the conversation when
     // the picker actually changed. Unknown (e.g. a conversation loaded from the drawer) → PATCH once.
     private val conversationModels = mutableMapOf<String, String?>()
 
     init {
+        _state.update { it.copy(buildEffort = buildPrefs.getString("effort", "medium") ?: "medium") }
         viewModelScope.launch {
             val models = ModelsApi.list()
             if (models.isNotEmpty()) {
@@ -531,6 +539,24 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     fun newBuild() {
         cancelLocalStream()
         _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "build") }
+        loadBuildSessions()
+    }
+
+    /** Refreshes the Build home / drawer statuses. A failure keeps the last list and says so. */
+    fun loadBuildSessions() {
+        if (!tokenStore.hasSession()) return
+        viewModelScope.launch {
+            val list = com.friday.app.data.api.BuildApi.sessions()
+            _state.update {
+                if (list == null) it.copy(buildSessionsLoaded = true, buildSessionsError = "Couldn't load your builds — pull to retry.")
+                else it.copy(buildSessions = list, buildSessionsLoaded = true, buildSessionsError = null)
+            }
+        }
+    }
+
+    fun setBuildEffort(effort: String) {
+        buildPrefs.edit().putString("effort", effort).apply()
+        _state.update { it.copy(buildEffort = effort) }
     }
 
     /** "Open in Build" under a normal-chat reply: a fresh Build session starting with that request.
@@ -743,7 +769,8 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             streamJobs[remoteId] = job
                             chatId = remoteId
                         }
-                        ChatApi.streamMessage(remoteId, text, modes, attachments)
+                        val isBuild = _state.value.chats.find { it.id == remoteId }?.workspace == "build"
+                        ChatApi.streamMessage(remoteId, text, modes, attachments, effort = if (isBuild) _state.value.buildEffort else null)
                     } else {
                         repo.send(text, modes)
                     }
@@ -809,6 +836,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 patchMessage(chatId!!, asstId) { it.copy(isStreaming = false) }
                 streamJobs.remove(chatId)
+                if (_state.value.chats.find { it.id == chatId }?.isBuild == true) loadBuildSessions()
                 val next = _state.value.queued[chatId]?.firstOrNull()
                 if (next != null && tokenStore.hasSession()) {
                     removeQueued(chatId!!, next.id)

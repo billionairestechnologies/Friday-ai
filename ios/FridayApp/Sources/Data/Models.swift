@@ -44,6 +44,38 @@ struct BuildStep: Identifiable, Hashable {
     let label: String
     let state: String // running | ok | error
     var detail: String?
+    /// File steps: which file, and the change itself (code for a new file, "- "/"+ " lines for an edit).
+    var path: String?
+    var code: String?
+    var added: Int?
+    var removed: Int?
+
+    /// A step from the stream or a saved message — shared so both keep the file-change fields.
+    static func parse(_ j: [String: Any], defaultState: String) -> BuildStep {
+        BuildStep(
+            id: j["id"] as? String ?? UUID().uuidString,
+            kind: j["kind"] as? String ?? "run",
+            label: j["label"] as? String ?? "",
+            state: j["state"] as? String ?? defaultState,
+            detail: j["detail"] as? String,
+            path: j["path"] as? String,
+            code: j["code"] as? String,
+            added: j["added"] as? Int,
+            removed: j["removed"] as? Int
+        )
+    }
+}
+
+/// One row of the Build home / drawer (backend GET /api/build/sessions).
+/// status: running | needs_input | done | error | idle.
+struct BuildSessionSummary: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let updatedAt: Date?
+    let status: String
+    let activity: String
+    let repo: String?
+    let prUrl: String?
 }
 
 /// One line of the Build Mode plan — todo | doing | done.
