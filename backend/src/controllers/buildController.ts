@@ -5,6 +5,7 @@ import { ensurePreview, getProject } from "../services/projectBuild/sandbox.js";
 import { listBuildSessions } from "../services/projectBuild/sessions.js";
 import { listPendingApprovals, resolveApproval } from "../services/projectBuild/approvals.js";
 import { listCheckpoints, restoreCheckpoint } from "../services/projectBuild/checkpoints.js";
+import { readEvents } from "../services/projectBuild/events.js";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler.js";
 
@@ -36,6 +37,13 @@ export async function approve(req: Request, res: Response) {
     throw new HttpError(409, "That request is no longer waiting — the build may have moved on or been stopped.");
   }
   res.json({ ok: true });
+}
+
+/** The current turn's event log after `after` — replay + live follow for a device that wasn't connected. */
+export async function events(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.conversationId!);
+  const { after } = z.object({ after: z.coerce.number().int().min(0).default(0) }).parse(req.query);
+  res.json(await readEvents(req.params.conversationId!, after));
 }
 
 /** Which user messages have a restore point (the files before that turn). */

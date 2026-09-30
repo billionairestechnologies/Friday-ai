@@ -838,6 +838,7 @@ private fun ChatShell(
                 if (ui.workspace == "build") {
                     LaunchedEffect(ui.currentId) {
                         while (true) {
+                            vm.resumeBuildIfRunning()
                             vm.pollApprovals()
                             kotlinx.coroutines.delay(4000)
                         }

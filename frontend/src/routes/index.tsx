@@ -25,6 +25,7 @@ import { BuildComposerFooter, BuildHome, BuildRepoChip } from "@/components/buil
 import { useBuildSessions, useBuildSessionsSync } from "@/lib/build-mode/sessions";
 import { ApprovalPanel } from "@/components/build-approval";
 import { useBuildCheckpoints } from "@/lib/build-mode/checkpoints";
+import { useBuildLiveResume } from "@/lib/build-mode/resume";
 import type { BuildApproval } from "@/lib/chat/types";
 import { useBuildPrefs } from "@/lib/build-mode/prefs";
 import { fileToAttachment } from "@/lib/chat/files";
@@ -131,6 +132,8 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     };
   }, [buildMode, activeConversationId, live, sessionStatus]);
   const pendingApproval = liveApproval ?? remoteApprovals[0] ?? null;
+  // A build running elsewhere (another device, before a reload): replay its event log and follow it live.
+  useBuildLiveResume({ enabled: buildMode && Boolean(user) && !isPending, chatId: activeId, conversationId: activeConversationId, status: sessionStatus });
 
   // Restore points for this Build session's messages — refreshed when it opens and after each turn.
   const loadCheckpoints = useBuildCheckpoints((s) => s.load);

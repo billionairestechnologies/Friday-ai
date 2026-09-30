@@ -20,6 +20,58 @@ import org.json.JSONObject
 import java.io.IOException
 
 /** Real backend chat calls, used once a session exists. Mirrors data/ChatRepository.kt's mock Flow<ChatEvent> shape. */
+/**
+ * Turns one stream frame into a ChatEvent. Text / reasoning / sources are cumulative (the UI replaces
+ * rather than appends), so the parser keeps the running totals. Shared by the live SSE stream and by
+ * Build live resume, which replays the same frames from the event log.
+ */
+class FrameParser {
+    private var text = ""
+    private var reasoning = ""
+    private val sources = mutableListOf<Source>()
+
+    fun parse(json: JSONObject): ChatEvent? = when (json.optString("t")) {
+        "status" -> ChatEvent.Status(json.optString("s"))
+        "think", "reasoning" -> {
+            reasoning += json.optString("c")
+            ChatEvent.Reasoning(reasoning)
+        }
+        "text" -> {
+            text += json.optString("c")
+            ChatEvent.Token(text)
+        }
+        "cite" -> {
+            sources += Source(title = json.optString("title").ifBlank { json.optString("u") }, url = json.optString("u"))
+            ChatEvent.Sources(sources.toList())
+        }
+        "err" -> {
+            text += "\n\n" + json.optString("c", "Something went wrong.")
+            ChatEvent.Token(text)
+        }
+        "agent" -> ChatEvent.Agent(
+            AgentStatus(
+                slug = json.optString("slug"),
+                model = json.optString("model"),
+                state = json.optString("state"),
+                error = json.optString("error").ifBlank { null },
+            ),
+        )
+        "step" -> ChatEvent.Step(com.friday.app.data.parseBuildStep(json))
+        "preview" -> ChatEvent.Preview(json.optString("url"), json.optInt("port"))
+        "plan" -> com.friday.app.data.parseBuildPlan(json)?.let { ChatEvent.Plan(it) }
+        "suggest_build" -> ChatEvent.SuggestBuild(json.optString("prompt"))
+        "approval" -> ChatEvent.Approval(com.friday.app.data.parseBuildApproval(json))
+        "meta" -> json.optString("userMessageId").ifBlank { null }?.let { ChatEvent.Meta(it) }
+        "build" -> ChatEvent.BuildMeta(
+            elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },
+            zipBytes = json.optLong("zipBytes").takeIf { it > 0 },
+            zipName = json.optString("zipName").ifBlank { null },
+        )
+        "ask" -> ChatEvent.Ask(com.friday.app.data.parseBuildAsk(json.optJSONArray("questions")))
+        else -> null
+    }
+}
+
 object ChatApi {
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
@@ -124,9 +176,7 @@ object ChatApi {
                     return@use
                 }
                 val source = resp.body?.source() ?: return@use
-                var text = ""
-                var reasoning = ""
-                val sources = mutableListOf<Source>()
+                val parser = FrameParser()
                 val block = StringBuilder()
                 var done = false
                 while (!done && !source.exhausted() && currentCoroutineContext().isActive) {
@@ -135,58 +185,8 @@ object ChatApi {
                         if (block.isNotEmpty()) {
                             val payload = block.toString()
                             block.setLength(0)
-                            val json = runCatching { JSONObject(payload) }.getOrNull()
-                            when (json?.optString("t")) {
-                                "status" -> emit(ChatEvent.Status(json.optString("s")))
-                                "think", "reasoning" -> {
-                                    reasoning += json.optString("c")
-                                    emit(ChatEvent.Reasoning(reasoning))
-                                }
-                                "text" -> {
-                                    text += json.optString("c")
-                                    emit(ChatEvent.Token(text))
-                                }
-                                "cite" -> {
-                                    sources += Source(
-                                        title = json.optString("title").ifBlank { json.optString("u") },
-                                        url = json.optString("u"),
-                                    )
-                                    emit(ChatEvent.Sources(sources.toList()))
-                                }
-                                "err" -> {
-                                    text += "\n\n" + json.optString("c", "Something went wrong.")
-                                    emit(ChatEvent.Token(text))
-                                }
-                                "agent" -> emit(
-                                    ChatEvent.Agent(
-                                        AgentStatus(
-                                            slug = json.optString("slug"),
-                                            model = json.optString("model"),
-                                            state = json.optString("state"),
-                                            error = json.optString("error").ifBlank { null },
-                                        ),
-                                    ),
-                                )
-                                "step" -> emit(
-                                    ChatEvent.Step(
-                                        com.friday.app.data.parseBuildStep(json),
-                                    ),
-                                )
-                                "preview" -> emit(ChatEvent.Preview(json.optString("url"), json.optInt("port")))
-                                "plan" -> com.friday.app.data.parseBuildPlan(json)?.let { emit(ChatEvent.Plan(it)) }
-                                "suggest_build" -> emit(ChatEvent.SuggestBuild(json.optString("prompt")))
-                                "approval" -> emit(ChatEvent.Approval(com.friday.app.data.parseBuildApproval(json)))
-                                "meta" -> json.optString("userMessageId").ifBlank { null }?.let { emit(ChatEvent.Meta(it)) }
-                                "build" -> emit(
-                                    ChatEvent.BuildMeta(
-                                        elapsedMs = json.optLong("elapsedMs").takeIf { it > 0 },
-                                        zipBytes = json.optLong("zipBytes").takeIf { it > 0 },
-                                        zipName = json.optString("zipName").ifBlank { null },
-                                    ),
-                                )
-                                "ask" -> emit(ChatEvent.Ask(com.friday.app.data.parseBuildAsk(json.optJSONArray("questions"))))
-                                "done" -> done = true
-                            }
+                            val json = runCatching { JSONObject(payload) }.getOrNull() ?: continue
+                            if (json.optString("t") == "done") done = true else parser.parse(json)?.let { emit(it) }
                         }
                     } else if (line.startsWith("data:")) {
                         val payload = line.removePrefix("data:").trimStart()

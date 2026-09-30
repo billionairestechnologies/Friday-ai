@@ -157,6 +157,7 @@ private struct ChatShell: View {
                         .padding(.horizontal, 16)
                         .task(id: vm.currentId) {
                             while !Task.isCancelled {
+                                vm.resumeBuildIfRunning()
                                 await vm.pollApprovals()
                                 try? await Task.sleep(nanoseconds: 4_000_000_000)
                             }

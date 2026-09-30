@@ -18,6 +18,7 @@ import { recordAdminAuditLog } from "../usageService.js";
 import { SUMMARY_PROMPT, applySummary, planSummaryCut, renderTranscript, transcriptChars } from "./summarize.js";
 import { approvedPlanNote, isPlanApproval } from "./plan.js";
 import { approvalFor, requestApproval, type PermissionMode } from "./approvals.js";
+import { notifyBuildNeedsInput } from "./notify.js";
 
 // A native tool round can carry several calls (write 4 files at once), so the round budget goes
 // further than a text-protocol iteration did. The wall clock is the real ceiling; the sandbox TTL
@@ -521,6 +522,7 @@ export async function runBuildAgent(opts: {
     if (ask) {
       const { request, decision } = requestApproval(conversationId, userId, ask, signal);
       onEvent({ t: "approval", ...request, state: "pending" });
+      void notifyBuildNeedsInput(userId, conversationId, ask.title);
       const waitStart = Date.now();
       const d = await decision;
       waitedMs += Date.now() - waitStart;

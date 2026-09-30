@@ -2,6 +2,16 @@ import Foundation
 
 /// Build Mode project endpoints (backend /api/build/:conversationId/…).
 enum BuildApi {
+    /// GET /api/build/:id/events?after= — the current turn's logged frames (id, frame) and whether it's running.
+    static func events(conversationId: String, after: Int) async throws -> (events: [(Int, [String: Any])], running: Bool) {
+        let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/events?after=\(after)", authed: true)
+        let list = (json["events"] as? [[String: Any]] ?? []).compactMap { row -> (Int, [String: Any])? in
+            guard let id = row["id"] as? Int, let ev = row["event"] as? [String: Any] else { return nil }
+            return (id, ev)
+        }
+        return (list, json["running"] as? Bool ?? false)
+    }
+
     /// GET /api/build/:id/checkpoints — ids of the user messages that have a restore point.
     static func checkpoints(conversationId: String) async throws -> Set<String> {
         let json = try await ApiClient.shared.requestJSON(path: "build/\(conversationId)/checkpoints", authed: true)

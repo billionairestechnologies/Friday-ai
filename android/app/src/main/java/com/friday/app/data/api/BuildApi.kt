@@ -10,6 +10,20 @@ import java.io.File
 
 /** Build Mode project endpoints (backend /api/build/:conversationId/…). */
 object BuildApi {
+    /** GET /api/build/:id/events?after= — the current turn's logged stream frames (id, frame) and
+     *  whether it's still running. Null on failure. */
+    suspend fun events(conversationId: String, after: Long): Pair<List<Pair<Long, JSONObject>>, Boolean>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "build/$conversationId/events?after=$after").get().build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val obj = JSONObject(resp.body?.string().orEmpty())
+                val arr = obj.optJSONArray("events") ?: org.json.JSONArray()
+                (0 until arr.length()).map { i -> arr.getJSONObject(i).let { it.optLong("id") to it.getJSONObject("event") } } to obj.optBoolean("running")
+            }
+        }.getOrNull()
+    }
+
     /** GET /api/build/:id/checkpoints — ids of the user messages that have a restore point. Null on failure. */
     suspend fun checkpoints(conversationId: String): Set<String>? = withContext(Dispatchers.IO) {
         runCatching {

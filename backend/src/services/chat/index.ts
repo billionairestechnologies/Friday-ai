@@ -47,6 +47,8 @@ import { runBuildAgent } from "../projectBuild/agent.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
 import { createCheckpoint } from "../projectBuild/checkpoints.js";
+import { createEventRecorder } from "../projectBuild/events.js";
+import { notifyBuildFinished } from "../projectBuild/notify.js";
 import { PLAN_MARKER, draftPlan, findPendingPlan, isPlanApproval, needsPlan, renderPlan, setPlanStatus } from "../projectBuild/plan.js";
 import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
 import { getProject } from "../projectBuild/sandbox.js";
@@ -689,40 +691,54 @@ export async function streamMessage(
       }
       // Restore point: the project's files as they are before this turn changes anything.
       await createCheckpoint(conversationId, userMessageRow.id as string);
-      // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
-      // only now, not during a question/plan round, which never touches the sandbox.
-      onEvent({ t: "status", s: "building" });
-      const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode });
-      if (built.error && !built.text && built.build.steps.length === 0) {
-        onEvent({ t: "err", c: built.error });
-        onEvent({ t: "done" });
+      // Event log for this turn: a device that isn't connected (reload, another phone) replays it and
+      // follows along live via GET /api/build/:id/events. Every event below goes to both.
+      const recorder = createEventRecorder(conversationId);
+      await recorder.reset();
+      const emit = (ev: StreamEvent) => {
+        recorder.record(ev);
+        onEvent(ev);
+      };
+      try {
+        // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
+        // only now, not during a question/plan round, which never touches the sandbox.
+        emit({ t: "status", s: "building" });
+        const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent: emit, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode });
+        if (built.error && !built.text && built.build.steps.length === 0) {
+          emit({ t: "err", c: built.error });
+          emit({ t: "done" });
+          void notifyBuildFinished(userId, conversationId, "error");
+          return;
+        }
+        if (built.candidate) {
+          reconcileTokens = built.usage.totalTokens;
+          void recordTokenUsage(userId, built.candidate.slug, built.candidate.modelId, built.usage, { conversationId, mode });
+          void recordTokenLedger(
+            userId,
+            effectivePlan.enterprise?.organizationId ?? null,
+            built.candidate.slug,
+            built.candidate.modelId,
+            built.usage,
+            reservation?.reserveTokens ?? 0,
+          );
+        }
+        emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl });
+        const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
+        await insertAssistantMessage(conversationId, built.text || "Done.", buildLabel, {
+          usedCanvas: false,
+          usedSearch: false,
+          usedThink: false,
+          build: built.build,
+          error: built.error,
+        });
+        await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+        if (built.error) emit({ t: "err", c: built.error });
+        emit({ t: "done" });
+        void notifyBuildFinished(userId, conversationId, built.error ? "error" : "done");
         return;
+      } finally {
+        await recorder.close();
       }
-      if (built.candidate) {
-        reconcileTokens = built.usage.totalTokens;
-        void recordTokenUsage(userId, built.candidate.slug, built.candidate.modelId, built.usage, { conversationId, mode });
-        void recordTokenLedger(
-          userId,
-          effectivePlan.enterprise?.organizationId ?? null,
-          built.candidate.slug,
-          built.candidate.modelId,
-          built.usage,
-          reservation?.reserveTokens ?? 0,
-        );
-      }
-      onEvent({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl });
-      const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
-      await insertAssistantMessage(conversationId, built.text || "Done.", buildLabel, {
-        usedCanvas: false,
-        usedSearch: false,
-        usedThink: false,
-        build: built.build,
-        error: built.error,
-      });
-      await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-      if (built.error) onEvent({ t: "err", c: built.error });
-      onEvent({ t: "done" });
-      return;
     }
 
     // A build-shaped request in normal chat: Build Mode lives in the Build workspace now, so answer

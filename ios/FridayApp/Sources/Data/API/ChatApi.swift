@@ -295,3 +295,32 @@ enum ModelsApi {
         }
     }
 }
+
+/// Turns one logged stream frame into a ChatEvent — Build live resume replays the same frames the live
+/// stream sends, from the event log. Text / reasoning are cumulative, like the live stream's buffers.
+final class FrameParser {
+    private var text = ""
+    private var think = ""
+
+    func parse(_ json: [String: Any]) -> ChatEvent? {
+        switch json["t"] as? String {
+        case "status": return .status(json["s"] as? String ?? "")
+        case "think", "reasoning":
+            think += json["c"] as? String ?? ""
+            return .think(think)
+        case "text":
+            text += json["c"] as? String ?? ""
+            return .text(text)
+        case "err":
+            text += "\n\n" + (json["c"] as? String ?? "Something went wrong.")
+            return .text(text)
+        case "step": return .step(BuildStep.parse(json, defaultState: "running"))
+        case "preview": return .preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0)
+        case "plan": return BuildPlan.parse(json).map { .plan($0) }
+        case "approval": return .approval(BuildApproval.parse(json))
+        case "ask": return .ask(ChatApi.parseAsk(json["questions"]))
+        case "build": return .buildMeta(elapsedMs: json["elapsedMs"] as? Int, zipBytes: json["zipBytes"] as? Int, zipName: json["zipName"] as? String)
+        default: return nil
+        }
+    }
+}

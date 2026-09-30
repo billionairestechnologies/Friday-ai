@@ -110,6 +110,51 @@ final class FridayViewModel: ObservableObject {
         if let list = try? await BuildApi.approvals(conversationId: chatId) { approvals[chatId] = list }
     }
 
+    private var resumeTask: Task<Void, Never>?
+
+    /// Build live resume: the open build is running with no stream on this device (started on another
+    /// device, or before the app restarted) — replay its event log into a live message and follow it
+    /// until it ends, then load the saved result. Only starts once the server confirms it's running.
+    func resumeBuildIfRunning() {
+        guard let chatId = currentId, UUID(uuidString: chatId) != nil, streamJobs[chatId] == nil, resumeTask == nil else { return }
+        let status = buildSessions.first(where: { $0.id == chatId })?.status
+        guard status == "running" || status == "needs_input" else { return }
+        resumeTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.resumeTask = nil }
+            let parser = FrameParser()
+            let asstId = "resume-\(UUID().uuidString)"
+            var after = 0
+            var started = false
+            while !Task.isCancelled {
+                if let page = try? await BuildApi.events(conversationId: chatId, after: after) {
+                    if !started {
+                        if !page.running { break }
+                        started = true
+                        var msg = ChatMessage(id: asstId, role: .assistant)
+                        msg.isStreaming = true
+                        msg.status = "building"
+                        if let idx = chats.firstIndex(where: { $0.id == chatId }) { chats[idx].messages.append(msg) }
+                    }
+                    for (id, frame) in page.events {
+                        after = id
+                        if let ev = parser.parse(frame) { apply(event: ev, chatId: chatId, assistantMessageId: asstId) }
+                    }
+                    if !page.running && page.events.isEmpty { break }
+                }
+                if currentId != chatId { break }
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+            }
+            if started {
+                if let messages = try? await ConversationsApi.messages(conversationId: chatId),
+                   let idx = chats.firstIndex(where: { $0.id == chatId }) {
+                    chats[idx].messages = messages
+                }
+                await loadBuildSessions()
+            }
+        }
+    }
+
     /// Refreshes the Build home / drawer statuses. A failure keeps the last list and says so.
     func loadBuildSessions() async {
         guard TokenStore.shared.hasSession() else { return }

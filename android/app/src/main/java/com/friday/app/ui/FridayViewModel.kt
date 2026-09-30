@@ -850,66 +850,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     repo.send(text, modes)
                 }
-                eventFlow.collect { event ->
-                    when (event) {
-                        is ChatEvent.Thinking -> patchMessage(chatId!!, asstId) {
-                            it.copy(thinkingLabel = event.label, thinkingSteps = event.steps)
-                        }
-                        is ChatEvent.Status -> patchMessage(chatId!!, asstId) {
-                            // "building" = Build Mode started: keep a BuildInfo around so the start-up
-                            // banner stays visible until the first step exists (narration flips status meanwhile).
-                            it.copy(status = event.phase, build = if (event.phase == "building" && it.build == null) BuildInfo() else it.build)
-                        }
-                        is ChatEvent.Sources -> patchMessage(chatId!!, asstId) {
-                            it.copy(sources = event.items)
-                        }
-                        is ChatEvent.Reasoning -> patchMessage(chatId!!, asstId) {
-                            it.copy(reasoning = event.text)
-                        }
-                        is ChatEvent.Token -> patchMessage(chatId!!, asstId) {
-                            it.copy(content = event.text)
-                        }
-                        is ChatEvent.CanvasUpdate -> patchMessage(chatId!!, asstId) {
-                            it.copy(canvasHtml = event.html)
-                        }
-                        is ChatEvent.Agent -> patchMessage(chatId!!, asstId) { msg ->
-                            val i = msg.agents.indexOfFirst { it.slug == event.status.slug && it.model == event.status.model }
-                            val nextAgents = if (i == -1) msg.agents + event.status else msg.agents.toMutableList().apply { set(i, event.status) }
-                            msg.copy(agents = nextAgents)
-                        }
-                        is ChatEvent.Step -> patchMessage(chatId!!, asstId) { msg ->
-                            val cur = msg.build ?: BuildInfo()
-                            val i = cur.steps.indexOfFirst { it.id == event.step.id }
-                            val steps = if (i == -1) cur.steps + event.step else cur.steps.toMutableList().apply { set(i, event.step) }
-                            msg.copy(build = cur.copy(steps = steps))
-                        }
-                        is ChatEvent.Preview -> patchMessage(chatId!!, asstId) { msg ->
-                            msg.copy(build = (msg.build ?: BuildInfo()).copy(previewUrl = event.url, port = event.port))
-                        }
-                        is ChatEvent.Plan -> patchMessage(chatId!!, asstId) { msg ->
-                            msg.copy(build = (msg.build ?: BuildInfo()).copy(plan = event.plan))
-                        }
-                        is ChatEvent.BuildMeta -> patchMessage(chatId!!, asstId) { msg ->
-                            msg.copy(build = (msg.build ?: BuildInfo()).copy(elapsedMs = event.elapsedMs, zipBytes = event.zipBytes, zipName = event.zipName))
-                        }
-                        is ChatEvent.Ask -> patchMessage(chatId!!, asstId) { msg ->
-                            msg.copy(build = (msg.build ?: BuildInfo()).copy(ask = event.questions))
-                        }
-                        is ChatEvent.SuggestBuild -> patchMessage(chatId!!, asstId) {
-                            it.copy(suggestBuildPrompt = event.prompt)
-                        }
-                        is ChatEvent.Approval -> upsertApproval(chatId!!, event.approval)
-                        is ChatEvent.Meta -> patchChat(chatId!!) { c ->
-                            c.copy(messages = c.messages.map { if (it.id == userMsg.id) it.copy(id = event.userMessageId) else it })
-                        }
-                        ChatEvent.Disconnected -> patchMessage(chatId!!, asstId) {
-                            it.copy(disconnected = true)
-                        }
-                        ChatEvent.Done -> patchMessage(chatId!!, asstId) {
-                            it.copy(isStreaming = false)
-                        }
-                    }
-                }
+                eventFlow.collect { event -> applyChatEvent(chatId!!, asstId, event, userMsg.id) }
             } finally {
                 patchMessage(chatId!!, asstId) { it.copy(isStreaming = false) }
                 streamJobs.remove(chatId)
@@ -925,6 +866,116 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         streamJobs[startChatId] = job
+    }
+
+    private var resumeJob: Job? = null
+
+    /**
+     * Build live resume: the open build is running with no stream on this device (started on another
+     * device, or before the app restarted) — replay its event log into a live message and keep
+     * following it until it ends, then load the saved result. Only starts once the server confirms
+     * it's running.
+     */
+    fun resumeBuildIfRunning() {
+        val chatId = _state.value.currentId ?: return
+        if (!isServerConversationId(chatId) || streamJobs[chatId]?.isActive == true || resumeJob?.isActive == true) return
+        val status = _state.value.buildSessions.firstOrNull { it.id == chatId }?.status
+        if (status != "running" && status != "needs_input") return
+        resumeJob = viewModelScope.launch {
+            val parser = com.friday.app.data.api.FrameParser()
+            val asstId = "a-resume-${System.currentTimeMillis()}"
+            var after = 0L
+            var started = false
+            try {
+                while (true) {
+                    val page = com.friday.app.data.api.BuildApi.events(chatId, after)
+                    if (page != null) {
+                        val (events, running) = page
+                        if (!started) {
+                            if (!running) break
+                            started = true
+                            patchChat(chatId) { it.copy(messages = it.messages + ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true, status = "building")) }
+                        }
+                        for ((id, frame) in events) {
+                            after = id
+                            if (frame.optString("t") == "done") continue
+                            parser.parse(frame)?.let { applyChatEvent(chatId, asstId, it, null) }
+                        }
+                        if (!running && events.isEmpty()) break
+                    }
+                    if (_state.value.currentId != chatId) break
+                    kotlinx.coroutines.delay(1200)
+                }
+            } finally {
+                if (started) {
+                    val msgs = ConversationsApi.messages(chatId)
+                    if (msgs.isNotEmpty()) patchChat(chatId) { it.copy(messages = msgs) }
+                    loadBuildSessions()
+                }
+            }
+        }
+    }
+
+    /** Applies one stream event to a chat's assistant message — shared by live sends and Build live resume. */
+    private fun applyChatEvent(chatId: String, asstId: String, event: ChatEvent, userMsgId: String?) {
+        when (event) {
+            is ChatEvent.Thinking -> patchMessage(chatId, asstId) {
+                it.copy(thinkingLabel = event.label, thinkingSteps = event.steps)
+            }
+            is ChatEvent.Status -> patchMessage(chatId, asstId) {
+                // "building" = Build Mode started: keep a BuildInfo around so the start-up
+                // banner stays visible until the first step exists (narration flips status meanwhile).
+                it.copy(status = event.phase, build = if (event.phase == "building" && it.build == null) BuildInfo() else it.build)
+            }
+            is ChatEvent.Sources -> patchMessage(chatId, asstId) {
+                it.copy(sources = event.items)
+            }
+            is ChatEvent.Reasoning -> patchMessage(chatId, asstId) {
+                it.copy(reasoning = event.text)
+            }
+            is ChatEvent.Token -> patchMessage(chatId, asstId) {
+                it.copy(content = event.text)
+            }
+            is ChatEvent.CanvasUpdate -> patchMessage(chatId, asstId) {
+                it.copy(canvasHtml = event.html)
+            }
+            is ChatEvent.Agent -> patchMessage(chatId, asstId) { msg ->
+                val i = msg.agents.indexOfFirst { it.slug == event.status.slug && it.model == event.status.model }
+                val nextAgents = if (i == -1) msg.agents + event.status else msg.agents.toMutableList().apply { set(i, event.status) }
+                msg.copy(agents = nextAgents)
+            }
+            is ChatEvent.Step -> patchMessage(chatId, asstId) { msg ->
+                val cur = msg.build ?: BuildInfo()
+                val i = cur.steps.indexOfFirst { it.id == event.step.id }
+                val steps = if (i == -1) cur.steps + event.step else cur.steps.toMutableList().apply { set(i, event.step) }
+                msg.copy(build = cur.copy(steps = steps))
+            }
+            is ChatEvent.Preview -> patchMessage(chatId, asstId) { msg ->
+                msg.copy(build = (msg.build ?: BuildInfo()).copy(previewUrl = event.url, port = event.port))
+            }
+            is ChatEvent.Plan -> patchMessage(chatId, asstId) { msg ->
+                msg.copy(build = (msg.build ?: BuildInfo()).copy(plan = event.plan))
+            }
+            is ChatEvent.BuildMeta -> patchMessage(chatId, asstId) { msg ->
+                msg.copy(build = (msg.build ?: BuildInfo()).copy(elapsedMs = event.elapsedMs, zipBytes = event.zipBytes, zipName = event.zipName))
+            }
+            is ChatEvent.Ask -> patchMessage(chatId, asstId) { msg ->
+                msg.copy(build = (msg.build ?: BuildInfo()).copy(ask = event.questions))
+            }
+            is ChatEvent.SuggestBuild -> patchMessage(chatId, asstId) {
+                it.copy(suggestBuildPrompt = event.prompt)
+            }
+            is ChatEvent.Approval -> upsertApproval(chatId, event.approval)
+            is ChatEvent.Meta -> patchChat(chatId) { c ->
+                c.copy(messages = c.messages.map { if (it.id == userMsgId) it.copy(id = event.userMessageId) else it })
+            }
+            ChatEvent.Disconnected -> patchMessage(chatId, asstId) {
+                it.copy(disconnected = true)
+            }
+            ChatEvent.Done -> patchMessage(chatId, asstId) {
+                it.copy(isStreaming = false)
+            }
+        }
     }
 
     /** Uploads a recorded voice message for transcription, then writes the recognized text into
