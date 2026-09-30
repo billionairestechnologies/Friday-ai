@@ -1,3 +1,4 @@
+import { createBranch, createRepo, listBranches, listMyRepos } from "../services/githubRepos.js";
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
@@ -152,6 +153,36 @@ connectorsRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const query = typeof req.query.q === "string" ? req.query.q : "";
-    res.json({ repositories: await searchGitHubRepositories(req.user!.id, query) });
+    // mine=1: the user's own repositories (Build's repo picker); otherwise the older name search.
+    if (req.query.mine === "1") res.json({ repositories: await listMyRepos(req.user!.id, query) });
+    else res.json({ repositories: await searchGitHubRepositories(req.user!.id, query) });
+  }),
+);
+
+connectorsRouter.post(
+  "/github/repos",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const body = z.object({ name: z.string().trim().min(1).max(100), private: z.boolean().default(true), description: z.string().max(350).optional() }).parse(req.body);
+    res.status(201).json({ repository: await createRepo(req.user!.id, body) });
+  }),
+);
+
+connectorsRouter.get(
+  "/github/branches",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const repo = z.string().trim().min(3).max(200).parse(req.query.repo);
+    res.json(await listBranches(req.user!.id, repo));
+  }),
+);
+
+connectorsRouter.post(
+  "/github/branches",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const body = z.object({ repo: z.string().trim().min(3).max(200), branch: z.string().trim().min(1).max(200), from: z.string().trim().min(1).max(200) }).parse(req.body);
+    await createBranch(req.user!.id, body.repo, body.branch, body.from);
+    res.status(201).json({ branch: body.branch });
   }),
 );

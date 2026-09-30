@@ -21,7 +21,8 @@ import type { AskQuestion, ChatMessage } from "@/lib/chat/types";
 import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
 import { PlanApprovalPanel, PLAN_APPROVE_TEXT, PLAN_MARKER } from "@/components/plan-approval";
 import { takeBuildHandoff } from "@/lib/chat/build-handoff";
-import { BuildComposerFooter, BuildHome, BuildRepoChip } from "@/components/build-home";
+import { BuildComposerFooter, BuildHome } from "@/components/build-home";
+import { GitHubPicker, type RepoChoice } from "@/components/github-picker";
 import { useBuildSessions, useBuildSessionsSync } from "@/lib/build-mode/sessions";
 import { ApprovalPanel } from "@/components/build-approval";
 import { useBuildCheckpoints } from "@/lib/build-mode/checkpoints";
@@ -104,7 +105,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
   }, [lastAssistantMessage]);
   const queued = useQueue((s) => (activeId ? s.byChat[activeId] : undefined)) ?? [];
   // Build home: the GitHub repo a brand-new build should work on (the chip above the composer).
-  const [buildRepo, setBuildRepo] = useState<string | null>(null);
+  const [buildRepo, setBuildRepo] = useState<RepoChoice | null>(null);
   // Build sessions list (home + sidebar statuses) — refreshed whenever a turn starts or ends.
   useBuildSessionsSync(buildMode && Boolean(user) && !isPending, streaming);
 
@@ -188,14 +189,18 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
 
   // The Build workspace docks the project panel (preview / files / terminal) on the right as soon as
   // there is something to show — on desktop only; on mobile it's a full-screen overlay the user opens.
+  const liveSnapshot = useLiveStream(activeId);
+  const liveHasBuild = Boolean(liveSnapshot?.steps.length || liveSnapshot?.preview);
   const activeHasBuild = useChat((s) => {
     const chat = s.chats.find((c) => c.id === s.activeId);
     return Boolean(chat?.hasBuild || chat?.messages.some((m) => m.build?.steps.length || m.build?.previewUrl));
   });
   useEffect(() => {
     if (!buildMode || window.innerWidth < 1024) return;
-    if (activeHasBuild || streaming) useChat.getState().setCanvasOpen(true);
-  }, [buildMode, activeHasBuild, streaming, activeId]);
+    // Only once there's something to show (steps / a preview) — not the moment any message is sent,
+    // which popped an empty Terminal open for a plain "hi" or a question round.
+    if (activeHasBuild || liveHasBuild) useChat.getState().setCanvasOpen(true);
+  }, [buildMode, activeHasBuild, liveHasBuild, activeId]);
 
   useEffect(() => {
     if (isPending || !user) return;
@@ -235,7 +240,15 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       if (chat.messages.some((m) => m.streaming)) return;
       api
         .get<{ messages: ServerMessage[] }>(`/chat/conversations/${chat.conversationId}/messages`)
-        .then((res) => useChat.getState().loadMessagesInto(chat.id, res.messages))
+        .then((res) => {
+          // A turn the server refused before saving anything (usage limit, validation…) exists only
+          // here, with its error. The server's copy is shorter — don't let it wipe the message and the
+          // error away (that's how a 429 looked like "I sent it and nothing happened").
+          const current = useChat.getState().chats.find((c) => c.id === chat.id);
+          const localLast = current?.messages.at(-1);
+          if (localLast?.error && res.messages.length < (current?.messages.length ?? 0)) return;
+          useChat.getState().loadMessagesInto(chat.id, res.messages);
+        })
         .catch(() => {
           /* next focus, or a realtime event, will retry */
         });
@@ -340,7 +353,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     // recognises it ("work on github.com/owner/repo") — it clones it before the agent starts.
     let content = trimmed;
     if (buildMode && buildRepo && !s.chats.find((c) => c.id === s.activeId)?.conversationId && !/github\.com\//i.test(trimmed)) {
-      content = `Work on https://github.com/${buildRepo} — ${trimmed}`;
+      content = `Work on https://github.com/${buildRepo.repo}/tree/${buildRepo.branch} (branch ${buildRepo.branch}) — ${trimmed}`;
       setBuildRepo(null);
     }
 
@@ -561,7 +574,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
               </div>
               <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
                 <div className="mx-auto w-full max-w-3xl">
-                  <BuildRepoChip repo={buildRepo} onChange={setBuildRepo} />
+                  <GitHubPicker value={buildRepo} onChange={setBuildRepo} />
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
