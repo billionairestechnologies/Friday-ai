@@ -48,7 +48,17 @@ async function request<T>(path: string, options: RequestInit = {}, isRetry = fal
   const body = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
-    const message = isJson && body && typeof body === "object" && "error" in body ? body.error : String(body);
+    // The backend answers { error: "text" }, but a proxy / gateway error (502, 503…) comes back as some
+    // other JSON shape — String() of that was the "[object Object]" banner. Take a readable string, else
+    // a plain sentence for the status.
+    const fromBody =
+      isJson && body && typeof body === "object"
+        ? [(body as { error?: unknown }).error, (body as { message?: unknown }).message].find((v): v is string => typeof v === "string" && v.length > 0)
+        : typeof body === "string"
+          ? body.trim()
+          : "";
+    const gateway = res.status === 502 || res.status === 503 || res.status === 504;
+    const message = gateway ? "Can't reach Friday right now — check your connection and try again in a moment." : fromBody;
     throw new ApiError(res.status, message || `Request failed: ${res.status}`);
   }
   return body as T;
