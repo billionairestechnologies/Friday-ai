@@ -4,6 +4,8 @@ import { useAuthStore } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { POLICY_VERSION } from "@/lib/site/legal";
 
+// The backdrop is a light dim (not an opaque wash) so the app stays visible behind the box, like every other dialog.
+
 // Routes that must stay reachable even while the gate would otherwise apply: the policy pages
 // themselves (so there's somewhere for the gate's own links to open), the OAuth hand-off page
 // (mobile-auth-bridge briefly holds a signed-in user mid-relay to the native app — blocking it
@@ -52,7 +54,7 @@ export function ConsentGate() {
     // failed to close — see client.ts's bootstrap()/verifyOtp() fix for why one could get stuck
     // open) leaving `pointer-events: none` inherited down to here: this is the one screen that must
     // always stay clickable no matter what else is going on behind it.
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-background/95 px-4 backdrop-blur-sm pointer-events-auto">
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/45 px-4 backdrop-blur-[2px] pointer-events-auto">
       <div className="w-full max-w-md rounded-[var(--radius-2xl)] border border-border bg-surface p-6 shadow-[var(--shadow-panel)] sm:p-8">
         <h1 className="text-lg font-semibold text-foreground">Updated Terms &amp; Privacy Policy</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">
