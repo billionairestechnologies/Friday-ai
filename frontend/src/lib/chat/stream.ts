@@ -16,6 +16,8 @@ export type StreamOptions = {
   skillId?: string;
   effort?: "low" | "medium" | "high";
   permissionMode?: "ask" | "auto_edit" | "full_auto";
+  /** Repo + branch picked in the Build composer — the server clones it before the agent starts. */
+  repo?: { repo: string; branch?: string };
 };
 
 async function fetchStream(

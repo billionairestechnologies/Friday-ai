@@ -43,7 +43,8 @@ import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
-import { runBuildAgent } from "../projectBuild/agent.js";
+import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
+import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
 import { createCheckpoint } from "../projectBuild/checkpoints.js";
@@ -181,7 +182,7 @@ export async function streamMessage(
   canvas = false,
   attachments: ChatImage[] = [],
   reservation?: Reservation,
-  options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode } = {},
+  options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode; repo?: RepoRef } = {},
 ): Promise<void> {
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
@@ -633,11 +634,15 @@ export async function streamMessage(
       const projectFiles = Object.keys((await getProject(conversationId))?.files ?? {});
       const pendingPlan = await findPendingPlan(conversationId);
       let approvedPlan: BuildPlan | undefined;
+      // Model-driven (like Claude Code): no forced question round, no forced plan round — the agent
+      // itself answers a "hi", asks (ask_user) or proposes a plan (propose_plan) when it judges it
+      // needs to. The staged flow below stays for models without tool calling.
+      const modelDriven = buildModelDriven(candidates);
       if (pendingPlan && isPlanApproval(content)) {
         // The user approved the plan on screen: build exactly that.
         approvedPlan = pendingPlan.plan;
         await setPlanStatus(pendingPlan.messageId, pendingPlan.plan, "approved");
-      } else if (pendingPlan || needsPlan(projectFiles.length, content)) {
+      } else if (!modelDriven && (pendingPlan || needsPlan(projectFiles.length, content))) {
         // A brand-new project (no files yet, no question round yet) may be missing details that change
         // what gets built — ask first, with a recommended option per question, instead of guessing.
         if (!pendingPlan && !alreadyAsked(history) && projectFiles.length === 0) {
@@ -703,7 +708,7 @@ export async function streamMessage(
         // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
         // only now, not during a question/plan round, which never touches the sandbox.
         emit({ t: "status", s: "building" });
-        const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent: emit, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode });
+        const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent: emit, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode, modelDriven, repo: options.repo });
         if (built.error && !built.text && built.build.steps.length === 0) {
           emit({ t: "err", c: built.error });
           emit({ t: "done" });
@@ -724,7 +729,14 @@ export async function streamMessage(
         }
         emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl });
         const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
-        await insertAssistantMessage(conversationId, built.text || "Done.", buildLabel, {
+        // A pause (ask_user / propose_plan) is stored under the same markers the staged flow uses, so
+        // later turns (alreadyAsked, findPendingPlan, the plan/ask cards) recognise it.
+        const storedText = built.pause
+          ? built.pause.kind === "ask"
+            ? ASK_MARKER
+            : `${PLAN_MARKER}\n\n${renderPlan(built.pause.plan)}`
+          : built.text || "Done.";
+        await insertAssistantMessage(conversationId, storedText, buildLabel, {
           usedCanvas: false,
           usedSearch: false,
           usedThink: false,

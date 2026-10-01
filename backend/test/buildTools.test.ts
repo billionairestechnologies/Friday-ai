@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BUILD_TOOL_SPECS, compactToolCallArgs, toolCallToAction } from "../src/services/projectBuild/tools.js";
+import { BUILD_TOOL_SPECS, INTERACTION_TOOL_SPECS, compactToolCallArgs, parseAskQuestions, toolCallToAction } from "../src/services/projectBuild/tools.js";
 import type { ToolCall } from "../src/services/providers/toolCalling.js";
 
 const call = (name: string, args: Record<string, unknown>): ToolCall => ({ id: "c", name, args });
@@ -64,4 +64,43 @@ test("compactToolCallArgs drops old file bodies but keeps the latest turns intac
   assert.equal(messages[2]!.toolCalls![0]!.args.content, big);
   assert.equal(messages[4]!.toolCalls![0]!.args.old_string, big);
   assert.equal(messages[0]!.toolCalls![0]!.args.path, "a");
+});
+
+test("interaction tool specs follow the same schema rules and are NOT in the default build toolset", () => {
+  const defaults = new Set(BUILD_TOOL_SPECS.map((t) => t.name));
+  for (const spec of INTERACTION_TOOL_SPECS) {
+    assert.ok(!defaults.has(spec.name), `${spec.name} must only exist in the model-driven flow`);
+    assert.ok(!JSON.stringify(spec.parameters).includes("additionalProperties"));
+    for (const req of spec.parameters.required ?? []) assert.ok(req in spec.parameters.properties, `${spec.name}.${req}`);
+  }
+  assert.deepEqual(INTERACTION_TOOL_SPECS.map((t) => t.name).sort(), ["ask_user", "propose_plan"]);
+});
+
+test("ask_user becomes question cards: limits applied, first option recommended", () => {
+  const action = toolCallToAction(
+    call("ask_user", {
+      questions: [
+        { question: "Which stack?", options: [{ label: "React + Vite", description: "fast" }, { label: "Next.js" }, { label: "Vue" }, { label: "Svelte" }, { label: "Extra" }] },
+        { question: "Broken", options: [{ label: "only one" }] },
+      ],
+    }),
+  );
+  assert.equal(action.kind, "ask");
+  if (action.kind !== "ask") return;
+  assert.equal(action.questions.length, 1, "a question with fewer than 2 options is dropped");
+  assert.equal(action.questions[0]!.options.length, 4);
+  assert.equal(action.questions[0]!.options[0]!.recommended, true);
+  assert.equal(action.questions[0]!.options[1]!.recommended, false);
+  assert.equal(action.questions[0]!.id, "q1");
+  assert.deepEqual(parseAskQuestions({ questions: "nope" }), []);
+  assert.equal(toolCallToAction(call("ask_user", { questions: [] })).kind, "malformed");
+});
+
+test("propose_plan needs real steps; checkbox prefixes are stripped and steps capped", () => {
+  const ok = toolCallToAction(call("propose_plan", { summary: "A CRM", architecture: "Vite + Express", steps: ["- [ ] Scaffold", "Build API", "Run it"] }));
+  assert.equal(ok.kind, "plan");
+  if (ok.kind === "plan") assert.deepEqual(ok.items, ["Scaffold", "Build API", "Run it"]);
+  const many = toolCallToAction(call("propose_plan", { summary: "x", architecture: "y", steps: Array.from({ length: 30 }, (_, i) => `step ${i}`) }));
+  if (many.kind === "plan") assert.equal(many.items.length, 12);
+  assert.equal(toolCallToAction(call("propose_plan", { summary: "x", steps: ["only one"] })).kind, "malformed");
 });

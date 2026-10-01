@@ -98,6 +98,14 @@ const sendMessageSchema = z
     effort: z.enum(["low", "medium", "high"]).optional(),
     // Build workspace permission mode (projectBuild/approvals.ts).
     permissionMode: z.enum(["ask", "auto_edit", "full_auto"]).optional(),
+    // Repo + branch picked in the Build composer, sent as fields (not rewritten into the message text)
+    // so the sandbox can clone it before the agent's first turn.
+    repo: z
+      .object({
+        repo: z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/).max(140),
+        branch: z.string().trim().min(1).max(200).optional(),
+      })
+      .optional(),
     attachments: z.array(attachmentSchema).max(4).optional().default([]),
   })
   // The composer already allows sending an attachment with no caption text (an image with
@@ -110,7 +118,7 @@ const sendMessageSchema = z
   });
 
 export async function streamMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, permissionMode, attachments } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, permissionMode, repo, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -168,7 +176,7 @@ export async function streamMessage(req: Request, res: Response) {
       canvas,
       attachments,
       req.quotaReservation,
-      { research, skillId, effort, permissionMode },
+      { research, skillId, effort, permissionMode, repo },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong";

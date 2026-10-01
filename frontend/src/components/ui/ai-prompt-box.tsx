@@ -543,6 +543,8 @@ export interface PromptInputBoxProps {
   onResearchChange?: (value: boolean) => void;
   model?: string;
   onModelChange?: (id: string) => void;
+  /** Build workspace: mic dictation stays, the hands-free voice-agent mode goes. */
+  hideVoiceMode?: boolean;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>(
@@ -565,6 +567,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       onResearchChange,
       model,
       onModelChange,
+      hideVoiceMode = false,
     } = props;
     const [input, setInput] = React.useState("");
     const [files, setFiles] = React.useState<File[]>([]);
@@ -1094,17 +1097,19 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
-              <PromptInputAction tooltip="Voice mode">
-                <button
-                  type="button"
-                  onClick={() => setVoiceModeOpen(true)}
-                  disabled={disabled}
-                  aria-label="Open voice mode"
-                  className="flex size-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-                >
-                  <AudioLines className="h-4 w-4" />
-                </button>
-              </PromptInputAction>
+              {!hideVoiceMode && (
+                <PromptInputAction tooltip="Voice mode">
+                  <button
+                    type="button"
+                    onClick={() => setVoiceModeOpen(true)}
+                    disabled={disabled}
+                    aria-label="Open voice mode"
+                    className="flex size-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    <AudioLines className="h-4 w-4" />
+                  </button>
+                </PromptInputAction>
+              )}
 
               {currentModel && onModelChange && (
                 <DropdownMenu.Root
@@ -1247,11 +1252,13 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
           imageUrl={selectedImage}
           onClose={() => setSelectedImage(null)}
         />
-        <VoiceMode
-          open={voiceModeOpen}
-          onClose={() => setVoiceModeOpen(false)}
-          onSubmit={submitVoiceText}
-        />
+        {!hideVoiceMode && (
+          <VoiceMode
+            open={voiceModeOpen}
+            onClose={() => setVoiceModeOpen(false)}
+            onSubmit={submitVoiceText}
+          />
+        )}
       </>
     );
   },

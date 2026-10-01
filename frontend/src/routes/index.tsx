@@ -349,11 +349,13 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
 
     const model = s.model;
     s.clearDraft();
-    // A new build started from the home screen with a repo chip: say which repo, the way the backend
-    // recognises it ("work on github.com/owner/repo") — it clones it before the agent starts.
-    let content = trimmed;
-    if (buildMode && buildRepo && !s.chats.find((c) => c.id === s.activeId)?.conversationId && !/github\.com\//i.test(trimmed)) {
-      content = `Work on https://github.com/${buildRepo.repo}/tree/${buildRepo.branch} (branch ${buildRepo.branch}) — ${trimmed}`;
+    // A new build started from the home screen with a repo chip: the repo + branch travel as their own
+    // fields (the message stays exactly what the user typed) and the server clones it into the sandbox
+    // before the agent's first turn.
+    const content = trimmed;
+    let repoForBuild: { repo: string; branch: string } | undefined;
+    if (buildMode && buildRepo && !s.chats.find((c) => c.id === s.activeId)?.conversationId) {
+      repoForBuild = { repo: buildRepo.repo, branch: buildRepo.branch };
       setBuildRepo(null);
     }
 
@@ -467,6 +469,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
         research: s.research,
         ...(s.activeSkill ? { skillId: s.activeSkill.id } : {}),
         ...(buildMode ? { effort: useBuildPrefs.getState().effort, permissionMode: useBuildPrefs.getState().permissionMode } : {}),
+        ...(repoForBuild ? { repo: repoForBuild } : {}),
       });
     } catch (err) {
       if ((err as { name?: string }).name !== "AbortError") {
@@ -581,6 +584,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     streaming={streaming}
                     disabled={!available}
                     placeholder="Describe what to build, or what to change in the repo…"
+                    hideVoiceMode={buildMode}
                   />
                   <BuildComposerFooter />
                 </div>
@@ -677,6 +681,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   onStop={stop}
                   streaming={streaming}
                   disabled={!available}
+                  hideVoiceMode={buildMode}
                 />
                 {available && (
                   <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -763,6 +768,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     streaming={streaming}
                     disabled={!available}
                     placeholder={pendingPlan ? "Tell me what to change in the plan…" : buildMode ? "Ask for a change, or reply to Friday…" : undefined}
+                    hideVoiceMode={buildMode}
                   />
                   {buildMode ? (
                     <BuildComposerFooter />
