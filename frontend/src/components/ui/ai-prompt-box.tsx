@@ -554,8 +554,9 @@ export interface PromptInputBoxProps {
   onResearchChange?: (value: boolean) => void;
   model?: string;
   onModelChange?: (id: string) => void;
-  /** Build workspace: mic dictation stays, the hands-free voice-agent mode goes. */
-  hideVoiceMode?: boolean;
+  /** Build workspace: mic dictation stays, the hands-free voice-agent mode goes, and the model
+   *  picker offers only Build-capable frontier models (+ Auto) — no Team Up. */
+  buildWorkspace?: boolean;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>(
@@ -578,8 +579,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       onResearchChange,
       model,
       onModelChange,
-      hideVoiceMode = false,
+      buildWorkspace = false,
     } = props;
+    const hideVoiceMode = buildWorkspace;
     const [input, setInput] = React.useState("");
     const [files, setFiles] = React.useState<File[]>([]);
     const [filePreviews, setFilePreviews] = React.useState<Record<string, string>>(
@@ -610,10 +612,13 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const loadPlan = usePlan((s) => s.load);
     // Auto/Team Up aren't tied to a vendor, so they stay as standalone top items; everything else
     // groups under its real vendor (see groupModelsByVendor) as a click-to-expand section.
-    const specialModels = React.useMemo(() => models.filter((m) => m.id === AUTO_MODEL_ID || m.id === TEAMUP_MODEL_ID), [models]);
+    const specialModels = React.useMemo(
+      () => models.filter((m) => m.id === AUTO_MODEL_ID || (!buildWorkspace && m.id === TEAMUP_MODEL_ID)),
+      [models, buildWorkspace],
+    );
     const vendorGroups = React.useMemo(
-      () => groupModelsByVendor(models.filter((m) => m.id !== AUTO_MODEL_ID && m.id !== TEAMUP_MODEL_ID)),
-      [models],
+      () => groupModelsByVendor(models.filter((m) => m.id !== AUTO_MODEL_ID && m.id !== TEAMUP_MODEL_ID && (!buildWorkspace || m.build))),
+      [models, buildWorkspace],
     );
     const [expandedVendors, setExpandedVendors] = React.useState<Set<string>>(() => new Set());
 

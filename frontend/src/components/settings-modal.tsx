@@ -551,14 +551,14 @@ function QuotaBar({
         />
       </div>
       <p className="mt-2 text-xs text-muted">
-        {formatTokens(bucket.used)} / {formatTokens(bucket.limit)} tokens
+        {formatTokens(Math.max(0, bucket.used))} / {formatTokens(bucket.limit)} tokens
       </p>
       {breakdown && breakdown.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-3 border-t border-border pt-3">
           {breakdown.map((entry, i) => (
             <span key={entry.type} className="flex items-center gap-1.5 text-xs text-muted">
               <span className={cn("size-1.5 rounded-full", DOT_COLORS[i % DOT_COLORS.length])} />
-              {labelForEventType(entry.type)} <span className="font-medium text-foreground">{entry.percent}%</span>
+              {labelForEventType(entry.type)} <span className="font-medium text-foreground">{Math.max(0, entry.percent)}%</span>
             </span>
           ))}
         </div>

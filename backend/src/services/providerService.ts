@@ -3,6 +3,7 @@ import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { getProviderAdapter } from "./providers/registry.js";
 import { invalidateMemoized, memoAsync } from "../utils/ttlMemo.js";
+import { isBuildModel } from "./projectBuild/buildModels.js";
 
 const LOOKUP_TTL_MS = 45_000;
 
@@ -148,7 +149,12 @@ export async function listModelsForProvider(slug: string) {
     .eq("provider_id", provider.id)
     .order("display_name");
   if (error) throw new HttpError(500, error.message);
-  return data;
+  // `build`: may this model drive the Build workspace (frontier coding allow-list) — the Build
+  // composer's model picker only offers these.
+  return (data ?? []).map((m) => {
+    const provider = (Array.isArray(m.providers) ? m.providers[0] : m.providers) as { slug?: string } | null;
+    return { ...m, build: provider?.slug ? isBuildModel({ slug: provider.slug, modelId: m.model_id as string, displayName: m.display_name as string }) : false };
+  });
 }
 
 async function setModelEnabledImpl(modelId: string, enabled: boolean) {
@@ -175,6 +181,7 @@ export async function listModelsForUsers() {
   if (error) throw new HttpError(500, error.message);
   return data;
 }
+
 
 export interface ChatCandidate {
   slug: string;

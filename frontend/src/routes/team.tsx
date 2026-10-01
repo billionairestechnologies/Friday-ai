@@ -37,7 +37,7 @@ function QuotaBar({ title, bucket }: { title: string; bucket: { used: number; li
         />
       </div>
       <p className="mt-2 text-xs text-muted">
-        {formatTokens(bucket.used)} / {formatTokens(bucket.limit)} tokens ({pct}%)
+        {formatTokens(Math.max(0, bucket.used))} / {formatTokens(bucket.limit)} tokens ({pct}%)
       </p>
     </div>
   );

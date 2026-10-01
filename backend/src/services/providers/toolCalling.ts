@@ -41,7 +41,31 @@ export type ToolTurnOptions = {
   /** Fires the moment the model STARTS a tool call (before its arguments finish streaming), so the
    *  UI can show a live row — a big write_file otherwise looks like the app froze for 30s+. */
   onToolStart?: (name: string) => void;
+  /** Build's Low/Medium/High switch, mapped to the provider's own reasoning control (reasoningParams). */
+  effort?: "low" | "medium" | "high";
 };
+
+/**
+ * The Build effort switch used to change only how many rounds the agent got — the model itself
+ * thought exactly as hard on "Low" as on "High". This maps it onto each provider's real reasoning
+ * control. "medium" sends nothing (the provider default — unchanged behaviour), and only model
+ * families known to accept the parameter get it: an unknown parameter is a hard 400 on several APIs.
+ *
+ * Anthropic (and ScaleMax, which proxies it) are deliberately left out: extended thinking with tool
+ * use requires every earlier thinking block to be sent back verbatim in later turns, which the
+ * tool loop's history compaction does not preserve — enabling it would break multi-round builds.
+ */
+export function reasoningParams(dialect: "openai" | "openrouter" | "gemini", model: string, effort?: "low" | "medium" | "high"): Record<string, unknown> {
+  if (!effort || effort === "medium") return {};
+  const id = model.toLowerCase().replace(/^[\w-]+\//, "");
+  if (dialect === "openai") return /^(o\d|gpt-5)/.test(id) ? { reasoning_effort: effort } : {};
+  if (dialect === "openrouter") {
+    return /^(o\d|gpt-5|gemini-2\.5|gemini-3|deepseek-r1|grok-3-mini|grok-4|qwen3)/.test(id) ? { reasoning: { effort } } : {};
+  }
+  if (/^gemini-3/.test(id)) return { generationConfig: { thinkingConfig: { thinkingLevel: effort === "low" ? "low" : "high" } } };
+  if (/^gemini-2\.5/.test(id)) return { generationConfig: { thinkingConfig: { thinkingBudget: effort === "low" ? 1024 : 24576 } } };
+  return {};
+}
 
 export type ToolTurnResult = { text: string; toolCalls: ToolCall[]; usage: TokenUsage | null };
 
@@ -131,6 +155,7 @@ export async function streamOpenAiToolTurn(
     stream: true,
     stream_options: { include_usage: true },
     ...(cachingEnabled() ? { prompt_cache_key: promptCacheKeyFor(joinedSystem(messages) ?? "") } : {}),
+    ...reasoningParams(url.includes("openrouter") ? "openrouter" : "openai", model, opts.effort),
     ...extraBody,
   };
   if (opts.tools.length) {
@@ -343,6 +368,7 @@ export async function streamGeminiToolTurn(
   const body: Record<string, unknown> = {
     contents: toGeminiToolContents(messages),
     ...(systemParts.length > 0 ? { systemInstruction: { parts: systemParts } } : {}),
+    ...reasoningParams("gemini", model, opts.effort),
   };
   if (opts.tools.length) {
     // Gemini rejects an OBJECT schema with empty `properties` — a no-argument tool omits `parameters`.

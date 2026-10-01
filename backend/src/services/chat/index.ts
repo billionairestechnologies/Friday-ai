@@ -47,6 +47,7 @@ import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
 import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
+import { buildCandidates, isBuildModel } from "../projectBuild/buildModels.js";
 import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
@@ -629,10 +630,14 @@ export async function streamMessage(
         return;
       }
       onEvent({ t: "status", s: "thinking" });
-      // A real build (and the judgment call on whether to ask first) needs a frontier-grade model,
-      // not whatever Auto ranked first for a plain chat reply — same bias as Deep Research.
-      const buildWorthy = candidates.filter(isFrontierModel);
-      if (buildWorthy.length > 0) candidates = buildWorthy;
+      // Build runs only on frontier coding models (projectBuild/buildModels.ts allow-list). A weak
+      // model picked for chat — or ranked first by Auto — is swapped for the best allowed model the
+      // user's plan includes, rather than producing a half-working project.
+      if (!candidates.some((c) => isBuildModel(c))) {
+        const pool = (await listChatCandidates()).filter((c) => tierAllows(c) && isBuildModel(c));
+        if (pool.length) candidates = rankCandidatesForMessage(pool, content);
+      }
+      candidates = buildCandidates(candidates, isFrontierModel);
       const projectFiles = Object.keys((await getProject(conversationId))?.files ?? {});
       const pendingPlan = await findPendingPlan(conversationId);
       let approvedPlan: BuildPlan | undefined;

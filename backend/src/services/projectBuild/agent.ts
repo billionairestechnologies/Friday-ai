@@ -902,6 +902,8 @@ export async function runBuildAgent(opts: {
               toolChoice: "auto",
               signal,
               maxTokens: nativeMaxTokens,
+              // Low/Medium/High also sets how hard the model itself reasons, not only the round budget.
+              effort,
               onToolStart: (name) => {
                 // Narration streamed before this call becomes its note row, in order with the steps.
                 if (text.slice(noted).trim()) pushNote(text.slice(noted));

@@ -441,6 +441,15 @@ export type QuotaStatus = {
 };
 
 /**
+ * What a usage meter shows for a counter: never below 0 and never above the limit. A counter CAN go
+ * negative — a bonus grant decrements it on purpose (headroom), and a refund can land on a key that
+ * already rolled over — and the raw value used to reach the client as "-12% used".
+ */
+export function meterValue(used: number, limit: number): number {
+  return Math.max(0, Math.min(Number.isFinite(used) ? used : 0, limit));
+}
+
+/**
  * Admin "master control" — grants extra headroom for the CURRENT period by decrementing
  * whichever counter(s) the user's plan actually enforces (rolling window excluded: it's a
  * moving 5h window, not a fixed bucket, so a bonus there would just get pruned away within
@@ -491,12 +500,12 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
       weekly: { used: 0, limit: 0, resetAt: nextWeeklyReset().toISOString() },
       monthly: null,
       org: {
-        used: Math.min(orgUsed, effective.enterprise.pooledMonthlyTokens),
+        used: meterValue(orgUsed, effective.enterprise.pooledMonthlyTokens),
         limit: effective.enterprise.pooledMonthlyTokens,
         seatCount: effective.enterprise.seatCount,
         resetAt: nextMonthlyReset().toISOString(),
       },
-      memberCap: effective.customMonthlyCap != null ? { used: Math.min(memberUsed, effective.customMonthlyCap), limit: effective.customMonthlyCap } : null,
+      memberCap: effective.customMonthlyCap != null ? { used: meterValue(memberUsed, effective.customMonthlyCap), limit: effective.customMonthlyCap } : null,
     };
   }
 
@@ -520,14 +529,14 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
     // Clamped for display: the counters can sit a few tokens past a limit (the turn that crossed it
     // is stopped, not undone) — the meter should read "100%", never "103%".
     rolling: {
-      used: Math.min(rollingUsed, eff.rolling),
+      used: meterValue(rollingUsed, eff.rolling),
       limit: eff.rolling,
       resetAt: new Date(now + limits.rollingWindowSeconds * 1000).toISOString(),
     },
-    weekly: { used: Math.min(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
+    weekly: { used: meterValue(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
     monthly:
       eff.monthly != null
-        ? { used: Math.min(monthlyUsed, eff.monthly), limit: eff.monthly, resetAt: nextMonthlyReset().toISOString() }
+        ? { used: meterValue(monthlyUsed, eff.monthly), limit: eff.monthly, resetAt: nextMonthlyReset().toISOString() }
         : null,
     org: null,
     memberCap: null,

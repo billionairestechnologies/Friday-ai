@@ -584,7 +584,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     streaming={streaming}
                     disabled={!available}
                     placeholder="Describe what to build, or what to change in the repo…"
-                    hideVoiceMode={buildMode}
+                    buildWorkspace={buildMode}
                   />
                   <BuildComposerFooter />
                 </div>
@@ -681,7 +681,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   onStop={stop}
                   streaming={streaming}
                   disabled={!available}
-                  hideVoiceMode={buildMode}
+                  buildWorkspace={buildMode}
                 />
                 {available && (
                   <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -768,7 +768,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     streaming={streaming}
                     disabled={!available}
                     placeholder={pendingPlan ? "Tell me what to change in the plan…" : buildMode ? "Ask for a change, or reply to Friday…" : undefined}
-                    hideVoiceMode={buildMode}
+                    buildWorkspace={buildMode}
                   />
                   {buildMode ? (
                     <BuildComposerFooter />

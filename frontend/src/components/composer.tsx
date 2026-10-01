@@ -10,8 +10,8 @@ type ComposerProps = {
   disabled?: boolean;
   /** Overrides the default prompt text, e.g. while a Build plan waits for feedback. */
   placeholder?: string;
-  /** Build workspace: no voice-agent mode (mic dictation still works). */
-  hideVoiceMode?: boolean;
+  /** Build workspace: no voice-agent mode (mic dictation still works), Build models only. */
+  buildWorkspace?: boolean;
 };
 
 export function Composer({
@@ -20,7 +20,7 @@ export function Composer({
   streaming,
   disabled,
   placeholder,
-  hideVoiceMode,
+  buildWorkspace,
 }: ComposerProps) {
   const think = useChat((s) => s.think);
   const setThink = useChat((s) => s.setThink);
@@ -65,7 +65,7 @@ export function Composer({
       onModelChange={setModel}
       onStop={onStop}
       onSend={onSend}
-      hideVoiceMode={hideVoiceMode}
+      buildWorkspace={buildWorkspace}
       placeholder={placeholder ?? "What do you want to know?"}
     />
     </>
