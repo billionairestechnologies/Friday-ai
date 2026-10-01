@@ -25,7 +25,15 @@ export type ConversationMode = "single" | "auto" | "teamup";
  *  high = the plan's full round budget plus extra verification passes. */
 export type BuildEffort = "low" | "medium" | "high";
 
-export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
+export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool" | "agent";
+
+/** A Build sub-agent's live card (kind "agent"): what it was asked, what it did, what it reported. */
+export type SubAgentInfo = {
+  title: string;
+  kind: "explore" | "research";
+  actions: { id: string; label: string; state: "running" | "ok" | "error" }[];
+  report?: string;
+};
 
 /** What a Build Mode turn did — persisted on the message (`messages.build`) so it survives reloads. */
 export type BuildStep = {
@@ -56,6 +64,8 @@ export type BuildStep = {
   startedAt?: number;
   /** Duration once finished. */
   ms?: number;
+  /** kind "agent": the sub-agent's title, its own tool steps and its final report. */
+  agent?: SubAgentInfo;
 };
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
 

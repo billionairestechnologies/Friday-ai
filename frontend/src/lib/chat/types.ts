@@ -33,7 +33,7 @@ export type AgentStatus = {
 
 export type BuildStep = {
   id: string;
-  kind: "write" | "run" | "start" | "read" | "note" | "tool";
+  kind: "write" | "run" | "start" | "read" | "note" | "tool" | "agent";
   label: string;
   state: "running" | "ok" | "error";
   detail?: string;
@@ -48,6 +48,13 @@ export type BuildStep = {
   removed?: number;
   startedAt?: number;
   ms?: number;
+  /** kind "agent": a Build sub-agent — its job, its own steps and its report. */
+  agent?: {
+    title: string;
+    kind: "explore" | "research";
+    actions: { id: string; label: string; state: "running" | "ok" | "error" }[];
+    report?: string;
+  };
 };
 
 /** A Build permission prompt (backend projectBuild/approvals.ts). */

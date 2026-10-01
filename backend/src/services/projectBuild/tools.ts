@@ -2,6 +2,7 @@ import type { ToolCall, ToolSpec } from "../providers/toolCalling.js";
 import { fetchUrlTool, webSearchTool } from "../agent/tools/web.js";
 import type { BuildAction } from "./protocol.js";
 import type { AskQuestion } from "../chat/types.js";
+import { MAX_SUBAGENTS, parseSubTasks, type SubTask } from "./subagents.js";
 
 /**
  * Native (structured) tool definitions for the Build agent — the same actions as the `<friday-*>`
@@ -26,7 +27,8 @@ export type NativeBuildAction =
   /** The model needs an answer from the user before it can go on — ends the turn with a question card. */
   | { kind: "ask"; questions: AskQuestion[] }
   /** The model proposes a plan for the user to approve — ends the turn with a plan card. */
-  | { kind: "plan"; summary: string; architecture: string; items: string[] };
+  | { kind: "plan"; summary: string; architecture: string; items: string[] }
+  | { kind: "subagents"; tasks: SubTask[] };
 
 /**
  * Tools that let the MODEL decide to talk to the user instead of working: ask a question, or put a
@@ -34,6 +36,38 @@ export type NativeBuildAction =
  * where nothing forces a question or plan round before the agent runs — the model calls these
  * itself when a request really calls for it, the way Claude Code asks or enters plan mode.
  */
+/** Parallel read-only helpers (subagents.ts) — native tool-calling path only. */
+export const SUBAGENT_TOOL_SPEC: ToolSpec = {
+  name: "spawn_subagents",
+  description:
+    `Run up to ${MAX_SUBAGENTS} sub-agents IN PARALLEL, each with its own fresh context, for self-contained READ-ONLY investigations; ` +
+    "you get back only their short reports. Use it when work splits into independent questions that would otherwise flood your " +
+    "context or take many sequential steps — e.g. in a large existing repo: one maps the auth flow, one finds where payments are " +
+    "handled, one lists the API routes; or research: current docs for two libraries at once. kind \"explore\" reads/greps the project; " +
+    "kind \"research\" searches and reads the web. Sub-agents cannot write files or run commands — you do all changes. Don't use it " +
+    "for a single quick lookup (just call grep/read_file yourself) or for tiny projects. Give each one complete, specific instructions " +
+    "(it sees nothing of this conversation) and say exactly what its report must contain.",
+  parameters: {
+    type: "object",
+    properties: {
+      tasks: {
+        type: "array",
+        description: `1-${MAX_SUBAGENTS} independent jobs`,
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Short name shown to the user, e.g. \"Map the auth flow\"" },
+            kind: { type: "string", enum: ["explore", "research"] },
+            instructions: { type: "string", description: "Complete, self-contained instructions and what the report must include" },
+          },
+          required: ["title", "kind", "instructions"],
+        },
+      },
+    },
+    required: ["tasks"],
+  },
+};
+
 export const INTERACTION_TOOL_SPECS: ToolSpec[] = [
   {
     name: "ask_user",
@@ -328,6 +362,11 @@ export function toolCallToAction(call: ToolCall, extTools?: ReadonlySet<string>)
     case "ask_user": {
       const questions = parseAskQuestions(a.questions);
       return questions.length ? { kind: "ask", questions } : { kind: "malformed", reason: "ask_user needs at least one question with 2-4 options" };
+    }
+    case "spawn_subagents": {
+      const tasks = parseSubTasks(a);
+      if (!tasks.length) return { kind: "malformed", reason: "spawn_subagents needs 1-4 tasks, each with a title and instructions" };
+      return { kind: "subagents", tasks };
     }
     case "propose_plan": {
       const items = (Array.isArray(a.steps) ? a.steps : [])

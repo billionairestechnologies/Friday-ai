@@ -7,9 +7,10 @@ import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type Toke
 import type { AskQuestion, BuildEffort, BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
 import { ActionParser, applySearchReplace, compactAssistantTurn, type BuildAction } from "./protocol.js";
 import { findGitHubRepoUrl, importRepo, openPullRequest, type RepoRef } from "./github.js";
+import { runSubAgents, type ProjectReader } from "./subagents.js";
 import JSZip from "jszip";
 import { BuildSandbox, PROJECT_DIR, getProject, safeProjectPath, saveProject, tail } from "./sandbox.js";
-import { BUILD_TOOL_SPECS, INTERACTION_TOOL_SPECS, compactToolCallArgs, toolCallToAction, type NativeBuildAction } from "./tools.js";
+import { BUILD_TOOL_SPECS, INTERACTION_TOOL_SPECS, SUBAGENT_TOOL_SPEC, compactToolCallArgs, toolCallToAction, type NativeBuildAction } from "./tools.js";
 import { SAVED_OUTPUT_CHARS, codePreview, editDiff, langForPath, tailText, throttledOutput } from "./activity.js";
 import { fetchUrlTool, webSearchTool } from "../agent/tools/web.js";
 import { buildToolset } from "../agent/toolset.js";
@@ -553,7 +554,7 @@ export async function runBuildAgent(opts: {
    * Executes one action (shared by the native and text protocols) and returns the result text the
    * model sees. `live` is the row already shown while the model was still writing this action.
    */
-  const execute = async (action: Exclude<NativeBuildAction, { kind: "ask" | "plan" }>, live?: BuildStep | null): Promise<string> => {
+  const execute = async (action: Exclude<NativeBuildAction, { kind: "ask" | "plan" | "subagents" }>, live?: BuildStep | null): Promise<string> => {
     if (action.kind === "done" || action.kind === "progress") return "";
     if (action.kind === "malformed") {
       if (live) {
@@ -866,6 +867,7 @@ export async function runBuildAgent(opts: {
   // no approved plan to execute (otherwise the model could loop on re-proposing it).
   const buildToolSpecs = [
     ...BUILD_TOOL_SPECS,
+    SUBAGENT_TOOL_SPEC,
     ...(opts.modelDriven ? INTERACTION_TOOL_SPECS.filter((s) => s.name !== "propose_plan" || !opts.approvedPlan) : []),
     ...extTools.map((t) => t.spec),
   ];
@@ -873,6 +875,42 @@ export async function runBuildAgent(opts: {
     { role: "system", content: `${NATIVE_BUILD_PROMPT}${opts.modelDriven ? MODEL_DRIVEN_NOTE : ""}${extNote}\n\n${stateNote}${secretsNote}${planNote}` },
     ...opts.history.filter((m) => m.role !== "system"),
   ];
+  // Read-only project access for sub-agents (they run in parallel, so nothing that writes).
+  const projectReader: ProjectReader = {
+    read: async (p) => {
+      const path = safeProjectPath(p);
+      if (!path) return null;
+      await ensureBox();
+      return box.read(path).catch(() => null);
+    },
+    ls: async (p) => {
+      const path = p === "." ? "." : safeProjectPath(p);
+      if (!path) return "path must be inside the project";
+      await ensureBox();
+      const out = await box.runScript(
+        'find "$FRIDAY_PATH" -maxdepth 3 -not -path "*/node_modules*" -not -path "*/.git/*" -not -path "*/.git" -not -path "*/dist/*" | sort | head -400',
+        30_000,
+        { FRIDAY_PATH: path },
+      );
+      return tail(out.output.trim() || "(empty)", 6000);
+    },
+    grep: async (pattern, p) => {
+      const path = p === "." ? "." : safeProjectPath(p);
+      if (!path) return "path must be inside the project";
+      await ensureBox();
+      const out = await box.runScript(
+        'grep -rnIE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next -e "$FRIDAY_PATTERN" -- "$FRIDAY_PATH" | head -150',
+        60_000,
+        { FRIDAY_PATTERN: pattern, FRIDAY_PATH: path },
+      );
+      return tail(out.output.trim() || "(no matches)", 6000);
+    },
+  };
+  const subAgentProjectNote =
+    existingFiles.length > 0
+      ? `The project lives in ${PROJECT_DIR} (${existingFiles.length} files)${project?.repo ? `, GitHub repo ${project.repo}` : ""}. Paths are relative to it.`
+      : "The project is new and may be empty.";
+
   let nativeRounds = 0;
   // How much of the current native turn's text has already become a note row (narration before a tool call).
   let noted = 0;
@@ -1063,6 +1101,29 @@ export async function runBuildAgent(opts: {
         } else if (action.kind === "progress") {
           applyProgress(action.body);
           outputs.push("[update_progress] ok");
+        } else if (action.kind === "subagents") {
+          if (pause || signal?.aborted) {
+            outputs.push("[skipped]");
+          } else {
+            const sub = await runSubAgents({
+              tasks: action.tasks,
+              candidates: toolCandidates,
+              reader: projectReader,
+              projectNote: subAgentProjectNote,
+              userId,
+              conversationId,
+              signal,
+              nextStepId: () => `s${++stepSeq}`,
+              onUpdate: (st) => {
+                const i = steps.findIndex((x) => x.id === st.id);
+                if (i === -1) steps.push(st);
+                else steps[i] = st;
+                onEvent({ t: "step", ...st });
+              },
+            });
+            usage = mergeTokenUsage(usage, sub.usage);
+            outputs.push(sub.output);
+          }
         } else if (action.kind === "ask" || action.kind === "plan") {
           // The model chose to stop and talk to the user. Only the first such call counts; the turn
           // ends below and the user's next message continues the conversation.

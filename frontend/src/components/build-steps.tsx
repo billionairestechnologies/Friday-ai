@@ -19,6 +19,8 @@ import {
   Search,
   Terminal,
   Wrench,
+  Bot,
+  Telescope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildInfo, BuildStep } from "@/lib/chat/types";
@@ -261,6 +263,78 @@ function StepRow({ step }: { step: BuildStep }) {
   );
 }
 
+/**
+ * One Build sub-agent (backend projectBuild/subagents.ts): its job, a live list of what it is doing,
+ * and — when it's done — the report it handed back to the main agent. Parallel sub-agents sit in an
+ * AgentGroup so it reads as "3 agents working at once", the way Claude Code shows Task agents.
+ */
+function AgentCard({ step }: { step: BuildStep }) {
+  const info = step.agent;
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const running = step.state === "running";
+  const open = userOpen ?? running;
+  const Icon = info?.kind === "research" ? Telescope : Bot;
+  const current = info?.actions.filter((a) => a.state === "running").at(-1) ?? info?.actions.at(-1);
+  return (
+    <div className="rounded-xl border border-border/70 bg-composer/60">
+      <button type="button" onClick={() => setUserOpen(!open)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm">
+        {running ? <span className="build-orb shrink-0" aria-hidden /> : step.state === "error" ? <AlertCircle className="size-3.5 shrink-0 text-danger" /> : <Icon className="size-3.5 shrink-0 text-muted" />}
+        <span className="shrink-0 font-medium text-foreground">{info?.title ?? step.label}</span>
+        <span className="shrink-0 rounded-full bg-chip px-1.5 py-px text-[10px] tracking-wide text-subtle uppercase">{info?.kind === "research" ? "research" : "explore"}</span>
+        <span className={cn("min-w-0 flex-1 truncate text-xs", running ? "shimmer-text" : "text-subtle")}>
+          {running ? current?.label ?? "Starting…" : `${info?.actions.length ?? 0} step${info?.actions.length === 1 ? "" : "s"}`}
+        </span>
+        <StepTime step={step} />
+        <ChevronRight className={cn("size-3.5 shrink-0 text-subtle transition-transform duration-200", open && "rotate-90")} />
+      </button>
+      <Collapse open={open}>
+        <div className="border-t border-border/60 px-3 py-2">
+          {info?.actions.length ? (
+            <ul className="space-y-0.5">
+              {info.actions.map((a) => (
+                <li key={a.id} className="flex items-center gap-2 text-xs text-muted">
+                  {a.state === "running" ? <span className="build-orb scale-75" aria-hidden /> : a.state === "error" ? <AlertCircle className="size-3 text-danger" /> : <Check className="size-3 text-subtle" />}
+                  <span className="min-w-0 truncate">{a.label}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-subtle">Getting started…</p>
+          )}
+          {info?.report && (
+            <div className="mt-2 max-h-56 overflow-auto rounded-lg bg-chip p-2 text-xs leading-relaxed text-muted">
+              <p className="mb-1 font-medium text-foreground">Report</p>
+              <div className="prose-sm whitespace-pre-wrap">{info.report}</div>
+            </div>
+          )}
+          {step.state === "error" && step.detail && <p className="mt-1 text-xs text-danger">{step.detail}</p>}
+        </div>
+      </Collapse>
+    </div>
+  );
+}
+
+function AgentGroup({ steps }: { steps: BuildStep[] }) {
+  const running = steps.filter((st) => st.state === "running").length;
+  return (
+    <div className="step-enter relative pl-6">
+      <span className="absolute top-[13px] left-0 flex size-4 -translate-y-1/2 items-center justify-center bg-background">
+        {running ? <span className="build-orb" aria-hidden /> : <Bot className="size-3.5 text-muted" />}
+      </span>
+      <p className="py-1 text-sm text-foreground">
+        {running
+          ? `${running} sub-agent${running === 1 ? "" : "s"} working in parallel`
+          : `${steps.length} sub-agent${steps.length === 1 ? "" : "s"} reported back`}
+      </p>
+      <div className="mb-1 space-y-1.5">
+        {steps.map((st) => (
+          <AgentCard key={st.id} step={st} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WriteGroup({ steps, streaming }: { steps: BuildStep[]; streaming: boolean }) {
   const running = steps.some((st) => st.state === "running");
   const failed = steps.some((st) => st.state === "error");
@@ -302,6 +376,7 @@ function currentActivity(steps: BuildStep[]): string | null {
     if (st.state !== "running" || st.kind === "note") continue;
     if (st.kind === "run" && st.cmd) return `Running ${st.cmd.length > 60 ? `${st.cmd.slice(0, 60)}…` : st.cmd}`;
     if (st.kind === "write") return st.label.replace(/…$/, "");
+    if (st.kind === "agent") return `Sub-agent: ${st.agent?.title ?? st.label}`;
     return st.label.replace(/…$/, "");
   }
   return null;
@@ -425,17 +500,25 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
 
   // Consecutive file writes fold into one "Wrote 9 files" group so a big scaffold doesn't bury the
   // commands that matter; each file inside still opens to show its code or diff.
+  // Parallel sub-agents fold into one AgentGroup the same way.
   const groups: Array<BuildStep | BuildStep[]> = [];
   for (const step of build.steps) {
     const prev = groups[groups.length - 1];
-    if (step.kind === "write" && Array.isArray(prev)) prev.push(step);
-    else if (step.kind === "write") groups.push([step]);
+    const groupable = step.kind === "write" || step.kind === "agent";
+    if (groupable && Array.isArray(prev) && prev[0]!.kind === step.kind) prev.push(step);
+    else if (groupable) groups.push([step]);
     else groups.push(step);
   }
   const rows = (
     <div className="relative">
       <span className="absolute top-3 bottom-3 left-[7.5px] w-px bg-border" aria-hidden />
-      {groups.map((g) => (Array.isArray(g) ? <WriteGroup key={g[0]!.id} steps={g} streaming={streaming} /> : <StepRow key={g.id} step={g} />))}
+      {groups.map((g) =>
+        Array.isArray(g) ? (
+          g[0]!.kind === "agent" ? <AgentGroup key={g[0]!.id} steps={g} /> : <WriteGroup key={g[0]!.id} steps={g} streaming={streaming} />
+        ) : (
+          <StepRow key={g.id} step={g} />
+        ),
+      )}
     </div>
   );
 
