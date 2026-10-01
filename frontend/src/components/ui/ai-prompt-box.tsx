@@ -524,6 +524,17 @@ const CustomDivider: React.FC = () => (
   </div>
 );
 
+/** Everything the backend can read (providers/officeDocs, archiveDocs, pdfText, plainTextDocs). */
+const DOCUMENT_ACCEPT = [
+  ".pdf", ".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp",
+  ".zip", ".rar", ".tar", ".gz", ".tgz",
+  ".txt", ".md", ".rst", ".csv", ".tsv", ".json", ".jsonl", ".xml", ".xaml", ".xsd", ".svg", ".ipynb", ".log", ".tex", ".rtf",
+  ".py", ".js", ".mjs", ".ts", ".jsx", ".tsx", ".vue", ".svelte", ".java", ".kt", ".scala", ".c", ".cpp", ".h", ".hpp",
+  ".cs", ".vb", ".fs", ".go", ".rs", ".rb", ".php", ".swift", ".dart", ".lua", ".r", ".pl", ".sol", ".m",
+  ".html", ".css", ".scss", ".less", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env", ".properties",
+  ".sh", ".bash", ".ps1", ".bat", ".sql", ".graphql", ".proto", ".prisma", ".tf", ".gradle", ".csproj", ".sln",
+].join(",");
+
 export interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
   onStop?: () => void;
@@ -981,7 +992,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 // parsing needed — .py/.xml/.json/etc). Drag-and-drop bypasses this `accept`
                 // filter (it's a UI hint, not enforcement), so the backend independently handles
                 // any mime it doesn't recognize by just not extracting it rather than erroring.
-                accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.py,.js,.ts,.jsx,.tsx,.java,.c,.cpp,.go,.rs,.rb,.php,.swift,.kt,.html,.css,.yaml,.yml,.sh,.sql,.log"
+                accept={DOCUMENT_ACCEPT}
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);
                   if (e.target) e.target.value = "";

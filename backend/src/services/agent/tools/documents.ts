@@ -29,7 +29,11 @@ export const createDocumentTool: FridayTool = {
       "- xlsx: fill `sheets` with `columns` and `rows` (cells as strings; numbers are detected; start a cell with = for a formula, e.g. \"=SUM(B2:B9)\").\n" +
       "- docx / pdf / md: write the whole document as Markdown in `content` (headings, paragraphs, lists, tables, quotes, code). " +
       "PDF uses standard fonts: Latin text only — for Hindi or other scripts prefer docx.\n" +
-      "- xml / csv / json / html / txt: put the exact file text in `content` (csv may use `sheets` instead).",
+      "- xml / csv / json / html / txt: put the exact file text in `content` (csv may use `sheets` instead). For code or config " +
+      "files (Python, XAML, YAML, SQL, TypeScript, a README…) use format txt with `extension` set (py, xaml, yaml, sql, ts, md…).\n" +
+      "EDITING a file the user attached: its full content is in the conversation (as extracted text). Apply exactly the changes " +
+      "asked for, keep everything else (structure, wording, sheet names, columns, formulas as =FORMULA), and call create_document " +
+      "with the SAME format and the same title/file name — the user gets the edited file back as a download.",
     parameters: {
       type: "object",
       properties: {
@@ -71,6 +75,7 @@ export const createDocumentTool: FridayTool = {
           items: { type: "object", properties: { name: { type: "string" }, columns: stringList, rows: { type: "array", items: stringList } } },
         },
         theme_color: { type: "string", description: "Optional accent colour as hex, e.g. #4F46E5" },
+        extension: { type: "string", description: "txt only: the real extension for a code/config file, e.g. py, xaml, yaml, sql, ts" },
       },
       required: ["format", "title"],
     },
@@ -87,6 +92,7 @@ export const createDocumentTool: FridayTool = {
       slides: Array.isArray(args.slides) ? (args.slides as SlideSpec[]) : undefined,
       sheets: Array.isArray(args.sheets) ? (args.sheets as SheetSpec[]) : undefined,
       theme_color: str(args, "theme_color") || undefined,
+      extension: str(args, "extension") || undefined,
     };
     if (format === "pptx" && !spec.slides?.length) throw new Error("A presentation needs `slides`.");
     if (format === "xlsx" && !spec.sheets?.length) throw new Error("A spreadsheet needs `sheets`.");

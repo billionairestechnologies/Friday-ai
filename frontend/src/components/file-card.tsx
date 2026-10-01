@@ -78,7 +78,8 @@ export function FileCard({ file, index = 0 }: { file: GeneratedFile; index?: num
         }}
         className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-composer px-3.5 py-3 text-left transition-colors hover:bg-chip"
       >
-        <FileIcon format={file.format} />
+        {/* Code/config files are stored as txt but keep their real extension (.py, .xaml…) — show that. */}
+        <FileIcon format={file.format === "txt" ? (file.filename.split(".").pop() ?? "txt").slice(0, 5) : file.format} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-foreground">{file.filename}</div>
           <div className="truncate text-xs text-muted">

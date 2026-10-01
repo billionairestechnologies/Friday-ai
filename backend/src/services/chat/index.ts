@@ -25,6 +25,8 @@ import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDocs.js";
+import { extractArchiveText, isArchive } from "../providers/archiveDocs.js";
+import { extractPdfText } from "../providers/pdfText.js";
 import {
   appendExtractedText,
   attachImages,
@@ -95,30 +97,29 @@ export {
  * "read" an image's text.
  */
 async function extractDocumentText(attachments: ChatImage[]): Promise<string | null> {
-  const officeFiles = attachments.filter((a) => isOfficeDocument(a.mime));
-  const digitisableFiles = attachments.filter((a) => isDigitisable(a.mime));
-  const plainTextFiles = attachments.filter((a) => isPlainTextDocument(a.mime, a.name));
-  if (officeFiles.length === 0 && digitisableFiles.length === 0 && plainTextFiles.length === 0) return null;
-
-  const officeTexts = officeFiles.map((f) => extractOfficeText(f.dataUrl, f.mime));
-  const plainTexts = plainTextFiles.map((f) => Promise.resolve(extractPlainText(f.dataUrl, f.mime, f.name)));
-  const digitiseTexts = (async () => {
-    if (digitisableFiles.length === 0) return [];
-    const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
-    if (!sarvamKey) return digitisableFiles.map(() => Promise.resolve(null));
-    return digitisableFiles.map((f, i) => digitiseDocument(sarvamKey, f.dataUrl, f.mime, `attachment-${i + 1}`));
-  })();
-
-  const [officeResults, plainTextResults, digitiseResultPromises] = await Promise.all([
-    Promise.all(officeTexts),
-    Promise.all(plainTexts),
-    digitiseTexts,
-  ]);
-  const digitiseResults = await Promise.all(digitiseResultPromises);
-  const allResults = [...officeResults, ...plainTextResults, ...digitiseResults];
-
-  const extracted = allResults
-    .map((text, i) => (text ? (allResults.length > 1 ? `[Attachment ${i + 1}]\n${text}` : text) : null))
+  const label = (a: ChatImage, i: number) => `[Attachment ${i + 1}${a.name ? `: ${a.name}` : ""}]`;
+  const results = await Promise.all(
+    attachments.map(async (a): Promise<string | null> => {
+      if (isArchive(a.mime, a.name)) return extractArchiveText(a.dataUrl, a.mime, a.name);
+      if (isOfficeDocument(a.mime, a.name)) return extractOfficeText(a.dataUrl, a.mime, a.name);
+      if (isPlainTextDocument(a.mime, a.name)) return extractPlainText(a.dataUrl, a.mime, a.name);
+      if (a.mime === "application/pdf") {
+        // Text-layer PDFs are read locally (instant, any model); only scans go to OCR.
+        const local = await extractPdfText(a.dataUrl);
+        if (local && !local.scanned) return local.text;
+        const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
+        const ocr = sarvamKey ? await digitiseDocument(sarvamKey, a.dataUrl, a.mime, a.name ?? "document.pdf") : null;
+        return ocr ?? (local?.text || null);
+      }
+      if (isDigitisable(a.mime)) {
+        const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
+        return sarvamKey ? digitiseDocument(sarvamKey, a.dataUrl, a.mime, a.name ?? "image") : null;
+      }
+      return null;
+    }),
+  );
+  const extracted = results
+    .map((text, i) => (text ? (attachments.length > 1 || attachments[i]!.name ? `${label(attachments[i]!, i)}\n${text}` : text) : null))
     .filter((t): t is string => t !== null);
   return extracted.length > 0 ? extracted.join("\n\n") : null;
 }
@@ -367,7 +368,7 @@ export async function streamMessage(
     // one of these ever reaches the model at all, so a failure here (corrupt file, unsupported
     // internal structure) needs to surface regardless of mode, not just single's per-provider
     // gates below. Checked once, up front, before any mode-specific branching.
-    const hasOfficeAttachment = attachments.some((a) => isOfficeDocument(a.mime));
+    const hasOfficeAttachment = attachments.some((a) => isOfficeDocument(a.mime, a.name) || isArchive(a.mime, a.name));
     if (hasOfficeAttachment && !extractedDocText) {
       onEvent({ t: "err", c: "Couldn't read that document — it may be corrupted or empty." });
       onEvent({ t: "done" });

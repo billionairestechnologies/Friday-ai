@@ -45,10 +45,17 @@ const PLAIN_TEXT_MIMES = new Set([
 // combinations. A generic/unhelpful mime is recovered from the filename extension instead of
 // silently failing to match.
 const CODE_EXTENSIONS = new Set([
-  "txt", "md", "csv", "json", "xml", "py", "js", "ts", "jsx", "tsx", "java", "c", "cpp", "cc",
-  "h", "hpp", "go", "rs", "rb", "php", "swift", "kt", "html", "htm", "css", "yaml", "yml", "sh",
-  "bash", "sql", "log", "ini", "toml", "env", "gitignore", "dockerfile",
+  "txt", "md", "markdown", "mdx", "rst", "csv", "tsv", "json", "jsonl", "ndjson", "xml", "xaml", "xsd", "xsl", "xslt",
+  "svg", "plist", "resx", "csproj", "vbproj", "fsproj", "sln", "props", "targets", "nuspec", "config", "manifest",
+  "py", "pyi", "ipynb", "js", "mjs", "cjs", "ts", "mts", "cts", "jsx", "tsx", "vue", "svelte", "astro", "java", "kt",
+  "kts", "scala", "groovy", "gradle", "c", "cpp", "cc", "cxx", "h", "hpp", "hh", "m", "mm", "cs", "vb", "fs", "fsx",
+  "go", "rs", "rb", "php", "swift", "dart", "lua", "pl", "pm", "r", "jl", "ex", "exs", "erl", "hs", "clj", "elm", "zig",
+  "nim", "sol", "html", "htm", "xhtml", "css", "scss", "sass", "less", "yaml", "yml", "toml", "ini", "cfg", "conf",
+  "properties", "env", "sh", "bash", "zsh", "fish", "ps1", "psm1", "bat", "cmd", "sql", "graphql", "gql", "proto",
+  "prisma", "tf", "hcl", "log", "tex", "bib", "srt", "vtt", "rtf", "gitignore", "dockerignore", "editorconfig",
+  "dockerfile", "makefile", "cmake", "lock",
 ]);
+const MAX_TEXT_CHARS = 50_000;
 const GENERIC_MIMES = new Set(["application/octet-stream", ""]);
 
 function extensionOf(name?: string): string | null {
@@ -60,6 +67,22 @@ function extensionOf(name?: string): string | null {
 // A generic "text/*" mime not in the explicit list above (e.g. a browser guessing "text/x-log"
 // for a .log file) is still plain text by definition — accept the whole prefix, not just the
 // enumerated set, so this doesn't need a new entry for every possible source-file extension.
+/** True when the file name alone says it's text/code (used for archive entries, which have no mime). */
+export function isTextFileName(name: string): boolean {
+  const base = name.split("/").pop()!.toLowerCase();
+  if (base === "dockerfile" || base === "makefile" || base === "readme" || base === "license") return true;
+  const ext = extensionOf(base);
+  return ext !== null && CODE_EXTENSIONS.has(ext);
+}
+
+/** UTF-8 decode, refusing binary content (NUL bytes in the first 8 KB) so a mis-named binary isn't fed to a model as garbage. */
+export function decodeTextBuffer(buffer: Buffer, maxChars = MAX_TEXT_CHARS): string | null {
+  if (buffer.subarray(0, 8192).includes(0)) return null;
+  const text = buffer.toString("utf-8").trim();
+  if (!text) return null;
+  return text.length > maxChars ? `${text.slice(0, maxChars)}\n…(truncated)` : text;
+}
+
 export function isPlainTextDocument(mime: string, name?: string): boolean {
   if (PLAIN_TEXT_MIMES.has(mime) || mime.startsWith("text/")) return true;
   if (GENERIC_MIMES.has(mime)) {
@@ -69,7 +92,6 @@ export function isPlainTextDocument(mime: string, name?: string): boolean {
   return false;
 }
 
-const MAX_TEXT_CHARS = 50_000;
 
 /** Decodes a plain-text/code attachment's base64 payload directly — synchronous, no external API. */
 export function extractPlainText(dataUrl: string, mime: string, name?: string): string | null {
