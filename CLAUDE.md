@@ -169,6 +169,16 @@ templates with `cfn-lint infra/aws/*.yaml` (install in a venv — debian's PyYAM
 
 ## Current state (branch `v2`)
 
+On `feature/build-agent-loop` (not merged yet): Build is ONE model-driven agent loop — the model answers
+("hi" gets a hello, no sandbox), asks (`ask_user`), proposes a plan (`propose_plan`) or builds; repo +
+branch from the composer travel as structured fields and are cloned before the first turn; lazy sandbox;
+`spawn_subagents` (≤4 parallel read-only explore/research helpers, kind "agent" step cards); sandboxes
+PAUSE instead of being killed + one git commit per Build turn (`sandbox.ts` gitCommit/gitLog); Build
+model allow-list (`buildModels.ts`, `/models` marks `build`); effort → provider reasoning
+(`toolCalling.ts#reasoningParams`); `generate_image` tool; archives/PPTX/ODF/text-PDF reading
+(`providers/archiveDocs.ts`, `pdfText.ts`, `officeDocs.ts`); `create_document` `extension` for code files
++ edit-in-same-format; share popup with WhatsApp/Telegram/Email + `useDismiss`; theme before first paint.
+
 Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
 Team Console (`/admin`: support, CRM, tasks, product updates, email campaigns, plans & offers, users, team
 & roles, team mail, status & crashes, models, billing, audit) · What's New popups once per account (web,
@@ -199,6 +209,7 @@ connector audit log · fixed env-dependent tests · removed committed scratch sc
 
 Deploy requires migrations `0023`–`0036`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
 `FRIDAY_PROMPT_CACHE=off`, `FRIDAY_BUILD_NATIVE_TOOLS=off` (Build Mode back on the text protocol),
+`FRIDAY_BUILD_STAGED_FLOW=on` (forced ask/plan rounds), `FRIDAY_SANDBOX_PERSIST=off` (kill, don't pause),
 `FRIDAY_DISABLE_STATUS_MONITOR=1`, `FRIDAY_DISABLE_CAMPAIGNS=1`, `FRIDAY_DISABLE_GRANT_EXPIRY=1`.
 
 Also shipped since: prompt caching restored (Anthropic/ScaleMax/OpenAI/OpenRouter/Gemini, with

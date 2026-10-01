@@ -734,7 +734,7 @@ export async function streamMessage(
             reservation?.reserveTokens ?? 0,
           );
         }
-        emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl });
+        emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl, commit: built.build.commit });
         const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
         // A pause (ask_user / propose_plan) is stored under the same markers the staged flow uses, so
         // later turns (alreadyAsked, findPendingPlan, the plan/ask cards) recognise it.

@@ -459,7 +459,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
           const { t: _t, ...approval } = ev;
           upsertLiveApproval(chatId, approval);
         }
-        else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl });
+        else if (ev.t === "build") setLiveBuildMeta(chatId, { elapsedMs: ev.elapsedMs, zipBytes: ev.zipBytes, zipName: ev.zipName, prUrl: ev.prUrl, commit: ev.commit });
         else if (ev.t === "preview") {
           setLivePreview(chatId, ev.url, ev.port);
           // Build Mode produced a running app — open the panel on it, same as an auto-opened artifact.

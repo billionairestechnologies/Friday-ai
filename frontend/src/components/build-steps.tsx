@@ -560,6 +560,11 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
             ? `Worked for ${formatDuration(seconds)}`
             : `${build.steps.length} steps`}
         <ChevronRight className={cn("size-3.5 transition-transform duration-200", expanded && "rotate-90")} />
+        {build.commit && (
+          <span title="This turn's changes are committed in the project's git history" className="ml-1 rounded-full bg-chip px-2 py-0.5 font-mono text-[11px] text-subtle">
+            commit {build.commit}
+          </span>
+        )}
       </button>
       <Collapse open={expanded}>
         <div className="mt-2">{expanded && rows}</div>

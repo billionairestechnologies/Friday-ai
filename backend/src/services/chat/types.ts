@@ -8,7 +8,7 @@ export type StreamEvent =
   | { t: "file"; file: import("../documents/documentService.js").GeneratedFile }
   | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
-  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
+  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string; commit?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
   | { t: "suggest_build"; prompt: string }
@@ -86,6 +86,8 @@ export type AskOption = { label: string; description?: string; recommended?: boo
 export type AskQuestion = { id: string; question: string; options: AskOption[] };
 
 export type BuildMeta = {
+  /** Short hash of the git commit this Build turn made in the project (sandbox.ts gitCommit). */
+  commit?: string;
   /** Set on the assistant message that asks questions instead of building. */
   ask?: AskQuestion[];
   plan?: BuildPlan;

@@ -320,12 +320,18 @@ export async function runBuildAgent(opts: {
       break;
     }
   }
+  // The project's own git history (sandbox.ts gitCommit — one commit per Build turn): tells the agent
+  // what earlier turns changed without re-reading everything.
+  const gitHistory = boxReady && existingFiles.length > 0 ? await box.gitLog(10) : "";
   const stateNote =
     existingFiles.length > 0
       ? `EXISTING PROJECT in ${PROJECT_DIR} (${existingFiles.length} files): ${existingFiles.slice(0, 60).join(", ")}${existingFiles.length > 60 ? ", …" : ""}.\n` +
         (box.fresh
           ? "The sandbox was just restored from a snapshot: node_modules is NOT installed and no server is running — reinstall and restart if you need to run it.\n"
-          : "The sandbox is still alive: dependencies are probably installed and the dev server may still be running (restarting is fine).\n") +
+          : "The sandbox was kept (resumed as it was): dependencies are installed and the dev server may still be running (restarting is fine).\n") +
+        (gitHistory
+          ? `The project is a git repo and each Build turn is committed automatically. Recent commits (newest first):\n${gitHistory}\nUse git log / git diff HEAD~1 (run_command) to see exactly what an earlier turn changed; git revert or git checkout <commit> -- <file> to undo something.\n`
+          : "") +
         (project?.start_cmd ? `Last start command: ${project.start_cmd} (port ${project.port}).` : "") +
         (project?.repo
           ? `\nThis project is the GitHub repository ${project.repo} (base branch ${project.repo_branch ?? "main"}). It is an existing codebase: explore it before changing it, keep its conventions, and when the user asks for a pull request, open one before finishing.`
@@ -1375,7 +1381,16 @@ export async function runBuildAgent(opts: {
 
   // Nothing left running to preview → destroy the sandbox now. The files are safe in our database;
   // a sandbox that IS serving a preview expires (is killed, not paused) on its own TTL.
-  if (!last.start) await box.kill();
+  // One git commit per turn that changed files — the project's history for later turns and for undo.
+  if (writeSeq > 0) {
+    const hash = await box.gitCommit(`Friday: ${userRequestText.replace(/\s+/g, " ").slice(0, 120) || "Build changes"}`);
+    if (hash) build.commit = hash;
+  }
+
+  // Nothing left running to preview → pause the sandbox (persistent mode: the next message resumes it
+  // with dependencies and history intact) or kill it. The files are safe in our database either way;
+  // a sandbox that IS serving a preview pauses (or is killed) on its own TTL.
+  if (!last.start) await box.release();
 
   build.elapsedMs = Date.now() - started;
   return { text: visibleText, build, usage, candidate: usedCandidate, pause };

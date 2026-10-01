@@ -40,6 +40,12 @@ Optional:
 - `FRIDAY_DISABLE_AUTOMATIONS=1` — stop the in-process automation scheduler on this instance
 - `FRIDAY_PROMPT_CACHE=off` — disable Anthropic/OpenAI/Gemini prompt caching (on by default)
 - `FRIDAY_BUILD_NATIVE_TOOLS=off` — Build Mode back on the text-tag protocol
+- `FRIDAY_BUILD_STAGED_FLOW=on` — Build back on the forced question → plan → build rounds (default: the
+  model decides to answer / ask_user / propose_plan / build, like Claude Code)
+- `FRIDAY_BUILD_MODELS` — regex replacing Build's frontier-model allow-list (`projectBuild/buildModels.ts`)
+- `FRIDAY_SANDBOX_PERSIST=off` — kill Build sandboxes on timeout instead of pausing them (default: pause,
+  so the next message resumes with node_modules + the project's git history; paused sandboxes are billed
+  as E2B storage)
 - `STATUS_ALERT_EMAILS` — comma-separated inboxes for outage alerts and /status problem reports
   (falls back to the team's `support` mail identity, then the console owners)
 - `SUPPORT_INBOUND_SECRET` — shared secret for the inbound-email webhook (`POST /api/support/inbound`)
