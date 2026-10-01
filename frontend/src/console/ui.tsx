@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useEscape } from "@/lib/use-dismiss";
 import { create } from "zustand";
 
 /** Team Console UI kit — one visual language for every section (tokens from styles.css). */
@@ -311,6 +312,7 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, width
 }
 
 export function Modal({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
+  useEscape(open, onClose);
   return (
     <AnimatePresence>
       {open && (

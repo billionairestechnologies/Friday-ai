@@ -44,6 +44,7 @@ import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
+import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
 import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
@@ -810,7 +811,13 @@ export async function streamMessage(
     }
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
       if (research) onEvent({ t: "status", s: "searching" });
-      const tools = await (toolsetPromise ?? buildToolset(userId));
+      // generate_image joins every tool turn: the model, not a keyword list, decides when the user
+      // wants a picture (see agent/tools/image.ts) — so it never answers with drawing code instead.
+      const tools = [
+        ...(await (toolsetPromise ?? buildToolset(userId))),
+        imageTool({ lastImageUrl: lastGeneratedImageUrl(historyWithImages), attachedImage: currentImageAttachment?.dataUrl ?? null }),
+      ];
+      const imageMarkdown: string[] = [];
       const citedUrls = new Set(searchResults.map((r) => r.url));
       // An explicitly chosen skill is already pinned — don't also offer the menu (it would compete).
       const menu = activeSkill ? "" : skillMenu(await skillsPromise);
@@ -825,6 +832,11 @@ export async function streamMessage(
           userId,
           conversationId,
           signal,
+          onImage: (url, alt) => {
+            const md = `\n\n![${alt.replace(/[\[\]\n]/g, " ")}](${url})\n\n`;
+            imageMarkdown.push(md);
+            onEvent({ t: "text", c: md });
+          },
           onFile: (file) => {
             createdFiles.push(file);
             onEvent({ t: "file", file });
@@ -849,7 +861,8 @@ export async function streamMessage(
         full = "";
       } else {
         usedCandidate = toolRun.candidate;
-        full = toolRun.text;
+        // Images were streamed into the reply when their tool call finished; keep them in the stored message.
+        full = imageMarkdown.length ? `${imageMarkdown.join("").trim()}\n\n${toolRun.text}`.trim() : toolRun.text;
         tokenUsage = toolRun.usage;
         sawProviderUsage = true;
         lastError = toolRun.error;

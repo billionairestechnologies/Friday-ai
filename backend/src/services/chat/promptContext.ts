@@ -84,14 +84,12 @@ const EXECUTION_HONESTY_SYSTEM_PROMPT =
 // must never emit `![...](url)` markdown unless a real image URL was explicitly handed to it in
 // this conversation already for this exact purpose.
 const IMAGE_HONESTY_SYSTEM_PROMPT =
-  "You cannot generate, edit, or fetch images yourself — there is no image-generation tool wired " +
-  "to you. Never write markdown image syntax (`![...](...)`) with a URL you invented, guessed, or " +
-  "recalled from training data — that is a fabricated link, not a real image, and presenting it as " +
-  "one is a serious mistake. If the user asks you to create/edit an image and no real image URL " +
-  "already appears earlier in this exact conversation for that request, tell them plainly you " +
-  "can't produce one from this message and ask them to phrase it as an explicit image request " +
-  "(e.g. \"generate an image of...\") so the real image tool can pick it up — do not soften this " +
-  "into pretending to have made something.";
+  "Images: when a generate_image tool is available to you, use it for every request to create or change a picture — " +
+  "never answer an image request with SVG/HTML/canvas/Python drawing code or ASCII art unless the user explicitly asked " +
+  "for code. Without that tool you cannot generate, edit, or fetch images yourself. Either way, never write markdown " +
+  "image syntax (`![...](...)`) with a URL you invented, guessed, or recalled from training data — that is a fabricated " +
+  "link, not a real image. If you have no image tool and the user asks for an image, say plainly you can't produce one " +
+  "from this message and suggest an explicit request (e.g. \"generate an image of...\") so the image tool can pick it up.";
 
 // Both clients render real markdown (react-markdown+remark-gfm on web, a bold/list/code-fence
 // parser on Android) but a plain instruction-less prompt often comes back as an unbroken wall of

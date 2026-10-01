@@ -8,6 +8,8 @@ export type ToolContext = {
   onCite?: (url: string, title?: string) => void;
   /** Lets a tool attach a file it created (shown as a download card under the reply). */
   onFile?: (file: import("../../documents/documentService.js").GeneratedFile) => void;
+  /** Lets a tool put a generated image into the reply itself (the model never re-types the URL). */
+  onImage?: (url: string, alt: string) => void;
 };
 
 /** A tool the chat agent can call. `run` returns plain text for the model; throwing reports an error
