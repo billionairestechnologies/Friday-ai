@@ -106,7 +106,8 @@ struct ComposerBar: View {
 
             do {
                 HStack(spacing: 6) {
-                if vm.draft.isEmpty && vm.modes.isEmpty {
+                // No hands-free voice agent in Build (mic dictation stays).
+                if vm.draft.isEmpty && vm.modes.isEmpty && vm.workspace != "build" {
                     Button { vm.voiceModeOpen = true } label: {
                         Image(systemName: "waveform")
                             .font(.system(size: 16))

@@ -59,6 +59,13 @@ data class BuildStep(
     val code: String? = null,
     val added: Int? = null,
     val removed: Int? = null,
+    /** Terminal tab: the command a run/start step executed, its (live) output, how it ended and how long it took. */
+    val cmd: String? = null,
+    val output: String? = null,
+    val exitCode: Int? = null,
+    val ms: Int? = null,
+    /** "diff" for an edit (the code field holds +/- lines), else the file's language. */
+    val lang: String? = null,
     /** kind "agent": a Build / Deep Research sub-agent — its job, its own live actions and its report. */
     val agent: SubAgentInfo? = null,
 )
@@ -84,6 +91,11 @@ fun parseBuildStep(st: org.json.JSONObject): BuildStep = BuildStep(
     code = st.optString("code").ifBlank { null },
     added = if (st.has("added")) st.optInt("added") else null,
     removed = if (st.has("removed")) st.optInt("removed") else null,
+    cmd = st.optString("cmd").ifBlank { null },
+    output = if (st.has("output")) st.optString("output") else null,
+    exitCode = if (st.has("exitCode")) st.optInt("exitCode") else null,
+    ms = if (st.has("ms")) st.optInt("ms") else null,
+    lang = st.optString("lang").ifBlank { null },
     agent = st.optJSONObject("agent")?.let { a ->
         val arr = a.optJSONArray("actions")
         SubAgentInfo(

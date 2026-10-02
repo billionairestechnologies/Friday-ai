@@ -212,3 +212,39 @@ struct BuildEffortChip: View {
         }
     }
 }
+
+
+/// Build's Mode (permissions) and Effort pickers, inside the composer's "+" menu — same place as the web.
+struct BuildOptionsMenu: View {
+    @EnvironmentObject var vm: FridayViewModel
+    private let modes: [(id: String, label: String)] = [("ask", "Ask"), ("auto_edit", "Auto-edit"), ("full_auto", "Full auto")]
+    private let efforts: [(id: String, label: String)] = [("low", "Low"), ("medium", "Medium"), ("high", "High")]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            group("Mode", "shield", modes, vm.buildPermissionMode) { vm.buildPermissionMode = $0 }
+            group("Effort", "gauge.with.dots.needle.50percent", efforts, vm.buildEffort) { vm.buildEffort = $0 }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+    }
+
+    private func group(_ title: String, _ icon: String, _ options: [(id: String, label: String)], _ selected: String, _ pick: @escaping (String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 12))
+                Text(title).font(.system(size: 12.5, weight: .medium))
+            }
+            .foregroundColor(FridayColor.muted)
+            HStack(spacing: 6) {
+                ForEach(options, id: \.id) { o in
+                    Button { pick(o.id) } label: {
+                        Text(o.label).font(.system(size: 12.5, weight: o.id == selected ? .semibold : .regular))
+                            .foregroundColor(o.id == selected ? FridayColor.bg : FridayColor.text)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(o.id == selected ? FridayColor.text : FridayColor.surface).clipShape(Capsule())
+                    }
+                }
+            }
+        }
+    }
+}

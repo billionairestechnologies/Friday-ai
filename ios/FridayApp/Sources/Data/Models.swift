@@ -49,6 +49,13 @@ struct BuildStep: Identifiable, Hashable {
     var code: String?
     var added: Int?
     var removed: Int?
+    /// Terminal tab: the command a run/start step executed, its (live) output, how it ended and how long it took.
+    var cmd: String?
+    var output: String?
+    var exitCode: Int?
+    var ms: Int?
+    /// "diff" for an edit (the code field holds +/- lines), else the file's language.
+    var lang: String?
     /// kind "agent": a Build / Deep Research sub-agent — its job, its own live actions and its report.
     var agent: SubAgentInfo?
 
@@ -64,6 +71,11 @@ struct BuildStep: Identifiable, Hashable {
             code: j["code"] as? String,
             added: j["added"] as? Int,
             removed: j["removed"] as? Int,
+            cmd: j["cmd"] as? String,
+            output: j["output"] as? String,
+            exitCode: j["exitCode"] as? Int,
+            ms: j["ms"] as? Int,
+            lang: j["lang"] as? String,
             agent: (j["agent"] as? [String: Any]).map(SubAgentInfo.parse)
         )
     }

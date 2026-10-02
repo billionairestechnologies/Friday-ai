@@ -483,7 +483,8 @@ final class FridayViewModel: ObservableObject {
         let stream = ChatApi.streamMessage(
             conversationId: realId, content: content,
             think: modes.contains(.think), webSearch: modes.contains(.search), canvas: modes.contains(.canvas),
-            research: modes.contains(.research),
+            // No Deep Research in Build (its own agent does the research).
+            research: modes.contains(.research) && chats.first(where: { $0.id == realId })?.workspace != "build",
             attachments: streamAttachments,
             effort: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildEffort : nil,
             permissionMode: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildPermissionMode : nil,

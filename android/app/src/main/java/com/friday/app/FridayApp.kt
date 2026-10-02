@@ -480,15 +480,9 @@ fun FridayApp(
                     // before the backend fix could ever matter.
                     onFiles = {
                         filePickerLauncher.launch(
-                            arrayOf(
-                                "image/*",
-                                "application/pdf",
-                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                "text/*",
-                                "application/json",
-                                "application/xml",
-                            ),
+                            // Any file: the server reads what it can (PDF, Office/OpenDocument, archives, CSV/JSON/text/code)
+                            // and says so when it can't. A narrow list hid CSVs a phone reports as application/vnd.ms-excel.
+                            arrayOf("*/*"),
                         )
                     },
                     onPlugins = { vm.openSheet(Sheet.Plugins) },
@@ -497,6 +491,11 @@ fun FridayApp(
                         vm.toggleMode(Mode.Research)
                         vm.closeSheet()
                     },
+                    buildMode = ui.workspace == "build",
+                    permissionMode = ui.buildPermissionMode,
+                    onPermissionMode = vm::setBuildPermissionMode,
+                    effort = ui.buildEffort,
+                    onEffort = vm::setBuildEffort,
                 )
                 else -> {}
             }
@@ -872,10 +871,6 @@ private fun ChatShell(
                             kotlinx.coroutines.delay(4000)
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        com.friday.app.ui.buildmode.BuildPermissionChip(mode = ui.buildPermissionMode, onChange = vm::setBuildPermissionMode)
-                        com.friday.app.ui.buildmode.BuildEffortChip(effort = ui.buildEffort, onChange = vm::setBuildEffort)
-                    }
                 }
                 ui.activeSkill?.let { skill -> com.friday.app.ui.skills.ActiveSkillChip(skill) { vm.setActiveSkill(null) } }
                 ComposerBar(
@@ -893,6 +888,7 @@ private fun ChatShell(
                     onStop = vm::stop,
                     onAttach = { vm.openSheet(Sheet.Attach) },
                     onVoice = { voiceModeOpen = true },
+                    showVoiceAgent = ui.workspace != "build",
                     onModel = { vm.openSheet(Sheet.Model) },
                     onVoiceMessage = vm::sendVoiceMessage,
                     attachments = ui.pendingAttachments,

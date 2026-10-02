@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Difference
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Delete
@@ -122,7 +123,7 @@ fun BuildPanel(
     Column(modifier.fillMaxSize().background(FridayBg)) {
         // Icon tabs: globe = running preview, stack = project files; close on the right.
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            listOf("preview" to Icons.Default.Language, "files" to Icons.Default.Layers, "diff" to Icons.Default.Difference, "secrets" to Icons.Default.Key).forEach { (id, icon) ->
+            listOf("preview" to Icons.Default.Language, "files" to Icons.Default.Layers, "diff" to Icons.Default.Difference, "terminal" to Icons.Default.Terminal, "secrets" to Icons.Default.Key).forEach { (id, icon) ->
                 Icon(
                     icon, contentDescription = id,
                     tint = if (tab == id) FridayText else FridayMuted,
@@ -232,6 +233,8 @@ fun BuildPanel(
             }
         } else if (tab == "diff") {
             DiffList(steps)
+        } else if (tab == "terminal") {
+            BuildTerminal(steps, building = steps.any { it.state == "running" })
         } else if (tab == "secrets") {
             SecretsTab(conversationId)
         } else {

@@ -123,6 +123,8 @@ fun ComposerBar(
     focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
     /** Overrides the mode-based prompt text (Build workspace, a plan waiting for feedback). */
     placeholder: String? = null,
+    /** False in Build: no hands-free voice agent there (mic dictation stays). */
+    showVoiceAgent: Boolean = true,
 ) {
     val shape = RoundedCornerShape(ComposerCorner)
     val hasText = draft.trim().isNotEmpty()
@@ -261,7 +263,7 @@ fun ComposerBar(
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AnimatedVisibility(!hasText && modes.isEmpty(), enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
+                        AnimatedVisibility(showVoiceAgent && !hasText && modes.isEmpty(), enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
                             IconBtn(Icons.Outlined.GraphicEq, "Voice", FridayMuted, onVoice)
                         }
                         Row(

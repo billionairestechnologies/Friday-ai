@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.friday.app.R
 import com.friday.app.data.ModelId
 import com.friday.app.data.api.RemoteModel
+import com.friday.app.ui.theme.FridayBg
 import com.friday.app.ui.theme.FridayMuted
 import com.friday.app.ui.theme.FridaySurface
 import com.friday.app.ui.theme.FridayText
@@ -153,14 +154,45 @@ fun AttachSheet(
     /** Deep Research on/off for the next message — same place as the web's "+" menu. */
     researchOn: Boolean = false,
     onToggleResearch: () -> Unit = {},
+    /** Build workspace: Mode (permissions) and Effort live here, and there is no Deep research. */
+    buildMode: Boolean = false,
+    permissionMode: String = "full_auto",
+    onPermissionMode: (String) -> Unit = {},
+    effort: String = "medium",
+    onEffort: (String) -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
         AttachRow(Icons.Default.CameraAlt, "Camera", onCamera)
         AttachRow(Icons.Default.Photo, "Photos", onPhotos)
         AttachRow(Icons.AutoMirrored.Filled.InsertDriveFile, "Files", onFiles)
-        AttachRow(Icons.Default.TravelExplore, "Deep research", onToggleResearch, checked = researchOn)
+        if (buildMode) {
+            BuildOptionRow("Mode", listOf("ask" to "Ask", "auto_edit" to "Auto-edit", "full_auto" to "Full auto"), permissionMode, onPermissionMode)
+            BuildOptionRow("Effort", listOf("low" to "Low", "medium" to "Medium", "high" to "High"), effort, onEffort)
+        } else {
+            AttachRow(Icons.Default.TravelExplore, "Deep research", onToggleResearch, checked = researchOn)
+        }
         AttachRow(Icons.Default.Extension, "Plugins", onPlugins)
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** One labelled row of choices (Build's Mode / Effort), inside the "+" menu. */
+@Composable
+private fun BuildOptionRow(title: String, options: List<Pair<String, String>>, selected: String, onPick: (String) -> Unit) {
+    Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, color = FridayMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (id, label) ->
+                val on = id == selected
+                Text(
+                    label,
+                    color = if (on) FridayBg else FridayText,
+                    fontSize = 14.sp,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) FridayText else FridaySurface).clickable { onPick(id) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
+        }
     }
 }
 

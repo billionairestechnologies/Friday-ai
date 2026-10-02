@@ -889,7 +889,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         // A pinned skill applies to this one message, then the chip clears.
                         val pinnedSkillId = _state.value.activeSkill?.id
                         if (pinnedSkillId != null) _state.update { it.copy(activeSkill = null) }
-                        ChatApi.streamMessage(remoteId, text, modes, attachments, effort = if (isBuild) _state.value.buildEffort else null, permissionMode = if (isBuild) _state.value.buildPermissionMode else null, skillId = pinnedSkillId)
+                        ChatApi.streamMessage(remoteId, text, if (isBuild) modes - Mode.Research else modes, attachments, effort = if (isBuild) _state.value.buildEffort else null, permissionMode = if (isBuild) _state.value.buildPermissionMode else null, skillId = pinnedSkillId)
                     } else {
                         repo.send(text, modes)
                     }

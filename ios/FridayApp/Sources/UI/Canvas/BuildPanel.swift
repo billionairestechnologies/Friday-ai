@@ -46,7 +46,7 @@ struct BuildPanel: View {
         VStack(spacing: 0) {
             // Icon tabs: globe = running preview, stack = project files.
             HStack(spacing: 4) {
-                ForEach([("preview", "globe"), ("files", "square.stack.3d.up"), ("diff", "plusminus"), ("secrets", "key")], id: \.0) { id, icon in
+                ForEach([("preview", "globe"), ("files", "square.stack.3d.up"), ("diff", "plusminus"), ("terminal", "terminal"), ("secrets", "key")], id: \.0) { id, icon in
                     Button { tab = id } label: {
                         Image(systemName: icon).font(.system(size: 17))
                             .foregroundColor(tab == id ? FridayColor.text : FridayColor.muted)
@@ -76,6 +76,9 @@ struct BuildPanel: View {
                 } else if tab == "diff" {
                     Text("Changes in this build").font(.system(size: 12)).foregroundColor(FridayColor.muted)
                     Spacer()
+                } else if tab == "terminal" {
+                    Text("Commands this build ran").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+                    Spacer()
                 } else {
                     Button { showTree.toggle() } label: { Image(systemName: "list.bullet.indent").foregroundColor(showTree ? FridayColor.text : FridayColor.muted) }
                     Text(selected ?? "").font(.system(size: 13)).foregroundColor(FridayColor.text).lineLimit(1)
@@ -91,6 +94,8 @@ struct BuildPanel: View {
                 SecretsTab(conversationId: conversationId)
             } else if tab == "diff" {
                 BuildDiffList(steps: vm.currentChat?.messages.flatMap { $0.build?.steps ?? [] } ?? [])
+            } else if tab == "terminal" {
+                BuildTerminal(steps: vm.currentChat?.messages.flatMap { $0.build?.steps ?? [] } ?? [], building: vm.currentChat?.messages.last?.isStreaming ?? false)
             } else if tab == "preview" {
                 if loading {
                     VStack(spacing: 12) {

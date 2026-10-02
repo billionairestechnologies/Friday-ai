@@ -162,19 +162,15 @@ private struct ChatShell: View {
                     }
 
                     if vm.workspace == "build" {
-                        HStack(spacing: 8) {
-                            BuildPermissionChip()
-                            BuildEffortChip()
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .task(id: vm.currentId) {
-                            while !Task.isCancelled {
-                                vm.resumeBuildIfRunning()
-                                await vm.pollApprovals()
-                                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                        // Mode and Effort now live in the "+" menu (like the web); this just keeps a running build in sync.
+                        Color.clear.frame(height: 0)
+                            .task(id: vm.currentId) {
+                                while !Task.isCancelled {
+                                    vm.resumeBuildIfRunning()
+                                    await vm.pollApprovals()
+                                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                                }
                             }
-                        }
                     }
 
                     ActiveSkillChip().padding(.horizontal, 16)
@@ -407,10 +403,15 @@ private struct ChatShell: View {
                 vm.sheet = .none
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { triggerFilesPicker = true }
             }
-            // Deep Research on/off for the next message — same place as the web's "+" menu.
-            PopoverRow(icon: "binoculars.fill", title: "Deep research", subtitle: nil, selected: vm.modes.contains(.research), circularIcon: true) {
-                vm.toggleMode(.research)
-                vm.sheet = .none
+            if vm.workspace == "build" {
+                // Build: how it works lives here (Mode = permissions, Effort = how hard it tries); no Deep research.
+                BuildOptionsMenu()
+            } else {
+                // Deep Research on/off for the next message — same place as the web's "+" menu.
+                PopoverRow(icon: "binoculars.fill", title: "Deep research", subtitle: nil, selected: vm.modes.contains(.research), circularIcon: true) {
+                    vm.toggleMode(.research)
+                    vm.sheet = .none
+                }
             }
             PopoverRow(icon: "puzzlepiece.extension.fill", title: "Plugins", subtitle: nil, circularIcon: true) {
                 vm.sheet = .plugins
