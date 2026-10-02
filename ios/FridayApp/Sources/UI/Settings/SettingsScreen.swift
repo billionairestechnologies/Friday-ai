@@ -540,49 +540,120 @@ private struct BillingPage: View {
     }
 }
 
+private func formatTokens(_ n: Double) -> String {
+    if n >= 1_000_000 { return String(format: n.truncatingRemainder(dividingBy: 1_000_000) == 0 ? "%.0fM" : "%.1fM", n / 1_000_000) }
+    if n >= 1_000 { return String(format: n.truncatingRemainder(dividingBy: 1_000) == 0 ? "%.0fK" : "%.1fK", n / 1_000) }
+    return String(Int(n.rounded()))
+}
+
+private func formatReset(_ iso: String?) -> String? {
+    guard let iso else { return nil }
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    guard let d = f.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else { return nil }
+    let out = DateFormatter(); out.dateStyle = .medium; out.timeStyle = .short
+    return "Resets \(out.string(from: d))"
+}
+
+private func usageLabel(_ type: String) -> String {
+    switch type {
+    case "chat_message": return "Chat"
+    case "web_search": return "Search"
+    case "voice_second": return "Voice"
+    case "sandbox_run": return "Build"
+    case "attachment_upload": return "Attachments"
+    case "image_generation": return "Image generation"
+    default: return type
+    }
+}
+
+/// Usage — the same windows as the web's Usage pane: weekly, 5-hour, monthly, organization pool and your cap, each with
+/// its reset time and what used it, plus what your plan includes (all from GET /usage/quota).
 private struct UsagePage: View {
+    @EnvironmentObject var vm: FridayViewModel
     @State private var quota: UsageQuota?
     @State private var loading = true
 
     var body: some View {
-        SettingsCard {
+        VStack(alignment: .leading, spacing: 12) {
             if loading {
                 ProgressView().frame(maxWidth: .infinity).padding(20)
             } else if let quota {
-                bar("Weekly", quota.weekly)
-                SettingsDivider()
-                bar("Monthly", quota.monthly)
-                SettingsDivider()
-                bar("Rolling", quota.rolling)
+                HStack {
+                    Text((quota.isEnterprise ? "Enterprise" : (quota.plan ?? "free").capitalized) + " plan")
+                        .font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(FridayColor.chip).clipShape(Capsule())
+                    Spacer()
+                    if !quota.isEnterprise && (quota.plan ?? "free").lowercased() != "premium" {
+                        Button { vm.page = "plans" } label: {
+                            Text("Upgrade").font(.system(size: 12.5, weight: .semibold)).foregroundColor(FridayColor.bg)
+                                .padding(.horizontal, 12).padding(.vertical, 5).background(FridayColor.text).clipShape(Capsule())
+                        }
+                    }
+                }
+                bar("Weekly Limit", quota.weekly, quota.breakdown, nil)
+                if let r = quota.rolling { bar("5-Hour Limit", r, quota.rollingBreakdown, "A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once.") }
+                if let m = quota.monthly { bar("Monthly Limit", m, quota.monthlyBreakdown, nil) }
+                if let o = quota.orgPool { bar("Organization Pool (\(quota.orgSeats) seats)", o, [], nil) }
+                if let c = quota.memberCap { bar("Your Monthly Cap", c, [], "A personal sub-limit your org admin set within the shared pool.") }
+                if let e = quota.entitlements { includes(e) }
             } else {
-                SettingsRow(icon: "chart.bar", label: "Usage unavailable", showChevron: false)
+                SettingsCard { SettingsRow(icon: "chart.bar", label: "Usage unavailable", showChevron: false) }
             }
         }
-        Color.clear.frame(height: 1).task {
+        .task {
             quota = try? await UsageApi.quota()
             loading = false
         }
     }
 
-    private func bar(_ label: String, _ bucket: UsageBucket?) -> some View {
+    private func bar(_ title: String, _ bucket: UsageBucket?, _ breakdown: [UsageBreakdownEntry], _ help: String?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(label).font(.system(size: 15)).foregroundColor(FridayColor.text)
+                Text(title).font(.system(size: 15, weight: .medium)).foregroundColor(FridayColor.text)
                 Spacer()
-                Text(bucket.map { "\($0.used) / \($0.limit) · \(min(100, $0.pct))%" } ?? "—")
+                Text(bucket.map { "\(formatTokens(max(0, $0.used))) / \(formatTokens($0.limit)) · \($0.pct)%" } ?? "—")
                     .font(.system(size: 13)).foregroundColor(FridayColor.muted)
             }
             if let bucket, bucket.limit > 0 {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(FridayColor.surface)
-                        Capsule().fill(FridayColor.search).frame(width: geo.size.width * CGFloat(min(100, bucket.pct)) / 100)
+                        Capsule().fill(bucket.pct >= 90 ? FridayColor.error : FridayColor.search).frame(width: geo.size.width * CGFloat(bucket.pct) / 100)
                     }
                 }
                 .frame(height: 6)
             }
+            if let reset = formatReset(bucket?.resetAt) { Text(reset).font(.system(size: 12)).foregroundColor(FridayColor.muted) }
+            if let help { Text(help).font(.system(size: 12)).foregroundColor(FridayColor.muted) }
+            if !breakdown.isEmpty {
+                Text(breakdown.map { "\(usageLabel($0.type)) \(max(0, $0.percent))%" }.joined(separator: "  ·  "))
+                    .font(.system(size: 12)).foregroundColor(FridayColor.muted)
+            }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(14).background(FridayColor.surface.opacity(0.5)).cornerRadius(14)
+    }
+
+    private func includes(_ e: PlanEntitlements) -> some View {
+        let storage = e.libraryStorageMb >= 1024 ? String(format: "%.1f GB", Double(e.libraryStorageMb) / 1024) : "\(e.libraryStorageMb) MB"
+        let rows: [(String, String)] = [
+            ("Build Mode", e.buildMode ? "\(e.buildMaxRounds) rounds per run" : "Not included"),
+            ("Deep Research", e.deepResearchPerDay > 0 ? "\(e.deepResearchPerDay) per day" : "Not included"),
+            ("Documents", "\(e.documentsPerDay) per day"),
+            ("Custom skills", "\(e.customSkills)"),
+            ("Library storage", storage),
+            ("Team Up", "Up to \(e.teamUpModels) models"),
+            ("MCP servers", "\(e.mcpServers)"),
+            ("Automations", "\(e.automations)"),
+            ("Support", e.prioritySupport ? "Priority" : "Standard"),
+        ]
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("What your plan includes").font(.system(size: 15, weight: .semibold)).foregroundColor(FridayColor.text)
+            ForEach(rows, id: \.0) { k, v in
+                HStack { Text(k).foregroundColor(FridayColor.muted); Spacer(); Text(v).foregroundColor(FridayColor.text) }.font(.system(size: 13.5))
+            }
+        }
+        .padding(14).overlay(RoundedRectangle(cornerRadius: 14).stroke(FridayColor.hairline, lineWidth: 1))
     }
 }
 

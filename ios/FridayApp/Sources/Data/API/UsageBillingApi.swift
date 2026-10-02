@@ -1,35 +1,87 @@
 import Foundation
 
+/// One quota window: tokens used / allowed and when it resets (backend services/quota — buckets carry their own resetAt).
 struct UsageBucket {
-    let used: Int
-    let limit: Int
-    var pct: Int { limit > 0 ? Int((Double(used) / Double(limit)) * 100) : 0 }
+    let used: Double
+    let limit: Double
+    let resetAt: String?
+    /// Clamped both ways like the web: bonus grants/refunds can push a counter below 0 or above the limit.
+    var pct: Int { limit > 0 ? max(0, min(100, Int((used / limit * 100).rounded()))) : 0 }
+}
+
+struct UsageBreakdownEntry: Hashable {
+    let type: String
+    let percent: Int
+}
+
+struct PlanEntitlements {
+    let buildMode: Bool
+    let buildMaxRounds: Int
+    let deepResearchPerDay: Int
+    let documentsPerDay: Int
+    let customSkills: Int
+    let libraryStorageMb: Int
+    let teamUpModels: Int
+    let mcpServers: Int
+    let automations: Int
+    let prioritySupport: Bool
 }
 
 struct UsageQuota {
     let plan: String?
+    let isEnterprise: Bool
     let resetAt: String?
     let weekly: UsageBucket?
     let monthly: UsageBucket?
     let rolling: UsageBucket?
+    let orgPool: UsageBucket?
+    let orgSeats: Int
+    let memberCap: UsageBucket?
+    let breakdown: [UsageBreakdownEntry]
+    let rollingBreakdown: [UsageBreakdownEntry]
+    let monthlyBreakdown: [UsageBreakdownEntry]
+    let entitlements: PlanEntitlements?
 }
+
+private func num(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
 
 enum UsageApi {
     static func quota() async throws -> UsageQuota {
         let json = try await ApiClient.shared.requestJSON(path: "usage/quota", authed: true)
-        // Breakdown may live at top level or nested under "status" — check both.
+        // Newer servers nest the buckets under "status"; older ones put them at the top level.
         let status = json["status"] as? [String: Any]
         func bucket(_ key: String) -> UsageBucket? {
-            let dict = (json[key] as? [String: Any]) ?? (status?[key] as? [String: Any])
-            guard let dict, let used = dict["used"] as? Int, let limit = dict["limit"] as? Int else { return nil }
-            return UsageBucket(used: used, limit: limit)
+            let dict = (status?[key] as? [String: Any]) ?? (json[key] as? [String: Any])
+            guard let dict, let used = num(dict["used"]), let limit = num(dict["limit"]) else { return nil }
+            return UsageBucket(used: used, limit: limit, resetAt: dict["resetAt"] as? String)
         }
+        func entries(_ key: String) -> [UsageBreakdownEntry] {
+            (json[key] as? [[String: Any]] ?? []).map { UsageBreakdownEntry(type: $0["type"] as? String ?? "", percent: Int(num($0["percent"]) ?? 0)) }
+        }
+        let e = json["entitlements"] as? [String: Any]
+        let org = status?["org"] as? [String: Any]
         return UsageQuota(
             plan: status?["plan"] as? String ?? json["plan"] as? String,
-            resetAt: (status?["resetAt"] as? String) ?? (status?["reset_at"] as? String),
+            isEnterprise: status?["isEnterprise"] as? Bool ?? false,
+            resetAt: (status?["weekly"] as? [String: Any])?["resetAt"] as? String,
             weekly: bucket("weekly"),
             monthly: bucket("monthly"),
-            rolling: bucket("rolling")
+            rolling: bucket("rolling"),
+            orgPool: bucket("org"),
+            orgSeats: Int(num(org?["seatCount"]) ?? 0),
+            memberCap: bucket("memberCap").map { UsageBucket(used: $0.used, limit: $0.limit, resetAt: org?["resetAt"] as? String) },
+            breakdown: entries("breakdown"),
+            rollingBreakdown: entries("rollingBreakdown"),
+            monthlyBreakdown: entries("monthlyBreakdown"),
+            entitlements: e.map {
+                PlanEntitlements(
+                    buildMode: $0["buildMode"] as? Bool ?? false, buildMaxRounds: Int(num($0["buildMaxRounds"]) ?? 0),
+                    deepResearchPerDay: Int(num($0["deepResearchPerDay"]) ?? 0), documentsPerDay: Int(num($0["documentsPerDay"]) ?? 0),
+                    customSkills: Int(num($0["customSkills"]) ?? 0), libraryStorageMb: Int(num($0["libraryStorageMb"]) ?? 0),
+                    teamUpModels: Int(num($0["teamUpModels"]) ?? 0), mcpServers: Int(num($0["mcpServers"]) ?? 0),
+                    automations: Int(num($0["automations"]) ?? 0), prioritySupport: $0["prioritySupport"] as? Bool ?? false
+                )
+            }
         )
     }
 }

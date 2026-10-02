@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,6 +83,7 @@ import com.friday.app.data.api.BillingApi
 import com.friday.app.data.api.BillingOrder
 import com.friday.app.data.api.UsageApi
 import com.friday.app.data.api.UsageBreakdown
+import com.friday.app.data.api.UsageBreakdownEntry
 import com.friday.app.data.api.UsageQuota
 import com.friday.app.data.api.VoiceApi
 import com.friday.app.data.api.VoiceOption
@@ -149,7 +151,7 @@ fun SettingsScreen(
             BillingSection(ui.plan, onOpenPlans)
         }
         SettingsSub.Usage -> SubPageScaffold("Usage", onBack = { sub = null }) {
-            UsageSection()
+            UsageSection(onUpgrade = onOpenPlans)
         }
         SettingsSub.Memory -> SubPageScaffold("Memory", onBack = { sub = null }) {
             com.friday.app.ui.agent.MemoryContent()
@@ -646,53 +648,100 @@ private fun BillingSection(plan: String?, onOpenPlans: () -> Unit) {
     }
 }
 
+private fun formatTokens(n: Double): String = when {
+    n >= 1_000_000 -> if (n % 1_000_000 == 0.0) "${(n / 1_000_000).toInt()}M" else "%.1fM".format(n / 1_000_000)
+    n >= 1_000 -> if (n % 1_000 == 0.0) "${(n / 1_000).toInt()}K" else "%.1fK".format(n / 1_000)
+    else -> n.roundToInt().toString()
+}
+
+private fun formatReset(iso: String?): String? = runCatching {
+    val d = java.time.Instant.parse(iso ?: return null)
+    "Resets " + java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a", Locale.getDefault()).withZone(java.time.ZoneId.systemDefault()).format(d)
+}.getOrNull()
+
+private fun usageLabel(type: String): String = when (type) {
+    "chat_message" -> "Chat"; "web_search" -> "Search"; "voice_second" -> "Voice"; "sandbox_run" -> "Build"
+    "attachment_upload" -> "Attachments"; "image_generation" -> "Image generation"; else -> type
+}
+
+/** Usage — the same windows as the web's Usage pane: weekly, 5-hour, monthly, organization pool and your cap, each with its
+ *  reset time and what used it, plus what your plan includes (all from GET /usage/quota). */
 @Composable
-private fun UsageSection() {
+private fun UsageSection(onUpgrade: () -> Unit = {}) {
     var quota by remember { mutableStateOf<UsageQuota?>(null) }
     var loading by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         quota = UsageApi.quota()
         loading = false
     }
-    SettingsCard {
-        when {
-            loading -> Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+    val q = quota
+    when {
+        loading -> Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp)) }
+        q == null -> SettingsCard { SettingsRow(Icons.Default.DataUsage, "Usage unavailable", showChevron = false) }
+        else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    (if (q.isEnterprise) "Enterprise" else q.plan.replaceFirstChar { it.uppercase() }) + " plan",
+                    color = FridayText, fontSize = 12.5.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(FridaySurface).padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+                Spacer(Modifier.weight(1f))
+                if (!q.isEnterprise && q.plan.lowercase() != "premium") {
+                    Text("Upgrade", color = FridayBg, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(FridayText).clickable(onClick = onUpgrade).padding(horizontal = 12.dp, vertical = 5.dp))
+                }
             }
-            quota == null -> SettingsRow(Icons.Default.DataUsage, "Usage unavailable", showChevron = false)
-            else -> {
-                UsageBar("Weekly", quota!!.weekly)
-                SettingsDivider()
-                UsageBar("Monthly", quota!!.monthly)
-                SettingsDivider()
-                UsageBar("Rolling", quota!!.rolling)
-            }
+            UsageBar("Weekly Limit", q.weekly, q.breakdown, null)
+            q.rolling?.let { UsageBar("5-Hour Limit", it, q.rollingBreakdown, "A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once.") }
+            q.monthly?.let { UsageBar("Monthly Limit", it, q.monthlyBreakdown, null) }
+            q.orgPool?.let { UsageBar("Organization Pool (${q.orgSeats} seats)", it, emptyList(), null) }
+            q.memberCap?.let { UsageBar("Your Monthly Cap", it, emptyList(), "A personal sub-limit your org admin set within the shared pool.") }
+            q.entitlements?.let { PlanIncludes(it) }
         }
     }
 }
 
 @Composable
-private fun UsageBar(label: String, breakdown: UsageBreakdown?) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
-        val pct = if (breakdown != null && breakdown.limit > 0) {
-            ((breakdown.used.toFloat() / breakdown.limit) * 100).roundToInt().coerceIn(0, 100)
-        } else null
+private fun UsageBar(title: String, bucket: UsageBreakdown?, breakdown: List<UsageBreakdownEntry>, help: String?) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(FridaySurface.copy(alpha = 0.5f)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = FridayText, fontSize = 15.sp)
-            Text(
-                if (breakdown != null) "${breakdown.used} / ${breakdown.limit}${if (pct != null) " · $pct%" else ""}" else "—",
-                color = FridayMuted,
-                fontSize = 13.sp,
-            )
+            Text(title, color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(if (bucket != null) "${formatTokens(maxOf(0.0, bucket.used))} / ${formatTokens(bucket.limit)} · ${bucket.pct}%" else "—", color = FridayMuted, fontSize = 13.sp)
         }
-        if (pct != null) {
-            Spacer(Modifier.height(8.dp))
+        if (bucket != null && bucket.limit > 0) {
             LinearProgressIndicator(
-                progress = { pct / 100f },
+                progress = { bucket.pct / 100f },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = FridaySearch,
+                color = if (bucket.pct >= 90) FridayError else FridaySearch,
                 trackColor = FridaySurface,
             )
+        }
+        formatReset(bucket?.resetAt)?.let { Text(it, color = FridayMuted, fontSize = 12.sp) }
+        help?.let { Text(it, color = FridayMuted, fontSize = 12.sp) }
+        if (breakdown.isNotEmpty()) Text(breakdown.joinToString("  ·  ") { "${usageLabel(it.type)} ${maxOf(0, it.percent)}%" }, color = FridayMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun PlanIncludes(e: com.friday.app.data.api.PlanEntitlements) {
+    val storage = if (e.libraryStorageMb >= 1024) "%.1f GB".format(e.libraryStorageMb / 1024.0) else "${e.libraryStorageMb} MB"
+    val rows = listOf(
+        "Build Mode" to if (e.buildMode) "${e.buildMaxRounds} rounds per run" else "Not included",
+        "Deep Research" to if (e.deepResearchPerDay > 0) "${e.deepResearchPerDay} per day" else "Not included",
+        "Documents" to "${e.documentsPerDay} per day",
+        "Custom skills" to "${e.customSkills}",
+        "Library storage" to storage,
+        "Team Up" to "Up to ${e.teamUpModels} models",
+        "MCP servers" to "${e.mcpServers}",
+        "Automations" to "${e.automations}",
+        "Support" to if (e.prioritySupport) "Priority" else "Standard",
+    )
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, FridayMuted.copy(alpha = 0.2f), RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("What your plan includes", color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        rows.forEach { (k, v) ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(k, color = FridayMuted, fontSize = 13.5.sp)
+                Text(v, color = FridayText, fontSize = 13.5.sp)
+            }
         }
     }
 }
