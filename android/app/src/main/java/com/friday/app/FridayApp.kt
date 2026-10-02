@@ -238,6 +238,7 @@ fun FridayApp(
     ) {
         when (page) {
             "library" -> com.friday.app.ui.library.LibraryScreen(onClose = { page = "chat" })
+            "pages" -> com.friday.app.ui.projects.PagesScreen(onClose = { page = "chat" })
             "projects" -> com.friday.app.ui.projects.ProjectsScreen(
                 onClose = { page = "chat" },
                 onNewChat = { projectId -> vm.startProjectChat(projectId); page = "chat" },

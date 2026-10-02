@@ -12,6 +12,7 @@ struct RootShell: View {
             case "plans": PlansScreen()
             case "library": LibraryScreen()
             case "projects": ProjectsScreen()
+            case "pages": PagesScreen()
             case "automations": AutomationsScreen()
             default: ChatShell()
             }

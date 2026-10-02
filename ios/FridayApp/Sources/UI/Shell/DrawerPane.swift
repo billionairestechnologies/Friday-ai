@@ -17,6 +17,7 @@ struct DrawerPane: View {
                     navRow(icon: "arrow.triangle.2.circlepath", label: "Automations") { vm.page = "automations" }
                     navRow(icon: "books.vertical", label: "Library") { vm.page = "library" }
                     navRow(icon: "folder", label: "Projects") { vm.page = "projects" }
+                    navRow(icon: "doc.text", label: "Pages") { vm.page = "pages" }
                     // Support and status live on the web (same account, same tickets).
                     navRow(icon: "questionmark.bubble", label: "Help & support") { openWeb("/?support=contact") }
                     navRow(icon: "waveform.path.ecg", label: "System status") { openWeb("/status") }

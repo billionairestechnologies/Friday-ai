@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.SupportAgent
@@ -185,6 +186,7 @@ fun DrawerPane(
             PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
             PlainRow(Icons.AutoMirrored.Filled.LibraryBooks, "Library") { onNavigate("library") }
             PlainRow(Icons.Default.Folder, "Projects") { onNavigate("projects") }
+            PlainRow(Icons.Default.Description, "Pages") { onNavigate("pages") }
             // Support and status live on the web (same account, same tickets) — opened in a Custom Tab.
             PlainRow(Icons.Default.SupportAgent, "Help & support") { openWeb("/?support=contact") }
             PlainRow(Icons.Default.MonitorHeart, "System status") { openWeb("/status") }
