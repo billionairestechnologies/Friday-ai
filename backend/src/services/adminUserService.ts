@@ -121,43 +121,26 @@ export async function setOrganizationPooledTokens(organizationId: string, pooled
   if (error) throw new HttpError(500, error.message);
 }
 
-// tokenUsage.ts's estimateCostCents() is explicitly USD cents (see its own comment); Razorpay
-// revenue is INR paise. This is a fixed approximate conversion purely for a single "are we
-// profitable" number in the admin panel — not an accounting-grade FX rate, and worth revisiting
-// if this ever needs to be precise (a live rate lookup, or re-denominating provider cost tracking
-// in INR directly).
-const APPROX_USD_TO_INR = 83;
-
-/** Revenue (captured Razorpay payments, INR) vs. estimated provider cost (token_ledger, converted
- *  from USD) — the admin panel's profitability card. `sinceDays` bounds both sums to the same
- *  window. Returns everything in INR paise so the two sides are actually comparable. */
+/**
+ * Revenue vs. AI cost for the admin Billing card. Now a thin view over the Finance report
+ * (finance/report.ts): exact per-model prices instead of one flat guess per provider, an aggregate
+ * in the database instead of a select silently capped at 1000 rows, and the books' USD→INR rate
+ * instead of a hard-coded 83. Same response shape as before so the existing card keeps working.
+ */
 export async function profitabilitySummary(sinceDays = 30) {
-  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
-
-  const { data: paidOrders, error: ordersError } = await supabaseAdmin
-    .from("razorpay_orders")
-    .select("amount_paise")
-    .eq("status", "paid")
-    .gte("created_at", since);
-  if (ordersError) throw new HttpError(500, ordersError.message);
-  const revenuePaise = (paidOrders ?? []).reduce((sum, row) => sum + Number(row.amount_paise ?? 0), 0);
-
-  const { data: ledgerRows, error: ledgerError } = await supabaseAdmin
-    .from("token_ledger")
-    .select("estimated_cost_cents, total_tokens")
-    .gte("created_at", since);
-  if (ledgerError) throw new HttpError(500, ledgerError.message);
-  const costUsdCents = (ledgerRows ?? []).reduce((sum, row) => sum + Number(row.estimated_cost_cents ?? 0), 0);
-  const costInrPaise = costUsdCents * APPROX_USD_TO_INR;
-  const totalTokens = (ledgerRows ?? []).reduce((sum, row) => sum + Number(row.total_tokens ?? 0), 0);
-
+  const { financeReport } = await import("./finance/report.js");
+  const to = new Date().toISOString().slice(0, 10);
+  const from = new Date(Date.now() - (sinceDays - 1) * 86_400_000).toISOString().slice(0, 10);
+  const report = await financeReport(from, to);
+  const totalTokens = report.models.reduce((n, m) => n + m.inputTokens + m.outputTokens, 0);
+  const completions = report.models.reduce((n, m) => n + m.calls, 0);
   return {
     sinceDays,
-    revenuePaise: Math.round(revenuePaise),
-    costUsdCents: Math.round(costUsdCents),
-    costPaiseApprox: Math.round(costInrPaise),
-    profitPaiseApprox: Math.round(revenuePaise - costInrPaise),
+    revenuePaise: Math.round(report.totals.revenueInr * 100),
+    costUsdCents: Math.round((report.totals.aiCostInr / report.settings.usd_to_inr) * 100),
+    costPaiseApprox: Math.round(report.totals.aiCostInr * 100),
+    profitPaiseApprox: Math.round(report.totals.grossProfitInr * 100),
     totalTokens,
-    completions: (ledgerRows ?? []).length,
+    completions,
   };
 }

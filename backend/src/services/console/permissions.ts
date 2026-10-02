@@ -35,6 +35,8 @@ export const PERMISSIONS = [
   { id: "providers.view", group: "Models", label: "See model providers and keys" },
   { id: "providers.manage", group: "Models", label: "Manage providers, keys and model tiers" },
   { id: "mail.manage", group: "Mail", label: "Manage team mail addresses" },
+  { id: "finance.view", group: "Finance", label: "See model prices, profitability, revenue and expenses" },
+  { id: "finance.manage", group: "Finance", label: "Edit model prices, FX/markup settings and expenses" },
   { id: "audit.view", group: "Audit", label: "See the audit log" },
   { id: "status.view", group: "Status", label: "See system status, incidents and crash reports" },
   { id: "status.manage", group: "Status", label: "Post incidents and status updates" },

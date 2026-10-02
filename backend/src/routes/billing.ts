@@ -9,6 +9,7 @@ import {
   publicBillingConfig,
   verifyRazorpayWebhook,
 } from "../services/billingService.js";
+import { publicPriceList } from "../services/finance/pricing.js";
 
 export const billingRouter = Router();
 
@@ -41,6 +42,15 @@ billingRouter.get(
   "/config",
   asyncHandler(async (_req, res) => {
     res.json(await publicBillingConfig());
+  }),
+);
+
+// Public: per-model prices (INR per 1M input/output tokens) for the models an admin marked public in
+// Team Console → Finance. Transparency for users choosing a model; nothing about our cost is exposed.
+billingRouter.get(
+  "/model-prices",
+  asyncHandler(async (_req, res) => {
+    res.json({ prices: await publicPriceList().catch(() => []) });
   }),
 );
 

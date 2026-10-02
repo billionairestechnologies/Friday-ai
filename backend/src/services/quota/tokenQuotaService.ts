@@ -3,7 +3,8 @@ import { memoAsync } from "../../utils/ttlMemo.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { getRedisClient } from "../redisClient.js";
 import { logger } from "../../utils/logger.js";
-import { estimateCostCents, type TokenUsage } from "../tokenUsage.js";
+import type { TokenUsage } from "../tokenUsage.js";
+import { priceUsage } from "../finance/pricing.js";
 import {
   decideQuota,
   ENTERPRISE_MIN_SEATS,
@@ -404,7 +405,10 @@ export async function recordTokenLedger(
   usage: TokenUsage,
   reservedTokens: number,
 ): Promise<void> {
-  const { error } = await supabaseAdmin.from("token_ledger").insert({
+  // Exact cost at today's price for this model (finance/pricing.ts); flagged when no price exists.
+  const price = await priceUsage(providerSlug, modelId, usage);
+  const pricedColumns = { cost_usd: price.costUsd, sell_inr: price.sellInr, priced: price.priced };
+  const base = {
     user_id: userId,
     organization_id: organizationId,
     provider_slug: providerSlug,
@@ -416,9 +420,12 @@ export async function recordTokenLedger(
     // the provider/call reported no prompt-cache activity (see providers/promptCache.ts).
     cached_tokens: usage.cachedTokens ?? 0,
     cache_write_tokens: usage.cacheWriteTokens ?? 0,
-    estimated_cost_cents: estimateCostCents(providerSlug, usage),
+    estimated_cost_cents: Math.round(price.costUsd * 100 * 100) / 100,
     reserved_tokens: reservedTokens,
-  });
+  };
+  let { error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns });
+  // A server deployed before migration 0040 ran must still record usage (quota + audit rely on it).
+  if (error && /cost_usd|sell_inr|priced/.test(error.message)) ({ error } = await supabaseAdmin.from("token_ledger").insert(base));
   if (error) logger.warn("token_ledger_insert_failed", { userId, error: error.message });
 }
 

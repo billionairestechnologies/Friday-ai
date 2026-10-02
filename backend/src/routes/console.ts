@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
 import * as st from "../controllers/statusController.js";
+import * as fin from "../controllers/financeController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -87,3 +88,15 @@ consoleRouter.post("/plans/grants/:grantId/revoke", can("plans.manage"), h(p.rev
 consoleRouter.post("/plans/redemptions/:redemptionId/review", can("plans.review"), h(p.review));
 
 consoleRouter.get("/audit", can("audit.view"), h(c.auditLog));
+
+// Finance: model prices (cost vs sell), the P&L report and expenses.
+consoleRouter.get("/finance/report", can("finance.view"), h(fin.report));
+consoleRouter.get("/finance/pricing", can("finance.view"), h(fin.pricing));
+consoleRouter.post("/finance/pricing", can("finance.manage"), h(fin.savePrice));
+consoleRouter.delete("/finance/pricing/:priceId", can("finance.manage"), h(fin.removePrice));
+consoleRouter.post("/finance/pricing/sync", can("finance.manage"), h(fin.syncPrices));
+consoleRouter.post("/finance/settings", can("finance.manage"), h(fin.settings));
+consoleRouter.get("/finance/expenses", can("finance.view"), h(fin.expenses));
+consoleRouter.post("/finance/expenses", can("finance.manage"), h(fin.addExpense));
+consoleRouter.patch("/finance/expenses/:expenseId", can("finance.manage"), h(fin.editExpense));
+consoleRouter.delete("/finance/expenses/:expenseId", can("finance.manage"), h(fin.removeExpense));
