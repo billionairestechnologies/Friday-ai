@@ -102,6 +102,7 @@ Gotchas:
   `profiles.role='admin'` = owner), `mail.ts` (Resend, branded HTML, signed unsubscribe), support, CRM,
   tasks, announcements (What's New), campaigns (scheduler + send ledger), `plansService.ts` (packages,
   grants with expiry sweep, offers/student passes, public packages, checkout discounts).
+- `services/status/providerIssues.ts` — every provider failure (out of credit, gateway, rate limit, rejected key) is grouped per provider+kind in `provider_issues` (migration 0045), emailed to the team (6 h cooldown) and shown in Console → Status → Provider issues; users only ever see the friendly text from `utils/providerError.ts` (`sanitizeUserError` wraps every `err` event in `streamMessage`).
 - `services/status/statusService.ts` — probes every 5 min (Redis lease), auto incidents + alert emails,
   real-traffic model success (`recordModelOutcome`), public status payload, problem reports → tickets,
   crash reports (fingerprinted). Routes: `routes/status.ts` (public) + `/api/console/status/*`.

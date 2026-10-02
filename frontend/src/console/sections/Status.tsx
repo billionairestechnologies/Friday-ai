@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, Bug, ExternalLink, Plus, RefreshCw, Siren, Trash2 } from "lucide-react";
+import { Activity, Bug, Check, ExternalLink, Plug, Plus, RefreshCw, Siren, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCan } from "../access";
@@ -15,7 +15,17 @@ type CStatus = "operational" | "degraded" | "outage" | "unknown";
 type Component = { id: string; name: string; group: string; status: CStatus; latencyMs: number | null; uptime90: number | null };
 type Incident = { id: string; title: string; status: string; impact: string; components: string[]; auto: boolean; startedAt: string; resolvedAt: string | null; updates: { id: string; status: string; body: string; createdAt: string }[] };
 type CrashGroup = { fingerprint: string; platform: string; message: string; occurrences: number; users: number; first_seen: string; last_seen: string; sample_id: string };
-type Data = { status: { overall: CStatus; updatedAt: string | null; components: Component[] }; incidents: Incident[]; crashes: CrashGroup[] };
+type ProviderIssue = { id: string; provider: string; kind: string; sample: string; occurrences: number; first_seen: string; last_seen: string; resolved_at: string | null };
+type Data = { status: { overall: CStatus; updatedAt: string | null; components: Component[] }; incidents: Incident[]; crashes: CrashGroup[]; providerIssues?: ProviderIssue[] };
+
+const ISSUE_KIND: Record<string, { label: string; tone: string; hint: string }> = {
+  quota: { label: "Out of credit", tone: "red", hint: "Top up or renew the provider plan." },
+  gateway: { label: "Gateway / timeout", tone: "amber", hint: "Provider is down or slow; usually clears on its own." },
+  rate_limit: { label: "Rate limited", tone: "amber", hint: "Too many requests; raise the provider limit or add another key." },
+  auth: { label: "Key rejected", tone: "red", hint: "Replace the API key in Models & keys." },
+  too_large: { label: "Request too large", tone: "neutral", hint: "A very long chat or paste; users were told to shorten it." },
+  other: { label: "Error", tone: "neutral", hint: "See the sample below." },
+};
 
 const DOT: Record<CStatus, string> = { operational: "bg-emerald-500", degraded: "bg-amber-500", outage: "bg-red-500", unknown: "bg-zinc-400" };
 const IMPACT_TONE: Record<string, string> = { none: "neutral", minor: "amber", major: "red", critical: "red" };
@@ -28,7 +38,7 @@ const STATUSES = [
 
 export default function Status() {
   const data = useResource<Data>("/console/status");
-  const [tab, setTab] = useState<"incidents" | "crashes">("incidents");
+  const [tab, setTab] = useState<"incidents" | "crashes" | "providers">("incidents");
   const [editing, setEditing] = useState<Incident | "new" | null>(null);
   const [crash, setCrash] = useState<CrashGroup | null>(null);
   const [checking, setChecking] = useState(false);
@@ -36,6 +46,8 @@ export default function Status() {
   const d = data.data;
   const reload = () => void data.reload();
   const active = d?.incidents.filter((i) => i.status !== "resolved") ?? [];
+  const issues = d?.providerIssues ?? [];
+  const openIssues = issues.filter((i) => !i.resolved_at);
 
   return (
     <>
@@ -85,7 +97,7 @@ export default function Status() {
             ))}
           </div>
           <div className="mb-4">
-            <Segmented value={tab} onChange={setTab} options={[{ value: "incidents", label: "Incidents", count: active.length }, { value: "crashes", label: "Crashes (14 days)", count: d.crashes.length }]} />
+            <Segmented value={tab} onChange={setTab} options={[{ value: "incidents", label: "Incidents", count: active.length }, { value: "providers", label: "Provider issues", count: openIssues.length }, { value: "crashes", label: "Crashes (14 days)", count: d.crashes.length }]} />
           </div>
           {tab === "incidents" ? (
             d.incidents.length === 0 ? (
@@ -106,6 +118,33 @@ export default function Status() {
                     </Card>
                   </button>
                 ))}
+              </div>
+            )
+          ) : tab === "providers" ? (
+            issues.length === 0 ? (
+              <EmptyState icon={Plug} title="No provider issues" text="When a model, image or search provider fails (out of credit, gateway errors, rejected keys), it is logged here with the real reason — users only see a friendly message — and the team is emailed." />
+            ) : (
+              <div className="grid gap-3">
+                {issues.map((i) => {
+                  const kind = ISSUE_KIND[i.kind] ?? ISSUE_KIND.other!;
+                  return (
+                    <Card key={i.id} className={cn(i.resolved_at && "opacity-60")}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold capitalize">{i.provider}</span>
+                        <Badge tone={kind.tone}>{kind.label}</Badge>
+                        {i.resolved_at ? <Badge tone="green">resolved</Badge> : <Badge tone="amber">open</Badge>}
+                        <span className="text-xs text-muted">{formatNumber(Number(i.occurrences))} failures · first {timeAgo(i.first_seen)} · last {timeAgo(i.last_seen)}</span>
+                        {canManage && !i.resolved_at && (
+                          <Button size="sm" variant="secondary" className="ml-auto" onClick={() => void act(() => api.post(`/console/status/provider-issues/${i.id}/resolve`, {}), "Marked resolved").then(reload)}>
+                            <Check className="size-3.5" /> Mark resolved
+                          </Button>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm">{kind.hint}</p>
+                      <p className="mt-2 rounded-lg bg-chip/40 px-3 py-2 font-mono text-xs break-words text-muted">{i.sample}</p>
+                    </Card>
+                  );
+                })}
               </div>
             )
           ) : d.crashes.length === 0 ? (

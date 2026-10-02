@@ -30,3 +30,22 @@ test("an exhausted provider balance (402) is never quoted to the user", () => {
   assert.match(out, /isn't available right now/);
   assert.ok(!/token|renew|scalemax/i.test(out), out);
 });
+
+test("the raw quota JSON from the screenshot is replaced; Friday's own limit messages are left alone", async () => {
+  const { sanitizeUserError, classifyProviderIssue } = await import("../src/utils/providerError.js");
+  const raw = '{"type":"error","error":{"type":"quota_error","message":"Your token pack is almost used up (the reply would be cut off mid-way). Top up or renew your pack and retry.","request_id":"2e6efae3"}}';
+  const shown = sanitizeUserError(raw);
+  assert.match(shown, /isn't available right now/);
+  assert.ok(!/token|pack|renew|quota|request_id/i.test(shown), shown);
+  assert.equal(classifyProviderIssue(raw), "quota");
+  const own = "You've reached your daily limit on the Free plan. Upgrade to keep going.";
+  assert.equal(sanitizeUserError(own), own);
+  assert.equal(sanitizeUserError("Claude Opus doesn't support images."), "Claude Opus doesn't support images.");
+});
+
+test("issue kinds are classified for the admin log", async () => {
+  const { classifyProviderIssue } = await import("../src/utils/providerError.js");
+  assert.equal(classifyProviderIssue("scalemax: ScaleMax chat failed: 502 <html>"), "gateway");
+  assert.equal(classifyProviderIssue("openai: OpenAI chat failed: 429 slow down"), "rate_limit");
+  assert.equal(classifyProviderIssue("gemini: Gemini chat failed: 403 API key not valid"), "auth");
+});

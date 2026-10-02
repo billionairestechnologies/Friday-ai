@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { listProviderIssues, resolveProviderIssue } from "../services/status/providerIssues.js";
 import { z } from "zod";
 import { recordAdminAuditLog } from "../services/usageService.js";
 import * as status from "../services/status/statusService.js";
@@ -62,8 +63,13 @@ function audit(req: Request, action: string, targetId?: string, meta: Record<str
 }
 
 export async function consoleOverview(_req: Request, res: Response) {
-  const [publicView, incidents, crashes] = await Promise.all([status.getPublicStatus(), status.listIncidents(90), status.crashGroups(14).catch(() => [])]);
-  res.json({ status: publicView, incidents, crashes });
+  const [publicView, incidents, crashes, providerIssues] = await Promise.all([
+    status.getPublicStatus(),
+    status.listIncidents(90),
+    status.crashGroups(14).catch(() => []),
+    listProviderIssues(30).catch(() => []),
+  ]);
+  res.json({ status: publicView, incidents, crashes, providerIssues });
 }
 
 const incidentSchema = z.object({
@@ -104,6 +110,13 @@ export async function runChecks(req: Request, res: Response) {
   const results = await status.runProbes();
   audit(req, "console.status.probe");
   res.json({ results });
+}
+
+export async function resolveProviderIssueRoute(req: Request, res: Response) {
+  const issueId = id.parse(req.params.issueId);
+  await resolveProviderIssue(issueId);
+  audit(req, "console.status.provider_issue.resolve", issueId);
+  res.json({ ok: true });
 }
 
 export async function crashDetail(req: Request, res: Response) {

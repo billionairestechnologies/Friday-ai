@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { recordProviderIssue } from "../status/providerIssues.js";
 import { friendlyProviderError } from "../../utils/providerError.js";
 import type { AgentMessage, ToolCall, ToolTurnResult } from "../providers/toolCalling.js";
 import type { ChatMessage, ProviderAdapter } from "../providers/types.js";
@@ -163,6 +164,7 @@ export async function runToolLoop(opts: {
         const rawError = `${c.slug}: ${err instanceof Error ? err.message : "failed"}`;
         console.warn(`[agent] ${rawError.slice(0, 300)}`);
         lastError = friendlyProviderError(rawError);
+        void recordProviderIssue({ raw: rawError, provider: c.slug });
         if (emittedThisRound) candidate = c; // part of the reply is already on screen — it's this model's
         if (emittedThisRound || candidate) break; // can't switch models mid-reply / mid-conversation
       }

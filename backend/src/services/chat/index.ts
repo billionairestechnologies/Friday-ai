@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase.js";
+import { sanitizeUserError } from "../../utils/providerError.js";
+import { recordProviderIssue } from "../status/providerIssues.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { getProviderAdapter } from "../providers/registry.js";
 import type { ChatImage, ChatMessage } from "../providers/types.js";
@@ -164,6 +166,7 @@ async function tryGenerateOrEditImage(
     return await generateImage(apiKey, intent.prompt);
   } catch (err) {
     console.error("[chat] image generation failed:", err instanceof Error ? err.message : err);
+    void recordProviderIssue({ raw: err instanceof Error ? err.message : String(err), provider: "scalemax" });
     return null;
   }
 }
@@ -205,6 +208,18 @@ export async function streamMessage(
   reservation?: Reservation,
   options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode; repo?: RepoRef } = {},
 ): Promise<void> {
+  // Last line of defence: whichever code path produced an error, raw provider output (JSON bodies, HTML
+  // pages, request ids, quota wording) never reaches the user — it is logged for admins instead.
+  const deliver = onEvent;
+  onEvent = (ev) => {
+    if (ev.t === "err") {
+      const shown = sanitizeUserError(ev.c);
+      if (shown !== ev.c) void recordProviderIssue({ raw: ev.c, userId, conversationId });
+      deliver({ ...ev, c: shown });
+    } else if (ev.t === "agent" && ev.error) {
+      deliver({ ...ev, error: sanitizeUserError(ev.error) });
+    } else deliver(ev);
+  };
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
   if (research) webSearch = true;

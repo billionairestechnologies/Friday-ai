@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { recordProviderIssue } from "../status/providerIssues.js";
 import { friendlyProviderError } from "../../utils/providerError.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
@@ -121,6 +122,7 @@ export async function streamWithHedging(opts: {
         const rawError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
         console.warn(`[chat] ${rawError.slice(0, 300)}`);
         attempt.error = friendlyProviderError(rawError);
+        void recordProviderIssue({ raw: rawError, provider: candidate.slug });
         // A rejected key (rotated/revoked) must not keep being served from the lookup cache.
         if (/\b(401|403)\b|invalid.{0,20}(api )?key|unauthori[sz]ed/i.test(rawError)) invalidateMemoized();
       } finally {

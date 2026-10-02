@@ -76,6 +76,7 @@ consoleRouter.post("/status/incidents", can("status.manage"), h(st.createInciden
 consoleRouter.post("/status/incidents/:incidentId/updates", can("status.manage"), h(st.updateIncident));
 consoleRouter.delete("/status/incidents/:incidentId", can("status.manage"), h(st.deleteIncident));
 consoleRouter.post("/status/checks", can("status.manage"), h(st.runChecks));
+consoleRouter.post("/status/provider-issues/:issueId/resolve", can("status.manage"), h(st.resolveProviderIssueRoute));
 consoleRouter.get("/status/crashes/:crashId", can("status.view"), h(st.crashDetail));
 consoleRouter.get("/plans", can("plans.view"), h(p.overview));
 consoleRouter.post("/plans/packages", can("plans.manage"), h(p.savePackage));

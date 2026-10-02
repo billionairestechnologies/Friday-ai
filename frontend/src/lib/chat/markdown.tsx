@@ -125,7 +125,14 @@ function urlTransform(url: string, key: string): string {
   return defaultUrlTransform(url);
 }
 
-export const Markdown = memo(function Markdown({ text, live = false }: { text: string; live?: boolean }) {
+/** While a reply streams, a half-arrived `![alt](url…` must not show as code: drop it until the closing `)` lands
+ *  and the whole image appears at once (a generated image arrives as one big markdown line). */
+function hideUnfinishedImage(text: string): string {
+  return text.replace(/!\[[^\]]*\]\([^)]*$/, "").replace(/!\[[^\]]*$/, "");
+}
+
+export const Markdown = memo(function Markdown({ text: rawText, live = false }: { text: string; live?: boolean }) {
+  const text = live ? hideUnfinishedImage(rawText) : rawText;
   if (!text) return null;
   return (
     <div className="md">
