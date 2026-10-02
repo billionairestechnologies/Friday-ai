@@ -50,6 +50,8 @@ import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
 import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
 import { researchAgentsTool } from "../agent/tools/research.js";
 import { setTurnKind } from "../jobs/turns.js";
+import { projectSearchTool } from "../agent/tools/projectSearch.js";
+import { readyFileNames } from "../knowledge/projectKnowledge.js";
 import { buildCandidates, isBuildModel } from "../projectBuild/buildModels.js";
 import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
@@ -426,6 +428,9 @@ export async function streamMessage(
     }
 
     const project = conversation.assistant_projects;
+    const projectId = (conversation as { project_id?: string | null }).project_id ?? null;
+    // Project knowledge (files added to the project) — listed in the context and searchable by tool.
+    const projectFiles = projectId ? await readyFileNames(projectId).catch(() => [] as string[]) : [];
     const projectContext: ChatMessage[] = project
       ? [
           {
@@ -436,6 +441,9 @@ export async function streamMessage(
               project.description ? `Description: ${project.description}` : null,
               project.repository_url ? `Repository: ${project.repository_url}` : null,
               project.instructions ? `Project instructions:\n${project.instructions}` : null,
+              projectFiles.length
+                ? `Project files (search them with search_project_files before answering anything they could cover): ${projectFiles.slice(0, 60).join(", ")}${projectFiles.length > 60 ? ", …" : ""}`
+                : null,
             ]
               .filter(Boolean)
               .join("\n"),
@@ -818,6 +826,7 @@ export async function streamMessage(
         ...(await (toolsetPromise ?? buildToolset(userId))),
         imageTool({ lastImageUrl: lastGeneratedImageUrl(historyWithImages), attachedImage: currentImageAttachment?.dataUrl ?? null }),
       ];
+      if (projectId && projectFiles.length) tools.push(projectSearchTool(projectId, projectFiles));
       // Deep Research fans out: parallel research helpers (agent/tools/research.ts).
       if (research) tools.push(researchAgentsTool(candidates.filter(supportsTools)));
       const imageMarkdown: string[] = [];

@@ -4,6 +4,11 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { createProject, deleteProject, listProjects, updateProject } from "../services/projectService.js";
 import { listConversations } from "../services/chat/index.js";
+import multer from "multer";
+import { MAX_FILE_BYTES, addProjectFile, deleteProjectFile, listProjectFiles, searchProject } from "../services/knowledge/projectKnowledge.js";
+import { getOwnedProject } from "../services/projectService.js";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: 10 } });
 
 export const projectsRouter = Router();
 
@@ -76,5 +81,51 @@ projectsRouter.get(
   "/:id/conversations",
   asyncHandler(async (req, res) => {
     res.json({ conversations: await listConversations(req.user!.id, {}, req.params.id) });
+  }),
+);
+
+// Project knowledge: files every chat in the project can search (services/knowledge).
+projectsRouter.get(
+  "/:projectId/files",
+  asyncHandler(async (req, res) => {
+    res.json({ files: await listProjectFiles(req.user!.id, z.string().uuid().parse(req.params.projectId)) });
+  }),
+);
+
+projectsRouter.post(
+  "/:projectId/files",
+  upload.array("files", 10),
+  asyncHandler(async (req, res) => {
+    const projectId = z.string().uuid().parse(req.params.projectId);
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    if (!files.length) {
+      res.status(400).json({ error: "Choose at least one file" });
+      return;
+    }
+    const added = [];
+    for (const f of files) {
+      // multer decodes multipart file names as latin1; restore UTF-8 names (Hindi, accents…).
+      const filename = Buffer.from(f.originalname, "latin1").toString("utf8");
+      added.push(await addProjectFile(req.user!.id, projectId, { filename, mime: f.mimetype, buffer: f.buffer }));
+    }
+    res.status(201).json({ files: added });
+  }),
+);
+
+projectsRouter.delete(
+  "/:projectId/files/:fileId",
+  asyncHandler(async (req, res) => {
+    await deleteProjectFile(req.user!.id, z.string().uuid().parse(req.params.projectId), z.string().uuid().parse(req.params.fileId));
+    res.status(204).end();
+  }),
+);
+
+projectsRouter.get(
+  "/:projectId/search",
+  asyncHandler(async (req, res) => {
+    const projectId = z.string().uuid().parse(req.params.projectId);
+    await getOwnedProject(req.user!.id, projectId);
+    const { q } = z.object({ q: z.string().trim().min(1).max(500) }).parse(req.query);
+    res.json({ results: await searchProject(projectId, q, 10) });
   }),
 );
