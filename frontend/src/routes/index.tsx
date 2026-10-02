@@ -62,6 +62,12 @@ function modeForModel(model: string): ConversationMode {
   return "single";
 }
 
+/** A fetch/stream that died because the connection did, not because the server answered with an error. */
+function isConnectionDrop(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return err instanceof TypeError || /failed to fetch|load failed|network ?error|network request failed|terminated|connection (was )?(lost|closed|reset)|other side closed/i.test(msg);
+}
+
 export function Home({ conversationId, workspace = "chat" }: { conversationId?: string; workspace?: "chat" | "build" } = {}) {
   const buildMode = workspace === "build";
   const navigate = useNavigate();
@@ -137,7 +143,9 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
   // A build running elsewhere (another device, before a reload): replay its event log and follow it live.
   useBuildLiveResume({ enabled: buildMode && Boolean(user) && !isPending, chatId: activeId, conversationId: activeConversationId, status: sessionStatus });
   // Normal chats too: a reply or research report still generating (closed app, other device) is followed live.
-  useBuildLiveResume({ enabled: !buildMode && Boolean(user) && !isPending, chatId: activeId, conversationId: activeConversationId, status: undefined, mode: "chat" });
+  // `resumeTick` bumps when this tab's stream connection drops mid-reply, so the same follower re-attaches.
+  const [resumeTick, setResumeTick] = useState(0);
+  useBuildLiveResume({ enabled: !buildMode && Boolean(user) && !isPending, chatId: activeId, conversationId: activeConversationId, status: undefined, mode: "chat", nonce: resumeTick });
 
   // Restore points for this Build session's messages — refreshed when it opens and after each turn.
   const loadCheckpoints = useBuildCheckpoints((s) => s.load);
@@ -428,6 +436,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     const sendableAttachments = attachments.map((a) => ({ mime: a.mime, dataUrl: a.dataUrl, name: a.name, size: a.size, kind: a.kind }));
 
     let askQuestions: AskQuestion[] | undefined;
+    let connectionDropped = false;
     try {
       await streamMessage(conversationId, content, "text", s.think, s.behavior, s.webSearch, s.canvas, sendableAttachments, (ev) => {
         if (ev.t === "status" && ev.s === "building") applyLive(chatId, { text: "", think: "", cites: [], agents: [], status: "building" });
@@ -471,7 +480,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
         ...(repoForBuild ? { repo: repoForBuild } : {}),
       });
     } catch (err) {
-      if ((err as { name?: string }).name !== "AbortError") {
+      // The connection dropped (network blip, proxy idle timeout, a deploy) — the turn keeps running on the
+      // server, so re-attach to it instead of showing "Failed to fetch".
+      if (isConnectionDrop(err) && !ac.signal.aborted) {
+        connectionDropped = true;
+      } else if ((err as { name?: string }).name !== "AbortError") {
         applyLive(chatId, {
           text: "",
           think: "",
@@ -508,6 +521,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       });
       clearLive(chatId);
       endStream(chatId, ac);
+      if (connectionDropped) window.setTimeout(() => setResumeTick((t) => t + 1), 800);
       const next = useQueue.getState().shift(chatId);
       if (next) void send(next.text, undefined, next.attachments ?? []);
     }

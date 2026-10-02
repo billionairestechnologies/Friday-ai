@@ -40,8 +40,8 @@ function applyEvent(chatId: string, ev: StreamEvent) {
  * device, or before a reload) replays the turn from the event log and keeps following it until it
  * ends, then loads the saved result. Only starts once the server confirms the build is running.
  */
-export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | null; conversationId: string | undefined; status: string | undefined; mode?: "build" | "chat" }) {
-  const { enabled, chatId, conversationId, status } = opts;
+export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | null; conversationId: string | undefined; status: string | undefined; mode?: "build" | "chat"; nonce?: number }) {
+  const { enabled, chatId, conversationId, status, nonce } = opts;
   const mode = opts.mode ?? "build";
   useEffect(() => {
     // Build knows the session status from its list; a normal chat just asks once whether a turn is
@@ -104,5 +104,5 @@ export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | nu
       if (timer) window.clearTimeout(timer);
       if (started) clearLive(chatId);
     };
-  }, [enabled, chatId, conversationId, status, mode]);
+  }, [enabled, chatId, conversationId, status, mode, nonce]);
 }

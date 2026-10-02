@@ -19,7 +19,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
 import { BuildSidebar } from "@/components/build-sidebar";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { filteredChats, useChat, type ServerConversation } from "@/lib/chat/store";
 import { usePlan } from "@/lib/usage/planStore";
@@ -47,6 +47,9 @@ function NavRow({ icon: Icon, label, onClick, active = false }: { icon: typeof M
     </button>
   );
 }
+
+/** Conversation ids with a delete request in flight (see handleDelete). */
+const deletingNow = new Set<string>();
 
 export function Sidebar() {
   const navigate = useNavigate();
@@ -122,10 +125,18 @@ export function Sidebar() {
 
   function handleDelete(id: string) {
     const conversationId = chats.find((c) => c.id === id)?.conversationId;
+    // A double click / fast repeat must not send the same delete twice: the second one finds the chat already
+    // gone (404) and used to pop "Couldn't delete that chat" although the delete had worked.
+    if (conversationId) {
+      if (deletingNow.has(conversationId)) return;
+      deletingNow.add(conversationId);
+    }
     deleteChatLocal(id);
     if (id === activeId) void navigate({ to: buildMode ? "/build" : "/" });
     if (conversationId) {
-      api.delete(`/chat/conversations/${conversationId}`).catch(() => {
+      api.delete(`/chat/conversations/${conversationId}`).catch((err) => {
+        // Already deleted (another tab, a repeat request): that is the outcome the user wanted.
+        if (err instanceof ApiError && err.status === 404) return;
         // The delete didn't reach the server, so the chat would silently come back on the next
         // sync — refetch now so it visibly returns instead of looking deleted but not being.
         void api
@@ -133,7 +144,7 @@ export function Sidebar() {
           .then((res) => useChat.getState().hydrateFromServer(res.conversations))
           .catch(() => {});
         window.alert("Couldn't delete that chat — check your connection and try again.");
-      });
+      }).finally(() => deletingNow.delete(conversationId));
     }
   }
 
