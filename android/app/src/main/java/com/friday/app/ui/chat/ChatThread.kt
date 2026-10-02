@@ -784,9 +784,9 @@ private fun GeneratedImage(url: String, alt: String) {
             )
         }
         AsyncImage(
-            // Coil needs the decoded bytes for an inline base64 image.
+            // Coil 2 takes an inline base64 image as decoded bytes in a ByteBuffer.
             model = ImageRequest.Builder(LocalContext.current)
-                .data(if (url.startsWith("data:")) android.util.Base64.decode(url.substringAfter("base64,"), android.util.Base64.DEFAULT) else url)
+                .data(if (url.startsWith("data:")) java.nio.ByteBuffer.wrap(android.util.Base64.decode(url.substringAfter("base64,"), android.util.Base64.DEFAULT)) else url)
                 .crossfade(false)
                 .build(),
             contentDescription = alt,
