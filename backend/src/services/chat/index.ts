@@ -79,6 +79,19 @@ import {
   type Reservation,
 } from "../quota/tokenQuotaService.js";
 
+// A failed turn leaves an assistant row that is empty (error kept in metadata) or, from older
+// versions, a raw provider error page. Re-sending those makes the next request invalid or oversized
+// (production 400 "rejected by the model … payload size" after a ScaleMax 502), so they stay out of the
+// model's history; the user still sees them in the thread.
+function dropFailedTurns(rows: ChatMessage[]): ChatMessage[] {
+  return rows.filter((m) => {
+    if (m.role !== "assistant") return true;
+    const text = typeof m.content === "string" ? m.content : "";
+    if (!text.trim() && !(m.images && m.images.length)) return false;
+    return !/^\w[\w-]*: \w+ chat failed: \d{3}\b/.test(text.trim());
+  });
+}
+
 export type { StreamEvent, ConversationMode } from "./types.js";
 export {
   createConversation,
@@ -303,7 +316,7 @@ export async function streamMessage(
       .order("created_at");
     if (historyError) throw new HttpError(500, historyError.message);
 
-    const historyWithImages: ChatMessage[] = await Promise.all(
+    const historyWithImages: ChatMessage[] = dropFailedTurns(await Promise.all(
       (historyRows ?? []).map(async (row) => {
         const attachmentRows = (row as { message_attachments?: Array<Record<string, unknown>> | null }).message_attachments;
         const imageRows = (attachmentRows ?? []).filter((a) => String(a.mime ?? "").startsWith("image/"));
@@ -325,7 +338,7 @@ export async function streamMessage(
         );
         return { role: row.role, content, images: images.filter((img) => img.dataUrl) } as ChatMessage;
       }),
-    );
+    ));
 
     // Confirmed live in production: Search blindly ran on the literal message text regardless of
     // whether that text was an actual query — a screenshot attached with the caption "see" searched

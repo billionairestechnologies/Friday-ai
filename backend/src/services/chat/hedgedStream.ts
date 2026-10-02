@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { friendlyProviderError } from "../../utils/providerError.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
@@ -117,9 +118,11 @@ export async function streamWithHedging(opts: {
           }
         }
       } catch (err) {
-        attempt.error = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
+        const rawError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
+        console.warn(`[chat] ${rawError.slice(0, 300)}`);
+        attempt.error = friendlyProviderError(rawError);
         // A rejected key (rotated/revoked) must not keep being served from the lookup cache.
-        if (/\b(401|403)\b|invalid.{0,20}(api )?key|unauthori[sz]ed/i.test(attempt.error)) invalidateMemoized();
+        if (/\b(401|403)\b|invalid.{0,20}(api )?key|unauthori[sz]ed/i.test(rawError)) invalidateMemoized();
       } finally {
         attempt.finished = true;
         signal?.removeEventListener("abort", onOuterAbort);
