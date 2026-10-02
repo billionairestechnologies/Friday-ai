@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
@@ -258,6 +260,20 @@ private fun SettingsHome(
                 SectionLabel("Data & Information")
                 SettingsCard {
                     SettingsRow(Icons.Default.Storage, "Data Controls", onClick = { onOpen(SettingsSub.DataControls) })
+                }
+
+                // Support and status live on the web (same account, same tickets) — opened in a Custom Tab.
+                Spacer(Modifier.height(18.dp))
+                SectionLabel("Help")
+                val webContext = androidx.compose.ui.platform.LocalContext.current
+                val openWeb: (String) -> Unit = { path ->
+                    androidx.browser.customtabs.CustomTabsIntent.Builder().build()
+                        .launchUrl(webContext, android.net.Uri.parse("https://friday.billionairestechnologies.com$path"))
+                }
+                SettingsCard {
+                    SettingsRow(Icons.Default.SupportAgent, "Help & support") { openWeb("/?support=contact") }
+                    SettingsDivider()
+                    SettingsRow(Icons.Default.MonitorHeart, "System status") { openWeb("/status") }
                 }
             }
         }

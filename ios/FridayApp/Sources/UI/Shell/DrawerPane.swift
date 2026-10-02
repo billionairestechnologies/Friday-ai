@@ -7,6 +7,50 @@ struct DrawerPane: View {
     @State private var searchError: String?
     @State private var shareNote: String?
 
+    @State private var projects: [ProjectSummary] = []
+    @State private var projectsOpen = true
+
+    /// Same as the web sidebar: a collapsible "Projects" group with a + button and one row per project.
+    private var projectsSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Button { withAnimation(.easeOut(duration: 0.15)) { projectsOpen.toggle() } } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold)).rotationEffect(.degrees(projectsOpen ? 0 : -90))
+                        Text("Projects").font(.system(size: 12, weight: .medium))
+                        Spacer()
+                    }
+                    .foregroundColor(FridayColor.muted)
+                }
+                Button { vm.projectsCreateRequested = true; vm.page = "projects" } label: {
+                    Image(systemName: "plus").font(.system(size: 13)).foregroundColor(FridayColor.muted).frame(width: 28, height: 28)
+                }
+            }
+            .padding(.leading, 16).padding(.trailing, 8).padding(.top, 14)
+            if projectsOpen {
+                if projects.isEmpty {
+                    Text("No projects yet").font(.system(size: 13)).foregroundColor(FridayColor.muted).padding(.horizontal, 16).padding(.vertical, 6)
+                }
+                ForEach(projects) { p in
+                    Button { vm.projectToOpen = p.id; vm.page = "projects" } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "folder").font(.system(size: 13)).foregroundColor(FridayColor.muted)
+                            Text(p.name).font(.system(size: 14)).lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                    }
+                    .foregroundColor(FridayColor.text)
+                    .padding(.horizontal, 8)
+                }
+            }
+        }
+        .task(id: vm.drawerOpen) {
+            guard vm.user != nil else { projects = []; return }
+            if let list = try? await ProjectsApi.list() { projects = list }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -14,14 +58,12 @@ struct DrawerPane: View {
                 VStack(alignment: .leading, spacing: 4) {
                     navRow(icon: "square.and.pencil", label: "New chat") { vm.newChat(); vm.page = "chat" }
                     navRow(icon: "hammer", label: "Build") { vm.newBuild(); vm.page = "chat" }
-                    navRow(icon: "arrow.triangle.2.circlepath", label: "Automations") { vm.page = "automations" }
                     navRow(icon: "books.vertical", label: "Library") { vm.page = "library" }
-                    navRow(icon: "folder", label: "Projects") { vm.page = "projects" }
                     navRow(icon: "doc.text", label: "Pages") { vm.page = "pages" }
-                    navRow(icon: "sparkles", label: "Skills") { vm.page = "skills" }
-                    // Support and status live on the web (same account, same tickets).
-                    navRow(icon: "questionmark.bubble", label: "Help & support") { openWeb("/?support=contact") }
-                    navRow(icon: "waveform.path.ecg", label: "System status") { openWeb("/status") }
+                    navRow(icon: "arrow.triangle.2.circlepath", label: "Automations") { vm.page = "automations" }
+                    // Skills live in Plugins; Help & support and System status live in Settings (same as web).
+
+                    projectsSection
 
                     Text(vm.workspace == "build" ? "Builds" : "Conversations")
                         .font(.system(size: 12, weight: .medium))

@@ -92,6 +92,14 @@ struct SettingsScreen: View {
                         SettingsCard {
                             SettingsRow(icon: "externaldrive", label: "Data Controls") { go(.dataControls) }
                         }
+
+                        // Support and status live on the web (same account, same tickets).
+                        SectionLabel("Help")
+                        SettingsCard {
+                            SettingsRow(icon: "questionmark.bubble", label: "Help & support") { openWeb("/?support=contact") }
+                            SettingsDivider()
+                            SettingsRow(icon: "waveform.path.ecg", label: "System status") { openWeb("/status") }
+                        }
                     }
                 }
                 .padding(16)
@@ -636,4 +644,9 @@ private struct DataControlsPage: View {
             self.error = "Couldn't export: \(error.localizedDescription)"
         }
     }
+}
+
+
+private func openWeb(_ path: String) {
+    if let url = URL(string: "https://friday.billionairestechnologies.com" + path) { UIApplication.shared.open(url) }
 }

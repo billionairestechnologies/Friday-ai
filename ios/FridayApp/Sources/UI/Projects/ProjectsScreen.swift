@@ -63,7 +63,12 @@ struct ProjectsScreen: View {
                 if let p = openProject { ProjectDetailScreen(project: p) { Task { await load() } } }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            // Coming from the drawer's Projects dropdown: open that project / the create form straight away.
+            if let id = vm.projectToOpen { openProject = projects?.first(where: { $0.id == id }); vm.projectToOpen = nil }
+            if vm.projectsCreateRequested { creating = true; vm.projectsCreateRequested = false }
+        }
         .sheet(isPresented: $creating) {
             NewProjectSheet { Task { await load() } }
         }

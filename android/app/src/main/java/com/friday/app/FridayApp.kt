@@ -121,6 +121,9 @@ fun FridayApp(
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     var page by remember { mutableStateOf("chat") }
+    // Set by the drawer's Projects dropdown; the Projects screen consumes them once.
+    var projectToOpen by remember { mutableStateOf<String?>(null) }
+    var projectCreate by remember { mutableStateOf(false) }
     var updatePopupDismissed by remember { mutableStateOf(false) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -230,6 +233,9 @@ fun FridayApp(
                         vm.setDrawer(false)
                         page = dest
                     },
+                    drawerOpen = ui.drawerOpen,
+                    onOpenProject = { id -> vm.setDrawer(false); projectToOpen = id; page = "projects" },
+                    onNewProject = { vm.setDrawer(false); projectCreate = true; page = "projects" },
                     onClose = { drawerState.close() },
                     onUpdate = { openUpdate() },
                 )
@@ -244,6 +250,9 @@ fun FridayApp(
                 onUse = { skill -> vm.setActiveSkill(skill); page = "chat" },
             )
             "projects" -> com.friday.app.ui.projects.ProjectsScreen(
+                initialProjectId = projectToOpen,
+                startCreating = projectCreate,
+                onConsumed = { projectToOpen = null; projectCreate = false },
                 onClose = { page = "chat" },
                 onNewChat = { projectId -> vm.startProjectChat(projectId); page = "chat" },
                 onOpenChat = { chat -> vm.openProjectChat(chat); page = "chat" },
@@ -500,7 +509,7 @@ fun FridayApp(
         ) {
             when (ui.sheet) {
                 Sheet.Auth, Sheet.Welcome, Sheet.Signup -> {}
-                Sheet.Plugins -> PluginsSheet(ui.pluginsTab, vm::setPluginsTab)
+                Sheet.Plugins -> PluginsSheet(ui.pluginsTab, vm::setPluginsTab, onOpenSkills = { vm.closeSheet(); page = "skills" })
                 else -> {}
             }
         }

@@ -187,7 +187,7 @@ private fun AttachRow(icon: ImageVector, label: String, onClick: () -> Unit, che
 }
 
 @Composable
-fun PluginsSheet(tab: String, onTab: (String) -> Unit) {
+fun PluginsSheet(tab: String, onTab: (String) -> Unit, onOpenSkills: () -> Unit = {}) {
     Column(Modifier.padding(20.dp)) {
         Text("Plugins", fontWeight = FontWeight.Medium, fontSize = 18.sp, color = FridayText)
         Spacer(Modifier.height(12.dp))
@@ -202,9 +202,11 @@ fun PluginsSheet(tab: String, onTab: (String) -> Unit) {
             PluginRow("Drive", "Recent files")
             PluginRow("GitHub", "Open pull requests")
         } else {
-            PluginRow("Web Search", "Live sources when Search is on")
-            PluginRow("Think", "Deeper reasoning steps")
-            PluginRow("Canvas", "Workspace for layouts and code")
+            // Real skills (built-in playbooks + your own) — the same list as web's Plugins → Skills.
+            Column(Modifier.clickable(onClick = onOpenSkills).padding(vertical = 8.dp)) {
+                Text("Browse and use skills", color = FridayText, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                Text("Expert playbooks Friday can use; pin one to your next message", color = FridayMuted, fontSize = 13.sp)
+            }
         }
         Spacer(Modifier.height(16.dp))
     }

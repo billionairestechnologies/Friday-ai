@@ -518,6 +518,8 @@ private struct StubPage: View {
 }
 
 private struct PluginsSheet: View {
+    @EnvironmentObject var vm: FridayViewModel
+
     var body: some View {
         List {
             Section("Connectors") {
@@ -527,9 +529,13 @@ private struct PluginsSheet: View {
                 Label("GitHub", systemImage: "chevron.left.slash.chevron.right")
             }
             Section("Skills") {
-                Label("Web Search", systemImage: "globe")
-                Label("Think", systemImage: "gearshape")
-                Label("Canvas", systemImage: "rectangle.split.2x1")
+                // Real skills (built-in playbooks + your own) — the same list as web's Plugins → Skills.
+                Button {
+                    vm.sheet = .none
+                    vm.page = "skills"
+                } label: {
+                    Label("Browse and use skills", systemImage: "sparkles")
+                }
             }
         }
     }

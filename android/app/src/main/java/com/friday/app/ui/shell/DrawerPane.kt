@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.SupportAgent
@@ -47,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -92,6 +95,10 @@ fun DrawerPane(
     onNavigate: (String) -> Unit,
     onClose: () -> Unit,
     onUpdate: () -> Unit = {},
+    /** True while the drawer is on screen — the Projects dropdown refreshes then. */
+    drawerOpen: Boolean = false,
+    onOpenProject: (String) -> Unit = {},
+    onNewProject: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val webContext = androidx.compose.ui.platform.LocalContext.current
@@ -184,14 +191,35 @@ fun DrawerPane(
         Column(Modifier.padding(horizontal = 12.dp)) {
             PlainRow(Icons.Default.Edit, "New chat", onNewChat)
             PlainRow(Icons.Default.Build, "Build", onNewBuild)
-            PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
             PlainRow(Icons.AutoMirrored.Filled.LibraryBooks, "Library") { onNavigate("library") }
-            PlainRow(Icons.Default.Folder, "Projects") { onNavigate("projects") }
             PlainRow(Icons.Default.Description, "Pages") { onNavigate("pages") }
-            PlainRow(Icons.Default.AutoAwesome, "Skills") { onNavigate("skills") }
-            // Support and status live on the web (same account, same tickets) — opened in a Custom Tab.
-            PlainRow(Icons.Default.SupportAgent, "Help & support") { openWeb("/?support=contact") }
-            PlainRow(Icons.Default.MonitorHeart, "System status") { openWeb("/status") }
+            PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
+            // Skills live in Plugins; Help & support and System status live in Settings (same as web).
+
+            // Same as the web sidebar: a collapsible "Projects" group with a + button and one row per project.
+            var projects by remember { mutableStateOf<List<com.friday.app.data.api.ProjectSummary>>(emptyList()) }
+            var projectsOpen by remember { mutableStateOf(true) }
+            androidx.compose.runtime.LaunchedEffect(drawerOpen, user?.email) {
+                if (user == null) { projects = emptyList(); return@LaunchedEffect }
+                com.friday.app.data.api.ProjectsApi.list()?.let { projects = it }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { projectsOpen = !projectsOpen }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, null, tint = FridayMuted, modifier = Modifier.size(16.dp).rotate(if (projectsOpen) 0f else -90f))
+                    Text("Projects", color = FridayMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+                Box(Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onNewProject), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Add, "New project", tint = FridayMuted, modifier = Modifier.size(18.dp))
+                }
+            }
+            if (projectsOpen) {
+                if (projects.isEmpty()) Text("No projects yet", color = FridayMuted, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                projects.forEach { p -> PlainRow(Icons.Default.Folder, p.name) { onOpenProject(p.id) } }
+            }
         }
 
         Spacer(Modifier.height(16.dp))

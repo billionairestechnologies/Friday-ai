@@ -616,6 +616,10 @@ final class FridayViewModel: ObservableObject {
         workspace = "chat"
     }
 
+    /// Set by the drawer's Projects dropdown: open this project (or the create form) when the Projects screen appears.
+    @Published var projectToOpen: String?
+    @Published var projectsCreateRequested = false
+
     /// A skill pinned from the Skills screen for the next message.
     @Published var activeSkill: ActiveSkill?
 

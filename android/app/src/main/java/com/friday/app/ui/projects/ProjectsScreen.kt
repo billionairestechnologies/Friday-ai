@@ -67,6 +67,10 @@ fun ProjectsScreen(
     onClose: () -> Unit,
     onNewChat: (projectId: String) -> Unit,
     onOpenChat: (ChatThread) -> Unit,
+    /** From the drawer's Projects dropdown: open this project / the create form right away, then [onConsumed]. */
+    initialProjectId: String? = null,
+    startCreating: Boolean = false,
+    onConsumed: () -> Unit = {},
 ) {
     var projects by remember { mutableStateOf<List<ProjectSummary>?>(null) }
     var failed by remember { mutableStateOf(false) }
@@ -78,7 +82,12 @@ fun ProjectsScreen(
         val list = ProjectsApi.list()
         if (list != null) { projects = list; failed = false } else if (projects == null) failed = true
     }
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(Unit) {
+        load()
+        if (initialProjectId != null) open = projects?.firstOrNull { it.id == initialProjectId }
+        if (startCreating) creating = true
+        if (initialProjectId != null || startCreating) onConsumed()
+    }
 
     val current = open
     if (current != null) {
