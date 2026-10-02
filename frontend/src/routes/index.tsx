@@ -19,6 +19,7 @@ import { useChat, type ServerConversation, type ServerMessage } from "@/lib/chat
 import { extractArtifact } from "@/lib/chat/artifact";
 import type { AskQuestion, ChatMessage } from "@/lib/chat/types";
 import { AskPanel, ASK_MARKER } from "@/components/ask-panel";
+import { SignInPrompt, guestGateKind, type GuestGateKind } from "@/components/signin-prompt";
 import { PlanApprovalPanel, PLAN_APPROVE_TEXT, PLAN_MARKER } from "@/components/plan-approval";
 import { takeBuildHandoff } from "@/lib/chat/build-handoff";
 import { BuildComposerFooter, BuildHome } from "@/components/build-home";
@@ -144,6 +145,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     if (buildMode && activeConversationId && !streaming) void loadCheckpoints(activeConversationId);
   }, [buildMode, activeConversationId, streaming, loadCheckpoints]);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [guestGate, setGuestGate] = useState<GuestGateKind | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const loadedConversations = useRef<Set<string>>(new Set());
 
@@ -345,9 +347,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     }
 
     if (!useAuthStore.getState().user) {
-      s.setDialog("login");
+      // Signed out: a slow inline prompt (log in / create account) instead of an abrupt dialog; the draft stays in the box.
+      setGuestGate(guestGateKind(trimmed));
       return;
     }
+    setGuestGate(null);
 
     const model = s.model;
     s.clearDraft();
@@ -580,6 +584,9 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
               <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
                 <div className="mx-auto w-full max-w-3xl">
                   <GitHubPicker value={buildRepo} onChange={setBuildRepo} />
+                  <AnimatePresence>
+                    {guestGate && !(user && !user.isDevFallback) && <SignInPrompt key="guest-gate" kind={guestGate} onClose={() => setGuestGate(null)} />}
+                  </AnimatePresence>
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
@@ -678,6 +685,9 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                 )}
               </div>
               <div className="relative z-10 w-full max-w-2xl">
+                <AnimatePresence>
+                  {guestGate && !(user && !user.isDevFallback) && <SignInPrompt key="guest-gate" kind={guestGate} onClose={() => setGuestGate(null)} />}
+                </AnimatePresence>
                 <Composer
                   onSend={(message, files) => void send(message, files)}
                   onStop={stop}
@@ -769,6 +779,9 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                       }}
                     />
                   )}
+                  <AnimatePresence>
+                    {guestGate && !(user && !user.isDevFallback) && <SignInPrompt key="guest-gate" kind={guestGate} onClose={() => setGuestGate(null)} />}
+                  </AnimatePresence>
                   <Composer
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}

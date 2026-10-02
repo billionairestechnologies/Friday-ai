@@ -89,7 +89,7 @@ function CodeBlock({ lang, text, children }: { lang?: string; text: string; chil
 function FadeInImage({ src, alt }: { src?: string; alt?: string }) {
   const [loaded, setLoaded] = useState(false);
   return (
-    <span className="relative my-2 block overflow-hidden rounded-2xl">
+    <span className="relative my-2 block w-fit max-w-full overflow-hidden rounded-2xl">
       {!loaded && (
         <span className="absolute inset-0 block animate-pulse rounded-2xl bg-white/5" aria-hidden />
       )}
@@ -100,7 +100,7 @@ function FadeInImage({ src, alt }: { src?: string; alt?: string }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: loaded ? 1 : 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="block max-w-full rounded-2xl"
+        className="block h-auto max-h-[420px] w-auto max-w-[min(100%,420px)] rounded-2xl object-contain"
       />
     </span>
   );

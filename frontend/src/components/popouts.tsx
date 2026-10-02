@@ -3,6 +3,7 @@ import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "rea
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, LayoutDashboard, Link2, Share2, X } from "lucide-react";
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
+import { getAuthIntent, setAuthIntent } from "@/lib/auth/intent";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
 import { PluginsDrawer } from "@/components/plugins-drawer";
@@ -83,6 +84,13 @@ export function LoginPopout() {
   const requestPasswordReset = useAuthStore((s) => s.requestPasswordReset);
   const signup = useAuthStore((s) => s.signup);
   const [mode, setMode] = useState<"login" | "signup">("login");
+  // The inline "Create a free account" prompt opens this dialog on the sign-up side.
+  useEffect(() => {
+    if (dialog === "login") {
+      setMode(getAuthIntent());
+      setAuthIntent("login");
+    }
+  }, [dialog]);
   const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

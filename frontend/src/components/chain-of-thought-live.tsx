@@ -27,6 +27,21 @@ function hitsFrom(message: ChatMessage): SearchHit[] {
   }));
 }
 
+const GRID = 15;
+/** Square of dots whose size/opacity pulse in a wave from the middle; CSS only, off for reduced motion. */
+function ImageDotGrid() {
+  const c = (GRID - 1) / 2;
+  const max = Math.hypot(c, c);
+  return (
+    <div className="image-dots" style={{ gridTemplateColumns: `repeat(${GRID}, 1fr)` }} aria-hidden>
+      {Array.from({ length: GRID * GRID }, (_, i) => {
+        const d = Math.hypot((i % GRID) - c, Math.floor(i / GRID) - c) / max;
+        return <span key={i} style={{ animationDelay: `${(d * 1.6).toFixed(2)}s` }} />;
+      })}
+    </div>
+  );
+}
+
 export function LiveChainOfThought({ message }: { message: ChatMessage }) {
   const streaming = Boolean(message.streaming);
   const status = message.status;
@@ -94,16 +109,17 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
               ? "Plan"
               : "Done";
 
-  // Small, flat "Creating your image" indicator — intentionally tiny and unboxed (not a big
-  // loading card) with a simulated completion percentage, per the reference product's own
-  // compact "Creating your image" shimmer. Disappears the instant the real image event lands —
-  // there's nothing left to show once `content` (the final markdown image) arrives.
+  // "Creating image": a soft dot-grid that ripples outward from the centre until the real image lands
+  // (like the reference product's own loader). The percentage is simulated — see useSimulatedProgress.
+  // Disappears the instant the final markdown image arrives in `content`.
   if (generatingImage) {
     return (
-      <div className="flex items-center gap-2 py-1 text-sm font-medium text-foreground">
-        <Loader2 className="size-3.5 shrink-0 animate-spin text-sky-400" />
-        <span className="live-label">Creating your image</span>
-        <span className="tabular-nums text-subtle">{imageProgress}%</span>
+      <div className="flex flex-col gap-3 py-1" role="status" aria-live="polite">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <span className="live-label">Creating image</span>
+          <span className="tabular-nums text-subtle">{imageProgress}%</span>
+        </div>
+        <ImageDotGrid />
       </div>
     );
   }

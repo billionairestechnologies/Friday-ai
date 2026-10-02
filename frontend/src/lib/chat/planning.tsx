@@ -33,7 +33,8 @@ export function shouldShowPlan(message: ChatMessage) {
       message.usedSearch ||
       message.usedCanvas ||
       message.agents?.length ||
-      message.status === "generating_image",
+      // Only while the image is being made: a finished image reply must not keep a "Stopped"/"Done" plan header above it.
+      (message.status === "generating_image" && Boolean(message.streaming)),
   );
 }
 

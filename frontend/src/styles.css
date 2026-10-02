@@ -809,3 +809,28 @@ textarea::-webkit-scrollbar-thumb {
 .friday-doc .ProseMirror-selectednode {
   outline: 2px solid #2563eb;
 }
+
+/* "Creating image" loader: dots ripple outward from the centre. */
+.image-dots {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 260px);
+  aspect-ratio: 1;
+  padding: 6px;
+}
+.image-dots span {
+  place-self: center;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(56 189 248);
+  opacity: 0.25;
+  animation: image-dot-wave 1.6s ease-in-out infinite;
+}
+@keyframes image-dot-wave {
+  0%, 100% { transform: scale(0.45); opacity: 0.2; }
+  45% { transform: scale(1.5); opacity: 0.95; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .image-dots span { animation: none; opacity: 0.5; transform: scale(1); }
+}
