@@ -43,6 +43,9 @@ Optional:
 - `FRIDAY_BUILD_STAGED_FLOW=on` — Build back on the forced question → plan → build rounds (default: the
   model decides to answer / ask_user / propose_plan / build, like Claude Code)
 - `FRIDAY_BUILD_MODELS` — regex replacing Build's frontier-model allow-list (`projectBuild/buildModels.ts`)
+- `MAILCOW_URL`, `MAILCOW_API_KEY` (+ optional `MAIL_SERVER_HOST`) — company mail hosting on our own
+  mailcow server: Team Console → Mail hosting creates employee mailboxes; Mailbox is the webmail
+  (see `docs/MAIL_HOSTING.md`). Migrations `0040` (finance) and `0041` (mail) must be applied.
 - `FRIDAY_SANDBOX_PERSIST=off` — kill Build sandboxes on timeout instead of pausing them (default: pause,
   so the next message resumes with node_modules + the project's git history; paused sandboxes are billed
   as E2B storage)

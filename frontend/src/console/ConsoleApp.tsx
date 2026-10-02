@@ -9,6 +9,7 @@ import {
   Cpu,
   Gauge,
   Handshake,
+  Inbox,
   LifeBuoy,
   LogOut,
   Mail,
@@ -16,6 +17,7 @@ import {
   Menu,
   MessageSquare,
   ScrollText,
+  Server,
   Send,
   ShieldCheck,
   Ticket,
@@ -62,17 +64,21 @@ const Billing = lazy(() => import("./sections/Billing"));
 const Audit = lazy(() => import("./sections/Audit"));
 const StatusSection = lazy(() => import("./sections/Status"));
 const Finance = lazy(() => import("./sections/Finance"));
+const Mailbox = lazy(() => import("./sections/Mailbox"));
+const MailHosting = lazy(() => import("./sections/MailHosting"));
 
 export const SECTIONS: Section[] = [
   { id: "overview", label: "Overview", icon: Gauge, permission: "overview.view", group: "Workspace", component: Overview },
   { id: "support", label: "Support", icon: LifeBuoy, permission: "support.view", group: "Workspace", component: Support },
   { id: "crm", label: "CRM", icon: Handshake, permission: "crm.view", group: "Workspace", component: Crm },
+  { id: "mailbox", label: "Mailbox", icon: Inbox, permission: "mailbox.use", group: "Workspace", component: Mailbox },
   { id: "tasks", label: "Tasks", icon: ClipboardList, permission: "tasks.view", group: "Workspace", component: Tasks },
   { id: "updates", label: "Product updates", icon: Megaphone, permission: "updates.view", group: "Growth", component: Updates },
   { id: "marketing", label: "Email campaigns", icon: Send, permission: "marketing.view", group: "Growth", component: Marketing },
   { id: "plans", label: "Plans & offers", icon: Ticket, permission: "plans.view", group: "Growth", component: Plans },
   { id: "users", label: "Users", icon: Users, permission: "users.view", group: "Admin", component: UsersSection },
   { id: "team", label: "Team & roles", icon: ShieldCheck, permission: "team.manage", group: "Admin", component: Team },
+  { id: "mail-hosting", label: "Mail hosting", icon: Server, permission: "mail.manage", group: "Admin", component: MailHosting },
   { id: "mail", label: "Team mail", icon: Mail, permission: "mail.manage", group: "Admin", component: MailSection },
   { id: "status", label: "Status & crashes", icon: Activity, permission: "status.view", group: "Admin", component: StatusSection },
   { id: "models", label: "Models & keys", icon: Cpu, permission: "providers.view", group: "Admin", component: Models },
