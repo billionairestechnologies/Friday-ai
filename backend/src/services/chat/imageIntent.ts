@@ -18,6 +18,9 @@ const IMAGE_NOUN = /\b(image|picture|photo|illustration|logo|icon|artwork|drawin
 const EDIT_VERB = /\b(edit|recolor|re-?touch|colorize|photoshop|transform|restyle)\b/i;
 const EDIT_PHRASE = /\b(edit|change|turn|make|colorize|recolor|re-?touch)\b.{0,30}\b(this|that|the)\s+(image|picture|photo)\b/i;
 
+const MAX_IMAGE_REQUEST_CHARS = 600;
+const GENERATE_VERB_NEAR_NOUN = new RegExp(`${GENERATE_VERB.source}\\b[^.\\n]{0,40}?${IMAGE_NOUN.source}`, "i");
+
 export type ImageIntent = { kind: "generate"; prompt: string } | { kind: "edit"; prompt: string } | null;
 
 export function detectImageIntent(message: string, hasImageAttachment: boolean): ImageIntent {
@@ -28,7 +31,10 @@ export function detectImageIntent(message: string, hasImageAttachment: boolean):
     return { kind: "edit", prompt: text };
   }
 
-  if (GENERATE_VERB.test(text) && IMAGE_NOUN.test(text)) {
+  // An image request is a short ask ("draw a logo for my cafe"). A long brief that happens to contain
+  // "design" and "icons" somewhere (a landing-page spec) must reach the normal chat / Build path, and
+  // the verb has to sit right before the noun, not anywhere in the message.
+  if (text.length <= MAX_IMAGE_REQUEST_CHARS && GENERATE_VERB_NEAR_NOUN.test(text)) {
     return { kind: "generate", prompt: text };
   }
 

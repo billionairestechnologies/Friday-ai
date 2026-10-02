@@ -389,13 +389,15 @@ export async function streamMessage(
     // respond in text (e.g. explain it couldn't generate the image) rather than the user getting
     // nothing.
     const currentImageAttachment = attachments.find((a) => a.mime.startsWith("image/"));
-    let imageIntent = detectImageIntent(content, Boolean(currentImageAttachment));
+    // Never in the Build workspace: every message there is for the Build agent, and a long spec that
+    // merely mentions a "logo" or "icons" (a landing-page brief did exactly this) is not an image ask.
+    let imageIntent = buildWorkspace ? null : detectImageIntent(content, Boolean(currentImageAttachment));
     let correctionSourceUrl: string | null = null;
     // No explicit generate/edit wording matched — but if the very last reply was itself a real
     // generated image and this message is short (a correction, not a new unrelated request), redo
     // it as an edit of that image using the new wording. See findImageCorrection()'s comment for
     // why this exists and why the length cap keeps it from firing on unrelated follow-ups.
-    if (!imageIntent && isShortEnoughForCorrection(content)) {
+    if (!imageIntent && !buildWorkspace && isShortEnoughForCorrection(content)) {
       const correction = findImageCorrection(historyWithImages);
       if (correction) {
         imageIntent = { kind: "edit", prompt: `${correction.priorPrompt}. Correction: ${content}` };
