@@ -179,7 +179,12 @@ export async function listModelsForUsers() {
     .eq("is_enabled_for_users", true)
     .order("display_name");
   if (error) throw new HttpError(500, error.message);
-  return data;
+  // `build`: may this model drive the Build workspace (frontier coding allow-list). Without this the public list never
+  // carried the flag, so the Build model picker (web and apps) found no Build models and offered only "Auto".
+  return (data ?? []).map((m) => {
+    const provider = (Array.isArray(m.providers) ? m.providers[0] : m.providers) as { slug?: string } | null;
+    return { ...m, build: provider?.slug ? isBuildModel({ slug: provider.slug, modelId: m.model_id as string, displayName: m.display_name as string }) : false };
+  });
 }
 
 
