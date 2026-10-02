@@ -19,6 +19,11 @@ const DRAIN_MS = 240;
 const MIN_CHARS_PER_FRAME = 2;
 /** Upper bound on the final drain when the stream ends, so "done" is never held back noticeably. */
 const FINAL_DRAIN_MAX_MS = 450;
+/** A tool call (search, page read) pauses the stream, then the next paragraph lands in one burst. Draining a big burst
+ *  in 240 ms looks like "types, stops, then jumps" — so a bigger backlog gets proportionally longer (up to this), which
+ *  reads as steady typing. Never used for the final drain once the stream has ended. */
+const MAX_BURST_DRAIN_MS = 800;
+const BURST_MS_PER_CHAR = 1.2;
 
 /** How many backlog characters to reveal this frame (exported for tests). */
 export function revealCount(backlog: number, frameMs: number, drainMs = DRAIN_MS): number {
@@ -55,7 +60,8 @@ export function createStreamBatcher(apply: (acc: StreamAcc) => void) {
     const dt = lastFrame ? now - lastFrame : 16;
     lastFrame = now;
     if (backlog) {
-      const n = safeCut(backlog, revealCount(backlog.length, dt, drainMs));
+      const effectiveDrain = drainMs === DRAIN_MS ? Math.min(MAX_BURST_DRAIN_MS, Math.max(DRAIN_MS, backlog.length * BURST_MS_PER_CHAR)) : drainMs;
+      const n = safeCut(backlog, revealCount(backlog.length, dt, effectiveDrain));
       acc.text += backlog.slice(0, n);
       backlog = backlog.slice(n);
       acc.status = "writing";

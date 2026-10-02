@@ -56,7 +56,9 @@ export const DEEP_RESEARCH_PROMPT =
   "clear conclusion or recommendation; and a final 'Sources' list. Cite every non-obvious claim inline as a markdown " +
   "link to its source at the point it's used, not just in the list at the end.\n\n" +
   "Do not stop after one or two searches and call it done — that is the failure mode this mode exists to prevent. " +
-  "Keep researching until the sub-questions from your plan are genuinely answered with evidence, not assumed.";
+  "Keep researching until the sub-questions from your plan are genuinely answered with evidence, not assumed.\n\n" +
+  "The report is delivered IN THE CHAT. Do not call create_document or create_page unless the user explicitly asked for a " +
+  "file; after the report you may offer to turn it into a document, deck or spreadsheet.";
 
 const CONNECTABLE: { app: string; probe: string }[] = [
   { app: "GitHub", probe: "github_read_file" },
@@ -111,6 +113,13 @@ export function toolUsePrompt(tools: FridayTool[], skillMenu = ""): string {
     names.includes("browser")
       ? "Use fetch_url to read a page; use browser only when you must interact (search forms, filters, clicking through, " +
         "JavaScript-only pages). Never sign in, pay, book, send or delete without the user confirming in chat."
+      : null,
+    names.includes("create_page") || names.includes("create_document")
+      ? "FILES ONLY ON REQUEST: create a page or file (create_page / create_document) ONLY when the user's latest message asks for " +
+        "one, or clearly says yes to a file you offered. Asking you to research, look up, find out, explain, compare or analyse " +
+        "is a request for an ANSWER IN THE CHAT — never turn it into a spreadsheet, deck or Word file on your own, even if " +
+        "earlier messages mentioned those formats. When the answer would make a good file, finish it in chat and offer to " +
+        "turn it into one."
       : null,
     names.includes("create_page")
       ? "For a doc, report, plan, spreadsheet, tracker or deck the user will keep working on, make a live page with " +
