@@ -239,6 +239,10 @@ fun FridayApp(
         when (page) {
             "library" -> com.friday.app.ui.library.LibraryScreen(onClose = { page = "chat" })
             "pages" -> com.friday.app.ui.projects.PagesScreen(onClose = { page = "chat" })
+            "skills" -> com.friday.app.ui.skills.SkillsScreen(
+                onClose = { page = "chat" },
+                onUse = { skill -> vm.setActiveSkill(skill); page = "chat" },
+            )
             "projects" -> com.friday.app.ui.projects.ProjectsScreen(
                 onClose = { page = "chat" },
                 onNewChat = { projectId -> vm.startProjectChat(projectId); page = "chat" },
@@ -862,6 +866,7 @@ private fun ChatShell(
                         com.friday.app.ui.buildmode.BuildEffortChip(effort = ui.buildEffort, onChange = vm::setBuildEffort)
                     }
                 }
+                ui.activeSkill?.let { skill -> com.friday.app.ui.skills.ActiveSkillChip(skill) { vm.setActiveSkill(null) } }
                 ComposerBar(
                     placeholder = if (pendingPlan != null) "Tell me what to change in the plan…" else if (ui.workspace == "build") "Describe what to build…" else null,
                     draft = ui.draft,

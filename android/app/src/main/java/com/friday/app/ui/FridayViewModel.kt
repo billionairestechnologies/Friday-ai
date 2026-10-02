@@ -92,6 +92,8 @@ data class FridayUiState(
     val workspace: String = "chat",
     /** The project the NEXT new chat belongs to (set by "New chat in this project", cleared once it exists). */
     val activeProjectId: String? = null,
+    /** A skill pinned from the Skills screen for the next message. */
+    val activeSkill: com.friday.app.data.api.Skill? = null,
     /** Build home + drawer: every build session with its live status (GET /api/build/sessions). */
     val buildSessions: List<com.friday.app.data.BuildSessionSummary> = emptyList(),
     val buildSessionsLoaded: Boolean = false,
@@ -552,6 +554,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "chat", activeProjectId = null) }
     }
 
+    fun setActiveSkill(skill: com.friday.app.data.api.Skill?) {
+        _state.update { it.copy(activeSkill = skill) }
+    }
+
     /** Chats that live inside a project: the main chat list never includes them, so the list sync must keep them. */
     private val projectChatIds = mutableSetOf<String>()
 
@@ -880,7 +886,10 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                             chatId = remoteId
                         }
                         val isBuild = _state.value.chats.find { it.id == remoteId }?.workspace == "build"
-                        ChatApi.streamMessage(remoteId, text, modes, attachments, effort = if (isBuild) _state.value.buildEffort else null, permissionMode = if (isBuild) _state.value.buildPermissionMode else null)
+                        // A pinned skill applies to this one message, then the chip clears.
+                        val pinnedSkillId = _state.value.activeSkill?.id
+                        if (pinnedSkillId != null) _state.update { it.copy(activeSkill = null) }
+                        ChatApi.streamMessage(remoteId, text, modes, attachments, effort = if (isBuild) _state.value.buildEffort else null, permissionMode = if (isBuild) _state.value.buildPermissionMode else null, skillId = pinnedSkillId)
                     } else {
                         repo.send(text, modes)
                     }

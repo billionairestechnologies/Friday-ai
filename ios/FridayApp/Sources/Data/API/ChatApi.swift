@@ -92,7 +92,8 @@ enum ChatApi {
         research: Bool = false,
         attachments: [StreamAttachment],
         effort: String? = nil,
-        permissionMode: String? = nil
+        permissionMode: String? = nil,
+        skillId: String? = nil
     ) -> AsyncThrowingStream<ChatEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -108,6 +109,8 @@ enum ChatApi {
                     // Build workspace effort picker (low | medium | high) — ignored outside Build sessions.
                     if let effort { body["effort"] = effort }
                     if let permissionMode { body["permissionMode"] = permissionMode }
+                    // A skill picked from the Skills screen for this message.
+                    if let skillId { body["skillId"] = skillId }
                     if !attachments.isEmpty {
                         body["attachments"] = attachments.map {
                             ["mime": $0.mime, "dataUrl": $0.dataUrl, "name": $0.name, "size": $0.size, "kind": $0.kind]

@@ -138,7 +138,7 @@ object ChatApi {
     /** POST /api/chat/conversations/:id/messages/stream — text/event-stream, "t"-discriminated JSON frames.
      * [attachments] (max 4, enforced server-side) ride inline in this same request body as base64 data
      * URLs — the backend has no separate upload endpoint for chat attachments. */
-    fun streamMessage(conversationId: String, content: String, modes: Set<Mode>, attachments: List<PendingAttachment> = emptyList(), effort: String? = null, permissionMode: String? = null): Flow<ChatEvent> = flow {
+    fun streamMessage(conversationId: String, content: String, modes: Set<Mode>, attachments: List<PendingAttachment> = emptyList(), effort: String? = null, permissionMode: String? = null, skillId: String? = null): Flow<ChatEvent> = flow {
         val body = JSONObject().apply {
             put("content", content)
             put("inputMode", "text")
@@ -149,6 +149,8 @@ object ChatApi {
             // Build workspace effort picker (low | medium | high) — ignored outside Build sessions.
             if (effort != null) put("effort", effort)
             if (permissionMode != null) put("permissionMode", permissionMode)
+            // A skill picked from the Skills screen for this message.
+            if (!skillId.isNullOrBlank()) put("skillId", skillId)
             if (attachments.isNotEmpty()) {
                 put(
                     "attachments",

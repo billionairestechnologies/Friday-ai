@@ -13,6 +13,7 @@ struct RootShell: View {
             case "library": LibraryScreen()
             case "projects": ProjectsScreen()
             case "pages": PagesScreen()
+            case "skills": SkillsScreen()
             case "automations": AutomationsScreen()
             default: ChatShell()
             }
@@ -177,6 +178,7 @@ private struct ChatShell: View {
                         }
                     }
 
+                    ActiveSkillChip().padding(.horizontal, 16)
                     ComposerBar()
                         .padding(.bottom, 8)
                         .opacity(composerIn ? 1 : 0)

@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 
 @MainActor
+struct ActiveSkill: Hashable { let id: String; let name: String; let icon: String }
+
 final class FridayViewModel: ObservableObject {
     // Must exactly match backend/src/services/policyService.ts's POLICY_VERSION and
     // frontend/src/lib/site/legal.ts's POLICY_VERSION — compared against the signed-in
@@ -475,13 +477,17 @@ final class FridayViewModel: ObservableObject {
             ChatApi.StreamAttachment(mime: $0.mime, dataUrl: $0.dataUrl, name: $0.name, size: $0.size, kind: $0.kind)
         }
 
+        // A pinned skill applies to this one message, then the chip clears.
+        let pinnedSkillId = activeSkill?.id
+        activeSkill = nil
         let stream = ChatApi.streamMessage(
             conversationId: realId, content: content,
             think: modes.contains(.think), webSearch: modes.contains(.search), canvas: modes.contains(.canvas),
             research: modes.contains(.research),
             attachments: streamAttachments,
             effort: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildEffort : nil,
-            permissionMode: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildPermissionMode : nil
+            permissionMode: chats.first(where: { $0.id == realId })?.workspace == "build" ? buildPermissionMode : nil,
+            skillId: pinnedSkillId
         )
 
         do {
@@ -609,6 +615,9 @@ final class FridayViewModel: ObservableObject {
         drawerOpen = false
         workspace = "chat"
     }
+
+    /// A skill pinned from the Skills screen for the next message.
+    @Published var activeSkill: ActiveSkill?
 
     /// The project the NEXT new chat belongs to (set by "New chat in this project", cleared once it exists).
     @Published var activeProjectId: String?
