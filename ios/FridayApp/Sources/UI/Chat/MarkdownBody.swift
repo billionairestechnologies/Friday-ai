@@ -118,7 +118,9 @@ struct MarkdownBody: View {
 
     private var blocks: [Block] {
         var result: [Block] = []
-        let all = text.replacingOccurrences(of: "\r", with: "").components(separatedBy: "\n")
+        // A half-arrived `![alt](url…` while a reply streams must not show as text: it appears once whole.
+        let visible = text.replacingOccurrences(of: #"!\[[^\]]*\]?\(?[^)]*$"#, with: "", options: .regularExpression)
+        let all = visible.replacingOccurrences(of: "\r", with: "").components(separatedBy: "\n")
         var paragraph = ""
 
         func flush() {

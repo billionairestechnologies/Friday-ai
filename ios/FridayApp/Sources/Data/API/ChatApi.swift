@@ -232,6 +232,17 @@ enum ConversationsApi {
         }
     }
 
+    /// GET /api/chat/conversations/:id/live?after= — the current (or last) turn's logged frames and whether it is
+    /// still running. Any device can follow a reply that was started elsewhere or before the app was closed.
+    static func live(conversationId: String, after: Int) async throws -> (events: [(Int, [String: Any])], running: Bool) {
+        let json = try await ApiClient.shared.requestJSON(path: "chat/conversations/\(conversationId)/live?after=\(after)", authed: true)
+        let list = (json["events"] as? [[String: Any]] ?? []).compactMap { row -> (Int, [String: Any])? in
+            guard let id = row["id"] as? Int, let ev = row["event"] as? [String: Any] else { return nil }
+            return (id, ev)
+        }
+        return (list, json["running"] as? Bool ?? false)
+    }
+
     static func messages(conversationId: String) async throws -> [ChatMessage] {
         let json = try await ApiClient.shared.requestJSON(path: "chat/conversations/\(conversationId)/messages", authed: true)
         guard let arr = json["messages"] as? [[String: Any]] else { return [] }

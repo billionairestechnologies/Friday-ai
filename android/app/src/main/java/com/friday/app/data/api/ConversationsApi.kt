@@ -40,6 +40,20 @@ object ConversationsApi {
         }.getOrNull()
     }
 
+    /** GET /api/chat/conversations/:id/live?after= — the current (or last) turn's logged stream frames and whether it is
+     *  still running, so any device can follow a reply that was started elsewhere or before the app was closed. Null on failure. */
+    suspend fun live(conversationId: String, after: Long): Pair<List<Pair<Long, JSONObject>>, Boolean>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(ApiClient.BASE_URL + "chat/conversations/$conversationId/live?after=$after").get().build()
+            ApiClient.authed.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val obj = JSONObject(resp.body?.string().orEmpty())
+                val arr = obj.optJSONArray("events") ?: JSONArray()
+                (0 until arr.length()).map { i -> arr.getJSONObject(i).let { it.optLong("id") to it.getJSONObject("event") } } to obj.optBoolean("running")
+            }
+        }.getOrNull()
+    }
+
     /** GET /api/chat/conversations/:id/messages — fetched lazily when a synced thread is opened. */
     suspend fun messages(conversationId: String): List<ChatMessage> = withContext(Dispatchers.IO) {
         runCatching {

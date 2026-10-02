@@ -59,7 +59,19 @@ data class BuildStep(
     val code: String? = null,
     val added: Int? = null,
     val removed: Int? = null,
+    /** kind "agent": a Build / Deep Research sub-agent — its job, its own live actions and its report. */
+    val agent: SubAgentInfo? = null,
 )
+
+/** A parallel helper the agent handed work to (backend projectBuild/subagents.ts): kind is explore | research. */
+data class SubAgentInfo(
+    val title: String,
+    val kind: String,
+    val actions: List<SubAgentAction> = emptyList(),
+    val report: String? = null,
+)
+
+data class SubAgentAction(val id: String, val label: String, val state: String)
 
 /** A step from the stream or a saved message — shared so both keep the file-change fields. */
 fun parseBuildStep(st: org.json.JSONObject): BuildStep = BuildStep(
@@ -72,6 +84,18 @@ fun parseBuildStep(st: org.json.JSONObject): BuildStep = BuildStep(
     code = st.optString("code").ifBlank { null },
     added = if (st.has("added")) st.optInt("added") else null,
     removed = if (st.has("removed")) st.optInt("removed") else null,
+    agent = st.optJSONObject("agent")?.let { a ->
+        val arr = a.optJSONArray("actions")
+        SubAgentInfo(
+            title = a.optString("title"),
+            kind = a.optString("kind", "explore"),
+            actions = (0 until (arr?.length() ?: 0)).map { i ->
+                val o = arr!!.getJSONObject(i)
+                SubAgentAction(o.optString("id"), o.optString("label"), o.optString("state", "running"))
+            },
+            report = a.optString("report").ifBlank { null },
+        )
+    },
 )
 
 /** A Build permission prompt (backend projectBuild/approvals.ts). kind: file | command | connector | pr;

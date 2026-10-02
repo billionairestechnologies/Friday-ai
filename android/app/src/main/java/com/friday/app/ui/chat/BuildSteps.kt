@@ -231,7 +231,7 @@ fun BuildStepsCard(build: BuildInfo, streaming: Boolean, onOpenPreview: () -> Un
         }
     }
     // A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
-    val toolsOnly = build.steps.isNotEmpty() && build.steps.all { it.kind == "tool" } && build.plan == null
+    val toolsOnly = build.steps.isNotEmpty() && build.steps.all { it.kind == "tool" || it.kind == "agent" } && build.plan == null
     // A plan-round message (no build steps yet) is just the plan — no "0 steps" row under it.
     if (build.plan != null && build.steps.isEmpty() && build.previewUrl == null) {
         PlanCard(build.plan)
@@ -341,6 +341,10 @@ fun ProjectZipCard(build: BuildInfo, conversationId: String) {
 @Composable
 private fun StepRow(step: BuildStep) {
     var open by remember { mutableStateOf(false) }
+    if (step.kind == "agent" && step.agent != null) {
+        SubAgentCard(step, step.agent)
+        return
+    }
     // Narration between actions — a plain thought line, not a command.
     if (step.kind == "note") {
         Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
@@ -432,6 +436,55 @@ private fun WriteGroup(steps: List<BuildStep>) {
                 steps.joinToString("\n") { it.label.removePrefix("Wrote ") },
                 fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = FridayMuted,
                 modifier = Modifier.fillMaxWidth().padding(start = 22.dp, bottom = 6.dp).clip(RoundedCornerShape(8.dp)).background(com.friday.app.ui.theme.FridayChip).padding(8.dp),
+            )
+        }
+    }
+}
+
+/** One parallel helper: what it was asked, its own live actions, and (when done) its short report. */
+@Composable
+private fun SubAgentCard(step: BuildStep, agent: com.friday.app.data.SubAgentInfo) {
+    var open by remember { mutableStateOf(false) }
+    val running = step.state == "running"
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(FridaySurface)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = agent.report != null) { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when {
+                running -> BuildOrb(14.dp)
+                step.state == "error" -> Icon(Icons.Default.Error, null, tint = FridayError, modifier = Modifier.size(14.dp))
+                else -> Icon(if (agent.kind == "research") Icons.Default.Visibility else Icons.Default.Description, null, tint = FridayMuted, modifier = Modifier.size(14.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(step.label, color = FridayText, fontSize = 13.5.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (agent.report != null) {
+                Icon(Icons.Default.ChevronRight, null, tint = FridayMuted, modifier = Modifier.size(16.dp).rotate(if (open) 90f else 0f))
+            }
+        }
+        if (running) {
+            agent.actions.takeLast(3).forEach { action ->
+                Text(action.label, color = FridayMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 22.dp, top = 2.dp))
+            }
+        }
+        if (open && agent.report != null) {
+            Text(
+                agent.report,
+                color = FridayText,
+                fontSize = 12.5.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(com.friday.app.ui.theme.FridayChip)
+                    .padding(10.dp),
             )
         }
     }

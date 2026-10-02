@@ -839,6 +839,10 @@ private fun ChatShell(
                 if (ui.workspace == "build" && ui.currentId == null) {
                     com.friday.app.ui.buildmode.GitHubPicker(ui.buildRepo?.first, ui.buildRepo?.second, vm::setBuildRepo)
                 }
+                if (ui.workspace != "build") {
+                    // Background turns: re-attach to a reply still running on the server when this chat is opened.
+                    LaunchedEffect(ui.currentId) { vm.resumeChatIfRunning() }
+                }
                 if (ui.workspace == "build") {
                     LaunchedEffect(ui.currentId) {
                         while (true) {

@@ -186,7 +186,7 @@ struct BuildStepsCard: View {
 
     /// A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
     private var toolsOnly: Bool {
-        !build.steps.isEmpty && build.steps.allSatisfy { $0.kind == "tool" } && build.plan == nil
+        !build.steps.isEmpty && build.steps.allSatisfy { $0.kind == "tool" || $0.kind == "agent" } && build.plan == nil
     }
 
     private var collapsedLabel: String {
@@ -316,7 +316,9 @@ private struct StepRow: View {
     }
 
     var body: some View {
-        if step.kind == "note" {
+        if step.kind == "agent", let agent = step.agent {
+            SubAgentCard(step: step, agent: agent)
+        } else if step.kind == "note" {
             // Narration between actions — a plain thought line, not a command.
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "lightbulb").font(.system(size: 12)).foregroundColor(FridayColor.muted).frame(width: 14).padding(.top, 3)
@@ -391,5 +393,52 @@ private struct WriteGroup: View {
                     .padding(.leading, 22).padding(.bottom, 6)
             }
         }
+    }
+}
+
+
+/// One parallel helper: what it was asked, its own live actions, and (when done) its short report.
+private struct SubAgentCard: View {
+    let step: BuildStep
+    let agent: SubAgentInfo
+    @State private var open = false
+
+    private var running: Bool { step.state == "running" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                if agent.report != nil { withAnimation(.easeOut(duration: 0.15)) { open.toggle() } }
+            } label: {
+                HStack(spacing: 8) {
+                    if running {
+                        BuildOrb(size: 14).frame(width: 14, height: 14)
+                    } else if step.state == "error" {
+                        Image(systemName: "exclamationmark.circle.fill").font(.system(size: 13)).foregroundColor(FridayColor.error).frame(width: 14)
+                    } else {
+                        Image(systemName: agent.kind == "research" ? "globe" : "magnifyingglass").font(.system(size: 12)).foregroundColor(FridayColor.muted).frame(width: 14)
+                    }
+                    Text(step.label).font(.system(size: 13.5, weight: .medium)).foregroundColor(FridayColor.text).lineLimit(2)
+                    Spacer(minLength: 0)
+                    if agent.report != nil {
+                        Image(systemName: "chevron.right").font(.system(size: 11)).foregroundColor(FridayColor.muted).rotationEffect(.degrees(open ? 90 : 0))
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            ForEach(agent.actions.suffix(running ? 3 : 0)) { action in
+                Text(action.label).font(.system(size: 12)).foregroundColor(FridayColor.muted).lineLimit(1).padding(.leading, 22)
+            }
+            if open, let report = agent.report {
+                Text(report).font(.system(size: 12.5)).foregroundColor(FridayColor.text).padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(FridayColor.chip).cornerRadius(10)
+            }
+        }
+        .padding(.vertical, 6).padding(.horizontal, 10)
+        .background(FridayColor.surface)
+        .cornerRadius(12)
+        .padding(.vertical, 3)
     }
 }

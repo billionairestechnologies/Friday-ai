@@ -689,6 +689,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
     fun onAppForegrounded() {
         if (!tokenStore.hasSession()) return
         syncConversations()
+        resumeChatIfRunning()
         val id = _state.value.currentId ?: return
         val chat = _state.value.chats.find { it.id == id } ?: return
         if (id.startsWith("c-") || chat.messages.any { it.isStreaming }) return
@@ -889,9 +890,28 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun resumeBuildIfRunning() {
         val chatId = _state.value.currentId ?: return
-        if (!isServerConversationId(chatId) || streamJobs[chatId]?.isActive == true || resumeJob?.isActive == true) return
         val status = _state.value.buildSessions.firstOrNull { it.id == chatId }?.status
         if (status != "running" && status != "needs_input") return
+        followRunningTurn(chatId, initialStatus = "building", isBuild = true) { id, after -> com.friday.app.data.api.BuildApi.events(id, after) }
+    }
+
+    /**
+     * Background turns: a normal chat reply keeps running on the server after the app is closed or the
+     * device changes. Opening that chat (or returning to the app) re-attaches to it live, same as the web.
+     */
+    fun resumeChatIfRunning() {
+        val chatId = _state.value.currentId ?: return
+        if (_state.value.workspace == "build") return
+        followRunningTurn(chatId, initialStatus = "thinking", isBuild = false) { id, after -> ConversationsApi.live(id, after) }
+    }
+
+    private fun followRunningTurn(
+        chatId: String,
+        initialStatus: String,
+        isBuild: Boolean,
+        fetch: suspend (String, Long) -> Pair<List<Pair<Long, org.json.JSONObject>>, Boolean>?,
+    ) {
+        if (!isServerConversationId(chatId) || streamJobs[chatId]?.isActive == true || resumeJob?.isActive == true) return
         resumeJob = viewModelScope.launch {
             val parser = com.friday.app.data.api.FrameParser()
             val asstId = "a-resume-${System.currentTimeMillis()}"
@@ -899,13 +919,13 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             var started = false
             try {
                 while (true) {
-                    val page = com.friday.app.data.api.BuildApi.events(chatId, after)
+                    val page = fetch(chatId, after)
                     if (page != null) {
                         val (events, running) = page
                         if (!started) {
                             if (!running) break
                             started = true
-                            patchChat(chatId) { it.copy(messages = it.messages + ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true, status = "building")) }
+                            patchChat(chatId) { it.copy(messages = it.messages + ChatMessage(id = asstId, role = Role.Assistant, isStreaming = true, status = initialStatus)) }
                         }
                         for ((id, frame) in events) {
                             after = id
@@ -921,7 +941,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                 if (started) {
                     val msgs = ConversationsApi.messages(chatId)
                     if (msgs.isNotEmpty()) patchChat(chatId) { it.copy(messages = msgs) }
-                    loadBuildSessions()
+                    if (isBuild) loadBuildSessions()
                 }
             }
         }

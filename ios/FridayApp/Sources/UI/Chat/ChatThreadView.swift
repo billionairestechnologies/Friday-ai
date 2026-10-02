@@ -95,7 +95,7 @@ private struct MessageRow: View {
                 }
                 // Tool-only turns (web search, page reads…) that already show the Search/Think trail below skip the Build-style tool rows.
                 if let build = message.build, !build.steps.isEmpty || build.plan != nil,
-                   !(!message.modesUsed.isEmpty && build.plan == nil && build.steps.allSatisfy { $0.kind == "tool" }) {
+                   !(!message.modesUsed.isEmpty && build.plan == nil && build.steps.allSatisfy { $0.kind == "tool" || $0.kind == "agent" }) {
                     BuildStepsCard(build: build, streaming: message.isStreaming)
                 }
                 if !message.agents.isEmpty {

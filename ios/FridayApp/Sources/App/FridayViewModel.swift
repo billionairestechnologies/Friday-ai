@@ -118,9 +118,30 @@ final class FridayViewModel: ObservableObject {
     /// device, or before the app restarted) — replay its event log into a live message and follow it
     /// until it ends, then load the saved result. Only starts once the server confirms it's running.
     func resumeBuildIfRunning() {
-        guard let chatId = currentId, UUID(uuidString: chatId) != nil, streamJobs[chatId] == nil, resumeTask == nil else { return }
+        guard let chatId = currentId else { return }
         let status = buildSessions.first(where: { $0.id == chatId })?.status
         guard status == "running" || status == "needs_input" else { return }
+        followRunningTurn(chatId: chatId, initialStatus: "building", isBuild: true) { id, after in
+            try await BuildApi.events(conversationId: id, after: after)
+        }
+    }
+
+    /// Background turns: a normal chat reply keeps running on the server after the app is closed or the device
+    /// changes. Opening that chat (or returning to the app) re-attaches to it live, same as the web.
+    func resumeChatIfRunning() {
+        guard workspace != "build", let chatId = currentId else { return }
+        followRunningTurn(chatId: chatId, initialStatus: "thinking", isBuild: false) { id, after in
+            try await ConversationsApi.live(conversationId: id, after: after)
+        }
+    }
+
+    private func followRunningTurn(
+        chatId: String,
+        initialStatus: String,
+        isBuild: Bool,
+        fetch: @escaping (String, Int) async throws -> (events: [(Int, [String: Any])], running: Bool)
+    ) {
+        guard UUID(uuidString: chatId) != nil, streamJobs[chatId] == nil, resumeTask == nil else { return }
         resumeTask = Task { [weak self] in
             guard let self else { return }
             defer { self.resumeTask = nil }
@@ -129,13 +150,13 @@ final class FridayViewModel: ObservableObject {
             var after = 0
             var started = false
             while !Task.isCancelled {
-                if let page = try? await BuildApi.events(conversationId: chatId, after: after) {
+                if let page = try? await fetch(chatId, after) {
                     if !started {
                         if !page.running { break }
                         started = true
                         var msg = ChatMessage(id: asstId, role: .assistant)
                         msg.isStreaming = true
-                        msg.status = "building"
+                        msg.status = initialStatus
                         if let idx = chats.firstIndex(where: { $0.id == chatId }) { chats[idx].messages.append(msg) }
                     }
                     for (id, frame) in page.events {
@@ -152,7 +173,7 @@ final class FridayViewModel: ObservableObject {
                    let idx = chats.firstIndex(where: { $0.id == chatId }) {
                     chats[idx].messages = messages
                 }
-                await loadBuildSessions()
+                if isBuild { await loadBuildSessions() }
             }
         }
     }

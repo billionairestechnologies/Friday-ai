@@ -200,7 +200,7 @@ private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, con
         val hasTrail = Mode.Think in msg.modesUsed || Mode.Search in msg.modesUsed || Mode.Canvas in msg.modesUsed
         msg.build
             ?.takeIf { it.steps.isNotEmpty() || it.plan != null }
-            ?.takeUnless { hasTrail && it.plan == null && it.steps.all { s -> s.kind == "tool" } }
+            ?.takeUnless { hasTrail && it.plan == null && it.steps.all { s -> s.kind == "tool" || s.kind == "agent" } }
             ?.let { BuildStepsCard(it, msg.isStreaming, onOpenPreview) }
         // Bare pill for as long as there's no actual reply text yet. Gating this on msg.status
         // used to hide it the instant the backend's generic "thinking" status frame landed (it
@@ -784,7 +784,11 @@ private fun GeneratedImage(url: String, alt: String) {
             )
         }
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(url).crossfade(false).build(),
+            // Coil needs the decoded bytes for an inline base64 image.
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(if (url.startsWith("data:")) android.util.Base64.decode(url.substringAfter("base64,"), android.util.Base64.DEFAULT) else url)
+                .crossfade(false)
+                .build(),
             contentDescription = alt,
             modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).alpha(alpha),
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
@@ -818,9 +822,12 @@ sealed class Md {
 // (see the backend's ScaleMax image-generation feature) fell straight through to MarkdownText's
 // plain-paragraph path and rendered as literal `![prompt](https://...)` text, since there was no
 // image concept anywhere in this parser and no image-loading library (Coil) in the project.
-private val imageLineRegex = Regex("!\\[([^\\]]*)\\]\\((https?://[^)\\s]+)\\)")
+// Also inline base64 images: the browser agent's screenshots and some providers return `data:image/...;base64,…`.
+private val imageLineRegex = Regex("!\\[([^\\]]*)\\]\\((https?://[^)\\s]+|data:image/[a-zA-Z+.-]+;base64,[A-Za-z0-9+/=]+)\\)")
 
-fun splitMarkdown(src: String): List<Md> {
+fun splitMarkdown(raw: String): List<Md> {
+    // A half-arrived `![alt](url…` while a reply streams must not show as text: it appears once whole.
+    val src = raw.replace(Regex("!\\[[^\\]]*\\]?\\(?[^)]*$"), "")
     val out = mutableListOf<Md>()
     // Alternation, so a fenced code block and a markdown image are both recognized as their own
     // top-level block in document order, same as web's react-markdown treats both as block-level.

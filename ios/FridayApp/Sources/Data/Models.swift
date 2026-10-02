@@ -49,6 +49,8 @@ struct BuildStep: Identifiable, Hashable {
     var code: String?
     var added: Int?
     var removed: Int?
+    /// kind "agent": a Build / Deep Research sub-agent — its job, its own live actions and its report.
+    var agent: SubAgentInfo?
 
     /// A step from the stream or a saved message — shared so both keep the file-change fields.
     static func parse(_ j: [String: Any], defaultState: String) -> BuildStep {
@@ -61,8 +63,29 @@ struct BuildStep: Identifiable, Hashable {
             path: j["path"] as? String,
             code: j["code"] as? String,
             added: j["added"] as? Int,
-            removed: j["removed"] as? Int
+            removed: j["removed"] as? Int,
+            agent: (j["agent"] as? [String: Any]).map(SubAgentInfo.parse)
         )
+    }
+}
+
+/// A parallel helper the agent handed work to (backend projectBuild/subagents.ts): `kind` is explore | research.
+struct SubAgentInfo: Hashable {
+    struct Action: Identifiable, Hashable {
+        let id: String
+        let label: String
+        let state: String // running | ok | error
+    }
+    let title: String
+    let kind: String
+    var actions: [Action]
+    var report: String?
+
+    static func parse(_ j: [String: Any]) -> SubAgentInfo {
+        let actions = (j["actions"] as? [[String: Any]] ?? []).map {
+            Action(id: $0["id"] as? String ?? UUID().uuidString, label: $0["label"] as? String ?? "", state: $0["state"] as? String ?? "running")
+        }
+        return SubAgentInfo(title: j["title"] as? String ?? "", kind: j["kind"] as? String ?? "explore", actions: actions, report: j["report"] as? String)
     }
 }
 

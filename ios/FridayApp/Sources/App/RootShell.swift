@@ -30,6 +30,14 @@ struct RootShell: View {
 
 private struct ChatShell: View {
     @EnvironmentObject var vm: FridayViewModel
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Changes when the open chat changes or the app returns to the foreground — re-runs the background-turn check.
+    private var resumeKey: String {
+        let chat: String = vm.currentId ?? ""
+        let active: String = scenePhase == .active ? "active" : "away"
+        return chat + "-" + active
+    }
 
     // Staggered entrance sequence, matching android FridayApp.kt: glow 400ms,
     // greeting fade+slide 500ms (80ms delay), composer fade+scale 480ms
@@ -172,6 +180,10 @@ private struct ChatShell: View {
                         .padding(.bottom, 8)
                         .opacity(composerIn ? 1 : 0)
                         .scaleEffect(composerIn ? 1 : 0.96)
+                        // Background turns: re-attach to a reply still running on the server (closed app, other device).
+                        .task(id: resumeKey) {
+                            if scenePhase == .active { vm.resumeChatIfRunning() }
+                        }
                 }
                 .background(FridayColor.bg.ignoresSafeArea())
 
