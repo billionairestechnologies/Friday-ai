@@ -1,6 +1,7 @@
 import { listConnectedProviders } from "../connectorService.js";
 import { isTokenConnector } from "../tokenConnectors.js";
 import { codeTools } from "./tools/code.js";
+import { browserTools } from "./tools/browser.js";
 import { TOKEN_CONNECTOR_TOOLS } from "./tools/connectors.js";
 import { GITHUB_TOOLS } from "./tools/github.js";
 import { loadMcpTools } from "./mcpService.js";
@@ -13,7 +14,7 @@ import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
-  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), createDocumentTool, useSkillTool];
+  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), ...browserTools(), createDocumentTool, useSkillTool];
   // Both lookups sit on the critical path before the first token — run them concurrently.
   const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());
@@ -106,6 +107,10 @@ export function toolUsePrompt(tools: FridayTool[], skillMenu = ""): string {
       ? "Use run_code for exact arithmetic, data work and checking code — report the real output, never invented output."
       : null,
     "When you rely on a web page, cite it inline as a markdown link.",
+    names.includes("browser")
+      ? "Use fetch_url to read a page; use browser only when you must interact (search forms, filters, clicking through, " +
+        "JavaScript-only pages). Never sign in, pay, book, send or delete without the user confirming in chat."
+      : null,
     names.includes("create_document")
       ? "When the user wants a presentation, spreadsheet, Word document, PDF or another file, make the real file with create_document " +
         "(after gathering the facts it needs) instead of pasting its content into the chat."

@@ -1,6 +1,6 @@
 import { memo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { Check, Copy, Download } from "lucide-react";
@@ -115,12 +115,23 @@ const NO_REHYPE: typeof REHYPE_HIGHLIGHT = [];
  * code (rendering it every frame would throw and flicker), and a very long open code block skips
  * syntax highlighting until it completes (re-highlighting 10KB+ on every frame drops frames).
  */
+/**
+ * react-markdown drops data: URLs by default — which silently hid real images Friday made itself
+ * (browser screenshots, providers that return base64 images). Inline raster images are allowed;
+ * everything else (incl. data:image/svg+xml, which can carry script) keeps the default rules.
+ */
+function urlTransform(url: string, key: string): string {
+  if (key === "src" && /^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(url)) return url;
+  return defaultUrlTransform(url);
+}
+
 export const Markdown = memo(function Markdown({ text, live = false }: { text: string; live?: boolean }) {
   if (!text) return null;
   return (
     <div className="md">
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
+        urlTransform={urlTransform}
         rehypePlugins={live && text.length > 6000 ? NO_REHYPE : REHYPE_HIGHLIGHT}
         components={{
           a: ({ href, children }) => (
