@@ -258,7 +258,9 @@ private struct ChatImage: View {
         AsyncImage(url: resolved) { phase in
             switch phase {
             case .success(let image):
+                // Capped like other chat apps: a generated image is a thumbnail in the thread, not a full-width banner.
                 image.resizable().scaledToFit()
+                    .frame(maxWidth: 340, maxHeight: 420)
                     .overlay(alignment: .topTrailing) {
                         Button { Task { await download() } } label: {
                             Image(systemName: "arrow.down.to.line")
@@ -277,7 +279,7 @@ private struct ChatImage: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func download() async {

@@ -103,7 +103,11 @@ private struct MessageRow: View {
                 } else if !message.modesUsed.isEmpty {
                     ThoughtCard(message: message)
                 } else if message.isStreaming && message.content.isEmpty {
-                    ThinkingPill(modes: message.modesUsed)
+                    if message.status == "generating_image" {
+                        ImageGeneratingView()
+                    } else {
+                        ThinkingPill(modes: message.modesUsed)
+                    }
                 }
 
                 // A plan-round message stores the marker + the plan as text (so the model sees it later);

@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -320,20 +321,52 @@ private fun ThinkingPill() {
     }
 }
 
-/** Small, flat "Creating your image" indicator with a simulated completion percentage — matches
- *  web's chain-of-thought-live.tsx generatingImage branch. Image generation is one blocking
- *  server call with no real progress to report, so this fakes a decelerating climb the same way
- *  (and the same way most "AI is generating..." UIs, including the reference product, do). */
+/** "Creating image": a soft dot grid that ripples outward from the centre until the real image lands,
+ *  with a simulated completion percentage — matches web's ImageDotGrid (chain-of-thought-live.tsx).
+ *  Image generation is one blocking server call with no real progress to report, so the percentage
+ *  fakes a decelerating climb. */
 @Composable
 private fun GeneratingImagePill() {
     val pct = rememberSimulatedProgress(ceiling = 92)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        CircularProgressIndicator(strokeWidth = 2.dp, color = FridayThink, modifier = Modifier.size(14.dp))
-        Text("Creating your image", color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-        Text("$pct%", color = FridayMuted, fontSize = 15.sp)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Creating image", color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text("$pct%", color = FridayMuted, fontSize = 15.sp)
+        }
+        ImageDotGrid()
+    }
+}
+
+@Composable
+private fun ImageDotGrid() {
+    val transition = rememberInfiniteTransition(label = "imageDots")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
+        label = "imageDotsPhase",
+    )
+    val grid = 13
+    androidx.compose.foundation.Canvas(Modifier.size(200.dp)) {
+        val cell = size.width / grid
+        val centre = (grid - 1) / 2f
+        val maxDist = kotlin.math.hypot(centre, centre)
+        for (row in 0 until grid) {
+            for (col in 0 until grid) {
+                val d = kotlin.math.hypot(col - centre, row - centre) / maxDist
+                // Each dot pulses once per cycle, delayed by its distance from the centre.
+                val t = (phase - d * 0.6f + 1f) % 1f
+                val wave = kotlin.math.sin(t * Math.PI.toFloat()).coerceAtLeast(0f)
+                drawCircle(
+                    color = FridayThink.copy(alpha = 0.2f + 0.75f * wave),
+                    radius = cell * (0.1f + 0.2f * wave),
+                    center = Offset(cell * (col + 0.5f), cell * (row + 0.5f)),
+                )
+            }
+        }
     }
 }
 
@@ -736,9 +769,10 @@ private fun GeneratedImage(url: String, alt: String) {
         animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
         label = "imagePulseAlpha",
     )
+    // Capped like other chat apps: a generated image is a thumbnail in the thread, not a full-width banner.
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .widthIn(max = 320.dp)
             .clip(RoundedCornerShape(16.dp)),
     ) {
         if (!loaded) {
@@ -752,7 +786,8 @@ private fun GeneratedImage(url: String, alt: String) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current).data(url).crossfade(false).build(),
             contentDescription = alt,
-            modifier = Modifier.fillMaxWidth().alpha(alpha),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).alpha(alpha),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             onState = { state -> loaded = state is AsyncImagePainter.State.Success },
         )
         if (loaded) {
