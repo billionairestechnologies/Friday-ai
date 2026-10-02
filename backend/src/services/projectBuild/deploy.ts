@@ -1,5 +1,5 @@
 import { HttpError } from "../../middleware/errorHandler.js";
-import { isGenerating } from "../chat/activeGenerations.js";
+import { isTurnRunning } from "../jobs/turns.js";
 import { insertAssistantMessage } from "../chat/conversations.js";
 import { loadTokenCredentials } from "../connectorService.js";
 import { supabaseAdmin } from "../../config/supabase.js";
@@ -21,7 +21,7 @@ const DEPLOY_SCRIPT = [
 ].join("\n");
 
 export async function deployToVercel(userId: string, conversationId: string): Promise<{ url: string }> {
-  if (isGenerating(conversationId)) throw new HttpError(409, "Wait for the build to finish (or stop it) before deploying.");
+  if (await isTurnRunning(conversationId)) throw new HttpError(409, "Wait for the build to finish (or stop it) before deploying.");
   const project = await getProject(conversationId);
   if (!project || Object.keys(project.files ?? {}).length === 0) throw new HttpError(400, "Nothing to deploy yet — build the project first.");
   let token: string;

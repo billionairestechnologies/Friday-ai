@@ -49,12 +49,12 @@ import { streamWithHedging } from "./hedgedStream.js";
 import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
 import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
 import { researchAgentsTool } from "../agent/tools/research.js";
+import { setTurnKind } from "../jobs/turns.js";
 import { buildCandidates, isBuildModel } from "../projectBuild/buildModels.js";
 import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
 import { createCheckpoint } from "../projectBuild/checkpoints.js";
-import { createEventRecorder } from "../projectBuild/events.js";
 import { notifyBuildFinished } from "../projectBuild/notify.js";
 import { PLAN_MARKER, draftPlan, findPendingPlan, isPlanApproval, needsPlan, renderPlan, setPlanStatus } from "../projectBuild/plan.js";
 import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
@@ -705,18 +705,13 @@ export async function streamMessage(
       }
       // Restore point: the project's files as they are before this turn changes anything.
       await createCheckpoint(conversationId, userMessageRow.id as string);
-      // Event log for this turn: a device that isn't connected (reload, another phone) replays it and
-      // follows along live via GET /api/build/:id/events. Every event below goes to both.
-      const recorder = createEventRecorder(conversationId);
-      await recorder.reset();
-      const emit = (ev: StreamEvent) => {
-        recorder.record(ev);
-        onEvent(ev);
-      };
-      try {
+      // Every event of every turn is logged by jobs/runTurn.ts (replay + live follow on any device).
+      const emit = onEvent;
+      {
         // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
         // only now, not during a question/plan round, which never touches the sandbox.
         emit({ t: "status", s: "building" });
+        void setTurnKind(conversationId, "build").catch(() => undefined);
         const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent: emit, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode, modelDriven, repo: options.repo });
         if (built.error && !built.text && built.build.steps.length === 0) {
           emit({ t: "err", c: built.error });
@@ -757,8 +752,6 @@ export async function streamMessage(
         emit({ t: "done" });
         void notifyBuildFinished(userId, conversationId, built.error ? "error" : "done");
         return;
-      } finally {
-        await recorder.close();
       }
     }
 

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
-import { isGenerating } from "../chat/activeGenerations.js";
+import { isTurnRunning } from "../jobs/turns.js";
 import type { StreamEvent } from "../chat/types.js";
 
 /**
@@ -34,7 +34,14 @@ export function createEventRecorder(conversationId: string) {
       await supabaseAdmin.from("build_events").delete().eq("conversation_id", conversationId);
     },
     record(ev: StreamEvent) {
-      buffer.push(ev);
+      // Chat turns stream one tiny text event per token: merge consecutive text/think deltas so a
+      // long answer is a handful of rows, not thousands.
+      const last = buffer[buffer.length - 1];
+      if (last && (ev.t === "text" || ev.t === "think") && last.t === ev.t) {
+        (last as { c: string }).c += (ev as { c: string }).c;
+        return;
+      }
+      buffer.push(ev.t === "text" || ev.t === "think" ? { ...ev } : ev);
       if (!timer) timer = setTimeout(() => void flush(), FLUSH_MS);
     },
     /** Writes whatever is buffered (call when the turn ends). */
@@ -59,6 +66,6 @@ export async function readEvents(conversationId: string, after: number): Promise
   if (error) throw new HttpError(500, error.message);
   return {
     events: (data ?? []).map((row) => ({ id: Number(row.id), event: row.payload as StreamEvent })),
-    running: isGenerating(conversationId),
+    running: await isTurnRunning(conversationId),
   };
 }

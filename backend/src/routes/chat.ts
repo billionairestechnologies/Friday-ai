@@ -48,3 +48,4 @@ chatRouter.post(
   asyncHandler(controller.streamMessage),
 );
 chatRouter.post("/conversations/:id/stop", asyncHandler(controller.stopMessage));
+chatRouter.get("/conversations/:id/live", asyncHandler(controller.live));

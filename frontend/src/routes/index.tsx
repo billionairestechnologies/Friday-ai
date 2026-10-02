@@ -135,6 +135,8 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
   const pendingApproval = liveApproval ?? remoteApprovals[0] ?? null;
   // A build running elsewhere (another device, before a reload): replay its event log and follow it live.
   useBuildLiveResume({ enabled: buildMode && Boolean(user) && !isPending, chatId: activeId, conversationId: activeConversationId, status: sessionStatus });
+  // Normal chats too: a reply or research report still generating (closed app, other device) is followed live.
+  useBuildLiveResume({ enabled: !buildMode && Boolean(user) && !isPending, chatId: activeId, conversationId: activeConversationId, status: undefined, mode: "chat" });
 
   // Restore points for this Build session's messages — refreshed when it opens and after each turn.
   const loadCheckpoints = useBuildCheckpoints((s) => s.load);

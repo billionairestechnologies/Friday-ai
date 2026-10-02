@@ -46,6 +46,9 @@ Optional:
 - `MAILCOW_URL`, `MAILCOW_API_KEY` (+ optional `MAIL_SERVER_HOST`) — company mail hosting on our own
   mailcow server: Team Console → Mail hosting creates employee mailboxes; Mailbox is the webmail
   (see `docs/MAIL_HOSTING.md`). Migrations `0040` (finance) and `0041` (mail) must be applied.
+- `FRIDAY_DRAIN_SECONDS` (default 20) — on deploy/stop, running turns get this long to finish before they are
+  handed over (keep it under the platform's kill timeout); `FRIDAY_DISABLE_TURN_RESUME=1` stops the sweeper
+  that resumes interrupted Builds and reports interrupted chats (migration `0042_add_active_turns`)
 - `FRIDAY_SANDBOX_PERSIST=off` — kill Build sandboxes on timeout instead of pausing them (default: pause,
   so the next message resumes with node_modules + the project's git history; paused sandboxes are billed
   as E2B storage)

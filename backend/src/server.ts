@@ -11,6 +11,8 @@ const { startAutomationScheduler, stopAutomationScheduler } = await import("./se
 const { startCampaignScheduler } = await import("./services/console/campaignService.js");
 const { startGrantExpirySweep } = await import("./services/console/plansService.js");
 const { startStatusMonitor } = await import("./services/status/statusService.js");
+const { startTurnSweeper, stopTurnSweeper } = await import("./services/jobs/sweeper.js");
+const { drainTurns } = await import("./services/jobs/turns.js");
 const app = createApp();
 const sockets = new Set<Socket>();
 
@@ -23,6 +25,7 @@ const server = app.listen(env.port, () => {
   startCampaignScheduler();
   startGrantExpirySweep();
   startStatusMonitor();
+  startTurnSweeper();
 });
 
 server.on("connection", (socket) => {
@@ -36,8 +39,14 @@ async function shutdown(reason: string, exitCode = 0) {
   shutdownStarted = true;
   beginShutdown();
   stopAutomationScheduler();
+  stopTurnSweeper();
   process.exitCode = exitCode;
   logger.info("server_shutdown_started", { reason });
+
+  // Running chat/research/Build turns get a short grace period to finish; whatever is still running
+  // is handed over (another instance — or this service after it restarts — resumes Builds, and
+  // reports the rest as interrupted). Keep FRIDAY_DRAIN_SECONDS below the platform's kill timeout.
+  await drainTurns(Number(process.env.FRIDAY_DRAIN_SECONDS ?? 20) * 1000).catch(() => undefined);
 
   const forceTimer = setTimeout(() => {
     logger.error("server_shutdown_timeout", { activeConnections: sockets.size });
