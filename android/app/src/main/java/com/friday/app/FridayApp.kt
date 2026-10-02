@@ -125,6 +125,8 @@ fun FridayApp(
     // Set by the drawer's Projects dropdown; the Projects screen consumes them once.
     var projectToOpen by remember { mutableStateOf<String?>(null) }
     var projectCreate by remember { mutableStateOf(false) }
+    // Set by a "page" file card in chat; the Pages screen consumes it once.
+    var pageToOpen by remember { mutableStateOf<String?>(null) }
     var updatePopupDismissed by remember { mutableStateOf(false) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -245,7 +247,7 @@ fun FridayApp(
     ) {
         when (page) {
             "library" -> com.friday.app.ui.library.LibraryScreen(onClose = { page = "chat" })
-            "pages" -> com.friday.app.ui.projects.PagesScreen(onClose = { page = "chat" })
+            "pages" -> com.friday.app.ui.projects.PagesScreen(onClose = { page = "chat" }, initialPageId = pageToOpen, onConsumed = { pageToOpen = null })
             "plugins" -> com.friday.app.ui.plugins.PluginsScreen(
                 signedIn = ui.user != null,
                 onClose = { page = "chat" },
@@ -318,6 +320,7 @@ fun FridayApp(
                 onOpenAuth = { page = "auth" },
                 onOpenPlans = { page = "plans" },
                 onOpenUpdate = { openUpdate() },
+                onOpenPage = { id -> pageToOpen = id; page = "pages" },
             )
         }
     }
@@ -569,6 +572,7 @@ private fun ChatShell(
     onOpenAuth: () -> Unit,
     onOpenPlans: () -> Unit,
     onOpenUpdate: () -> Unit,
+    onOpenPage: (String) -> Unit = {},
 ) {
     val ui by vm.state.collectAsState()
     LaunchedEffect(ui.authRequired) {
@@ -780,6 +784,7 @@ private fun ChatShell(
                         onOpenPreview = { buildOpen = true },
                         conversationId = chat?.id,
                         onOpenInBuild = vm::openInBuild,
+                        onOpenPage = onOpenPage,
                         restorable = if (ui.workspace == "build") chat?.id?.let { ui.checkpoints[it] }.orEmpty() else emptySet(),
                         onRestore = vm::restoreTo,
                     )

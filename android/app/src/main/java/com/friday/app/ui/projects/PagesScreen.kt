@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
  * editing, sharing and export are on the web.
  */
 @Composable
-fun PagesScreen(onClose: () -> Unit) {
+fun PagesScreen(onClose: () -> Unit, initialPageId: String? = null, onConsumed: () -> Unit = {}) {
     var pages by remember { mutableStateOf<List<PageSummary>?>(null) }
     var failed by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf<PageSummary?>(null) }
@@ -64,7 +64,11 @@ fun PagesScreen(onClose: () -> Unit) {
         val list = PagesApi.list()
         if (list != null) { pages = list; failed = false } else if (pages == null) failed = true
     }
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(Unit) {
+        load()
+        // A "page" file card in chat: open that page straight away.
+        if (initialPageId != null) { open = pages?.firstOrNull { it.id == initialPageId }; onConsumed() }
+    }
 
     val current = open
     if (current != null) {

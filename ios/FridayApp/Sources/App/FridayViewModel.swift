@@ -541,6 +541,8 @@ final class FridayViewModel: ObservableObject {
             // the panel opens on the running app.
             freshBuildMessageIds.insert(assistantMessageId)
             withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) { canvasOpen = true }
+        case .file(let file):
+            if !chats[ci].messages[mi].files.contains(where: { $0.id == file.id }) { chats[ci].messages[mi].files.append(file) }
         case .plan(let plan):
             var build = chats[ci].messages[mi].build ?? BuildInfo()
             build.plan = plan
@@ -620,6 +622,9 @@ final class FridayViewModel: ObservableObject {
     /// Set by the drawer's Projects dropdown: open this project (or the create form) when the Projects screen appears.
     @Published var projectToOpen: String?
     @Published var projectsCreateRequested = false
+
+    /// Set by a "page" file card: open this page when the Pages screen appears.
+    @Published var pageToOpen: String?
 
     /// A skill pinned from the Skills screen for the next message.
     @Published var activeSkill: ActiveSkill?

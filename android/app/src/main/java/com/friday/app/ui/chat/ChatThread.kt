@@ -109,6 +109,7 @@ fun ChatThread(
     onOpenPreview: () -> Unit = {},
     conversationId: String? = null,
     onOpenInBuild: (String) -> Unit = {},
+    onOpenPage: (String) -> Unit = {},
     /** Build: user message ids with a restore point, and what to do on "Restore to before this". */
     restorable: Set<String> = emptySet(),
     onRestore: (String) -> Unit = {},
@@ -166,7 +167,7 @@ fun ChatThread(
                         )
                     }
                 }
-            } else AssistantBlock(msg, onOpenPreview, conversationId, onOpenInBuild)
+            } else AssistantBlock(msg, onOpenPreview, conversationId, onOpenInBuild, onOpenPage)
         }
     }
 }
@@ -189,7 +190,7 @@ private fun UserBubble(text: String) {
 }
 
 @Composable
-private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, conversationId: String? = null, onOpenInBuild: (String) -> Unit = {}) {
+private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, conversationId: String? = null, onOpenInBuild: (String) -> Unit = {}, onOpenPage: (String) -> Unit = {}) {
     // A plan-round message stores the marker + the plan as text (so the model sees it later); the plan
     // card already shows all of it, so the text isn't repeated under it.
     val planRound = msg.build?.plan?.status != null && msg.content.startsWith(com.friday.app.data.PLAN_MARKER)
@@ -235,6 +236,7 @@ private fun AssistantBlock(msg: ChatMessage, onOpenPreview: () -> Unit = {}, con
         AnimatedVisibility(visible = msg.content.isNotEmpty() && !planRound, enter = fadeIn(tween(220)), exit = fadeOut(tween(0))) {
             MarkdownBody(msg.content)
         }
+        if (msg.files.isNotEmpty()) FileCards(msg.files, onOpenPage)
         if (!msg.isStreaming) msg.suggestBuildPrompt?.let { prompt -> SuggestBuildCard { onOpenInBuild(prompt) } }
         if (!msg.isStreaming && conversationId != null) msg.build?.takeIf { it.zipBytes != null }?.let { ProjectZipCard(it, conversationId) }
         if (msg.content.isNotEmpty() && !msg.isStreaming && !planRound) {

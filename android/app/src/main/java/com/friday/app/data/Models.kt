@@ -199,6 +199,30 @@ data class BuildInfo(
     val zipName: String? = null,
 )
 
+/** A file Friday generated this turn (create_document): rendered as a download card; format "page" = a live Friday page. */
+data class GeneratedFile(
+    val id: String,
+    val title: String,
+    val filename: String,
+    val format: String,
+    val size: Long,
+    val summary: String,
+    val pageKind: String? = null,
+)
+
+fun parseGeneratedFile(o: org.json.JSONObject) = GeneratedFile(
+    id = o.optString("id"),
+    title = o.optString("title"),
+    filename = o.optString("filename").ifBlank { "file" },
+    format = o.optString("format", "txt"),
+    size = o.optLong("size"),
+    summary = o.optString("summary"),
+    pageKind = o.optString("pageKind").ifBlank { null },
+)
+
+fun parseGeneratedFiles(arr: org.json.JSONArray?): List<GeneratedFile> =
+    (0 until (arr?.length() ?: 0)).mapNotNull { i -> arr!!.optJSONObject(i)?.let(::parseGeneratedFile) }
+
 data class ChatMessage(
     val id: String,
     val role: Role,
@@ -225,6 +249,8 @@ data class ChatMessage(
      *  consulted, upserted by (slug, model) as its state changes. */
     val agents: List<AgentStatus> = emptyList(),
     val build: BuildInfo? = null,
+    /** Documents Friday made this turn (PowerPoint, Excel, Word, PDF… or a live page). */
+    val files: List<GeneratedFile> = emptyList(),
     /** Normal chat answered a build request — shows "Open in Build" carrying this prompt. */
     val suggestBuildPrompt: String? = null,
 )
@@ -273,6 +299,8 @@ sealed class ChatEvent {
     data class Plan(val plan: BuildPlan) : ChatEvent()
     data class BuildMeta(val elapsedMs: Long?, val zipBytes: Long?, val zipName: String?) : ChatEvent()
     data class Ask(val questions: List<BuildAskQuestion>) : ChatEvent()
+    /** A document a tool created this turn (from {"t":"file",...}). */
+    data class File(val file: GeneratedFile) : ChatEvent()
     /** Normal chat got a build request: offer "Open in Build" (from {"t":"suggest_build",...}). */
     data class SuggestBuild(val prompt: String) : ChatEvent()
     /** Build permission prompt: pending until the user answers (from {"t":"approval",...}). */

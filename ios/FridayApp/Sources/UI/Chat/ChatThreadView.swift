@@ -116,6 +116,7 @@ private struct MessageRow: View {
                     MarkdownBody(text: message.content)
                         .transition(.opacity)
                 }
+                if !message.files.isEmpty { FileCards(files: message.files) }
 
                 if !message.isStreaming, let prompt = message.suggestBuildPrompt {
                     SuggestBuildCard(prompt: prompt)

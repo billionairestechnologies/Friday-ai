@@ -68,6 +68,7 @@ class FrameParser {
             zipName = json.optString("zipName").ifBlank { null },
         )
         "ask" -> ChatEvent.Ask(com.friday.app.data.parseBuildAsk(json.optJSONArray("questions")))
+        "file" -> json.optJSONObject("file")?.let { ChatEvent.File(com.friday.app.data.parseGeneratedFile(it)) }
         else -> null
     }
 }

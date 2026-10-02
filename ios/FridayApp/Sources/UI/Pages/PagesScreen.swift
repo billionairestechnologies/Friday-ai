@@ -60,7 +60,11 @@ struct PagesScreen: View {
                 if let p = open { PageViewer(page: p) }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            // A "page" file card in chat: open that page straight away.
+            if let id = vm.pageToOpen { open = pages?.first(where: { $0.id == id }); vm.pageToOpen = nil }
+        }
     }
 
     private func load() async {

@@ -1015,6 +1015,9 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                 val steps = if (i == -1) cur.steps + event.step else cur.steps.toMutableList().apply { set(i, event.step) }
                 msg.copy(build = cur.copy(steps = steps))
             }
+            is ChatEvent.File -> patchMessage(chatId, asstId) { msg ->
+                if (msg.files.any { it.id == event.file.id }) msg else msg.copy(files = msg.files + event.file)
+            }
             is ChatEvent.Preview -> patchMessage(chatId, asstId) { msg ->
                 msg.copy(build = (msg.build ?: BuildInfo()).copy(previewUrl = event.url, port = event.port))
             }

@@ -101,6 +101,7 @@ object ConversationsApi {
                         role = role,
                         content = if (errorText == null) rawContent else if (rawContent.isBlank()) errorText else "$rawContent\n\n$errorText",
                         sources = sources,
+                        files = com.friday.app.data.parseGeneratedFiles(o.optJSONArray("files")),
                         // A suggestion-only build object (no steps/plan/ask) isn't a Build turn.
                         build = build?.takeUnless { it.steps.isEmpty() && it.plan == null && it.ask.isEmpty() && it.previewUrl == null && it.zipBytes == null },
                         suggestBuildPrompt = buildObj?.optJSONObject("suggestBuild")?.optString("prompt")?.ifBlank { null },

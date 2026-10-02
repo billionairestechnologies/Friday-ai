@@ -188,6 +188,33 @@ struct BuildInfo: Hashable {
     var ask: [BuildAskQuestion]?
 }
 
+/// A file Friday generated this turn (create_document): rendered as a download card; format "page" = a live Friday page.
+struct GeneratedFile: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let filename: String
+    let format: String
+    let size: Int
+    let summary: String
+    let pageKind: String?
+
+    static func parse(_ j: [String: Any]) -> GeneratedFile {
+        GeneratedFile(
+            id: j["id"] as? String ?? UUID().uuidString,
+            title: j["title"] as? String ?? "",
+            filename: j["filename"] as? String ?? "file",
+            format: j["format"] as? String ?? "txt",
+            size: j["size"] as? Int ?? 0,
+            summary: j["summary"] as? String ?? "",
+            pageKind: j["pageKind"] as? String
+        )
+    }
+
+    static func parseList(_ raw: Any?) -> [GeneratedFile] {
+        (raw as? [[String: Any]] ?? []).map(parse)
+    }
+}
+
 struct ChatMessage: Identifiable, Hashable {
     let id: String
     let role: Role
@@ -209,6 +236,8 @@ struct ChatMessage: Identifiable, Hashable {
     var build: BuildInfo?
     /// Normal chat answered a build request — shows "Open in Build" carrying this prompt.
     var suggestBuildPrompt: String?
+    /// Documents Friday made this turn (PowerPoint, Excel, Word, PDF… or a live page).
+    var files: [GeneratedFile] = []
 }
 
 struct ChatThread: Identifiable, Hashable {

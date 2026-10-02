@@ -13,6 +13,8 @@ enum ChatEvent {
     case preview(url: String, port: Int)
     case plan(BuildPlan)
     case ask([BuildAskQuestion])
+    /// A document a tool created this turn (from {"t":"file",...}).
+    case file(GeneratedFile)
     /// Normal chat got a build request: offer "Open in Build" (from {"t":"suggest_build",...}).
     case suggestBuild(String)
     /// Build permission prompt: pending until the user answers (from {"t":"approval",...}).
@@ -174,6 +176,8 @@ enum ChatApi {
                             continuation.yield(.preview(url: json["url"] as? String ?? "", port: json["port"] as? Int ?? 0))
                         case "plan":
                             if let plan = BuildPlan.parse(json) { continuation.yield(.plan(plan)) }
+                        case "file":
+                            if let f = json["file"] as? [String: Any] { continuation.yield(.file(GeneratedFile.parse(f))) }
                         case "suggest_build":
                             continuation.yield(.suggestBuild(json["prompt"] as? String ?? ""))
                         case "approval":
@@ -287,7 +291,8 @@ enum ConversationsApi {
                 content: content,
                 sources: sources,
                 build: build,
-                suggestBuildPrompt: (suggest?.isEmpty ?? true) ? nil : suggest
+                suggestBuildPrompt: (suggest?.isEmpty ?? true) ? nil : suggest,
+                files: GeneratedFile.parseList(row["files"])
             )
         }
     }
@@ -340,6 +345,7 @@ final class FrameParser {
         case "plan": return BuildPlan.parse(json).map { .plan($0) }
         case "approval": return .approval(BuildApproval.parse(json))
         case "ask": return .ask(ChatApi.parseAsk(json["questions"]))
+        case "file": return (json["file"] as? [String: Any]).map { .file(GeneratedFile.parse($0)) }
         case "build": return .buildMeta(elapsedMs: json["elapsedMs"] as? Int, zipBytes: json["zipBytes"] as? Int, zipName: json["zipName"] as? String)
         default: return nil
         }
