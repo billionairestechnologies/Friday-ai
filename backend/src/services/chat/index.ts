@@ -136,6 +136,9 @@ async function extractDocumentText(attachments: ChatImage[]): Promise<string | n
         const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
         return sarvamKey ? digitiseDocument(sarvamKey, a.dataUrl, a.mime, a.name ?? "image") : null;
       }
+      // A file we can't read must be SAID, not skipped: otherwise the model sees no attachment and asks the
+      // user to upload it again (the "it doesn't get my attachment" report).
+      if (!a.mime.startsWith("image/")) return `(This file could not be read — its type "${a.mime || "unknown"}" isn't supported yet. Tell the user plainly that Friday can't open this file type and suggest PDF, DOCX, XLSX, PPTX, CSV, TXT or an image.)`;
       return null;
     }),
   );

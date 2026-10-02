@@ -83,13 +83,18 @@ export function decodeTextBuffer(buffer: Buffer, maxChars = MAX_TEXT_CHARS): str
   return text.length > maxChars ? `${text.slice(0, maxChars)}\n…(truncated)` : text;
 }
 
+// Production incident (2026-10-02): a "Friday email lead.csv" arrived as application/vnd.ms-excel (what Chrome
+// reports for .csv on machines with Excel installed) — not text/*, not generic — so it was matched by NO
+// extraction path, the model never saw it and answered "please upload the file". These extensions are text
+// whatever mime the browser guessed, as long as the mime isn't a real binary type we handle elsewhere.
+const TEXT_WHATEVER_THE_MIME = new Set(["csv", "tsv", "txt", "md", "json", "jsonl", "xml", "log", "yml", "yaml"]);
+const BINARY_MIME = /^(image\/|audio\/|video\/|application\/pdf$|application\/zip$|application\/vnd\.openxmlformats|application\/vnd\.oasis)/;
+
 export function isPlainTextDocument(mime: string, name?: string): boolean {
   if (PLAIN_TEXT_MIMES.has(mime) || mime.startsWith("text/")) return true;
-  if (GENERIC_MIMES.has(mime)) {
-    const ext = extensionOf(name);
-    return ext !== null && CODE_EXTENSIONS.has(ext);
-  }
-  return false;
+  const ext = extensionOf(name);
+  if (GENERIC_MIMES.has(mime)) return ext !== null && CODE_EXTENSIONS.has(ext);
+  return ext !== null && TEXT_WHATEVER_THE_MIME.has(ext) && !BINARY_MIME.test(mime);
 }
 
 

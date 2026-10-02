@@ -49,3 +49,11 @@ test("issue kinds are classified for the admin log", async () => {
   assert.equal(classifyProviderIssue("openai: OpenAI chat failed: 429 slow down"), "rate_limit");
   assert.equal(classifyProviderIssue("gemini: Gemini chat failed: 403 API key not valid"), "auth");
 });
+
+test("a .csv labelled application/vnd.ms-excel is read as text, real spreadsheets and images are not", async () => {
+  const { isPlainTextDocument } = await import("../src/services/providers/plainTextDocs.js");
+  assert.equal(isPlainTextDocument("application/vnd.ms-excel", "Friday email lead.csv"), true);
+  assert.equal(isPlainTextDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "leads.csv"), false);
+  assert.equal(isPlainTextDocument("application/vnd.ms-excel", "budget.xls"), false);
+  assert.equal(isPlainTextDocument("image/png", "chart.csv"), false);
+});
