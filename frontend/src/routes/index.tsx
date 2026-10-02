@@ -761,7 +761,12 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   {pendingPlan && !streaming && (
                     <PlanApprovalPanel
                       onApprove={approvePlan}
-                      onRequestChanges={() => document.querySelector<HTMLTextAreaElement>("textarea")?.focus()}
+                      onRequestChanges={() => {
+                        // Opens the message box for the change request (the placeholder already says what to type).
+                        const box = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]");
+                        box?.scrollIntoView({ block: "center", behavior: "smooth" });
+                        box?.focus({ preventScroll: true });
+                      }}
                     />
                   )}
                   <Composer

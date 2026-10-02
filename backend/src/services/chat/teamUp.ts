@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { friendlyProviderError } from "../../utils/providerError.js";
 import type { ChatImage, ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, listChatCandidates, type ChatCandidate } from "../providerService.js";
 import { pickStrongest } from "../modelRouting.js";
@@ -93,7 +94,7 @@ export async function streamTeamUp(
           slug: candidate.slug,
           model: candidate.displayName,
           state: "error" as const,
-          error: err instanceof Error ? err.message : "failed",
+          error: friendlyProviderError(err instanceof Error ? err.message : "failed"),
         };
         agents.push(failed);
         onEvent({ t: "agent", ...failed });

@@ -478,6 +478,7 @@ const PromptInputTextarea: React.FC<
       className={cn("overflow-hidden text-base", className)}
       disabled={disabled}
       placeholder={placeholder}
+      data-prompt-input
       {...props}
     />
   );

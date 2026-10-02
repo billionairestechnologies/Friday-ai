@@ -1,7 +1,7 @@
 import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
 import { TeamPage } from "@/routes/team";
@@ -40,6 +40,11 @@ const rootRoute = createRootRoute({
 // conversationId actually needs to change) on the very first message of a conversation.
 function AppShell() {
   const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
+  // The server titles an unknown first-load URL "Page not found — Friday"; navigating in-app (e.g. /build →
+  // /build/<id>) keeps that stale title, so every real chat/build screen resets it.
+  useEffect(() => {
+    document.title = "Friday";
+  }, [conversationId]);
   return <Home conversationId={conversationId} />;
 }
 

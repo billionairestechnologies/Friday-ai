@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { friendlyProviderError } from "../../utils/providerError.js";
 import type { AgentMessage, ToolTurnResult } from "../providers/toolCalling.js";
 import type { ChatMessage } from "../providers/types.js";
 import { compactToolResults, supportsTools } from "../agent/toolLoop.js";
@@ -963,7 +964,7 @@ export async function runBuildAgent(opts: {
           usedCandidate = candidate;
           return { result, text };
         } catch (err) {
-          lastError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
+          lastError = friendlyProviderError(`${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`);
           for (const step of liveQueue) {
             step.state = "error";
             step.detail = "Interrupted";
@@ -1269,7 +1270,7 @@ export async function runBuildAgent(opts: {
         modelError = undefined;
         break;
       } catch (err) {
-        modelError = `${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`;
+        modelError = friendlyProviderError(`${candidate.slug}: ${err instanceof Error ? err.message : "failed"}`);
         if (raw) break; // already streamed part of this turn — can't silently switch models mid-reply
       }
     }

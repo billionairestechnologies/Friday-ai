@@ -187,11 +187,15 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
   // for a "working" instant and then vanished the moment that status event landed, leaving
   // nothing visible until the first token of real content arrived (which can be several seconds
   // on a slow model). "thinking" now keeps the dots up through that whole gap.
+  // Reasoning models (Sarvam, o-series…) stream their thinking before the answer even when the user
+  // didn't switch Think on. That text is only SHOWN inside the plan card, so it must only hide the
+  // pill when the card is up — otherwise the pill vanished after ~1s and the thread sat empty until
+  // the first answer token a few seconds later. "writing" with no text yet is still waiting.
   const waiting = Boolean(
     message.streaming &&
       !message.content &&
-      !message.thinking &&
-      (message.status === "working" || message.status === "thinking" || !message.status),
+      !(message.thinking && plan) &&
+      (message.status === "working" || message.status === "thinking" || message.status === "writing" || !message.status),
   );
   const done = !message.streaming;
   // Rotates every ~2.6s while actually waiting, so a slow reply doesn't sit on one static line.
