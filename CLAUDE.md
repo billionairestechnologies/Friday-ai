@@ -159,6 +159,10 @@ tools, ask for a pptx/xlsx/pdf (download card + Library), pick a skill, Build a 
 report a problem, `/plans` checkout (test mode), console: publish an update (popup shows once), send a
 test campaign to yourself, create a package/offer and redeem it, hit a usage limit on Free.
 
+## Production (EC2)
+
+Live production is one EC2 instance with Docker + self-hosted Supabase, NOT the ECS stack below — see `docs/EC2_DEPLOY.md` (SSM access, image build, migrations, container swap, rollback).
+
 ## Deploying on AWS
 
 `docs/AWS_DEPLOY.md` + `infra/aws/`: ECS Fargate behind an ALB (1 h idle timeout for SSE), ElastiCache
