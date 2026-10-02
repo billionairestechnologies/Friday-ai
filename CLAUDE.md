@@ -18,7 +18,7 @@ Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0036 (apply in order; RLS on, backend uses service role)
+supabase/   SQL migrations 0001…0041 (apply in order; RLS on, backend uses service role)
 docs/       OPERATIONS.md, PLATFORM_BRIEFING.md, UPGRADE_ROADMAP.md, diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -178,6 +178,11 @@ model allow-list (`buildModels.ts`, `/models` marks `build`); effort → provide
 (`toolCalling.ts#reasoningParams`); `generate_image` tool; archives/PPTX/ODF/text-PDF reading
 (`providers/archiveDocs.ts`, `pdfText.ts`, `officeDocs.ts`); `create_document` `extension` for code files
 + edit-in-same-format; share popup with WhatsApp/Telegram/Email + `useDismiss`; theme before first paint.
+Team Console → **Finance** (`services/finance/`: `model_pricing` cost vs sell per 1M tokens, exact
+per-call cost in `token_ledger`, OpenRouter list-price sync, `finance_model_usage()` aggregate, P&L,
+expenses — migration 0040) and **Mailbox / Mail hosting** (`services/mail/`: mailcow REST API for
+company domains + employee mailboxes, IMAP/SMTP webmail for hosted + Gmail/Outlook/any accounts —
+migration 0041, `docs/MAIL_HOSTING.md`). Permissions `finance.view|manage`, `mailbox.use`.
 
 Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
 Team Console (`/admin`: support, CRM, tasks, product updates, email campaigns, plans & offers, users, team
