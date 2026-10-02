@@ -95,7 +95,6 @@ import com.friday.app.ui.composer.ComposerBar
 import com.friday.app.ui.shell.AttachSheet
 import com.friday.app.ui.shell.DrawerPane
 import com.friday.app.ui.shell.ModelSheet
-import com.friday.app.ui.shell.PluginsSheet
 import com.friday.app.ui.theme.FridayBg
 import com.friday.app.ui.theme.FridayCanvas
 import com.friday.app.ui.theme.FridayGlow
@@ -121,6 +120,8 @@ fun FridayApp(
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     var page by remember { mutableStateOf("chat") }
+    // Plugins is a full page (real connectors list), reached from Settings and the composer menu via Sheet.Plugins.
+    LaunchedEffect(ui.sheet) { if (ui.sheet == Sheet.Plugins) { vm.closeSheet(); page = "plugins" } }
     // Set by the drawer's Projects dropdown; the Projects screen consumes them once.
     var projectToOpen by remember { mutableStateOf<String?>(null) }
     var projectCreate by remember { mutableStateOf(false) }
@@ -245,9 +246,10 @@ fun FridayApp(
         when (page) {
             "library" -> com.friday.app.ui.library.LibraryScreen(onClose = { page = "chat" })
             "pages" -> com.friday.app.ui.projects.PagesScreen(onClose = { page = "chat" })
-            "skills" -> com.friday.app.ui.skills.SkillsScreen(
+            "plugins" -> com.friday.app.ui.plugins.PluginsScreen(
+                signedIn = ui.user != null,
                 onClose = { page = "chat" },
-                onUse = { skill -> vm.setActiveSkill(skill); page = "chat" },
+                onUseSkill = { skill -> vm.setActiveSkill(skill); page = "chat" },
             )
             "projects" -> com.friday.app.ui.projects.ProjectsScreen(
                 initialProjectId = projectToOpen,
@@ -509,7 +511,7 @@ fun FridayApp(
         ) {
             when (ui.sheet) {
                 Sheet.Auth, Sheet.Welcome, Sheet.Signup -> {}
-                Sheet.Plugins -> PluginsSheet(ui.pluginsTab, vm::setPluginsTab, onOpenSkills = { vm.closeSheet(); page = "skills" })
+                Sheet.Plugins -> {}
                 else -> {}
             }
         }

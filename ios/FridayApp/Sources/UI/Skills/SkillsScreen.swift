@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Skills: Friday's built-in expert playbooks plus the user's own. "Use in chat" pins one to the next message;
-/// otherwise Friday loads a matching enabled skill by itself. (Creating custom skills is on the web.)
-struct SkillsScreen: View {
-    @EnvironmentObject var vm: FridayViewModel
+/// Skills: Friday's built-in expert playbooks plus the user's own — shown in Plugins → Skills (same as web). "Use in chat"
+/// pins one to the next message; otherwise Friday loads a matching enabled skill by itself. Creating custom skills is on the web.
+struct SkillsList: View {
+    let onUse: (Skill) -> Void
     @State private var categories: [String] = []
     @State private var skills: [Skill]?
     @State private var failed = false
@@ -17,20 +17,9 @@ struct SkillsScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Skills").font(.system(size: 22, weight: .medium)).foregroundColor(FridayColor.text)
-                    Text("Expert playbooks Friday can use").font(.system(size: 13)).foregroundColor(FridayColor.muted)
-                }
-                Spacer()
-                Button { vm.page = "chat" } label: { Image(systemName: "xmark").foregroundColor(FridayColor.text).padding(8) }
-            }
-            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
-
             TextField("Search skills", text: $query)
                 .padding(10).background(FridayColor.surface).cornerRadius(10)
-                .padding(.horizontal, 16).padding(.bottom, 8)
-
+                .padding(.horizontal, 16).padding(.vertical, 8)
             if skills != nil {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -51,7 +40,6 @@ struct SkillsScreen: View {
             }
             Spacer(minLength: 0)
         }
-        .background(FridayColor.bg.ignoresSafeArea())
         .task { await load() }
     }
 
@@ -67,10 +55,7 @@ struct SkillsScreen: View {
                 Toggle("", isOn: Binding(get: { s.enabled }, set: { toggle(s, $0) })).labelsHidden()
             }
             if s.enabled {
-                Button {
-                    vm.activeSkill = ActiveSkill(id: s.id, name: s.name, icon: s.icon)
-                    vm.page = "chat"
-                } label: {
+                Button { onUse(s) } label: {
                     Text("Use in chat").font(.system(size: 13, weight: .medium)).foregroundColor(FridayColor.bg)
                         .padding(.horizontal, 12).padding(.vertical, 6).background(FridayColor.text).clipShape(Capsule())
                 }

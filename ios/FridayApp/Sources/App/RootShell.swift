@@ -13,7 +13,6 @@ struct RootShell: View {
             case "library": LibraryScreen()
             case "projects": ProjectsScreen()
             case "pages": PagesScreen()
-            case "skills": SkillsScreen()
             case "automations": AutomationsScreen()
             default: ChatShell()
             }
@@ -514,29 +513,5 @@ private struct StubPage: View {
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(FridayColor.bg.ignoresSafeArea())
-    }
-}
-
-private struct PluginsSheet: View {
-    @EnvironmentObject var vm: FridayViewModel
-
-    var body: some View {
-        List {
-            Section("Connectors") {
-                Label("Gmail", systemImage: "envelope")
-                Label("Calendar", systemImage: "calendar")
-                Label("Drive", systemImage: "folder")
-                Label("GitHub", systemImage: "chevron.left.slash.chevron.right")
-            }
-            Section("Skills") {
-                // Real skills (built-in playbooks + your own) — the same list as web's Plugins → Skills.
-                Button {
-                    vm.sheet = .none
-                    vm.page = "skills"
-                } label: {
-                    Label("Browse and use skills", systemImage: "sparkles")
-                }
-            }
-        }
     }
 }

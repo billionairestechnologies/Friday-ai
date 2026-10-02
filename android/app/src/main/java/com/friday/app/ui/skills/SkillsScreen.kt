@@ -46,11 +46,11 @@ import com.friday.app.ui.theme.FridayText
 import kotlinx.coroutines.launch
 
 /**
- * Skills: Friday's built-in expert playbooks plus the user's own. "Use in chat" pins one to the next message;
- * otherwise Friday loads a matching enabled skill by itself. (Creating custom skills is on the web.)
+ * Skills: Friday's built-in expert playbooks plus the user's own — shown in Plugins → Skills (same as web). "Use in chat"
+ * pins one to the next message; otherwise Friday loads a matching enabled skill by itself. Creating custom skills is on the web.
  */
 @Composable
-fun SkillsScreen(onClose: () -> Unit, onUse: (Skill) -> Unit) {
+fun SkillsList(onUse: (Skill) -> Unit) {
     var categories by remember { mutableStateOf<List<String>>(emptyList()) }
     var skills by remember { mutableStateOf<List<Skill>?>(null) }
     var failed by remember { mutableStateOf(false) }
@@ -63,14 +63,7 @@ fun SkillsScreen(onClose: () -> Unit, onUse: (Skill) -> Unit) {
     }
     LaunchedEffect(Unit) { load() }
 
-    Column(Modifier.fillMaxSize().background(FridayBg).statusBarsPadding().navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Skills", color = FridayText, fontSize = 22.sp, fontWeight = FontWeight.Medium)
-                Text("Expert playbooks Friday can use", color = FridayMuted, fontSize = 13.sp)
-            }
-            Box(Modifier.size(40.dp).clickable(onClick = onClose), contentAlignment = Alignment.Center) { Icon(Icons.Default.Close, "Close", tint = FridayText) }
-        }
+    Column(Modifier.fillMaxSize()) {
         OutlinedTextField(query, { query = it }, placeholder = { Text("Search skills") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
         val list = skills
         when {
