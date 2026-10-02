@@ -44,8 +44,8 @@ export function parseSubTasks(raw: unknown): SubTask[] {
 }
 
 const SUBAGENT_PROMPT = (task: SubTask, projectNote: string) =>
-  `You are a focused sub-agent working for Friday's Build agent. You have ONE job, described below, and your final ` +
-  `message is the only thing the Build agent will see — so end with a clear, compact REPORT: findings first, with ` +
+  `You are a focused sub-agent working for Friday's main agent. You have ONE job, described below, and your final ` +
+  `message is the only thing the main agent will see — so end with a clear, compact REPORT: findings first, with ` +
   `exact file paths, function names, line-level details, versions, commands or URLs it needs to act. No preamble, ` +
   `no restating the task, at most ~400 words unless the job needs a longer list.\n` +
   `You are READ-ONLY: you cannot write files or run commands — investigate and report. ` +
@@ -107,6 +107,8 @@ export async function runSubAgents(opts: {
   signal?: AbortSignal;
   nextStepId: () => string;
   onUpdate: (step: BuildStep) => void;
+  /** Sources a research helper reads become citation chips on the parent reply. */
+  onCite?: (url: string, title?: string) => void;
   /** Injectable for tests. */
   resolve?: (candidate: ChatCandidate) => Promise<{ adapter: ProviderAdapter; apiKey: string }>;
 }): Promise<{ output: string; usage: TokenUsage }> {
@@ -127,7 +129,7 @@ export async function runSubAgents(opts: {
           ],
           tools,
           maxRounds: SUBAGENT_ROUNDS,
-          ctx: { userId: opts.userId, conversationId: opts.conversationId, signal: opts.signal },
+          ctx: { userId: opts.userId, conversationId: opts.conversationId, signal: opts.signal, onCite: opts.onCite },
           onText: () => {},
           onStep: (s) => {
             const i = info.actions.findIndex((a) => a.id === s.id);

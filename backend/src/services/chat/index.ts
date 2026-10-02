@@ -16,6 +16,7 @@ import { searchWeb } from "../webSearch.js";
 import { recordAdminAuditLog, recordTokenUsage, recordUsageEvent } from "../usageService.js";
 import {
   emptyTokenUsage,
+  mergeTokenUsage,
   estimateTokenUsageFromText,
   type TokenUsage,
 } from "../tokenUsage.js";
@@ -47,6 +48,7 @@ import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
 import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
+import { researchAgentsTool } from "../agent/tools/research.js";
 import { buildCandidates, isBuildModel } from "../projectBuild/buildModels.js";
 import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
@@ -59,7 +61,7 @@ import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
-import type { BuildEffort, BuildPlan, ConversationMode, StreamEvent } from "./types.js";
+import type { BuildEffort, BuildPlan, BuildStep, ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
@@ -823,7 +825,11 @@ export async function streamMessage(
         ...(await (toolsetPromise ?? buildToolset(userId))),
         imageTool({ lastImageUrl: lastGeneratedImageUrl(historyWithImages), attachedImage: currentImageAttachment?.dataUrl ?? null }),
       ];
+      // Deep Research fans out: parallel research helpers (agent/tools/research.ts).
+      if (research) tools.push(researchAgentsTool(candidates.filter(supportsTools)));
       const imageMarkdown: string[] = [];
+      const nestedSteps = new Map<string, BuildStep>();
+      let nestedUsage: TokenUsage = emptyTokenUsage();
       const citedUrls = new Set(searchResults.map((r) => r.url));
       // An explicitly chosen skill is already pinned — don't also offer the menu (it would compete).
       const menu = activeSkill ? "" : skillMenu(await skillsPromise);
@@ -838,6 +844,13 @@ export async function streamMessage(
           userId,
           conversationId,
           signal,
+          onStep: (step) => {
+            nestedSteps.set(step.id, step);
+            onEvent({ t: "step", ...step });
+          },
+          onUsage: (u) => {
+            nestedUsage = mergeTokenUsage(nestedUsage, u);
+          },
           onImage: (url, alt) => {
             const md = `\n\n![${alt.replace(/[\[\]\n]/g, " ")}](${url})\n\n`;
             imageMarkdown.push(md);
@@ -869,7 +882,9 @@ export async function streamMessage(
         usedCandidate = toolRun.candidate;
         // Images were streamed into the reply when their tool call finished; keep them in the stored message.
         full = imageMarkdown.length ? `${imageMarkdown.join("").trim()}\n\n${toolRun.text}`.trim() : toolRun.text;
-        tokenUsage = toolRun.usage;
+        tokenUsage = mergeTokenUsage(toolRun.usage, nestedUsage);
+        // Sub-agent cards are kept with the reply, in the order they started.
+        if (nestedSteps.size) toolRun.steps = [...toolRun.steps, ...nestedSteps.values()].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
         sawProviderUsage = true;
         lastError = toolRun.error;
         const webCalls = toolRun.toolNames.filter((name) => name === "web_search" || name === "fetch_url").length;

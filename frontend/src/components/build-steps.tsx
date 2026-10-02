@@ -523,7 +523,7 @@ export function BuildSteps({ build, streaming }: { build: BuildInfo; streaming: 
   );
 
   // A chat turn that only used tools (web search, reading a page, Gmail…) isn't Build Mode.
-  const toolsOnly = build.steps.length > 0 && build.steps.every((st) => st.kind === "tool") && !build.plan;
+  const toolsOnly = build.steps.length > 0 && build.steps.every((st) => st.kind === "tool" || st.kind === "agent") && !build.plan;
 
   if (streaming) {
     const activity = currentActivity(build.steps);

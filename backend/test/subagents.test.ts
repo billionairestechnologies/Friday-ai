@@ -72,3 +72,12 @@ test("sub-agents run in parallel, stream their own steps and return compact repo
     assert.ok(f.agent!.actions.some((a) => /^Read src\//.test(a.label)), "its own tool steps are on the card");
   }
 });
+
+test("research_in_parallel forces research helpers and reports usage + nested steps to the chat turn", async () => {
+  const { researchAgentsTool } = await import("../src/services/agent/tools/research.js");
+  const tool = researchAgentsTool([candidate]);
+  assert.equal(tool.spec.name, "research_in_parallel");
+  assert.ok(!JSON.stringify(tool.spec.parameters).includes("additionalProperties"));
+  assert.match(tool.label({ tasks: [{ title: "A", instructions: "find the market size" }, { title: "B", instructions: "list competitors" }] }), /2 questions in parallel/);
+  await assert.rejects(tool.run({ tasks: [] }, { userId: "u", conversationId: "c" }), /1-4 tasks/);
+});

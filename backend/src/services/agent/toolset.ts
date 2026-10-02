@@ -38,9 +38,10 @@ export const DEEP_RESEARCH_PROMPT =
   "1. PLAN — before searching, write a short numbered list of 5-8 concrete sub-questions that together fully cover " +
   "the topic (definitions/background, current state, key players or options, data/numbers, risks or counterarguments, " +
   "outlook). This is your research plan; follow it.\n" +
-  "2. SEARCH BROAD — run at least 8-12 web_search calls across the sub-questions, varying phrasing and angle (not " +
-  "near-duplicate queries). Fire independent searches in parallel in the same turn when they don't depend on each " +
-  "other's results — don't serialize what doesn't need to be.\n" +
+  "2. SEARCH BROAD — when research_in_parallel is available, hand 3-4 of the sub-questions to it in ONE call (helpers " +
+  "research them at the same time and return cited reports), then cover the rest yourself. Overall run at least 8-12 " +
+  "web_search calls across the sub-questions, varying phrasing and angle (not near-duplicate queries). Fire independent " +
+  "searches in parallel in the same turn when they don't depend on each other's results — don't serialize what doesn't need to be.\n" +
   "3. READ DEEP — fetch_url the 10-15 most load-bearing pages in full. Strongly prefer primary sources (official docs, " +
   "filings, papers, government/company data) and recent, reputable reporting over blogs, SEO content or aggregators. " +
   "Note each source's publish/updated date — recency matters, say when something might be stale.\n" +
