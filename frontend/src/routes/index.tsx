@@ -421,18 +421,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       }
     }
 
-    // Images/PDF/DOCX/XLSX actually reach the backend. Every model can read a PDF or image via
-    // Sarvam's Doc AI OCR the backend runs server-side (a PDF-native provider — Anthropic direct,
-    // Gemini — also gets the raw file as a fallback); DOCX/XLSX are parsed directly server-side,
-    // no OCR needed. Anything else picked via drag-and-drop (the file picker itself only offers
-    // these four) is dropped here before it ever leaves the client.
-    const OFFICE_MIMES = new Set([
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ]);
-    const sendableAttachments = attachments
-      .filter((a) => a.mime.startsWith("image/") || a.mime === "application/pdf" || OFFICE_MIMES.has(a.mime))
-      .map((a) => ({ mime: a.mime, dataUrl: a.dataUrl, name: a.name, size: a.size, kind: a.kind }));
+    // Every attachment goes to the backend, which reads what it can (images, PDF, Office/OpenDocument, archives,
+    // CSV/JSON/text/code — providers/*Docs.ts) and tells the model plainly about anything it can't open. This used
+    // to drop everything except images/PDF/DOCX/XLSX right here, so a CSV never left the browser: the model saw no
+    // file ("please upload it") and an attachment-only send failed with "Message cannot be empty".
+    const sendableAttachments = attachments.map((a) => ({ mime: a.mime, dataUrl: a.dataUrl, name: a.name, size: a.size, kind: a.kind }));
 
     let askQuestions: AskQuestion[] | undefined;
     try {
