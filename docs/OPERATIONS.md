@@ -49,6 +49,12 @@ Optional:
 - `FRIDAY_DRAIN_SECONDS` (default 20) — on deploy/stop, running turns get this long to finish before they are
   handed over (keep it under the platform's kill timeout); `FRIDAY_DISABLE_TURN_RESUME=1` stops the sweeper
   that resumes interrupted Builds and reports interrupted chats (migration `0042_add_active_turns`)
+- Project knowledge (files a project's chats search): migration `0043_add_project_knowledge` needs the
+  `vector` extension (Supabase: enabled by the migration). Embeddings use the OpenAI or Gemini key from
+  Models & keys; with neither, search is full-text only. `FRIDAY_DISABLE_EMBEDDINGS=1` forces text-only.
+- Browser agent (`browser` tool): needs `E2B_API_KEY` (one sandbox per chat, 10 min idle); turn it off
+  with `FRIDAY_DISABLE_BROWSER=1`
+- Pages (live docs / sheets / slides, `/pages`, share links at `/p/:token`): migration `0044_add_pages`
 - `FRIDAY_SANDBOX_PERSIST=off` — kill Build sandboxes on timeout instead of pausing them (default: pause,
   so the next message resumes with node_modules + the project's git history; paused sandboxes are billed
   as E2B storage)
@@ -65,7 +71,8 @@ model availability, not process startup.
 ## Migrations
 
 Apply every SQL file under `supabase/migrations/` in numeric order before deploying backend code
-that depends on it. Branch `v2` needs everything through `0036_add_skills.sql`.
+that depends on it. Branch `v2` needs everything through `0036_add_skills.sql`; `feature/build-agent-loop`
+needs everything through `0044_add_pages.sql`.
 
 Recommended deploy order:
 

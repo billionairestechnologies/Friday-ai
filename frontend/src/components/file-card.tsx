@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Download, FileCode2, FileSpreadsheet, FileText, Loader2, Presentation } from "lucide-react";
+import { ArrowUpRight, Download, FileCode2, FileSpreadsheet, FileText, Loader2, Presentation } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { API_BASE_URL, getAccessToken } from "@/lib/api";
 import type { GeneratedFile } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
@@ -56,7 +57,45 @@ export function FileIcon({ format, className }: { format: string; className?: st
   );
 }
 
+const PAGE_STYLE = {
+  doc: { label: "Document", color: "#185ABD", icon: FileText },
+  sheet: { label: "Spreadsheet", color: "#107C41", icon: FileSpreadsheet },
+  slides: { label: "Slides", color: "#D24726", icon: Presentation },
+} as const;
+
+/** A live page Friday made: opens in the editor (edit, share, export) instead of downloading. */
+function PageCard({ file, index }: { file: GeneratedFile; index: number }) {
+  const navigate = useNavigate();
+  const style = PAGE_STYLE[file.pageKind ?? "doc"];
+  const Icon = style.icon;
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: index * 0.05 }} className="w-full max-w-md">
+      <button
+        type="button"
+        onClick={() => void navigate({ to: "/pages/$pageId", params: { pageId: file.id } })}
+        className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-composer px-3.5 py-3 text-left transition-colors hover:bg-chip"
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl" style={{ background: `${style.color}1f`, color: style.color }}>
+          <Icon className="size-5" strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-foreground">{file.title || file.filename}</div>
+          <div className="truncate text-xs text-muted">{style.label} · edit, share or download</div>
+        </div>
+        <span className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium text-muted transition-colors group-hover:text-foreground">
+          Open <ArrowUpRight className="size-3.5" />
+        </span>
+      </button>
+    </motion.div>
+  );
+}
+
 export function FileCard({ file, index = 0 }: { file: GeneratedFile; index?: number }) {
+  if (file.format === "page") return <PageCard file={file} index={index} />;
+  return <DownloadCard file={file} index={index} />;
+}
+
+function DownloadCard({ file, index }: { file: GeneratedFile; index: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const style = FORMAT_STYLE[file.format] ?? FORMAT_STYLE.txt!;

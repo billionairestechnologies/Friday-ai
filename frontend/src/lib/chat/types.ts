@@ -103,7 +103,8 @@ export type BuildInfo = {
 };
 
 /** A file Friday generated for this reply (create_document) — shown as a download card. */
-export type GeneratedFile = { id: string; title: string; filename: string; format: string; size: number; summary?: string; createdAt?: string };
+/** A generated file — or, with format "page", a live page (doc/sheet/slides) that opens in the editor. */
+export type GeneratedFile = { id: string; title: string; filename: string; format: string; size: number; summary?: string; createdAt?: string; pageKind?: "doc" | "sheet" | "slides" };
 
 export type ChatMessage = {
   id: string;

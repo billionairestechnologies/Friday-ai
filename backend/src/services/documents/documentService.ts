@@ -15,7 +15,17 @@ import { FORMAT_MIME, codeExtension, describeSpec, renderDocument, type DocForma
 export const DOCUMENTS_BUCKET = "generated-files";
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-export type GeneratedFile = { id: string; title: string; filename: string; format: DocFormat; size: number; summary: string; createdAt: string };
+export type GeneratedFile = {
+  id: string;
+  title: string;
+  filename: string;
+  /** "page" = a live Friday page (services/pages), shown as an Open card instead of a download. */
+  format: DocFormat | "page";
+  size: number;
+  summary: string;
+  createdAt: string;
+  pageKind?: "doc" | "sheet" | "slides";
+};
 
 export function safeFilename(name: string, format: DocFormat, extension?: string | null): string {
   const base = name

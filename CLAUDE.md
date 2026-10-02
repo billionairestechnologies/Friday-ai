@@ -18,7 +18,7 @@ Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0041 (apply in order; RLS on, backend uses service role)
+supabase/   SQL migrations 0001…0044 (apply in order; RLS on, backend uses service role)
 docs/       OPERATIONS.md, PLATFORM_BRIEFING.md, UPGRADE_ROADMAP.md, diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -146,7 +146,7 @@ Gotchas:
 ```bash
 git fetch origin && git checkout v2 && git pull       # or any feature branch
 npm --prefix backend ci && npm --prefix frontend ci   # deps changed on v2 (pptxgenjs, docx, pdfkit)
-npm run verify                                        # migrations + typechecks + 135 tests + builds
+npm run verify                                        # migrations + typechecks + 193 tests + builds
 ```
 
 A fresh test environment (e.g. a Railway service "friday-test" + its own Supabase project) needs:
@@ -183,6 +183,23 @@ per-call cost in `token_ledger`, OpenRouter list-price sync, `finance_model_usag
 expenses — migration 0040) and **Mailbox / Mail hosting** (`services/mail/`: mailcow REST API for
 company domains + employee mailboxes, IMAP/SMTP webmail for hosted + Gmail/Outlook/any accounts —
 migration 0041, `docs/MAIL_HOSTING.md`). Permissions `finance.view|manage`, `mailbox.use`.
+Claude-gap work on the same branch:
+- Deep Research fans out: `research_in_parallel` (`agent/tools/research.ts` → `runSubAgents` kind
+  "research"; nested steps/usage merged into the turn).
+- Turns outlive the app and deploys: `services/jobs/` (`active_turns` heartbeat rows — migration 0042,
+  `runTurn`, `sweeper` resumes stale Builds headless / reports interrupted chats, `drainTurns` on
+  SIGTERM). `GET /chat/conversations/:id/live` replays a running chat (`useBuildLiveResume` mode "chat").
+- Project knowledge: `services/knowledge/` (chunking, OpenAI/Gemini embeddings → pgvector, hybrid RRF
+  search `search_project_chunks` — migration 0043), tool `search_project_files`, `project-files.tsx`.
+- Browser agent: `services/browser/` (Playwright daemon inside an E2B sandbox per chat, numbered element
+  refs), tool `browser`; screenshots ride `onImage` as data URLs (markdown `urlTransform` allows them).
+- Pages (live docs/sheets/slides like Claude's): `services/pages/pageService.ts` (versions, CAS saves →
+  409, share tokens, export via the document renderer — migration 0044), tools `create_page` /
+  `read_page` / `update_page`, `routes/pages.ts`. Web: `routes/pages.tsx` (lazy; `/pages`,
+  `/pages/$pageId`, public `/p/$token`), `components/pages/*` (TipTap markdown doc, sheet grid +
+  `lib/pages/formula.ts`, slides), chat cards with `format: "page"` open the editor.
+- Kill switches: `FRIDAY_DISABLE_TURN_RESUME=1`, `FRIDAY_DRAIN_SECONDS`, `FRIDAY_DISABLE_EMBEDDINGS=1`,
+  `FRIDAY_DISABLE_BROWSER=1`.
 
 Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
 Team Console (`/admin`: support, CRM, tasks, product updates, email campaigns, plans & offers, users, team

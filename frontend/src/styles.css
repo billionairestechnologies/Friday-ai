@@ -774,3 +774,38 @@ textarea::-webkit-scrollbar-thumb {
   .shimmer-text { animation: none; color: var(--color-foreground); background: none; }
   .terminal-cursor, .plan-check { animation: none; }
 }
+
+/* Live pages — the document editor (TipTap) reuses the chat .md typography, plus editing affordances. */
+.friday-doc {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.friday-doc h1 {
+  font-size: 1.9rem;
+}
+.friday-doc p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-subtle);
+}
+.friday-doc table {
+  display: table;
+  table-layout: fixed;
+}
+.friday-doc td,
+.friday-doc th {
+  position: relative;
+  min-width: 4rem;
+}
+.friday-doc .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #2563eb 14%, transparent);
+  pointer-events: none;
+}
+.friday-doc .ProseMirror-selectednode {
+  outline: 2px solid #2563eb;
+}

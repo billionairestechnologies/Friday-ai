@@ -22,6 +22,7 @@ import { emailRouter, offersRouter, supportRouter, updatesRouter } from "./route
 import { statusRouter } from "./routes/status.js";
 import { filesRouter } from "./routes/files.js";
 import { skillsRouter } from "./routes/skills.js";
+import { pagesRouter } from "./routes/pages.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { buildRouter } from "./routes/build.js";
 import { voiceRouter } from "./routes/voice.js";
@@ -105,6 +106,7 @@ export function createApp() {
   app.use("/api/status", statusRouter);
   app.use("/api/files", filesRouter);
   app.use("/api/skills", skillsRouter);
+  app.use("/api/pages", pagesRouter);
 
   if (existsSync(frontendDist)) {
     const indexPath = path.join(frontendDist, "index.html");
