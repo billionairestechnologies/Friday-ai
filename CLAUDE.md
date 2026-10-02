@@ -18,7 +18,7 @@ Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0036 (apply in order; RLS on, backend uses service role)
+supabase/   SQL migrations 0001…0044 (apply in order; RLS on, backend uses service role)
 docs/       OPERATIONS.md, PLATFORM_BRIEFING.md, UPGRADE_ROADMAP.md, diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -146,7 +146,7 @@ Gotchas:
 ```bash
 git fetch origin && git checkout v2 && git pull       # or any feature branch
 npm --prefix backend ci && npm --prefix frontend ci   # deps changed on v2 (pptxgenjs, docx, pdfkit)
-npm run verify                                        # migrations + typechecks + 135 tests + builds
+npm run verify                                        # migrations + typechecks + 193 tests + builds
 ```
 
 A fresh test environment (e.g. a Railway service "friday-test" + its own Supabase project) needs:
@@ -168,6 +168,38 @@ Deploy: `infra/aws/deploy.sh [--env-file infra/aws/app.env]` (deploys the commit
 templates with `cfn-lint infra/aws/*.yaml` (install in a venv — debian's PyYAML blocks a global pip install).
 
 ## Current state (branch `v2`)
+
+On `feature/build-agent-loop` (not merged yet): Build is ONE model-driven agent loop — the model answers
+("hi" gets a hello, no sandbox), asks (`ask_user`), proposes a plan (`propose_plan`) or builds; repo +
+branch from the composer travel as structured fields and are cloned before the first turn; lazy sandbox;
+`spawn_subagents` (≤4 parallel read-only explore/research helpers, kind "agent" step cards); sandboxes
+PAUSE instead of being killed + one git commit per Build turn (`sandbox.ts` gitCommit/gitLog); Build
+model allow-list (`buildModels.ts`, `/models` marks `build`); effort → provider reasoning
+(`toolCalling.ts#reasoningParams`); `generate_image` tool; archives/PPTX/ODF/text-PDF reading
+(`providers/archiveDocs.ts`, `pdfText.ts`, `officeDocs.ts`); `create_document` `extension` for code files
++ edit-in-same-format; share popup with WhatsApp/Telegram/Email + `useDismiss`; theme before first paint.
+Team Console → **Finance** (`services/finance/`: `model_pricing` cost vs sell per 1M tokens, exact
+per-call cost in `token_ledger`, OpenRouter list-price sync, `finance_model_usage()` aggregate, P&L,
+expenses — migration 0040) and **Mailbox / Mail hosting** (`services/mail/`: mailcow REST API for
+company domains + employee mailboxes, IMAP/SMTP webmail for hosted + Gmail/Outlook/any accounts —
+migration 0041, `docs/MAIL_HOSTING.md`). Permissions `finance.view|manage`, `mailbox.use`.
+Claude-gap work on the same branch:
+- Deep Research fans out: `research_in_parallel` (`agent/tools/research.ts` → `runSubAgents` kind
+  "research"; nested steps/usage merged into the turn).
+- Turns outlive the app and deploys: `services/jobs/` (`active_turns` heartbeat rows — migration 0042,
+  `runTurn`, `sweeper` resumes stale Builds headless / reports interrupted chats, `drainTurns` on
+  SIGTERM). `GET /chat/conversations/:id/live` replays a running chat (`useBuildLiveResume` mode "chat").
+- Project knowledge: `services/knowledge/` (chunking, OpenAI/Gemini embeddings → pgvector, hybrid RRF
+  search `search_project_chunks` — migration 0043), tool `search_project_files`, `project-files.tsx`.
+- Browser agent: `services/browser/` (Playwright daemon inside an E2B sandbox per chat, numbered element
+  refs), tool `browser`; screenshots ride `onImage` as data URLs (markdown `urlTransform` allows them).
+- Pages (live docs/sheets/slides like Claude's): `services/pages/pageService.ts` (versions, CAS saves →
+  409, share tokens, export via the document renderer — migration 0044), tools `create_page` /
+  `read_page` / `update_page`, `routes/pages.ts`. Web: `routes/pages.tsx` (lazy; `/pages`,
+  `/pages/$pageId`, public `/p/$token`), `components/pages/*` (TipTap markdown doc, sheet grid +
+  `lib/pages/formula.ts`, slides), chat cards with `format: "page"` open the editor.
+- Kill switches: `FRIDAY_DISABLE_TURN_RESUME=1`, `FRIDAY_DRAIN_SECONDS`, `FRIDAY_DISABLE_EMBEDDINGS=1`,
+  `FRIDAY_DISABLE_BROWSER=1`.
 
 Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
 Team Console (`/admin`: support, CRM, tasks, product updates, email campaigns, plans & offers, users, team
@@ -199,6 +231,7 @@ connector audit log · fixed env-dependent tests · removed committed scratch sc
 
 Deploy requires migrations `0023`–`0036`. Kill switches: `FRIDAY_DISABLE_TOOLS=1`, `FRIDAY_DISABLE_AUTOMATIONS=1`,
 `FRIDAY_PROMPT_CACHE=off`, `FRIDAY_BUILD_NATIVE_TOOLS=off` (Build Mode back on the text protocol),
+`FRIDAY_BUILD_STAGED_FLOW=on` (forced ask/plan rounds), `FRIDAY_SANDBOX_PERSIST=off` (kill, don't pause),
 `FRIDAY_DISABLE_STATUS_MONITOR=1`, `FRIDAY_DISABLE_CAMPAIGNS=1`, `FRIDAY_DISABLE_GRANT_EXPIRY=1`.
 
 Also shipped since: prompt caching restored (Anthropic/ScaleMax/OpenAI/OpenRouter/Gemini, with

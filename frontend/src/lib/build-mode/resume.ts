@@ -40,10 +40,14 @@ function applyEvent(chatId: string, ev: StreamEvent) {
  * device, or before a reload) replays the turn from the event log and keeps following it until it
  * ends, then loads the saved result. Only starts once the server confirms the build is running.
  */
-export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | null; conversationId: string | undefined; status: string | undefined }) {
+export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | null; conversationId: string | undefined; status: string | undefined; mode?: "build" | "chat" }) {
   const { enabled, chatId, conversationId, status } = opts;
+  const mode = opts.mode ?? "build";
   useEffect(() => {
-    if (!enabled || !chatId || !conversationId || (status !== "running" && status !== "needs_input")) return;
+    // Build knows the session status from its list; a normal chat just asks once whether a turn is
+    // still running (started on another device, or before this tab reloaded) and follows it if so.
+    if (!enabled || !chatId || !conversationId) return;
+    if (mode === "build" && status !== "running" && status !== "needs_input") return;
     if (isStreamActive(chatId) || isLive(chatId)) return;
     let cancelled = false;
     let timer: number | undefined;
@@ -59,13 +63,15 @@ export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | nu
         /* the next open / focus refetches */
       }
       clearLive(chatId);
-      void useBuildSessions.getState().load();
+      if (mode === "build") void useBuildSessions.getState().load();
     };
 
     const tick = async () => {
       if (cancelled) return;
       try {
-        const res = await api.get<{ events: { id: number; event: StreamEvent }[]; running: boolean }>(`/build/${conversationId}/events?after=${after}`);
+        const res = await api.get<{ events: { id: number; event: StreamEvent }[]; running: boolean }>(
+          mode === "build" ? `/build/${conversationId}/events?after=${after}` : `/chat/conversations/${conversationId}/live?after=${after}`,
+        );
         if (cancelled) return;
         if (!started) {
           if (!res.running) return; // finished in the meantime — the saved messages are already current
@@ -74,10 +80,10 @@ export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | nu
             chats: st.chats.map((c) =>
               c.id !== chatId
                 ? c
-                : { ...c, messages: [...c.messages, { id: assistantId, role: "assistant" as const, content: "", createdAt: Date.now(), streaming: true, status: "building" as const }] },
+                : { ...c, messages: [...c.messages, { id: assistantId, role: "assistant" as const, content: "", createdAt: Date.now(), streaming: true, status: mode === "build" ? ("building" as const) : ("thinking" as const) }] },
             ),
           }));
-          startLive(chatId, assistantId, "building");
+          startLive(chatId, assistantId, mode === "build" ? "building" : "thinking");
         }
         for (const { id, event } of res.events) {
           after = id;
@@ -98,5 +104,5 @@ export function useBuildLiveResume(opts: { enabled: boolean; chatId: string | nu
       if (timer) window.clearTimeout(timer);
       if (started) clearLive(chatId);
     };
-  }, [enabled, chatId, conversationId, status]);
+  }, [enabled, chatId, conversationId, status, mode]);
 }

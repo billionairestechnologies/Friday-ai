@@ -23,7 +23,8 @@ export type QuotaResponse = {
 
 export function percentUsed(bucket: { used: number; limit: number } | null): number {
   if (!bucket || bucket.limit <= 0) return 0;
-  return Math.min(100, Math.round((bucket.used / bucket.limit) * 100));
+  // Clamped both ways: an older server could still send a negative counter (bonus grants).
+  return Math.max(0, Math.min(100, Math.round((bucket.used / bucket.limit) * 100)));
 }
 
 const EVENT_LABELS: Record<string, string> = {

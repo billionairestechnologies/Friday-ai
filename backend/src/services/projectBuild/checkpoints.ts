@@ -2,7 +2,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
-import { isGenerating } from "../chat/activeGenerations.js";
+import { isTurnRunning } from "../jobs/turns.js";
 import { getProject, saveProject } from "./sandbox.js";
 
 /**
@@ -46,7 +46,7 @@ export async function listCheckpoints(conversationId: string): Promise<Checkpoin
 }
 
 export async function restoreCheckpoint(userId: string, conversationId: string, messageId: string): Promise<{ fileCount: number }> {
-  if (isGenerating(conversationId)) throw new HttpError(409, "Stop the build first — it's still running.");
+  if (await isTurnRunning(conversationId)) throw new HttpError(409, "Stop the build first — it's still running.");
   const { data: checkpoint } = await supabaseAdmin
     .from("build_checkpoints")
     .select("files, start_cmd, port")

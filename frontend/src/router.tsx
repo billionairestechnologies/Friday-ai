@@ -117,6 +117,54 @@ const statusRoute = createRoute({
   ),
 });
 
+// Pages (live docs / sheets / slides) — code-split: the editors (TipTap etc.) only load here.
+const pagesModule = () => import("@/routes/pages");
+const PagesList = lazy(() => pagesModule().then((m) => ({ default: m.PagesListPage })));
+const PageEditor = lazy(() => pagesModule().then((m) => ({ default: m.PageEditorPage })));
+const SharedPage = lazy(() => pagesModule().then((m) => ({ default: m.SharedPageView })));
+const pageFallback = <div className="h-dvh bg-background" />;
+
+const pagesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pages",
+  component: () => (
+    <Suspense fallback={pageFallback}>
+      <PagesList />
+    </Suspense>
+  ),
+});
+
+function PageEditorRoute() {
+  const { pageId } = useParams({ strict: false }) as { pageId: string };
+  return (
+    <Suspense fallback={pageFallback}>
+      <PageEditor pageId={pageId} />
+    </Suspense>
+  );
+}
+
+const pageEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pages/$pageId",
+  component: PageEditorRoute,
+});
+
+// Public read-only view of a shared page (no sign-in).
+function SharedPageRoute() {
+  const { token } = useParams({ strict: false }) as { token: string };
+  return (
+    <Suspense fallback={pageFallback}>
+      <SharedPage token={token} />
+    </Suspense>
+  );
+}
+
+const sharedPageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$token",
+  component: SharedPageRoute,
+});
+
 const upgradeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/upgrade",
@@ -228,6 +276,9 @@ const routeTree = rootRoute.addChildren([
   privacyRoute,
   termsRoute,
   statusRoute,
+  pagesRoute,
+  pageEditorRoute,
+  sharedPageRoute,
   ...siteRoutes,
 ]);
 

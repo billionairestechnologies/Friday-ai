@@ -33,7 +33,7 @@ export type AgentStatus = {
 
 export type BuildStep = {
   id: string;
-  kind: "write" | "run" | "start" | "read" | "note" | "tool";
+  kind: "write" | "run" | "start" | "read" | "note" | "tool" | "agent";
   label: string;
   state: "running" | "ok" | "error";
   detail?: string;
@@ -48,6 +48,13 @@ export type BuildStep = {
   removed?: number;
   startedAt?: number;
   ms?: number;
+  /** kind "agent": a Build sub-agent — its job, its own steps and its report. */
+  agent?: {
+    title: string;
+    kind: "explore" | "research";
+    actions: { id: string; label: string; state: "running" | "ok" | "error" }[];
+    report?: string;
+  };
 };
 
 /** A Build permission prompt (backend projectBuild/approvals.ts). */
@@ -89,12 +96,15 @@ export type BuildInfo = {
   zipName?: string;
   /** Pull request Build Mode opened (GitHub-imported projects). */
   prUrl?: string;
+  /** Short hash of the git commit this turn made in the project's own history. */
+  commit?: string;
   /** Normal chat answered a build-shaped request — offer "Open in Build" with this prompt. */
   suggestBuild?: { prompt: string };
 };
 
 /** A file Friday generated for this reply (create_document) — shown as a download card. */
-export type GeneratedFile = { id: string; title: string; filename: string; format: string; size: number; summary?: string; createdAt?: string };
+/** A generated file — or, with format "page", a live page (doc/sheet/slides) that opens in the editor. */
+export type GeneratedFile = { id: string; title: string; filename: string; format: string; size: number; summary?: string; createdAt?: string; pageKind?: "doc" | "sheet" | "slides" };
 
 export type ChatMessage = {
   id: string;
@@ -153,7 +163,7 @@ export type StreamEvent =
   | { t: "file"; file: GeneratedFile }
   | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
-  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
+  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string; commit?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
   | { t: "suggest_build"; prompt: string }

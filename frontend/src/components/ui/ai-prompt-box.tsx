@@ -524,6 +524,17 @@ const CustomDivider: React.FC = () => (
   </div>
 );
 
+/** Everything the backend can read (providers/officeDocs, archiveDocs, pdfText, plainTextDocs). */
+const DOCUMENT_ACCEPT = [
+  ".pdf", ".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp",
+  ".zip", ".rar", ".tar", ".gz", ".tgz",
+  ".txt", ".md", ".rst", ".csv", ".tsv", ".json", ".jsonl", ".xml", ".xaml", ".xsd", ".svg", ".ipynb", ".log", ".tex", ".rtf",
+  ".py", ".js", ".mjs", ".ts", ".jsx", ".tsx", ".vue", ".svelte", ".java", ".kt", ".scala", ".c", ".cpp", ".h", ".hpp",
+  ".cs", ".vb", ".fs", ".go", ".rs", ".rb", ".php", ".swift", ".dart", ".lua", ".r", ".pl", ".sol", ".m",
+  ".html", ".css", ".scss", ".less", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env", ".properties",
+  ".sh", ".bash", ".ps1", ".bat", ".sql", ".graphql", ".proto", ".prisma", ".tf", ".gradle", ".csproj", ".sln",
+].join(",");
+
 export interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
   onStop?: () => void;
@@ -543,6 +554,9 @@ export interface PromptInputBoxProps {
   onResearchChange?: (value: boolean) => void;
   model?: string;
   onModelChange?: (id: string) => void;
+  /** Build workspace: mic dictation stays, the hands-free voice-agent mode goes, and the model
+   *  picker offers only Build-capable frontier models (+ Auto) — no Team Up. */
+  buildWorkspace?: boolean;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>(
@@ -565,7 +579,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       onResearchChange,
       model,
       onModelChange,
+      buildWorkspace = false,
     } = props;
+    const hideVoiceMode = buildWorkspace;
     const [input, setInput] = React.useState("");
     const [files, setFiles] = React.useState<File[]>([]);
     const [filePreviews, setFilePreviews] = React.useState<Record<string, string>>(
@@ -596,10 +612,13 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const loadPlan = usePlan((s) => s.load);
     // Auto/Team Up aren't tied to a vendor, so they stay as standalone top items; everything else
     // groups under its real vendor (see groupModelsByVendor) as a click-to-expand section.
-    const specialModels = React.useMemo(() => models.filter((m) => m.id === AUTO_MODEL_ID || m.id === TEAMUP_MODEL_ID), [models]);
+    const specialModels = React.useMemo(
+      () => models.filter((m) => m.id === AUTO_MODEL_ID || (!buildWorkspace && m.id === TEAMUP_MODEL_ID)),
+      [models, buildWorkspace],
+    );
     const vendorGroups = React.useMemo(
-      () => groupModelsByVendor(models.filter((m) => m.id !== AUTO_MODEL_ID && m.id !== TEAMUP_MODEL_ID)),
-      [models],
+      () => groupModelsByVendor(models.filter((m) => m.id !== AUTO_MODEL_ID && m.id !== TEAMUP_MODEL_ID && (!buildWorkspace || m.build))),
+      [models, buildWorkspace],
     );
     const [expandedVendors, setExpandedVendors] = React.useState<Set<string>>(() => new Set());
 
@@ -978,7 +997,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 // parsing needed — .py/.xml/.json/etc). Drag-and-drop bypasses this `accept`
                 // filter (it's a UI hint, not enforcement), so the backend independently handles
                 // any mime it doesn't recognize by just not extracting it rather than erroring.
-                accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.py,.js,.ts,.jsx,.tsx,.java,.c,.cpp,.go,.rs,.rb,.php,.swift,.kt,.html,.css,.yaml,.yml,.sh,.sql,.log"
+                accept={DOCUMENT_ACCEPT}
                 onChange={(e) => {
                   if (e.target.files?.[0]) processFile(e.target.files[0]);
                   if (e.target) e.target.value = "";
@@ -1094,17 +1113,19 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
-              <PromptInputAction tooltip="Voice mode">
-                <button
-                  type="button"
-                  onClick={() => setVoiceModeOpen(true)}
-                  disabled={disabled}
-                  aria-label="Open voice mode"
-                  className="flex size-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-                >
-                  <AudioLines className="h-4 w-4" />
-                </button>
-              </PromptInputAction>
+              {!hideVoiceMode && (
+                <PromptInputAction tooltip="Voice mode">
+                  <button
+                    type="button"
+                    onClick={() => setVoiceModeOpen(true)}
+                    disabled={disabled}
+                    aria-label="Open voice mode"
+                    className="flex size-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-chip hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    <AudioLines className="h-4 w-4" />
+                  </button>
+                </PromptInputAction>
+              )}
 
               {currentModel && onModelChange && (
                 <DropdownMenu.Root
@@ -1247,11 +1268,13 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
           imageUrl={selectedImage}
           onClose={() => setSelectedImage(null)}
         />
-        <VoiceMode
-          open={voiceModeOpen}
-          onClose={() => setVoiceModeOpen(false)}
-          onSubmit={submitVoiceText}
-        />
+        {!hideVoiceMode && (
+          <VoiceMode
+            open={voiceModeOpen}
+            onClose={() => setVoiceModeOpen(false)}
+            onSubmit={submitVoiceText}
+          />
+        )}
       </>
     );
   },

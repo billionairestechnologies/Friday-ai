@@ -8,7 +8,7 @@ export type StreamEvent =
   | { t: "file"; file: import("../documents/documentService.js").GeneratedFile }
   | ({ t: "step" } & BuildStep)
   | { t: "preview"; url: string; port: number }
-  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string }
+  | { t: "build"; elapsedMs?: number; zipBytes?: number; zipName?: string; prUrl?: string; commit?: string }
   | { t: "ask"; questions: AskQuestion[] }
   | { t: "plan"; architecture: string; items: BuildPlanItem[]; summary?: string; status?: BuildPlan["status"] }
   | { t: "suggest_build"; prompt: string }
@@ -25,7 +25,15 @@ export type ConversationMode = "single" | "auto" | "teamup";
  *  high = the plan's full round budget plus extra verification passes. */
 export type BuildEffort = "low" | "medium" | "high";
 
-export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool";
+export type BuildStepKind = "write" | "run" | "start" | "read" | "note" | "tool" | "agent";
+
+/** A Build sub-agent's live card (kind "agent"): what it was asked, what it did, what it reported. */
+export type SubAgentInfo = {
+  title: string;
+  kind: "explore" | "research";
+  actions: { id: string; label: string; state: "running" | "ok" | "error" }[];
+  report?: string;
+};
 
 /** What a Build Mode turn did — persisted on the message (`messages.build`) so it survives reloads. */
 export type BuildStep = {
@@ -56,6 +64,8 @@ export type BuildStep = {
   startedAt?: number;
   /** Duration once finished. */
   ms?: number;
+  /** kind "agent": the sub-agent's title, its own tool steps and its final report. */
+  agent?: SubAgentInfo;
 };
 export type BuildPlanItem = { text: string; state: "todo" | "doing" | "done" };
 
@@ -76,6 +86,8 @@ export type AskOption = { label: string; description?: string; recommended?: boo
 export type AskQuestion = { id: string; question: string; options: AskOption[] };
 
 export type BuildMeta = {
+  /** Short hash of the git commit this Build turn made in the project (sandbox.ts gitCommit). */
+  commit?: string;
   /** Set on the assistant message that asks questions instead of building. */
   ask?: AskQuestion[];
   plan?: BuildPlan;

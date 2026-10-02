@@ -5,6 +5,7 @@ import { Code2, Copy, Download, ExternalLink, FileStack, Globe, ImageIcon, Layou
 import { api } from "@/lib/api";
 import { FileIcon, FORMAT_STYLE, downloadGeneratedFile, formatBytes } from "@/components/file-card";
 import { cn } from "@/lib/utils";
+import { useEscape } from "@/lib/use-dismiss";
 
 /**
  * The Library: everything Friday made for this user and everything they shared, in one organised
@@ -89,6 +90,7 @@ export function LibraryPage() {
   const [section, setSection] = useState<Section>("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<LibraryItem | null>(null);
+  useEscape(Boolean(open), () => setOpen(null));
   const [openUrl, setOpenUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);

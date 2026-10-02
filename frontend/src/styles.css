@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap");
 
 @theme {
   /* Official Gemini Web dark surface tokens. */
@@ -26,8 +25,9 @@
   --color-search: #1eaedb;
   --color-think: #8b5cf6;
   --color-canvas: #f97316;
-  --font-sans: "Google Sans Text", "Plus Jakarta Sans", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-  --font-heading: "Google Sans", "Google Sans Flex", "Plus Jakarta Sans", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  /* Google Sans Flex (Gemini's face, on Google Fonts) loads in index.html; the rest are fallbacks. */
+  --font-sans: "Google Sans Flex", "Google Sans Text", "Plus Jakarta Sans", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-heading: "Google Sans Flex", "Google Sans", "Plus Jakarta Sans", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   --font-mono: "Google Sans Code", "Roboto Mono", "SF Mono", Menlo, Consolas, Monaco, monospace;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -50,10 +50,21 @@
   --hairline: color-mix(in oklab, var(--color-border) 70%, transparent);
   --surface-highlight: color-mix(in oklab, var(--color-foreground) 7%, transparent);
   --focus-ring: color-mix(in oklab, var(--color-foreground) 72%, transparent);
+  --color-scrollbar: rgba(255, 255, 255, 0.18);
+  --color-scrollbar-hover: rgba(255, 255, 255, 0.32);
   --ambient-glow: radial-gradient(ellipse 85% 70% at 50% 48%, rgba(66, 133, 244, 0.16) 0%, rgba(20, 21, 22, 0) 72%);
 }
 
+html {
+  /* Native controls (scrollbars, date pickers, selects, autofill) follow the theme instead of
+     always rendering light — the grey-on-white scrollbars in dark mode were part of "not smooth". */
+  color-scheme: dark;
+}
+
 html.light {
+  color-scheme: light;
+  --color-scrollbar: rgba(0, 0, 0, 0.18);
+  --color-scrollbar-hover: rgba(0, 0, 0, 0.32);
   /* Gemini / Material 3 surface tokens — exact values from the M3 token spec (surface,
      surface-container, surface-container-high, on-surface, on-surface-variant,
      outline-variant, primary, primary-container). Search/Think/Canvas accents were already
@@ -483,7 +494,7 @@ html.light {
 
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: #444444 transparent;
+  scrollbar-color: var(--color-scrollbar) transparent;
 }
 
 .thread-scroll {
@@ -520,8 +531,16 @@ html.light {
 }
 
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: #444444;
+  background: var(--color-scrollbar);
   border-radius: 3px;
+}
+
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-hover);
+}
+
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 textarea::-webkit-scrollbar {
@@ -533,7 +552,7 @@ textarea::-webkit-scrollbar-track {
 }
 
 textarea::-webkit-scrollbar-thumb {
-  background-color: #444444;
+  background-color: var(--color-scrollbar);
   border-radius: 3px;
 }
 
@@ -754,4 +773,39 @@ textarea::-webkit-scrollbar-thumb {
 @media (prefers-reduced-motion: reduce) {
   .shimmer-text { animation: none; color: var(--color-foreground); background: none; }
   .terminal-cursor, .plan-check { animation: none; }
+}
+
+/* Live pages — the document editor (TipTap) reuses the chat .md typography, plus editing affordances. */
+.friday-doc {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.friday-doc h1 {
+  font-size: 1.9rem;
+}
+.friday-doc p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-subtle);
+}
+.friday-doc table {
+  display: table;
+  table-layout: fixed;
+}
+.friday-doc td,
+.friday-doc th {
+  position: relative;
+  min-width: 4rem;
+}
+.friday-doc .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #2563eb 14%, transparent);
+  pointer-events: none;
+}
+.friday-doc .ProseMirror-selectednode {
+  outline: 2px solid #2563eb;
 }

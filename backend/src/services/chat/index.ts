@@ -16,6 +16,7 @@ import { searchWeb } from "../webSearch.js";
 import { recordAdminAuditLog, recordTokenUsage, recordUsageEvent } from "../usageService.js";
 import {
   emptyTokenUsage,
+  mergeTokenUsage,
   estimateTokenUsageFromText,
   type TokenUsage,
 } from "../tokenUsage.js";
@@ -25,6 +26,8 @@ import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDocs.js";
+import { extractArchiveText, isArchive } from "../providers/archiveDocs.js";
+import { extractPdfText } from "../providers/pdfText.js";
 import {
   appendExtractedText,
   attachImages,
@@ -43,18 +46,25 @@ import { streamTeamUp } from "./teamUp.js";
 import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
-import { runBuildAgent } from "../projectBuild/agent.js";
+import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
+import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
+import { researchAgentsTool } from "../agent/tools/research.js";
+import { setTurnKind } from "../jobs/turns.js";
+import { projectSearchTool } from "../agent/tools/projectSearch.js";
+import { readyFileNames } from "../knowledge/projectKnowledge.js";
+import { pagesInConversation } from "../pages/pageService.js";
+import { buildCandidates, isBuildModel } from "../projectBuild/buildModels.js";
+import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
 import type { PermissionMode } from "../projectBuild/approvals.js";
 import { createCheckpoint } from "../projectBuild/checkpoints.js";
-import { createEventRecorder } from "../projectBuild/events.js";
 import { notifyBuildFinished } from "../projectBuild/notify.js";
 import { PLAN_MARKER, draftPlan, findPendingPlan, isPlanApproval, needsPlan, renderPlan, setPlanStatus } from "../projectBuild/plan.js";
 import { clarifyGeneralRequest, mightNeedClarification } from "./clarifyGeneral.js";
 import { getProject } from "../projectBuild/sandbox.js";
 import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from "./conversations.js";
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
-import type { BuildEffort, BuildPlan, ConversationMode, StreamEvent } from "./types.js";
+import type { BuildEffort, BuildPlan, BuildStep, ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
@@ -93,30 +103,29 @@ export {
  * "read" an image's text.
  */
 async function extractDocumentText(attachments: ChatImage[]): Promise<string | null> {
-  const officeFiles = attachments.filter((a) => isOfficeDocument(a.mime));
-  const digitisableFiles = attachments.filter((a) => isDigitisable(a.mime));
-  const plainTextFiles = attachments.filter((a) => isPlainTextDocument(a.mime, a.name));
-  if (officeFiles.length === 0 && digitisableFiles.length === 0 && plainTextFiles.length === 0) return null;
-
-  const officeTexts = officeFiles.map((f) => extractOfficeText(f.dataUrl, f.mime));
-  const plainTexts = plainTextFiles.map((f) => Promise.resolve(extractPlainText(f.dataUrl, f.mime, f.name)));
-  const digitiseTexts = (async () => {
-    if (digitisableFiles.length === 0) return [];
-    const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
-    if (!sarvamKey) return digitisableFiles.map(() => Promise.resolve(null));
-    return digitisableFiles.map((f, i) => digitiseDocument(sarvamKey, f.dataUrl, f.mime, `attachment-${i + 1}`));
-  })();
-
-  const [officeResults, plainTextResults, digitiseResultPromises] = await Promise.all([
-    Promise.all(officeTexts),
-    Promise.all(plainTexts),
-    digitiseTexts,
-  ]);
-  const digitiseResults = await Promise.all(digitiseResultPromises);
-  const allResults = [...officeResults, ...plainTextResults, ...digitiseResults];
-
-  const extracted = allResults
-    .map((text, i) => (text ? (allResults.length > 1 ? `[Attachment ${i + 1}]\n${text}` : text) : null))
+  const label = (a: ChatImage, i: number) => `[Attachment ${i + 1}${a.name ? `: ${a.name}` : ""}]`;
+  const results = await Promise.all(
+    attachments.map(async (a): Promise<string | null> => {
+      if (isArchive(a.mime, a.name)) return extractArchiveText(a.dataUrl, a.mime, a.name);
+      if (isOfficeDocument(a.mime, a.name)) return extractOfficeText(a.dataUrl, a.mime, a.name);
+      if (isPlainTextDocument(a.mime, a.name)) return extractPlainText(a.dataUrl, a.mime, a.name);
+      if (a.mime === "application/pdf") {
+        // Text-layer PDFs are read locally (instant, any model); only scans go to OCR.
+        const local = await extractPdfText(a.dataUrl);
+        if (local && !local.scanned) return local.text;
+        const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
+        const ocr = sarvamKey ? await digitiseDocument(sarvamKey, a.dataUrl, a.mime, a.name ?? "document.pdf") : null;
+        return ocr ?? (local?.text || null);
+      }
+      if (isDigitisable(a.mime)) {
+        const sarvamKey = await getWorkingKeyForProvider("sarvam").catch(() => null);
+        return sarvamKey ? digitiseDocument(sarvamKey, a.dataUrl, a.mime, a.name ?? "image") : null;
+      }
+      return null;
+    }),
+  );
+  const extracted = results
+    .map((text, i) => (text ? (attachments.length > 1 || attachments[i]!.name ? `${label(attachments[i]!, i)}\n${text}` : text) : null))
     .filter((t): t is string => t !== null);
   return extracted.length > 0 ? extracted.join("\n\n") : null;
 }
@@ -181,7 +190,7 @@ export async function streamMessage(
   canvas = false,
   attachments: ChatImage[] = [],
   reservation?: Reservation,
-  options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode } = {},
+  options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode; repo?: RepoRef } = {},
 ): Promise<void> {
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
@@ -365,7 +374,7 @@ export async function streamMessage(
     // one of these ever reaches the model at all, so a failure here (corrupt file, unsupported
     // internal structure) needs to surface regardless of mode, not just single's per-provider
     // gates below. Checked once, up front, before any mode-specific branching.
-    const hasOfficeAttachment = attachments.some((a) => isOfficeDocument(a.mime));
+    const hasOfficeAttachment = attachments.some((a) => isOfficeDocument(a.mime, a.name) || isArchive(a.mime, a.name));
     if (hasOfficeAttachment && !extractedDocText) {
       onEvent({ t: "err", c: "Couldn't read that document — it may be corrupted or empty." });
       onEvent({ t: "done" });
@@ -420,6 +429,9 @@ export async function streamMessage(
     }
 
     const project = conversation.assistant_projects;
+    const projectId = (conversation as { project_id?: string | null }).project_id ?? null;
+    // Project knowledge (files added to the project) — listed in the context and searchable by tool.
+    const projectFiles = projectId ? await readyFileNames(projectId).catch(() => [] as string[]) : [];
     const projectContext: ChatMessage[] = project
       ? [
           {
@@ -430,6 +442,9 @@ export async function streamMessage(
               project.description ? `Description: ${project.description}` : null,
               project.repository_url ? `Repository: ${project.repository_url}` : null,
               project.instructions ? `Project instructions:\n${project.instructions}` : null,
+              projectFiles.length
+                ? `Project files (search them with search_project_files before answering anything they could cover): ${projectFiles.slice(0, 60).join(", ")}${projectFiles.length > 60 ? ", …" : ""}`
+                : null,
             ]
               .filter(Boolean)
               .join("\n"),
@@ -440,9 +455,18 @@ export async function streamMessage(
     // Memory + project context are pinned AFTER trimming, so a long chat can never trim them away.
     const memoryPrompt = await memoryPromptPromise;
     const activeSkill = await activeSkillPromise;
+    // Live pages made earlier in this chat: the model needs their ids to read/revise them later.
+    const chatPages = await pagesInConversation(conversationId).catch(() => []);
     const pinnedContext: ChatMessage[] = [
       ...(memoryPrompt ? [{ role: "system" as const, content: memoryPrompt }] : []),
       ...projectContext,
+      ...(chatPages.length
+        ? [{
+            role: "system" as const,
+            volatile: true,
+            content: `Friday pages in this chat (the user may have edited them — read_page before changing one):\n${chatPages.map((p) => `- ${p.kind} "${p.title}" — page_id ${p.id}, version ${p.version}`).join("\n")}`,
+          }]
+        : []),
       ...(activeSkill ? [{ role: "system" as const, content: activeSkillPrompt(activeSkill) }] : []),
     ];
     const history = appendExtractedText(
@@ -626,18 +650,26 @@ export async function streamMessage(
         return;
       }
       onEvent({ t: "status", s: "thinking" });
-      // A real build (and the judgment call on whether to ask first) needs a frontier-grade model,
-      // not whatever Auto ranked first for a plain chat reply — same bias as Deep Research.
-      const buildWorthy = candidates.filter(isFrontierModel);
-      if (buildWorthy.length > 0) candidates = buildWorthy;
+      // Build runs only on frontier coding models (projectBuild/buildModels.ts allow-list). A weak
+      // model picked for chat — or ranked first by Auto — is swapped for the best allowed model the
+      // user's plan includes, rather than producing a half-working project.
+      if (!candidates.some((c) => isBuildModel(c))) {
+        const pool = (await listChatCandidates()).filter((c) => tierAllows(c) && isBuildModel(c));
+        if (pool.length) candidates = rankCandidatesForMessage(pool, content);
+      }
+      candidates = buildCandidates(candidates, isFrontierModel);
       const projectFiles = Object.keys((await getProject(conversationId))?.files ?? {});
       const pendingPlan = await findPendingPlan(conversationId);
       let approvedPlan: BuildPlan | undefined;
+      // Model-driven (like Claude Code): no forced question round, no forced plan round — the agent
+      // itself answers a "hi", asks (ask_user) or proposes a plan (propose_plan) when it judges it
+      // needs to. The staged flow below stays for models without tool calling.
+      const modelDriven = buildModelDriven(candidates);
       if (pendingPlan && isPlanApproval(content)) {
         // The user approved the plan on screen: build exactly that.
         approvedPlan = pendingPlan.plan;
         await setPlanStatus(pendingPlan.messageId, pendingPlan.plan, "approved");
-      } else if (pendingPlan || needsPlan(projectFiles.length, content)) {
+      } else if (!modelDriven && (pendingPlan || needsPlan(projectFiles.length, content))) {
         // A brand-new project (no files yet, no question round yet) may be missing details that change
         // what gets built — ask first, with a recommended option per question, instead of guessing.
         if (!pendingPlan && !alreadyAsked(history) && projectFiles.length === 0) {
@@ -691,19 +723,14 @@ export async function streamMessage(
       }
       // Restore point: the project's files as they are before this turn changes anything.
       await createCheckpoint(conversationId, userMessageRow.id as string);
-      // Event log for this turn: a device that isn't connected (reload, another phone) replays it and
-      // follows along live via GET /api/build/:id/events. Every event below goes to both.
-      const recorder = createEventRecorder(conversationId);
-      await recorder.reset();
-      const emit = (ev: StreamEvent) => {
-        recorder.record(ev);
-        onEvent(ev);
-      };
-      try {
+      // Every event of every turn is logged by jobs/runTurn.ts (replay + live follow on any device).
+      const emit = onEvent;
+      {
         // Tell the client right away (sandbox startup takes a few seconds) so it can show Build Mode —
         // only now, not during a question/plan round, which never touches the sandbox.
         emit({ t: "status", s: "building" });
-        const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent: emit, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode });
+        void setTurnKind(conversationId, "build").catch(() => undefined);
+        const built = await runBuildAgent({ userId, conversationId, history, candidates, onEvent: emit, signal, budget, maxRounds: entitlements.buildMaxRounds, approvedPlan, effort: options.effort, permissionMode: options.permissionMode, modelDriven, repo: options.repo });
         if (built.error && !built.text && built.build.steps.length === 0) {
           emit({ t: "err", c: built.error });
           emit({ t: "done" });
@@ -722,9 +749,16 @@ export async function streamMessage(
             reservation?.reserveTokens ?? 0,
           );
         }
-        emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl });
+        emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl, commit: built.build.commit });
         const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
-        await insertAssistantMessage(conversationId, built.text || "Done.", buildLabel, {
+        // A pause (ask_user / propose_plan) is stored under the same markers the staged flow uses, so
+        // later turns (alreadyAsked, findPendingPlan, the plan/ask cards) recognise it.
+        const storedText = built.pause
+          ? built.pause.kind === "ask"
+            ? ASK_MARKER
+            : `${PLAN_MARKER}\n\n${renderPlan(built.pause.plan)}`
+          : built.text || "Done.";
+        await insertAssistantMessage(conversationId, storedText, buildLabel, {
           usedCanvas: false,
           usedSearch: false,
           usedThink: false,
@@ -736,8 +770,6 @@ export async function streamMessage(
         emit({ t: "done" });
         void notifyBuildFinished(userId, conversationId, built.error ? "error" : "done");
         return;
-      } finally {
-        await recorder.close();
       }
     }
 
@@ -798,7 +830,18 @@ export async function streamMessage(
     }
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
       if (research) onEvent({ t: "status", s: "searching" });
-      const tools = await (toolsetPromise ?? buildToolset(userId));
+      // generate_image joins every tool turn: the model, not a keyword list, decides when the user
+      // wants a picture (see agent/tools/image.ts) — so it never answers with drawing code instead.
+      const tools = [
+        ...(await (toolsetPromise ?? buildToolset(userId))),
+        imageTool({ lastImageUrl: lastGeneratedImageUrl(historyWithImages), attachedImage: currentImageAttachment?.dataUrl ?? null }),
+      ];
+      if (projectId && projectFiles.length) tools.push(projectSearchTool(projectId, projectFiles));
+      // Deep Research fans out: parallel research helpers (agent/tools/research.ts).
+      if (research) tools.push(researchAgentsTool(candidates.filter(supportsTools)));
+      const imageMarkdown: string[] = [];
+      const nestedSteps = new Map<string, BuildStep>();
+      let nestedUsage: TokenUsage = emptyTokenUsage();
       const citedUrls = new Set(searchResults.map((r) => r.url));
       // An explicitly chosen skill is already pinned — don't also offer the menu (it would compete).
       const menu = activeSkill ? "" : skillMenu(await skillsPromise);
@@ -813,6 +856,18 @@ export async function streamMessage(
           userId,
           conversationId,
           signal,
+          onStep: (step) => {
+            nestedSteps.set(step.id, step);
+            onEvent({ t: "step", ...step });
+          },
+          onUsage: (u) => {
+            nestedUsage = mergeTokenUsage(nestedUsage, u);
+          },
+          onImage: (url, alt) => {
+            const md = `\n\n![${alt.replace(/[\[\]\n]/g, " ")}](${url})\n\n`;
+            imageMarkdown.push(md);
+            onEvent({ t: "text", c: md });
+          },
           onFile: (file) => {
             createdFiles.push(file);
             onEvent({ t: "file", file });
@@ -837,8 +892,11 @@ export async function streamMessage(
         full = "";
       } else {
         usedCandidate = toolRun.candidate;
-        full = toolRun.text;
-        tokenUsage = toolRun.usage;
+        // Images were streamed into the reply when their tool call finished; keep them in the stored message.
+        full = imageMarkdown.length ? `${imageMarkdown.join("").trim()}\n\n${toolRun.text}`.trim() : toolRun.text;
+        tokenUsage = mergeTokenUsage(toolRun.usage, nestedUsage);
+        // Sub-agent cards are kept with the reply, in the order they started.
+        if (nestedSteps.size) toolRun.steps = [...toolRun.steps, ...nestedSteps.values()].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
         sawProviderUsage = true;
         lastError = toolRun.error;
         const webCalls = toolRun.toolNames.filter((name) => name === "web_search" || name === "fetch_url").length;

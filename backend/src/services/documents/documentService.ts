@@ -4,7 +4,7 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { logger } from "../../utils/logger.js";
 import { consumeDailyAllowance, entitlementsFor, refundDailyAllowance } from "../quota/entitlements.js";
-import { FORMAT_MIME, describeSpec, renderDocument, type DocFormat, type DocumentSpec } from "./render.js";
+import { FORMAT_MIME, codeExtension, describeSpec, renderDocument, type DocFormat, type DocumentSpec } from "./render.js";
 
 /**
  * Generated documents: render → store → hand back a file record the chat shows as a download card
@@ -15,9 +15,19 @@ import { FORMAT_MIME, describeSpec, renderDocument, type DocFormat, type Documen
 export const DOCUMENTS_BUCKET = "generated-files";
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-export type GeneratedFile = { id: string; title: string; filename: string; format: DocFormat; size: number; summary: string; createdAt: string };
+export type GeneratedFile = {
+  id: string;
+  title: string;
+  filename: string;
+  /** "page" = a live Friday page (services/pages), shown as an Open card instead of a download. */
+  format: DocFormat | "page";
+  size: number;
+  summary: string;
+  createdAt: string;
+  pageKind?: "doc" | "sheet" | "slides";
+};
 
-export function safeFilename(name: string, format: DocFormat): string {
+export function safeFilename(name: string, format: DocFormat, extension?: string | null): string {
   const base = name
     .replace(/\.[a-z0-9]{2,5}$/i, "")
     .normalize("NFKD")
@@ -25,7 +35,7 @@ export function safeFilename(name: string, format: DocFormat): string {
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 80);
-  return `${base || "document"}.${format}`;
+  return `${base || "document"}.${format === "txt" && extension ? extension : format}`;
 }
 
 export async function storageUsedBytes(userId: string): Promise<number> {
@@ -57,7 +67,7 @@ export async function createDocument(userId: string, conversationId: string | nu
     if ((await storageUsedBytes(userId)) + bytes.length > limitBytes) {
       throw new HttpError(413, `Your Library is full (${entitlements.libraryStorageMb >= 1024 ? `${Math.round(entitlements.libraryStorageMb / 1024)} GB` : `${entitlements.libraryStorageMb} MB`}). Delete some files in the Library or upgrade for more space.`);
     }
-    const filename = safeFilename(spec.title, spec.format);
+    const filename = safeFilename(spec.title, spec.format, codeExtension(spec.extension));
     const id = randomUUID();
     let storage: { bucket: string; path: string } | null = null;
     if (env.attachmentObjectStorageEnabled) {

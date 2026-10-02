@@ -1,5 +1,5 @@
 import { SupportCenter } from "@/components/support-center";
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, LayoutDashboard, Link2, Share2, X } from "lucide-react";
 import { authEnabled, signOut, useAuthStore } from "@/lib/auth/client";
@@ -8,6 +8,8 @@ import { useChat } from "@/lib/chat/store";
 import { PluginsDrawer } from "@/components/plugins-drawer";
 import { SettingsModal } from "@/components/settings-modal";
 import { api } from "@/lib/api";
+import { useDismiss } from "@/lib/use-dismiss";
+import { SHARE_TARGETS, ShareTargetLogo } from "@/components/share-logos";
 
 function Shell({
   open,
@@ -440,18 +442,22 @@ export function LoginPopout() {
 // two buttons were a redundant second entry point. Replaced with a direct Canvas opener now that
 // the composer's own Canvas toggle is gone, so there's still a manual way to bring the panel up
 // (auto-open on a detected artifact still works independently of this).
-/** Share the current chat as a read-only public link (copy / turn off). */
+/** Share the current chat as a read-only public link: copy it, send it to WhatsApp / Telegram / email, or turn it off. */
 function ShareButton() {
   const conversationId = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.conversationId);
+  const chatTitle = useChat((s) => s.chats.find((c) => c.id === s.activeId)?.title);
   const [open, setOpen] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  useDismiss(open, () => setOpen(false), wrap);
   useEffect(() => {
     setOpen(false);
     setLink(null);
   }, [conversationId]);
   if (!conversationId) return null;
+  const shareTitle = chatTitle && chatTitle !== "New chat" ? `${chatTitle} — shared from Friday` : "A chat shared from Friday";
 
   async function create() {
     setError(null);
@@ -475,12 +481,14 @@ function ShareButton() {
       setError(err instanceof Error ? err.message : "Couldn't turn off the link");
     }
   }
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   return (
-    <div className="relative">
+    <div ref={wrap} className="relative">
       <button
         type="button"
         aria-label="Share chat"
+        aria-expanded={open}
         onClick={() => {
           setOpen((v) => !v);
           if (!open && !link) void create();
@@ -490,26 +498,57 @@ function ShareButton() {
         <Share2 className="size-4" />
       </button>
       {open && (
-        <div className="absolute top-11 right-0 z-50 w-72 rounded-2xl border border-border bg-elevated p-3 text-sm shadow-[var(--shadow-composer)]">
-          <p className="mb-2 font-medium">Share this chat</p>
+        <div role="dialog" aria-label="Share this chat" className="absolute top-11 right-0 z-50 w-80 rounded-2xl border border-border bg-elevated p-3 text-sm shadow-[var(--shadow-composer)]">
+          <p className="mb-1 font-medium">Share this chat</p>
           <p className="mb-3 text-xs text-muted">Anyone with the link can read this conversation (text only). New messages appear too.</p>
           {error && <p className="mb-2 text-xs text-danger">{error}</p>}
           {link ? (
             <>
-              <div className="mb-2 flex items-center gap-2 rounded-xl border border-border px-2 py-1.5">
+              <div className="mb-3 flex items-center gap-2 rounded-xl border border-border px-2 py-1.5">
                 <Link2 className="size-3.5 shrink-0 text-muted" />
                 <span className="min-w-0 flex-1 truncate text-xs">{link}</span>
                 <button
                   type="button"
-                  onClick={() => void navigator.clipboard?.writeText(link).then(() => setCopied(true))}
+                  onClick={() => void navigator.clipboard?.writeText(link).then(() => {
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1500);
+                  })}
                   className="shrink-0 rounded-full bg-chip px-2 py-0.5 text-xs"
                 >
                   {copied ? <Check className="size-3.5" /> : "Copy"}
                 </button>
               </div>
-              <button type="button" onClick={() => void revoke()} className="text-xs text-danger hover:underline">
-                Stop sharing (the link stops working)
-              </button>
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {SHARE_TARGETS.map((t) => (
+                  <a
+                    key={t.id}
+                    href={t.href(link, shareTitle)}
+                    target={t.id === "email" ? undefined : "_blank"}
+                    rel="noreferrer"
+                    onClick={() => setOpen(false)}
+                    className="flex flex-col items-center gap-1.5 rounded-xl border border-border px-2 py-2.5 text-xs text-foreground transition-colors hover:bg-chip"
+                  >
+                    <ShareTargetLogo id={t.id} className="size-6" />
+                    {t.label}
+                  </a>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                {canNativeShare ? (
+                  <button
+                    type="button"
+                    onClick={() => void navigator.share({ title: shareTitle, url: link }).catch(() => {})}
+                    className="text-xs text-muted hover:text-foreground"
+                  >
+                    More apps…
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <button type="button" onClick={() => void revoke()} className="text-xs text-danger hover:underline">
+                  Stop sharing
+                </button>
+              </div>
             </>
           ) : (
             !error && <p className="text-xs text-muted">Creating link…</p>

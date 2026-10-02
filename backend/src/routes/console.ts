@@ -2,6 +2,8 @@ import { Router } from "express";
 import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
 import * as st from "../controllers/statusController.js";
+import * as fin from "../controllers/financeController.js";
+import * as mail from "../controllers/mailController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -87,3 +89,36 @@ consoleRouter.post("/plans/grants/:grantId/revoke", can("plans.manage"), h(p.rev
 consoleRouter.post("/plans/redemptions/:redemptionId/review", can("plans.review"), h(p.review));
 
 consoleRouter.get("/audit", can("audit.view"), h(c.auditLog));
+
+// Finance: model prices (cost vs sell), the P&L report and expenses.
+consoleRouter.get("/finance/report", can("finance.view"), h(fin.report));
+consoleRouter.get("/finance/pricing", can("finance.view"), h(fin.pricing));
+consoleRouter.post("/finance/pricing", can("finance.manage"), h(fin.savePrice));
+consoleRouter.delete("/finance/pricing/:priceId", can("finance.manage"), h(fin.removePrice));
+consoleRouter.post("/finance/pricing/sync", can("finance.manage"), h(fin.syncPrices));
+consoleRouter.post("/finance/settings", can("finance.manage"), h(fin.settings));
+consoleRouter.get("/finance/expenses", can("finance.view"), h(fin.expenses));
+consoleRouter.post("/finance/expenses", can("finance.manage"), h(fin.addExpense));
+consoleRouter.patch("/finance/expenses/:expenseId", can("finance.manage"), h(fin.editExpense));
+consoleRouter.delete("/finance/expenses/:expenseId", can("finance.manage"), h(fin.removeExpense));
+
+// Company mail hosting (admin): domains + employee mailboxes on our mail server.
+consoleRouter.get("/mail-hosting", can("mail.manage"), h(mail.hostingOverview));
+consoleRouter.post("/mail-hosting/domains", can("mail.manage"), h(mail.addDomain));
+consoleRouter.get("/mail-hosting/domains/:domain/dns", can("mail.manage"), h(mail.domainDns));
+consoleRouter.post("/mail-hosting/mailboxes", can("mail.manage"), h(mail.createMailbox));
+consoleRouter.patch("/mail-hosting/mailboxes/:mailboxId", can("mail.manage"), h(mail.updateMailbox));
+consoleRouter.delete("/mail-hosting/mailboxes/:mailboxId", can("mail.manage"), h(mail.deleteMailbox));
+
+// Webmail: each staff member's own accounts only (hosted mailbox + Gmail/Outlook/any IMAP).
+consoleRouter.get("/mailbox/accounts", can("mailbox.use"), h(mail.accounts));
+consoleRouter.post("/mailbox/accounts", can("mailbox.use"), h(mail.addAccount));
+consoleRouter.delete("/mailbox/accounts/:accountId", can("mailbox.use"), h(mail.removeAccount));
+consoleRouter.post("/mailbox/accounts/:accountId/default", can("mailbox.use"), h(mail.makeDefault));
+consoleRouter.post("/mailbox/accounts/:accountId/password", can("mailbox.use"), h(mail.changePassword));
+consoleRouter.get("/mailbox/accounts/:accountId/folders", can("mailbox.use"), h(mail.folders));
+consoleRouter.get("/mailbox/accounts/:accountId/messages", can("mailbox.use"), h(mail.messages));
+consoleRouter.get("/mailbox/accounts/:accountId/messages/:uid", can("mailbox.use"), h(mail.message));
+consoleRouter.get("/mailbox/accounts/:accountId/messages/:uid/attachments/:index", can("mailbox.use"), h(mail.attachment));
+consoleRouter.post("/mailbox/accounts/:accountId/actions", can("mailbox.use"), h(mail.act));
+consoleRouter.post("/mailbox/accounts/:accountId/send", can("mailbox.use"), h(mail.send));

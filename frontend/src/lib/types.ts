@@ -24,6 +24,8 @@ export interface ModelOption {
   capabilities: { chat?: boolean; vision?: boolean; tts?: boolean; stt?: boolean };
   min_tier: "free" | "pro" | "premium";
   providers: { slug: string; display_name: string };
+  /** Can drive the Build workspace (server-side frontier coding allow-list). */
+  build?: boolean;
 }
 
 export type ConversationMode = "single" | "auto" | "teamup";

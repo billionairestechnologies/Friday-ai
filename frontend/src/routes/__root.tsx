@@ -11,6 +11,8 @@ export function RootLayout() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", appearance === "light");
+    // The browser/OS chrome (mobile address bar, PWA title bar) matches the app surface.
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", appearance === "light" ? "#ffffff" : "#131314");
     document.documentElement.lang = currentLocale();
     document.documentElement.dir = currentDirection();
   }, [appearance]);

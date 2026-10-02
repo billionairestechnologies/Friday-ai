@@ -14,6 +14,8 @@ export type ChatModel = {
    *  actually use per-message by the viewer's real plan (see chat/index.ts's tier gate); this
    *  field only needs to gate a DIRECT single-model pick in the model picker's lock icon. */
   minTier: "free" | "pro" | "premium";
+  /** Offered in the Build workspace's picker (frontier coding models only). */
+  build?: boolean;
 };
 
 export const AUTO_MODEL_ID = "mode:auto";
@@ -58,6 +60,7 @@ function fromOption(m: ModelOption): ChatModel {
     reasoning: false,
     providerSlug: m.providers.slug,
     minTier: m.min_tier,
+    build: m.build === true,
   };
 }
 

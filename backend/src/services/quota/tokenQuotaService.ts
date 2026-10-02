@@ -3,7 +3,8 @@ import { memoAsync } from "../../utils/ttlMemo.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { getRedisClient } from "../redisClient.js";
 import { logger } from "../../utils/logger.js";
-import { estimateCostCents, type TokenUsage } from "../tokenUsage.js";
+import type { TokenUsage } from "../tokenUsage.js";
+import { priceUsage } from "../finance/pricing.js";
 import {
   decideQuota,
   ENTERPRISE_MIN_SEATS,
@@ -404,7 +405,10 @@ export async function recordTokenLedger(
   usage: TokenUsage,
   reservedTokens: number,
 ): Promise<void> {
-  const { error } = await supabaseAdmin.from("token_ledger").insert({
+  // Exact cost at today's price for this model (finance/pricing.ts); flagged when no price exists.
+  const price = await priceUsage(providerSlug, modelId, usage);
+  const pricedColumns = { cost_usd: price.costUsd, sell_inr: price.sellInr, priced: price.priced };
+  const base = {
     user_id: userId,
     organization_id: organizationId,
     provider_slug: providerSlug,
@@ -416,9 +420,12 @@ export async function recordTokenLedger(
     // the provider/call reported no prompt-cache activity (see providers/promptCache.ts).
     cached_tokens: usage.cachedTokens ?? 0,
     cache_write_tokens: usage.cacheWriteTokens ?? 0,
-    estimated_cost_cents: estimateCostCents(providerSlug, usage),
+    estimated_cost_cents: Math.round(price.costUsd * 100 * 100) / 100,
     reserved_tokens: reservedTokens,
-  });
+  };
+  let { error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns });
+  // A server deployed before migration 0040 ran must still record usage (quota + audit rely on it).
+  if (error && /cost_usd|sell_inr|priced/.test(error.message)) ({ error } = await supabaseAdmin.from("token_ledger").insert(base));
   if (error) logger.warn("token_ledger_insert_failed", { userId, error: error.message });
 }
 
@@ -439,6 +446,15 @@ export type QuotaStatus = {
   org: { used: number; limit: number; seatCount: number; resetAt: string } | null;
   memberCap: { used: number; limit: number } | null;
 };
+
+/**
+ * What a usage meter shows for a counter: never below 0 and never above the limit. A counter CAN go
+ * negative — a bonus grant decrements it on purpose (headroom), and a refund can land on a key that
+ * already rolled over — and the raw value used to reach the client as "-12% used".
+ */
+export function meterValue(used: number, limit: number): number {
+  return Math.max(0, Math.min(Number.isFinite(used) ? used : 0, limit));
+}
 
 /**
  * Admin "master control" — grants extra headroom for the CURRENT period by decrementing
@@ -491,12 +507,12 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
       weekly: { used: 0, limit: 0, resetAt: nextWeeklyReset().toISOString() },
       monthly: null,
       org: {
-        used: Math.min(orgUsed, effective.enterprise.pooledMonthlyTokens),
+        used: meterValue(orgUsed, effective.enterprise.pooledMonthlyTokens),
         limit: effective.enterprise.pooledMonthlyTokens,
         seatCount: effective.enterprise.seatCount,
         resetAt: nextMonthlyReset().toISOString(),
       },
-      memberCap: effective.customMonthlyCap != null ? { used: Math.min(memberUsed, effective.customMonthlyCap), limit: effective.customMonthlyCap } : null,
+      memberCap: effective.customMonthlyCap != null ? { used: meterValue(memberUsed, effective.customMonthlyCap), limit: effective.customMonthlyCap } : null,
     };
   }
 
@@ -520,14 +536,14 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
     // Clamped for display: the counters can sit a few tokens past a limit (the turn that crossed it
     // is stopped, not undone) — the meter should read "100%", never "103%".
     rolling: {
-      used: Math.min(rollingUsed, eff.rolling),
+      used: meterValue(rollingUsed, eff.rolling),
       limit: eff.rolling,
       resetAt: new Date(now + limits.rollingWindowSeconds * 1000).toISOString(),
     },
-    weekly: { used: Math.min(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
+    weekly: { used: meterValue(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
     monthly:
       eff.monthly != null
-        ? { used: Math.min(monthlyUsed, eff.monthly), limit: eff.monthly, resetAt: nextMonthlyReset().toISOString() }
+        ? { used: meterValue(monthlyUsed, eff.monthly), limit: eff.monthly, resetAt: nextMonthlyReset().toISOString() }
         : null,
     org: null,
     memberCap: null,

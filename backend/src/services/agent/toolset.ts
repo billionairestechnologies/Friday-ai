@@ -1,19 +1,21 @@
 import { listConnectedProviders } from "../connectorService.js";
 import { isTokenConnector } from "../tokenConnectors.js";
 import { codeTools } from "./tools/code.js";
+import { browserTools } from "./tools/browser.js";
 import { TOKEN_CONNECTOR_TOOLS } from "./tools/connectors.js";
 import { GITHUB_TOOLS } from "./tools/github.js";
 import { loadMcpTools } from "./mcpService.js";
 import { googleToolsForScopes } from "./tools/google.js";
 import { MEMORY_TOOLS } from "./tools/memory.js";
 import { createDocumentTool } from "./tools/documents.js";
+import { PAGE_TOOLS } from "./tools/pages.js";
 import { useSkillTool } from "./tools/skills.js";
 import type { FridayTool } from "./tools/types.js";
 import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
-  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), createDocumentTool, useSkillTool];
+  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), ...browserTools(), ...PAGE_TOOLS, createDocumentTool, useSkillTool];
   // Both lookups sit on the critical path before the first token — run them concurrently.
   const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());
@@ -38,9 +40,10 @@ export const DEEP_RESEARCH_PROMPT =
   "1. PLAN — before searching, write a short numbered list of 5-8 concrete sub-questions that together fully cover " +
   "the topic (definitions/background, current state, key players or options, data/numbers, risks or counterarguments, " +
   "outlook). This is your research plan; follow it.\n" +
-  "2. SEARCH BROAD — run at least 8-12 web_search calls across the sub-questions, varying phrasing and angle (not " +
-  "near-duplicate queries). Fire independent searches in parallel in the same turn when they don't depend on each " +
-  "other's results — don't serialize what doesn't need to be.\n" +
+  "2. SEARCH BROAD — when research_in_parallel is available, hand 3-4 of the sub-questions to it in ONE call (helpers " +
+  "research them at the same time and return cited reports), then cover the rest yourself. Overall run at least 8-12 " +
+  "web_search calls across the sub-questions, varying phrasing and angle (not near-duplicate queries). Fire independent " +
+  "searches in parallel in the same turn when they don't depend on each other's results — don't serialize what doesn't need to be.\n" +
   "3. READ DEEP — fetch_url the 10-15 most load-bearing pages in full. Strongly prefer primary sources (official docs, " +
   "filings, papers, government/company data) and recent, reputable reporting over blogs, SEO content or aggregators. " +
   "Note each source's publish/updated date — recency matters, say when something might be stale.\n" +
@@ -105,6 +108,15 @@ export function toolUsePrompt(tools: FridayTool[], skillMenu = ""): string {
       ? "Use run_code for exact arithmetic, data work and checking code — report the real output, never invented output."
       : null,
     "When you rely on a web page, cite it inline as a markdown link.",
+    names.includes("browser")
+      ? "Use fetch_url to read a page; use browser only when you must interact (search forms, filters, clicking through, " +
+        "JavaScript-only pages). Never sign in, pay, book, send or delete without the user confirming in chat."
+      : null,
+    names.includes("create_page")
+      ? "For a doc, report, plan, spreadsheet, tracker or deck the user will keep working on, make a live page with " +
+        "create_page (they edit it in place, share it, export it). To change one later: read_page, then update_page. " +
+        "Use create_document only when they ask for a file in a specific format."
+      : null,
     names.includes("create_document")
       ? "When the user wants a presentation, spreadsheet, Word document, PDF or another file, make the real file with create_document " +
         "(after gathering the facts it needs) instead of pasting its content into the chat."

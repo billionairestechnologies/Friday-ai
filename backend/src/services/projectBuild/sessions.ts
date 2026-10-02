@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { isGenerating } from "../chat/activeGenerations.js";
+import { runningAmong } from "../jobs/turns.js";
 import { hasPendingApproval } from "./approvals.js";
 import type { BuildMeta } from "../chat/types.js";
 
@@ -72,6 +73,8 @@ export async function listBuildSessions(userId: string): Promise<BuildSessionSum
       .order("created_at", { ascending: false }),
   ]);
   const last = new Map(lastByConversation);
+  // Running = a fresh heartbeat from ANY instance (jobs/turns.ts), not just this process.
+  const running = await runningAmong(ids).catch(() => new Set<string>());
   const prByConversation = new Map<string, string>();
   for (const row of prs.data ?? []) {
     const url = (row.build as BuildMeta | null)?.prUrl;
@@ -87,7 +90,7 @@ export async function listBuildSessions(userId: string): Promise<BuildSessionSum
     if (hasPendingApproval(id)) {
       status = "needs_input";
       activity = "Waiting for your permission to continue";
-    } else if (isGenerating(id)) {
+    } else if (isGenerating(id) || running.has(id)) {
       status = "running";
       activity = "Working on it…";
     } else if (msg?.role === "assistant" && build?.plan?.status === "pending") {

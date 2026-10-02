@@ -5,9 +5,19 @@ import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 
 export const PROJECT_DIR = "/home/user/app";
-// E2B kills (never pauses) a sandbox when this expires, so nothing lingers there. Project files live
-// in our own database (build_projects.files); a sandbox only exists while a build or preview needs it.
 const SANDBOX_TTL_MS = 15 * 60 * 1000;
+/**
+ * Persistent sandboxes (default on): when the TTL runs out — or a build ends with nothing to preview —
+ * the sandbox is PAUSED, not killed. The next message resumes it exactly as it was: node_modules
+ * installed, the project's git history, caches, even running processes (memory snapshot). Before,
+ * every follow-up after 15 idle minutes started from a bare snapshot of ≤300 text files and had to
+ * reinstall everything, and there was no history of what earlier turns changed.
+ * The database snapshot (build_projects.files) stays the safety net if a paused sandbox is gone.
+ * FRIDAY_SANDBOX_PERSIST=off restores kill-on-timeout.
+ */
+export const SANDBOX_PERSIST = process.env.FRIDAY_SANDBOX_PERSIST !== "off";
+/** Kept out of git without touching the project's own .gitignore. */
+const GIT_EXCLUDES = ["node_modules/", "dist/", "build/", ".next/", "__pycache__/", ".venv/", "venv/", "*.log", ".env", ".env.*", ".DS_Store"];
 const SNAPSHOT_MAX_FILES = 300;
 const SNAPSHOT_MAX_FILE_BYTES = 200_000;
 const SNAPSHOT_MAX_TOTAL_BYTES = 3_000_000;
@@ -82,7 +92,19 @@ export class BuildSandbox {
 
   /** Creates a brand-new sandbox and restores the last known file snapshot into it. */
   private static async createFresh(userId: string, conversationId: string, apiKey: string, files: ProjectFiles): Promise<Sandbox> {
-    const sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
+    let sandbox: Sandbox;
+    if (SANDBOX_PERSIST) {
+      try {
+        // autoResume: opening the preview URL of a paused sandbox wakes it up.
+        sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS, lifecycle: { onTimeout: "pause", autoResume: true } });
+      } catch (err) {
+        // An account/region without pause support must still get a sandbox.
+        console.error("[build] pausable sandbox unavailable, using kill-on-timeout:", err instanceof Error ? err.message : err);
+        sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
+      }
+    } else {
+      sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
+    }
     await sandbox.commands.run(`mkdir -p ${PROJECT_DIR}`);
     await Promise.all(Object.entries(files).map(([path, content]) => sandbox.files.write(`${PROJECT_DIR}/${path}`, content)));
     await saveProject(userId, conversationId, { sandbox_id: sandbox.sandboxId });
@@ -155,6 +177,55 @@ export class BuildSandbox {
   async kill(): Promise<void> {
     await this.sandbox.kill().catch(() => {});
     await saveProject(this.userId, this.conversationId, { sandbox_id: null });
+  }
+
+  /**
+   * End of a build with nothing left to serve: pause (persistent mode — the next turn resumes with
+   * dependencies and git history intact) or kill. A failed pause falls back to kill so nothing runs on.
+   */
+  async release(): Promise<void> {
+    if (SANDBOX_PERSIST) {
+      const paused = await this.sandbox.pause().then(() => true).catch(() => false);
+      if (paused) return;
+    }
+    await this.kill();
+  }
+
+  /**
+   * The project's own local git history — one commit per Build turn — so the agent (and the user)
+   * can see what earlier turns changed, diff against them and roll back. Imported GitHub repos keep
+   * their real history underneath. Never throws.
+   */
+  async gitInit(): Promise<void> {
+    await this.runScript(
+      [
+        "git rev-parse --is-inside-work-tree >/dev/null 2>&1 || git init -q -b main 2>/dev/null || git init -q",
+        // set -f: the patterns (*.log, .env.*) must reach the file literally, not glob-expand here.
+        'set -f; mkdir -p .git/info && printf "%s\\n" $FRIDAY_EXCLUDES >> .git/info/exclude && sort -u -o .git/info/exclude .git/info/exclude',
+        'git config user.name >/dev/null || git config user.name "Friday Build"',
+        'git config user.email >/dev/null || git config user.email "build@friday.local"',
+      ].join("\n"),
+      30_000,
+      { FRIDAY_EXCLUDES: GIT_EXCLUDES.join(" ") },
+    ).catch(() => null);
+  }
+
+  /** Commits everything changed this turn; returns the short hash, or null when nothing changed. */
+  async gitCommit(message: string): Promise<string | null> {
+    await this.gitInit();
+    const out = await this.runScript(
+      'git add -A >/dev/null 2>&1; if git diff --cached --quiet; then echo "__nothing__"; else git commit -q -m "$FRIDAY_MSG" && git rev-parse --short HEAD; fi',
+      60_000,
+      { FRIDAY_MSG: message.replace(/\s+/g, " ").trim().slice(0, 200) || "Friday Build changes" },
+    ).catch(() => null);
+    const last = out?.output.trim().split("\n").pop() ?? "";
+    return out?.ok && /^[0-9a-f]{6,12}$/.test(last) ? last : null;
+  }
+
+  /** The last few commits, for the agent's context ("what did earlier turns do?"). */
+  async gitLog(limit = 12): Promise<string> {
+    const out = await this.runScript(`git log --oneline -n ${Math.max(1, Math.min(50, limit))} 2>/dev/null`, 20_000, {}).catch(() => null);
+    return out?.ok ? out.output.trim() : "";
   }
 
   private touch() {

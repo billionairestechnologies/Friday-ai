@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f0f4f9" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Apply the saved theme BEFORE first paint. Without this every light-theme user (the default)
+      // saw a dark frame flash on each load until React mounted and toggled the class.
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem("friday-chat-v1") || "{}");
+          var appearance = (saved.state && saved.state.appearance) || "light";
+          if (appearance === "light") document.documentElement.classList.add("light");
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", appearance === "light" ? "#ffffff" : "#131314");
+        } catch (e) {
+          document.documentElement.classList.add("light");
+        }
+      })();
+    </script>
     <meta name="description" content="Chat with Friday — think, search the web, attach files." />
     <title>Friday</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -11,10 +27,10 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    />
+    <!-- Separate requests on purpose: Google Fonts rejects the WHOLE request if one family is unknown. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" />
   </head>
   <body class="bg-background text-foreground">
     <div id="root"></div>

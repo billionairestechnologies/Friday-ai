@@ -506,8 +506,49 @@ export function UpgradePage() {
           </section>
         )}
 
+        <ModelPriceList />
+
         {config && !config.keyId && <p className="mt-6 text-xs text-muted">Razorpay keys are not configured on this environment yet.</p>}
       </div>
     </div>
+  );
+}
+
+/** Per-model prices (₹ per 1M tokens) for models the team made public in Console → Finance. */
+function ModelPriceList() {
+  const [prices, setPrices] = useState<{ provider: string; model: string; name: string; inputPerMInr: number; outputPerMInr: number }[]>([]);
+  useEffect(() => {
+    api
+      .get<{ prices: typeof prices }>("/billing/model-prices")
+      .then((r) => setPrices(r.prices))
+      .catch(() => setPrices([]));
+  }, []);
+  if (prices.length === 0) return null;
+  const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return (
+    <section className="mt-14 w-full">
+      <h2 className="text-lg font-semibold">Model prices</h2>
+      <p className="mt-1 text-sm text-muted">What each model costs per 1 million tokens (about 750,000 words). Input is what you send, output is what the model writes.</p>
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-surface text-left text-xs text-subtle">
+            <tr>
+              <th className="px-4 py-2.5 font-medium">Model</th>
+              <th className="px-4 py-2.5 text-right font-medium">Input / 1M tokens</th>
+              <th className="px-4 py-2.5 text-right font-medium">Output / 1M tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            {prices.map((p) => (
+              <tr key={`${p.provider}/${p.model}`} className="border-t border-border">
+                <td className="px-4 py-2.5">{p.name}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{rupees(p.inputPerMInr)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{rupees(p.outputPerMInr)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

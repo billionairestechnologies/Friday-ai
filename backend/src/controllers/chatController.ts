@@ -2,8 +2,11 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import * as chatService from "../services/chat/index.js";
 import * as searchAndShare from "../services/chat/searchAndShare.js";
-import { finishGeneration, registerGeneration, stopGeneration } from "../services/chat/activeGenerations.js";
-import { notifyUser } from "../services/pushService.js";
+import { stopGeneration } from "../services/chat/activeGenerations.js";
+import { runTurn } from "../services/jobs/runTurn.js";
+import { requestStop } from "../services/jobs/turns.js";
+import { readEvents } from "../services/projectBuild/events.js";
+import { getOwnedConversation } from "../services/chat/conversations.js";
 
 const pageSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -98,6 +101,14 @@ const sendMessageSchema = z
     effort: z.enum(["low", "medium", "high"]).optional(),
     // Build workspace permission mode (projectBuild/approvals.ts).
     permissionMode: z.enum(["ask", "auto_edit", "full_auto"]).optional(),
+    // Repo + branch picked in the Build composer, sent as fields (not rewritten into the message text)
+    // so the sandbox can clone it before the agent's first turn.
+    repo: z
+      .object({
+        repo: z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/).max(140),
+        branch: z.string().trim().min(1).max(200).optional(),
+      })
+      .optional(),
     attachments: z.array(attachmentSchema).max(4).optional().default([]),
   })
   // The composer already allows sending an attachment with no caption text (an image with
@@ -110,7 +121,7 @@ const sendMessageSchema = z
   });
 
 export async function streamMessage(req: Request, res: Response) {
-  const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, permissionMode, attachments } = sendMessageSchema.parse(req.body);
+  const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, permissionMode, repo, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -131,17 +142,11 @@ export async function streamMessage(req: Request, res: Response) {
   // of waiting for the server to finish its pre-model work.
   res.write(`data: ${JSON.stringify({ t: "status", s: "thinking" })}\n\n`);
 
-  const abortController = registerGeneration(req.params.id, req.user!.id);
   let clientGone = false;
   req.on("close", () => {
     clientGone = true;
   });
-
-  let replyText = "";
-  let failed = false;
   const send = (event: chatService.StreamEvent) => {
-    if (event.t === "text") replyText += event.c;
-    if (event.t === "err") failed = true;
     if (clientGone || res.writableEnded) return;
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
@@ -155,42 +160,45 @@ export async function streamMessage(req: Request, res: Response) {
   }, 15_000);
 
   try {
-    await chatService.streamMessage(
-      req.user!.id,
-      req.params.id,
-      content,
-      inputMode,
-      send,
-      abortController.signal,
-      think,
-      behavior,
-      webSearch,
-      canvas,
+    // The turn runs to completion whether or not this connection survives (jobs/runTurn.ts): it is
+    // registered as running for every instance, logged for live replay on any device, resumed after
+    // a restart (Build) and followed by a push notification when nobody was watching at the end.
+    await runTurn({
+      userId: req.user!.id,
+      conversationId: req.params.id!,
+      kind: research ? "research" : "chat",
+      request: {
+        content,
+        inputMode,
+        think,
+        behavior,
+        webSearch,
+        canvas,
+        options: { research, skillId, effort, permissionMode, repo },
+        hadAttachments: attachments.length > 0,
+      },
       attachments,
-      req.quotaReservation,
-      { research, skillId, effort, permissionMode },
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Something went wrong";
-    send({ t: "err", c: message });
-    send({ t: "done" });
+      reservation: req.quotaReservation,
+      onEvent: send,
+      listening: () => !clientGone,
+    });
   } finally {
     clearInterval(heartbeat);
-    finishGeneration(req.params.id, abortController);
     if (!res.writableEnded) res.end();
-    if (clientGone && !failed && !abortController.signal.aborted && replyText.trim()) {
-      const body = replyText.trim().replace(/\s+/g, " ");
-      void notifyUser(req.user!.id, {
-        title: "Friday replied",
-        body: body.length > 140 ? `${body.slice(0, 137)}...` : body,
-        conversationId: req.params.id,
-      });
-    }
   }
 }
 
+/** Replays the current (or last) turn's events and says whether it's still running — any device can follow along. */
+export async function live(req: Request, res: Response) {
+  await getOwnedConversation(req.user!.id, req.params.id!);
+  const { after } = z.object({ after: z.coerce.number().int().min(0).default(0) }).parse(req.query);
+  res.json(await readEvents(req.params.id!, after));
+}
+
 export async function stopMessage(req: Request, res: Response) {
-  stopGeneration(req.params.id, req.user!.id);
+  stopGeneration(req.params.id!, req.user!.id);
+  // The turn may be running on another instance — its heartbeat sees this flag and stops it.
+  await requestStop(req.params.id!, req.user!.id).catch(() => undefined);
   res.status(204).end();
 }
 

@@ -71,7 +71,15 @@ export type DocumentSpec = {
   sheets?: SheetSpec[];
   /** Accent colour, e.g. "#4F46E5". */
   theme_color?: string;
+  /** txt only: the real file extension for code/config files (py, xaml, yaml, sql, ts, …). */
+  extension?: string;
 };
+
+/** A safe file extension for a txt-format code/config file, or null. */
+export function codeExtension(ext?: string): string | null {
+  const e = (ext ?? "").trim().toLowerCase().replace(/^\./, "");
+  return /^[a-z0-9]{1,10}$/.test(e) && !["exe", "dll", "bat", "cmd", "com", "scr", "msi", "app", "jar", "apk"].includes(e) ? e : null;
+}
 
 export const LIMITS = { slides: 60, sheets: 20, rowsPerSheet: 50_000, contentChars: 400_000 };
 

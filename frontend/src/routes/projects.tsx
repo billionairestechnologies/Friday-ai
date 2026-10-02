@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { filteredChats, useChat, type ServerConversation } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
+import { ProjectFiles } from "@/components/project-files";
 
 export type AssistantProject = {
   id: string;
@@ -376,6 +377,8 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
             )}
           </div>
         )}
+
+        {project && !editing && <ProjectFiles projectId={project.id} />}
 
         {project && editing && (
           <div className="mt-4">

@@ -1,6 +1,8 @@
 import type { ToolCall, ToolSpec } from "../providers/toolCalling.js";
 import { fetchUrlTool, webSearchTool } from "../agent/tools/web.js";
 import type { BuildAction } from "./protocol.js";
+import type { AskQuestion } from "../chat/types.js";
+import { MAX_SUBAGENTS, parseSubTasks, type SubTask } from "./subagents.js";
 
 /**
  * Native (structured) tool definitions for the Build agent — the same actions as the `<friday-*>`
@@ -21,7 +23,106 @@ export type NativeBuildAction =
   /** Look something up on the web (docs, an error message, a library's current API) — same tools chat uses. */
   | { kind: "web"; tool: "web_search" | "fetch_url"; args: Record<string, unknown> }
   /** One of the user's connected-app or MCP tools (GitHub, Supabase, Vercel…) — run by the shared executor. */
-  | { kind: "ext"; tool: string; args: Record<string, unknown> };
+  | { kind: "ext"; tool: string; args: Record<string, unknown> }
+  /** The model needs an answer from the user before it can go on — ends the turn with a question card. */
+  | { kind: "ask"; questions: AskQuestion[] }
+  /** The model proposes a plan for the user to approve — ends the turn with a plan card. */
+  | { kind: "plan"; summary: string; architecture: string; items: string[] }
+  | { kind: "subagents"; tasks: SubTask[] };
+
+/**
+ * Tools that let the MODEL decide to talk to the user instead of working: ask a question, or put a
+ * plan up for approval. They are only offered in the model-driven flow (agent.ts `modelDriven`),
+ * where nothing forces a question or plan round before the agent runs — the model calls these
+ * itself when a request really calls for it, the way Claude Code asks or enters plan mode.
+ */
+/** Parallel read-only helpers (subagents.ts) — native tool-calling path only. */
+export const SUBAGENT_TOOL_SPEC: ToolSpec = {
+  name: "spawn_subagents",
+  description:
+    `Run up to ${MAX_SUBAGENTS} sub-agents IN PARALLEL, each with its own fresh context, for self-contained READ-ONLY investigations; ` +
+    "you get back only their short reports. Use it when work splits into independent questions that would otherwise flood your " +
+    "context or take many sequential steps — e.g. in a large existing repo: one maps the auth flow, one finds where payments are " +
+    "handled, one lists the API routes; or research: current docs for two libraries at once. kind \"explore\" reads/greps the project; " +
+    "kind \"research\" searches and reads the web. Sub-agents cannot write files or run commands — you do all changes. Don't use it " +
+    "for a single quick lookup (just call grep/read_file yourself) or for tiny projects. Give each one complete, specific instructions " +
+    "(it sees nothing of this conversation) and say exactly what its report must contain.",
+  parameters: {
+    type: "object",
+    properties: {
+      tasks: {
+        type: "array",
+        description: `1-${MAX_SUBAGENTS} independent jobs`,
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Short name shown to the user, e.g. \"Map the auth flow\"" },
+            kind: { type: "string", enum: ["explore", "research"] },
+            instructions: { type: "string", description: "Complete, self-contained instructions and what the report must include" },
+          },
+          required: ["title", "kind", "instructions"],
+        },
+      },
+    },
+    required: ["tasks"],
+  },
+};
+
+export const INTERACTION_TOOL_SPECS: ToolSpec[] = [
+  {
+    name: "ask_user",
+    description:
+      "Ask the user 1-4 multiple-choice questions and STOP until they answer. Use ONLY when a missing detail would change what " +
+      "you build and you cannot reasonably choose a sensible default yourself (which exchange? real money or demo? login method?). " +
+      "Never for greetings, small talk, questions you can answer, or details that don't change the outcome. Never ask a second " +
+      "round if the user already answered one. Each question has 2-4 concrete options; put your recommendation FIRST.",
+    parameters: {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          description: "1-4 questions",
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string", description: "The question, ending with a question mark" },
+              options: {
+                type: "array",
+                description: "2-4 concrete answers the user could pick as-is; the first is your recommendation",
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string", description: "Short answer, e.g. a real suggested name or a concrete choice" },
+                    description: { type: "string", description: "One line on what it means or why it's recommended" },
+                  },
+                  required: ["label"],
+                },
+              },
+            },
+            required: ["question", "options"],
+          },
+        },
+      },
+      required: ["questions"],
+    },
+  },
+  {
+    name: "propose_plan",
+    description:
+      "Show the user a plan to approve BEFORE you write any code, and STOP until they approve or ask for changes. Use for a new " +
+      "project or a large change where the request is clear enough to plan. Skip it for small fixes, follow-ups on an existing " +
+      "project, questions and conversation — just do those. Never call it when an APPROVED PLAN is already shown to you.",
+    parameters: {
+      type: "object",
+      properties: {
+        summary: { type: "string", description: "2-6 short plain-language lines: what will be built and its main features/screens" },
+        architecture: { type: "string", description: "3-8 short lines: stack and why, folder structure, ports, main design decisions" },
+        steps: { type: "array", description: "5-9 checklist items in execution order, one short line each; the last is 'Run it, verify it in a browser and fix any issues'", items: { type: "string" } },
+      },
+      required: ["summary", "steps"],
+    },
+  },
+];
 
 export const BUILD_TOOL_SPECS: ToolSpec[] = [
   {
@@ -180,6 +281,28 @@ function s(args: Record<string, unknown>, key: string): string {
   return typeof v === "string" ? v : typeof v === "number" ? String(v) : "";
 }
 
+/** Cleans the model's ask_user arguments into the question cards the client renders (same limits as clarify.ts). */
+export function parseAskQuestions(raw: unknown): AskQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AskQuestion[] = [];
+  for (const q of raw.slice(0, 4)) {
+    if (!q || typeof q !== "object") continue;
+    const rec = q as { question?: unknown; options?: unknown };
+    const question = typeof rec.question === "string" ? rec.question.trim().slice(0, 200) : "";
+    const options = (Array.isArray(rec.options) ? rec.options : [])
+      .map((o) => (o && typeof o === "object" ? (o as { label?: unknown; description?: unknown }) : null))
+      .filter((o): o is { label?: unknown; description?: unknown } => o !== null && typeof o.label === "string" && o.label.trim() !== "")
+      .slice(0, 4)
+      .map((o, i) => ({
+        label: String(o.label).trim().slice(0, 80),
+        description: typeof o.description === "string" && o.description.trim() ? o.description.trim().slice(0, 160) : undefined,
+        recommended: i === 0,
+      }));
+    if (question && options.length >= 2) out.push({ id: `q${out.length + 1}`, question, options });
+  }
+  return out;
+}
+
 /** Converts one native tool call into the shared BuildAction the executor runs. */
 export function toolCallToAction(call: ToolCall, extTools?: ReadonlySet<string>): NativeBuildAction {
   const a = call.args ?? {};
@@ -236,6 +359,23 @@ export function toolCallToAction(call: ToolCall, extTools?: ReadonlySet<string>)
     }
     case "finish":
       return { kind: "done", summary: s(a, "summary").trim() };
+    case "ask_user": {
+      const questions = parseAskQuestions(a.questions);
+      return questions.length ? { kind: "ask", questions } : { kind: "malformed", reason: "ask_user needs at least one question with 2-4 options" };
+    }
+    case "spawn_subagents": {
+      const tasks = parseSubTasks(a);
+      if (!tasks.length) return { kind: "malformed", reason: "spawn_subagents needs 1-4 tasks, each with a title and instructions" };
+      return { kind: "subagents", tasks };
+    }
+    case "propose_plan": {
+      const items = (Array.isArray(a.steps) ? a.steps : [])
+        .map((x) => (typeof x === "string" ? x.replace(/^\s*[-*]\s*(\[[ xX~]\]\s*)?/, "").trim() : ""))
+        .filter(Boolean)
+        .slice(0, 12);
+      if (items.length < 2) return { kind: "malformed", reason: "propose_plan needs at least 2 steps" };
+      return { kind: "plan", summary: s(a, "summary").trim(), architecture: s(a, "architecture").trim(), items };
+    }
     default:
       if (extTools?.has(call.name)) return { kind: "ext", tool: call.name, args: a };
       return { kind: "malformed", reason: `there is no tool named ${call.name}` };
