@@ -18,7 +18,8 @@ export function friendlyProviderError(raw: string): string {
 
   if (looksHtml || (status && /^(408|429|500|502|503|504|520|521|522|523|524|529)$/.test(status))) return BUSY;
   if (/timed? ?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|fetch failed|socket hang up|overloaded/i.test(text)) return BUSY;
-  if (status === "401" || status === "403") return UNAVAILABLE;
+  // 402 = the provider account is out of credit: ours to fix, never the user's, and never worth quoting.
+  if (status === "401" || status === "402" || status === "403") return UNAVAILABLE;
   if (status === "400" && /payload size|too (long|large)|context|token/i.test(text)) return TOO_LARGE;
 
   // Anything else: first line only, vendor prefix and markup stripped, length capped. Callers still

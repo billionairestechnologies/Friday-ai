@@ -24,3 +24,9 @@ test("short wording callers match on survives, minus the vendor prefix", () => {
   assert.equal(friendlyProviderError("fake: tools not supported"), "tools not supported");
   assert.ok(friendlyProviderError("x: <b>bad</b>\nsecond line").length < 50);
 });
+
+test("an exhausted provider balance (402) is never quoted to the user", () => {
+  const out = friendlyProviderError('scalemax: ScaleMax chat failed: 402 {"error":{"message":"Token allocation is too low. Renew this token pack"}}');
+  assert.match(out, /isn't available right now/);
+  assert.ok(!/token|renew|scalemax/i.test(out), out);
+});
