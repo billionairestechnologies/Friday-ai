@@ -90,6 +90,8 @@ data class FridayUiState(
     /** "chat" or "build" — which workspace the main screen is in. Build Mode only runs in "build"
      *  (a new chat there is created as a Build session); the drawer lists that workspace's history. */
     val workspace: String = "chat",
+    /** The project the NEXT new chat belongs to (set by "New chat in this project", cleared once it exists). */
+    val activeProjectId: String? = null,
     /** Build home + drawer: every build session with its live status (GET /api/build/sessions). */
     val buildSessions: List<com.friday.app.data.BuildSessionSummary> = emptyList(),
     val buildSessionsLoaded: Boolean = false,
@@ -256,7 +258,7 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
             // dropping it would orphan the running reply — and reuse already-loaded messages.
             val remoteIds = remote.map { it.id }.toSet()
             val merged = remote.map { r -> s.chats.firstOrNull { it.id == r.id }?.let { old -> r.copy(messages = old.messages) } ?: r }
-            val keep = s.chats.filter { it.id !in remoteIds && (streamJobs[it.id]?.isActive == true || !isServerConversationId(it.id)) && it.id != Seed.SHOWCASE_ID }
+            val keep = s.chats.filter { it.id !in remoteIds && (streamJobs[it.id]?.isActive == true || !isServerConversationId(it.id) || it.id in projectChatIds) && it.id != Seed.SHOWCASE_ID }
             val chats = keep + merged
             s.copy(chats = chats, currentId = if (s.currentId == null || chats.any { it.id == s.currentId }) s.currentId else null)
         }
@@ -547,7 +549,23 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun newChat() {
         cancelLocalStream()
-        _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "chat") }
+        _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "chat", activeProjectId = null) }
+    }
+
+    /** Chats that live inside a project: the main chat list never includes them, so the list sync must keep them. */
+    private val projectChatIds = mutableSetOf<String>()
+
+    /** "New chat in this project": the next chat created belongs to it. */
+    fun startProjectChat(projectId: String) {
+        cancelLocalStream()
+        _state.update { it.copy(currentId = null, draft = "", drawerOpen = false, workspace = "chat", activeProjectId = projectId) }
+    }
+
+    /** Opens one of a project's chats (not in the main list, so add it first). */
+    fun openProjectChat(chat: com.friday.app.data.ChatThread) {
+        projectChatIds += chat.id
+        _state.update { s -> if (s.chats.any { it.id == chat.id }) s else s.copy(chats = s.chats + chat) }
+        openChat(chat.id)
     }
 
     /** Opens the Build workspace on a fresh build session (created on the first send). */
@@ -833,8 +851,15 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
                         existingId
                     } else {
                         val workspace = _state.value.chats.find { it.id == chatId }?.workspace
-                        ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode, workspace)
-                            ?.also { conversationModels[it] = selectedId }
+                        val projectId = _state.value.activeProjectId
+                        ChatApi.createConversation(selected?.modelId, selected?.providerSlug, conversationMode, workspace, projectId)
+                            ?.also {
+                                conversationModels[it] = selectedId
+                                if (projectId != null) {
+                                    projectChatIds += it
+                                    _state.update { s -> s.copy(activeProjectId = null) }
+                                }
+                            }
                     }
                     if (remoteId != null) {
                         val oldId = chatId!!

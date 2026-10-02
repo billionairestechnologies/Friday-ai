@@ -11,7 +11,7 @@ struct RootShell: View {
             case "settings": SettingsScreen()
             case "plans": PlansScreen()
             case "library": LibraryScreen()
-            case "projects": StubPage(title: "Projects", body: "Project-scoped chats and files will live here.") { vm.page = "chat" }
+            case "projects": ProjectsScreen()
             case "automations": AutomationsScreen()
             default: ChatShell()
             }

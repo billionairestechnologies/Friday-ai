@@ -238,7 +238,11 @@ fun FridayApp(
     ) {
         when (page) {
             "library" -> com.friday.app.ui.library.LibraryScreen(onClose = { page = "chat" })
-            "projects" -> StubPage("Projects", "Project-scoped chats and files will live here.") { page = "chat" }
+            "projects" -> com.friday.app.ui.projects.ProjectsScreen(
+                onClose = { page = "chat" },
+                onNewChat = { projectId -> vm.startProjectChat(projectId); page = "chat" },
+                onOpenChat = { chat -> vm.openProjectChat(chat); page = "chat" },
+            )
             "automations" -> com.friday.app.ui.agent.AutomationsScreen(
                 onClose = { page = "chat" },
                 onOpenChat = { id -> vm.openChat(id); page = "chat" },

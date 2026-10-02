@@ -308,7 +308,7 @@ final class FridayViewModel: ObservableObject {
             }
         }
         // A chat being created/streamed locally isn't on the server list yet — dropping it would orphan the stream.
-        for local in chats where streamJobs[local.id] != nil && !next.contains(where: { $0.id == local.id }) {
+        for local in chats where (streamJobs[local.id] != nil || projectChatIds.contains(local.id)) && !next.contains(where: { $0.id == local.id }) {
             next.insert(local, at: 0)
         }
         chats = next
@@ -452,7 +452,9 @@ final class FridayViewModel: ObservableObject {
                 }
             } else {
                 let chatWorkspace = chats.first(where: { $0.id == localId })?.workspace
-                realId = try await ChatApi.createConversation(mode: mode, modelId: modelId, providerSlug: providerSlug, workspace: chatWorkspace)
+                let projectId = activeProjectId
+                realId = try await ChatApi.createConversation(mode: mode, modelId: modelId, providerSlug: providerSlug, workspace: chatWorkspace, projectId: projectId)
+                if projectId != nil { projectChatIds.insert(realId); activeProjectId = nil }
                 conversationModels[realId] = selectedModelId
             }
         } catch {
@@ -603,8 +605,30 @@ final class FridayViewModel: ObservableObject {
 
     func newChat() {
         currentId = nil
+        activeProjectId = nil
         drawerOpen = false
         workspace = "chat"
+    }
+
+    /// The project the NEXT new chat belongs to (set by "New chat in this project", cleared once it exists).
+    @Published var activeProjectId: String?
+    /// Chats that live inside a project: the main chat list never includes them, so the list sync must keep them.
+    private var projectChatIds: Set<String> = []
+
+    func startProjectChat(_ projectId: String) {
+        currentId = nil
+        workspace = "chat"
+        activeProjectId = projectId
+        page = "chat"
+    }
+
+    func openProjectChat(_ summary: ConversationsApi.Summary) {
+        if !chats.contains(where: { $0.id == summary.id }) {
+            chats.append(ChatThread(id: summary.id, title: summary.title, workspace: summary.workspace, hasBuild: summary.hasBuild))
+        }
+        projectChatIds.insert(summary.id)
+        page = "chat"
+        selectChat(summary.id)
     }
 
     /// Opens the Build workspace on a fresh build session (created on the first send).

@@ -47,8 +47,10 @@ enum ChatApi {
         let kind: String
     }
 
-    static func createConversation(mode: String, modelId: String?, providerSlug: String?, workspace: String? = nil) async throws -> String {
+    static func createConversation(mode: String, modelId: String?, providerSlug: String?, workspace: String? = nil, projectId: String? = nil) async throws -> String {
         var body: [String: Any] = ["mode": mode]
+        // A chat started inside a project: its files and instructions travel with every message.
+        if let projectId { body["projectId"] = projectId }
         // "build" = a Build workspace session: every message goes to the Build agent.
         if workspace == "build" { body["workspace"] = "build" }
         if mode == "single" {

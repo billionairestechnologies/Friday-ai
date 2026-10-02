@@ -78,12 +78,14 @@ object ChatApi {
     /** POST /api/chat/conversations — a real conversation id is required before streaming into it.
      *  [mode] "single" needs [modelId]/[providerSlug]; "auto"/"teamup" need neither — the backend
      *  picks/consults models itself for those. */
-    suspend fun createConversation(modelId: String? = null, providerSlug: String? = null, mode: String = "single", workspace: String? = null): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+    suspend fun createConversation(modelId: String? = null, providerSlug: String? = null, mode: String = "single", workspace: String? = null, projectId: String? = null): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
         runCatching {
             val body = JSONObject().apply {
                 put("mode", mode)
                 // "build" = a Build workspace session: every message goes to the Build agent.
                 if (workspace == "build") put("workspace", "build")
+                // A chat started inside a project: its files and instructions travel with every message.
+                if (!projectId.isNullOrBlank()) put("projectId", projectId)
                 if (mode == "single") {
                     if (!modelId.isNullOrBlank()) put("modelId", modelId)
                     if (!providerSlug.isNullOrBlank()) put("providerSlug", providerSlug)
