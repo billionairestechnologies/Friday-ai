@@ -340,19 +340,25 @@ private struct ChatShell: View {
 
     // MARK: - Model popover (anchored bottom-trailing, matches android's model popup)
 
+    private var inBuild: Bool { vm.workspace == "build" }
+    private var pickerModels: [RemoteModel] { inBuild ? vm.remoteModels.filter { $0.build } : vm.remoteModels }
+
     private var modelPopoverContent: some View {
         VStack(spacing: 0) {
             PopoverRow(icon: "bolt.fill", title: "Auto", subtitle: "Tries enabled models in order, falls back automatically", selected: vm.selectedModelId == AUTO_MODEL_ID) {
                 selectModel(AUTO_MODEL_ID)
             }
-            Divider().padding(.leading, 52)
-            PopoverRow(icon: "person.3.fill", title: "Team Up", subtitle: "Asks up to 3 models at once and shows every reply", selected: vm.selectedModelId == TEAMUP_MODEL_ID) {
-                selectModel(TEAMUP_MODEL_ID)
+            // Build workspace: frontier coding models only (+ Auto), no Team Up — same as web.
+            if !inBuild {
+                Divider().padding(.leading, 52)
+                PopoverRow(icon: "person.3.fill", title: "Team Up", subtitle: "Asks up to 3 models at once and shows every reply", selected: vm.selectedModelId == TEAMUP_MODEL_ID) {
+                    selectModel(TEAMUP_MODEL_ID)
+                }
             }
-            if !vm.remoteModels.isEmpty {
+            if !pickerModels.isEmpty {
                 Divider().padding(.leading, 52)
             }
-            ForEach(vm.remoteModels) { model in
+            ForEach(pickerModels) { model in
                 let locked = !ModelBrand.planSatisfies(vm.plan, minTier: model.minTier)
                 PopoverRow(
                     icon: ModelBrand.systemIcon(for: model.modelId + " " + model.displayName),
@@ -370,7 +376,7 @@ private struct ChatShell: View {
                         selectModel(model.modelId)
                     }
                 }
-                if model.id != vm.remoteModels.last?.id {
+                if model.id != pickerModels.last?.id {
                     Divider().padding(.leading, 52)
                 }
             }

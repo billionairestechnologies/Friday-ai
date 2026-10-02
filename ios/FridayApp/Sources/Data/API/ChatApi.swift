@@ -307,7 +307,8 @@ enum ModelsApi {
                 modelId: $0["model_id"] as? String ?? "",
                 displayName: $0["display_name"] as? String ?? "",
                 minTier: $0["min_tier"] as? String,
-                providerSlug: ($0["providers"] as? [String: Any])?["slug"] as? String
+                providerSlug: ($0["providers"] as? [String: Any])?["slug"] as? String,
+                build: $0["build"] as? Bool ?? false
             )
         }
     }

@@ -51,7 +51,6 @@ import com.friday.app.data.api.ProjectFile
 import com.friday.app.data.api.ProjectSummary
 import com.friday.app.data.api.ProjectsApi
 import com.friday.app.ui.theme.FridayBg
-import com.friday.app.ui.theme.FridayChip
 import com.friday.app.ui.theme.FridayError
 import com.friday.app.ui.theme.FridayMuted
 import com.friday.app.ui.theme.FridaySurface

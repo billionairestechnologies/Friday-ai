@@ -11,6 +11,8 @@ data class RemoteModel(
     val displayName: String,
     val minTier: String,
     val providerSlug: String,
+    /** Offered in the Build workspace's picker (frontier coding models only). */
+    val build: Boolean = false,
 )
 
 /** GET /api/models — public, no auth required. */
@@ -29,6 +31,7 @@ object ModelsApi {
                         displayName = o.optString("display_name", o.optString("model_id")),
                         minTier = o.optString("min_tier", "free"),
                         providerSlug = o.optJSONObject("providers")?.optString("slug").orEmpty(),
+                        build = o.optBoolean("build", false),
                     )
                 }
             }

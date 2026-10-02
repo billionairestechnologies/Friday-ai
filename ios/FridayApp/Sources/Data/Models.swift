@@ -263,4 +263,6 @@ struct RemoteModel: Identifiable, Hashable {
     let displayName: String
     let minTier: String?
     let providerSlug: String?
+    /// Offered in the Build workspace's picker (frontier coding models only).
+    var build: Bool = false
 }

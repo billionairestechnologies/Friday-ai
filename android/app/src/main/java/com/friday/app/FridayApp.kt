@@ -444,7 +444,8 @@ fun FridayApp(
         ) {
             when (ui.sheet) {
                 Sheet.Model -> ModelSheet(
-                    remoteModels = ui.remoteModels,
+                    // Build workspace: frontier coding models only (+ Auto), no Team Up — same as web.
+                    remoteModels = if (ui.workspace == "build") ui.remoteModels.filter { it.build || it.modelId == com.friday.app.data.AUTO_MODEL_ID } else ui.remoteModels,
                     selectedModelId = ui.selectedModelId,
                     localSelected = ui.model,
                     plan = ui.plan,
