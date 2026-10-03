@@ -54,8 +54,8 @@ test("catalog rows fall back to code defaults for anything unset", () => {
   assert.equal(plan.badge, null);
   assert.ok(plan.features.length > 0);
   assert.equal(plan.limits.weekly, 3_000_000);
-  assert.equal(plan.limits.rolling, 500_000);
-  assert.equal(plan.limits.monthly, 10_000_000);
+  assert.equal(plan.limits.rolling, 60_000);
+  assert.equal(plan.limits.monthly, 450_000);
   assert.equal(plan.limits.tokensPerSeat, null);
   assert.equal(plan.entitlements.deepResearchPerDay, 5);
   assert.equal(plan.entitlements.buildMaxRounds, DEFAULT_ENTITLEMENTS.pro.buildMaxRounds);

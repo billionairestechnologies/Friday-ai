@@ -72,6 +72,7 @@ import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js
 import { recordModelOutcome } from "../status/statusService.js";
 import { activeSkillPrompt, getSkill, listSkills, skillMenu, type Skill } from "../skills/skillService.js";
 import type { GeneratedFile } from "../documents/documentService.js";
+import { creditsForInputTokens, creditsForUsage, DEFAULT_RESERVE_RATES, meterRatesFor, type MeterRates } from "../quota/meter.js";
 import {
   chargeProgress,
   QUOTA_STOP_MESSAGE,
@@ -226,7 +227,14 @@ export async function streamMessage(
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
   if (research) webSearch = true;
+  // The quota meter counts CREDITS — what the call really costs (quota/meter.ts) — not raw tokens.
+  // `reconcileTokens` keeps its old name but holds credits. Rates start at the default and are
+  // swapped for the chosen model's priced rates as soon as routing has picked one.
   let reconcileTokens = 0;
+  let meterRates: MeterRates = DEFAULT_RESERVE_RATES;
+  const setMeterModel = async (c: { slug: string; modelId: string } | undefined) => {
+    if (c) meterRates = await meterRatesFor(c.slug, c.modelId);
+  };
   // Stage timings (FRIDAY_CHAT_TIMING=1) — how long each pre-model step takes before the first token.
   const timingStart = Date.now();
   const mark = (label: string) => {
@@ -522,15 +530,15 @@ export async function streamMessage(
     // new message, but the model is about to read the whole history. A turn the user can't afford
     // stops here, before any model is paid for.
     const promptTokens = Math.ceil(history.reduce((n, m) => n + m.content.length, 0) / 4) + 800;
-    const preflight = await chargeProgress(reservation, promptTokens);
+    const preflight = await chargeProgress(reservation, creditsForInputTokens(promptTokens, meterRates));
     if (!preflight.ok) {
       const why = QUOTA_STOP_MESSAGE[preflight.reason]!.replace(", so I stopped here.", ".");
       onEvent({ t: "err", c: `${why} This chat's history is larger than what's left — a new chat may still fit, or wait for the reset (Settings → Usage).` });
       onEvent({ t: "done" });
       return;
     }
-    const budget = async (spent: number) => {
-      const r = await chargeProgress(reservation, spent);
+    const budget = async (spent: TokenUsage) => {
+      const r = await chargeProgress(reservation, creditsForUsage(spent, meterRates));
       return r.ok ? null : QUOTA_STOP_MESSAGE[r.reason]!;
     };
 
@@ -546,8 +554,8 @@ export async function streamMessage(
       // Every proposer + the synthesizer counts against the quota (Team Up used to be unmetered).
       if (spent.length > 0) {
         const plan = await effectivePlanPromise.catch(() => null);
-        spent.forEach(({ candidate, usage }, i) => {
-          reconcileTokens += usage.totalTokens;
+        for (const [i, { candidate, usage }] of spent.entries()) {
+          reconcileTokens += creditsForUsage(usage, await meterRatesFor(candidate.slug, candidate.modelId));
           void recordTokenUsage(userId, candidate.slug, candidate.modelId, usage, { conversationId, mode });
           void recordTokenLedger(
             userId,
@@ -557,7 +565,7 @@ export async function streamMessage(
             usage,
             i === 0 ? (reservation?.reserveTokens ?? 0) : 0,
           );
-        });
+        }
       }
       return;
     }
@@ -675,6 +683,7 @@ export async function streamMessage(
     // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
     // Canvas (single-file preview) — Team Up already returned above.
     mark("candidates + tier resolved");
+    await setMeterModel(candidates[0]);
     if (await buildIntentPromise) {
       const entitlements = await entitlementsPromise;
       if (!entitlements.buildMode) {
@@ -691,6 +700,7 @@ export async function streamMessage(
         if (pool.length) candidates = rankCandidatesForMessage(pool, content);
       }
       candidates = buildCandidates(candidates, isFrontierModel);
+      await setMeterModel(candidates[0]);
       const projectFiles = Object.keys((await getProject(conversationId))?.files ?? {});
       const pendingPlan = await findPendingPlan(conversationId);
       let approvedPlan: BuildPlan | undefined;
@@ -739,7 +749,7 @@ export async function streamMessage(
           await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
           const planner = candidates[0];
           if (planner) {
-            reconcileTokens = drafted.usage.totalTokens;
+            reconcileTokens = creditsForUsage(drafted.usage, await meterRatesFor(planner.slug, planner.modelId));
             void recordTokenUsage(userId, planner.slug, planner.modelId, drafted.usage, { conversationId, mode });
             void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0);
           }
@@ -771,7 +781,7 @@ export async function streamMessage(
           return;
         }
         if (built.candidate) {
-          reconcileTokens = built.usage.totalTokens;
+          reconcileTokens = creditsForUsage(built.usage, await meterRatesFor(built.candidate.slug, built.candidate.modelId));
           void recordTokenUsage(userId, built.candidate.slug, built.candidate.modelId, built.usage, { conversationId, mode });
           void recordTokenLedger(
             userId,
@@ -782,6 +792,8 @@ export async function streamMessage(
             reservation?.reserveTokens ?? 0,
           );
         }
+        // E2B bills for the time the sandbox runs — booked as sandbox_second so the P&L and plan economics carry it.
+        if (built.build.elapsedMs) void recordUsageEvent(userId, "sandbox_second", Math.round(built.build.elapsedMs / 1000), { conversationId });
         emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl, commit: built.build.commit });
         const buildLabel = mode === "auto" ? `Auto → ${built.candidate?.displayName ?? "Build"}` : (built.candidate?.displayName ?? "Build");
         // A pause (ask_user / propose_plan) is stored under the same markers the staged flow uses, so
@@ -861,6 +873,7 @@ export async function streamMessage(
       const frontier = toolCapable.filter(isFrontierModel);
       candidates = [...(frontier.length ? frontier : toolCapable), ...candidates.filter((c) => !supportsTools(c))];
     }
+    await setMeterModel(candidates[0]);
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
       if (research) onEvent({ t: "status", s: "searching" });
       // generate_image joins every tool turn: the model, not a keyword list, decides when the user
@@ -987,7 +1000,7 @@ export async function streamMessage(
     }
     // The actual count is now known — this is what reconcileQuota corrects the pre-flight
     // reservation to in the finally block below.
-    reconcileTokens = tokenUsage.totalTokens;
+    reconcileTokens = creditsForUsage(tokenUsage, await meterRatesFor(usedCandidate.slug, usedCandidate.modelId));
 
     void recordTokenUsage(userId, usedCandidate.slug, usedCandidate.modelId, tokenUsage, {
       conversationId,

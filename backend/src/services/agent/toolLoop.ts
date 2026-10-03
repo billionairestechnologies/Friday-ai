@@ -75,7 +75,8 @@ export async function runToolLoop(opts: {
   /** Usage meter, called with the turn's running token total after each round that wants more
    *  tools. Returns a message to stop with (the user's limit is reached) or null to carry on — so
    *  a 12-round research turn can't run far past the plan limit. */
-  budget?: (totalTokensSoFar: number) => Promise<string | null>;
+  /** Called each round with the turn's running usage; a string means "stop now" (limit reached). */
+  budget?: (usage: TokenUsage) => Promise<string | null>;
   /** Adapter + key lookup; injectable for tests. */
   resolve?: (candidate: ChatCandidate) => Promise<{ adapter: ProviderAdapter; apiKey: string }>;
 }): Promise<ToolLoopResult> {
@@ -180,7 +181,7 @@ export async function runToolLoop(opts: {
       result.usage ?? estimateTokenUsageFromText(messages.reduce((n, m) => n + m.content.length, 0), result.text.length),
     );
     if (result.toolCalls.length === 0 || lastRound) break;
-    const stop = opts.budget ? await opts.budget(usage.totalTokens).catch(() => null) : null;
+    const stop = opts.budget ? await opts.budget(usage).catch(() => null) : null;
     if (stop) {
       needsBreak = true;
       emit(`_${stop}_`);

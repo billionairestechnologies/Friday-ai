@@ -1,5 +1,11 @@
 export type Plan = "free" | "pro" | "premium";
 
+/**
+ * Every figure below is in CREDITS (see meter.ts): 100,000 credits = US$1 of real model cost, so
+ * Pro's 110,000-credit week is about $1.10 (₹97) of usage. Sized for our current flat supplier
+ * cost of ₹25 per 1M tokens so that a plan's worst-case usage stays near 40% of its price; costs
+ * change, so Console → Plans shows live margin per plan and can re-suggest limits from Finance.
+ */
 export type PlanLimits = {
   /** Hard ceiling per calendar week (resets Monday 00:00 UTC — see weekResetAt). */
   weeklyTokens: number;
@@ -15,27 +21,27 @@ export const WEEKLY_TTL_SECONDS = 7 * 24 * 60 * 60; // 604,800s
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
-    weeklyTokens: 250_000,
-    rollingWindowTokens: 50_000,
+    weeklyTokens: 6_500,
+    rollingWindowTokens: 2_500,
     rollingWindowSeconds: ROLLING_WINDOW_SECONDS,
     monthlyTokens: null,
   },
   pro: {
-    weeklyTokens: 2_500_000,
-    rollingWindowTokens: 500_000,
+    weeklyTokens: 110_000,
+    rollingWindowTokens: 60_000,
     rollingWindowSeconds: ROLLING_WINDOW_SECONDS,
-    monthlyTokens: 10_000_000,
+    monthlyTokens: 450_000,
   },
   premium: {
-    weeklyTokens: 6_250_000,
-    rollingWindowTokens: 1_200_000,
+    weeklyTokens: 210_000,
+    rollingWindowTokens: 120_000,
     rollingWindowSeconds: ROLLING_WINDOW_SECONDS,
-    monthlyTokens: 25_000_000,
+    monthlyTokens: 900_000,
   },
 };
 
-/** Enterprise seats each add this many pooled tokens/month to their org (no per-seat rolling window). */
-export const ENTERPRISE_TOKENS_PER_SEAT = 35_000_000;
+/** Enterprise seats each add this many pooled credits/month to their org (no per-seat rolling window). */
+export const ENTERPRISE_TOKENS_PER_SEAT = 1_000_000;
 export const ENTERPRISE_MIN_SEATS = 3;
 
 const PLAN_RANK: Record<Plan, number> = { free: 0, pro: 1, premium: 2 };

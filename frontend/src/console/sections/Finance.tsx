@@ -11,7 +11,15 @@ import { Badge, Button, Card, Drawer, EmptyState, ErrorNote, Field, Input, Loadi
  * All money math is server-side (backend services/finance) so this page only displays numbers.
  */
 
-type Settings = { usd_to_inr: number; default_markup_pct: number; updated_at?: string };
+type Settings = {
+  usd_to_inr: number;
+  default_markup_pct: number;
+  blended_cost_per_m_inr: number;
+  target_cost_share_pct: number;
+  free_cost_budget_inr: number;
+  e2b_cost_per_hour_inr: number;
+  updated_at?: string;
+};
 
 type PriceRow = {
   id: string;
@@ -29,6 +37,7 @@ type PriceRow = {
   sell_output_per_m_inr: number | null;
   sell_per_image_inr: number | null;
   is_public: boolean;
+  cost_override?: boolean;
   notes: string;
   updated_at: string;
   effective: {
@@ -86,6 +95,8 @@ type Report = {
   totals: {
     revenueInr: number;
     aiCostInr: number;
+    sandboxHours?: number;
+    sandboxCostInr?: number;
     usageValueInr: number;
     usageMarginPct: number | null;
     grossProfitInr: number;
@@ -243,6 +254,7 @@ function PnL() {
                 {[
                   ["Revenue", r.totals.revenueInr],
                   ["− AI model cost", -r.totals.aiCostInr],
+                  [`− E2B sandboxes (${r.totals.sandboxHours ?? 0} h)`, -(r.totals.sandboxCostInr ?? 0)],
                   ["= Gross profit", r.totals.grossProfitInr],
                   ...r.expensesByCategory.map((c) => [`− ${c.label}`, -c.amountInr] as [string, number]),
                   ["= Net profit", r.totals.netProfitInr],
@@ -306,12 +318,24 @@ function Pricing() {
           <Field label="Default markup %" hint="Used when a model has no sell price">
             <Input type="number" step="1" disabled={!canManage} value={s.default_markup_pct} onChange={(e) => setSettings({ ...s, default_markup_pct: Number(e.target.value) })} />
           </Field>
+          <Field label="Blended cost ₹ / 1M tokens" hint="Flat supplier rate for every model (0 = use each model's own price)">
+            <Input type="number" step="0.5" min={0} disabled={!canManage} value={s.blended_cost_per_m_inr} onChange={(e) => setSettings({ ...s, blended_cost_per_m_inr: Number(e.target.value) })} />
+          </Field>
+          <Field label="Target usage cost % of plan price" hint="Drives the suggested limits in Plans → Profit">
+            <Input type="number" step="1" min={1} max={100} disabled={!canManage} value={s.target_cost_share_pct} onChange={(e) => setSettings({ ...s, target_cost_share_pct: Number(e.target.value) })} />
+          </Field>
+          <Field label="Free user budget ₹ / month" hint="Most one Free user may cost us">
+            <Input type="number" step="1" min={0} disabled={!canManage} value={s.free_cost_budget_inr} onChange={(e) => setSettings({ ...s, free_cost_budget_inr: Number(e.target.value) })} />
+          </Field>
+          <Field label="E2B sandbox ₹ / hour" hint="Build time is billed to profit at this rate">
+            <Input type="number" step="0.1" min={0} disabled={!canManage} value={s.e2b_cost_per_hour_inr} onChange={(e) => setSettings({ ...s, e2b_cost_per_hour_inr: Number(e.target.value) })} />
+          </Field>
           {canManage && (
             <Button
               variant="primary"
               disabled={!settings}
               onClick={async () => {
-                if (await act(() => api.post("/console/finance/settings", { usd_to_inr: s.usd_to_inr, default_markup_pct: s.default_markup_pct }), "Saved")) {
+                if (await act(() => api.post("/console/finance/settings", { usd_to_inr: s.usd_to_inr, default_markup_pct: s.default_markup_pct, blended_cost_per_m_inr: s.blended_cost_per_m_inr, target_cost_share_pct: s.target_cost_share_pct, free_cost_budget_inr: s.free_cost_budget_inr, e2b_cost_per_hour_inr: s.e2b_cost_per_hour_inr }), "Saved")) {
                   setSettings(null);
                   void data.reload();
                 }
@@ -454,7 +478,7 @@ function PriceDrawer({ row, settings, onClose, onSaved }: { row: Partial<PriceRo
                     cost_cache_read_per_m: f.cost_cache_read_per_m ?? null, cost_cache_write_per_m: f.cost_cache_write_per_m ?? null,
                     cost_per_image: f.cost_per_image ?? null, cost_source: f.cost_source ?? "",
                     sell_input_per_m_inr: f.sell_input_per_m_inr ?? null, sell_output_per_m_inr: f.sell_output_per_m_inr ?? null,
-                    sell_per_image_inr: f.sell_per_image_inr ?? null, is_public: Boolean(f.is_public), notes: f.notes ?? "",
+                    sell_per_image_inr: f.sell_per_image_inr ?? null, is_public: Boolean(f.is_public), cost_override: Boolean(f.cost_override), notes: f.notes ?? "",
                   }),
                 "Price saved",
               );
@@ -495,6 +519,7 @@ function PriceDrawer({ row, settings, onClose, onSaved }: { row: Partial<PriceRo
           <div className="text-muted">Margin on output</div>
           <div className={cn("text-right tabular-nums", profitTone(margin(sellOut, toInr(f.cost_output_per_m)) ?? 0))}>{pct(margin(sellOut, toInr(f.cost_output_per_m)))}</div>
         </Card>
+        <Toggle checked={Boolean(f.cost_override)} onChange={(v) => set({ cost_override: v })} label="Use this model's own cost (ignore the blended supplier rate)" />
         <Toggle checked={Boolean(f.is_public)} onChange={(v) => set({ is_public: v })} label="Show this price publicly (Plans page)" />
         <Field label="Notes"><Textarea value={f.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} /></Field>
       </div>

@@ -4,7 +4,7 @@ import { occurrencesInWindow } from "../src/services/finance/expenses.js";
 import { findPricing, matchOpenRouter, normalizeModelId, perMillion, priceTokens, sellRatesInr, type ModelPricing } from "../src/services/finance/pricing.js";
 import { modelLines } from "../src/services/finance/report.js";
 
-const s = { usd_to_inr: 88, default_markup_pct: 40 };
+const s = { usd_to_inr: 88, default_markup_pct: 40, blended_cost_per_m_inr: 0, target_cost_share_pct: 40, free_cost_budget_inr: 25, e2b_cost_per_hour_inr: 4.4 };
 
 function row(over: Partial<ModelPricing>): ModelPricing {
   return {

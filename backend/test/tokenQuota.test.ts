@@ -105,10 +105,11 @@ test("planSatisfiesTier respects free < pro < premium ordering", () => {
   assert.equal(planSatisfiesTier("premium", "premium"), true);
 });
 
-test("estimateReservationTokens scales with prompt length and adds the completion buffer", () => {
+test("estimateReservationTokens (credits) scales with prompt length and adds the completion buffer", () => {
   const short = estimateReservationTokens(40, 800);
   const long = estimateReservationTokens(4_000, 800);
-  assert.ok(short >= 800 + 10);
+  // 10 prompt tokens ≈ 1 credit at $1/M, plus 800 completion tokens at $4/M ≈ 320 credits.
+  assert.ok(short >= 320);
   assert.ok(long > short);
 });
 
@@ -138,8 +139,8 @@ test("a personal monthly cap replaces the plan month and scales the other window
   assert.equal(big.weekly, PLAN_LIMITS.pro.weeklyTokens * 3);
   assert.equal(big.rolling, PLAN_LIMITS.pro.rollingWindowTokens * 3);
   // A cap below the plan's month tightens only the month (e.g. a trial grant).
-  const small = effectiveIndividualLimits("pro", 1_000_000);
-  assert.equal(small.monthly, 1_000_000);
+  const small = effectiveIndividualLimits("pro", 200_000);
+  assert.equal(small.monthly, 200_000);
   assert.equal(small.weekly, PLAN_LIMITS.pro.weeklyTokens);
   // Free has no monthly ceiling of its own — a cap still becomes one.
   assert.equal(effectiveIndividualLimits("free", 400_000).monthly, 400_000);

@@ -76,6 +76,7 @@ const pricingSchema = z.object({
   sell_output_per_m_inr: money,
   sell_per_image_inr: money,
   is_public: z.boolean().optional(),
+  cost_override: z.boolean().optional(),
   notes: z.string().trim().max(2000).optional(),
 });
 
@@ -101,7 +102,14 @@ export async function syncPrices(req: Request, res: Response) {
 }
 
 export async function settings(req: Request, res: Response) {
-  const input = z.object({ usd_to_inr: z.number().optional(), default_markup_pct: z.number().optional() }).parse(req.body);
+  const input = z.object({
+    usd_to_inr: z.number().optional(),
+    default_markup_pct: z.number().optional(),
+    blended_cost_per_m_inr: z.number().optional(),
+    target_cost_share_pct: z.number().optional(),
+    free_cost_budget_inr: z.number().optional(),
+    e2b_cost_per_hour_inr: z.number().optional(),
+  }).parse(req.body);
   const saved = await saveFinanceSettings(input, req.user!.id);
   audit(req, "finance.settings_saved", null, input);
   res.json({ settings: saved });

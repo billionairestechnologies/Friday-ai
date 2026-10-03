@@ -81,6 +81,7 @@ consoleRouter.get("/status/crashes/:crashId", can("status.view"), h(st.crashDeta
 consoleRouter.get("/plans", can("plans.view"), h(p.overview));
 consoleRouter.post("/plans/packages", can("plans.manage"), h(p.savePackage));
 consoleRouter.patch("/plans/catalog/:planId", can("plans.manage"), h(p.saveCatalog));
+consoleRouter.get("/plans/economics", can("plans.view"), h(p.economics));
 consoleRouter.get("/plans/entitlements", can("plans.view"), h(p.userEntitlements));
 consoleRouter.delete("/plans/packages/:packageId", can("plans.manage"), h(p.deletePackage));
 consoleRouter.post("/plans/offers", can("plans.manage"), h(p.saveOffer));

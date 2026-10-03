@@ -25,11 +25,27 @@ export type ModelPricing = {
   sell_output_per_m_inr: number | null;
   sell_per_image_inr: number | null;
   is_public: boolean;
+  /** Keep this model's own cost rates even while the blended rate is on (model-wise costing). */
+  cost_override?: boolean;
   notes: string;
   updated_at: string;
 };
 
-export type FinanceSettings = { usd_to_inr: number; default_markup_pct: number; updated_at?: string };
+export type FinanceSettings = {
+  usd_to_inr: number;
+  default_markup_pct: number;
+  /** One flat ₹ cost per 1M tokens for every model without an override (supplier deal). 0 = off: each model uses its own price. */
+  blended_cost_per_m_inr: number;
+  /** The most of a plan's price we'll spend on usage at its caps — drives the suggested limits. */
+  target_cost_share_pct: number;
+  /** What one Free user may cost us per month. */
+  free_cost_budget_inr: number;
+  /** E2B sandbox running cost, ₹ per hour of Build time. */
+  e2b_cost_per_hour_inr: number;
+  updated_at?: string;
+};
+
+export const FINANCE_DEFAULTS = { blended_cost_per_m_inr: 25, target_cost_share_pct: 40, free_cost_budget_inr: 25, e2b_cost_per_hour_inr: 4.4 };
 
 /** Provider-published cache economics, used only when a model row leaves the cache price empty. */
 const CACHE_READ_DEFAULT: Record<string, number> = { anthropic: 0.1, scalemax: 0.1, openai: 0.5, openrouter: 0.5, gemini: 0.25 };
@@ -45,6 +61,7 @@ function normalizeRow(r: Record<string, unknown>): ModelPricing {
     cost_cache_read_per_m: num(r.cost_cache_read_per_m),
     cost_cache_write_per_m: num(r.cost_cache_write_per_m),
     cost_per_image: num(r.cost_per_image),
+    cost_override: Boolean(r.cost_override),
     sell_input_per_m_inr: num(r.sell_input_per_m_inr),
     sell_output_per_m_inr: num(r.sell_output_per_m_inr),
     sell_per_image_inr: num(r.sell_per_image_inr),
@@ -58,10 +75,15 @@ export const loadPricing = memoAsync(60_000, async (): Promise<ModelPricing[]> =
 });
 
 export const loadFinanceSettings = memoAsync(60_000, async (): Promise<FinanceSettings> => {
-  const { data } = await supabaseAdmin.from("finance_settings").select("usd_to_inr, default_markup_pct, updated_at").maybeSingle();
+  // select("*"): a server deployed before migration 0047 still reads the columns that exist.
+  const { data } = await supabaseAdmin.from("finance_settings").select("*").maybeSingle();
   return {
     usd_to_inr: Number(data?.usd_to_inr ?? 88),
     default_markup_pct: Number(data?.default_markup_pct ?? 40),
+    blended_cost_per_m_inr: Number(data?.blended_cost_per_m_inr ?? FINANCE_DEFAULTS.blended_cost_per_m_inr),
+    target_cost_share_pct: Number(data?.target_cost_share_pct ?? FINANCE_DEFAULTS.target_cost_share_pct),
+    free_cost_budget_inr: Number(data?.free_cost_budget_inr ?? FINANCE_DEFAULTS.free_cost_budget_inr),
+    e2b_cost_per_hour_inr: Number(data?.e2b_cost_per_hour_inr ?? FINANCE_DEFAULTS.e2b_cost_per_hour_inr),
     updated_at: (data?.updated_at as string | undefined) ?? undefined,
   };
 });
@@ -111,6 +133,23 @@ export function costRatesUsd(row: ModelPricing, s: FinanceSettings) {
   return { input, output, cacheRead, cacheWrite };
 }
 
+export type CostRatesUsd = { input: number; output: number; cacheRead: number; cacheWrite: number };
+
+/**
+ * The cost rates a call is metered and booked at. Precedence: a model that has its own price AND the
+ * override flag (or no blended rate configured) → its own price; otherwise the flat blended ₹/1M for
+ * every token class (cache reads included — the supplier deal doesn't discount them); otherwise the
+ * model's own price when it has one; otherwise null (caller falls back to the provider estimate).
+ */
+export function effectiveCostRatesUsd(row: ModelPricing | null, s: FinanceSettings): { rates: CostRatesUsd; source: "model" | "blended" } | null {
+  const own = hasTokenCost(row);
+  const blended = s.blended_cost_per_m_inr > 0 ? s.blended_cost_per_m_inr / s.usd_to_inr : 0;
+  if (own && (row.cost_override || blended <= 0)) return { rates: costRatesUsd(row, s), source: "model" };
+  if (blended > 0) return { rates: { input: blended, output: blended, cacheRead: blended, cacheWrite: blended }, source: "blended" };
+  if (own) return { rates: costRatesUsd(row, s), source: "model" };
+  return null;
+}
+
 /** What we charge per 1M tokens in INR: the explicit sell price, or cost × FX × (1 + default markup). */
 export function sellRatesInr(row: ModelPricing, s: FinanceSettings) {
   const cost = costRatesUsd(row, s);
@@ -152,9 +191,20 @@ export async function priceUsage(providerSlug: string, modelId: string, usage: T
   try {
     const [rows, s] = await Promise.all([loadPricing(), loadFinanceSettings()]);
     const row = findPricing(rows, providerSlug, modelId);
-    if (hasTokenCost(row)) {
-      const p = priceTokens(row, { input: usage.promptTokens, output: usage.completionTokens, cached: usage.cachedTokens ?? 0, cacheWrite: usage.cacheWriteTokens ?? 0 }, s);
-      return { costUsd: p.costUsd, sellInr: p.sellInr, priced: true };
+    const eff = effectiveCostRatesUsd(row, s);
+    if (eff) {
+      const t = { input: usage.promptTokens, output: usage.completionTokens, cached: usage.cachedTokens ?? 0, cacheWrite: usage.cacheWriteTokens ?? 0 };
+      if (eff.source === "model" && hasTokenCost(row)) {
+        const p = priceTokens(row, t, s);
+        return { costUsd: p.costUsd, sellInr: p.sellInr, priced: true };
+      }
+      const cached = Math.min(t.cached, t.input);
+      const written = Math.min(t.cacheWrite, t.input - cached);
+      const r = eff.rates;
+      const costUsd = round(((t.input - cached - written) * r.input + cached * r.cacheRead + written * r.cacheWrite + t.output * r.output) / 1_000_000, 8);
+      // Value at our prices: the model's own sell rates when it has them, else cost × markup.
+      const sellInr = hasTokenCost(row) ? priceTokens(row, t, s).sellInr : round(costUsd * s.usd_to_inr * (1 + s.default_markup_pct / 100), 6);
+      return { costUsd, sellInr, priced: true };
     }
   } catch {
     /* pricing table unavailable — fall through to the estimate */
@@ -168,7 +218,7 @@ export type PricingInput = Partial<Omit<ModelPricing, "id" | "updated_at">> & { 
 
 const EDITABLE: (keyof PricingInput)[] = [
   "display_name", "cost_currency", "cost_input_per_m", "cost_output_per_m", "cost_cache_read_per_m", "cost_cache_write_per_m",
-  "cost_per_image", "cost_source", "sell_input_per_m_inr", "sell_output_per_m_inr", "sell_per_image_inr", "is_public", "notes",
+  "cost_per_image", "cost_source", "sell_input_per_m_inr", "sell_output_per_m_inr", "sell_per_image_inr", "is_public", "notes", "cost_override",
 ];
 
 export async function savePricing(input: PricingInput, userId: string): Promise<ModelPricing> {
@@ -199,6 +249,16 @@ export async function saveFinanceSettings(input: Partial<FinanceSettings>, userI
     if (!(input.default_markup_pct >= 0 && input.default_markup_pct <= 1000)) throw new HttpError(400, "Markup must be between 0 and 1000%");
     row.default_markup_pct = input.default_markup_pct;
   }
+  const bounded = (key: keyof FinanceSettings, min: number, max: number, label: string) => {
+    const v = input[key];
+    if (v === undefined) return;
+    if (typeof v !== "number" || !(v >= min && v <= max)) throw new HttpError(400, `${label} must be between ${min} and ${max}`);
+    row[key] = v;
+  };
+  bounded("blended_cost_per_m_inr", 0, 100_000, "Blended cost per 1M tokens");
+  bounded("target_cost_share_pct", 1, 100, "Target cost share");
+  bounded("free_cost_budget_inr", 0, 100_000, "Free-user cost budget");
+  bounded("e2b_cost_per_hour_inr", 0, 10_000, "E2B cost per hour");
   const { error } = await supabaseAdmin.from("finance_settings").upsert(row);
   if (error) throw new HttpError(500, error.message);
   invalidatePricing();

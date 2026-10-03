@@ -6,6 +6,9 @@ import { loadFinanceSettings } from "./pricing.js";
 
 export const EXPENSE_CATEGORIES = [
   { id: "infrastructure", label: "Servers & infrastructure" },
+  { id: "hosting", label: "Hosting (EC2, Supabase, CDN, email)" },
+  { id: "sandbox", label: "E2B sandboxes (fixed plan fees)" },
+  { id: "domains", label: "Domains & DNS" },
   { id: "model_credits", label: "AI provider credits" },
   { id: "software", label: "Software & tools" },
   { id: "salaries", label: "Salaries & contractors" },

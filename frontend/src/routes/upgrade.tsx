@@ -28,7 +28,7 @@ const FALLBACK_FEATURES: Record<CatalogPlan["id"], string[]> = {
   free: ["250K tokens a week", "Chat, search, Canvas and images"],
   pro: ["Everything in Free", "2.5M tokens a week", "Flagship models"],
   premium: ["Everything in Pro", "6.25M tokens a week", "Reasoning and heavy models"],
-  enterprise: ["Org-pooled tokens, no 5-hour lockout", "Per-member caps", "Every model"],
+  enterprise: ["Org-pooled usage, no 5-hour lockout", "Per-member caps", "Every model"],
 };
 
 function tokens(n: number): string {
@@ -464,7 +464,7 @@ export function UpgradePage() {
                 <FeatureList items={enterprise.features} />
                 <Chips title="Included for every member" items={entitlementChips(enterprise.entitlements)} />
                 {enterprise.limits.tokensPerSeat ? (
-                  <p className="mt-4 text-xs text-subtle">{tokens(enterprise.limits.tokensPerSeat)} pooled tokens per seat every month.</p>
+                  <p className="mt-4 text-xs text-subtle">Pooled usage for every seat, every month.</p>
                 ) : null}
               </motion.div>
             </div>

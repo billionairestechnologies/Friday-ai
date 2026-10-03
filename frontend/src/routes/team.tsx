@@ -37,7 +37,7 @@ function QuotaBar({ title, bucket }: { title: string; bucket: { used: number; li
         />
       </div>
       <p className="mt-2 text-xs text-muted">
-        {formatTokens(Math.max(0, bucket.used))} / {formatTokens(bucket.limit)} tokens ({pct}%)
+        {pct}% used
       </p>
     </div>
   );
@@ -312,13 +312,13 @@ export function TeamPage() {
                 >
                   Buy Enterprise seats
                 </button>{" "}
-                to pool tokens, add members, and set per-member caps.
+                to pool usage, add members, and set per-member caps.
               </p>
             )}
 
             {selected && selected.plan === "enterprise" && (
               <>
-                {orgQuota?.org && <QuotaBar title={`Pooled tokens (${orgQuota.org.seatCount} seats)`} bucket={orgQuota.org} />}
+                {orgQuota?.org && <QuotaBar title={`Pooled usage (${orgQuota.org.seatCount} seats)`} bucket={orgQuota.org} />}
 
                 {canManageMembers && (
                   <div className="flex items-center gap-2 rounded-2xl border border-border bg-elevated p-4">
@@ -415,7 +415,7 @@ export function TeamPage() {
                             </>
                           )}
                           {!canManageMembers && m.customMonthlyCap != null && (
-                            <span className="text-xs text-muted">Cap: {formatTokens(m.customMonthlyCap)} tokens/mo</span>
+                            <span className="text-xs text-muted">Cap: {formatTokens(m.customMonthlyCap)} credits/mo</span>
                           )}
                         </div>
                       ))}

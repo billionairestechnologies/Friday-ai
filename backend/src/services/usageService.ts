@@ -9,10 +9,12 @@ export type UsageEventType =
   | "sandbox_run"
   | "attachment_upload"
   | "image_generation"
+  /** Build-agent wall-clock seconds — what E2B bills us for; priced via finance_settings.e2b_cost_per_hour_inr. */
+  | "sandbox_second"
   | "token_usage";
 
 /** The feature categories shown in the Usage settings breakdown, in display order. */
-export const BREAKDOWN_EVENT_TYPES: Exclude<UsageEventType, "token_usage">[] = [
+export const BREAKDOWN_EVENT_TYPES: Exclude<UsageEventType, "token_usage" | "sandbox_second">[] = [
   "chat_message",
   "web_search",
   "voice_second",

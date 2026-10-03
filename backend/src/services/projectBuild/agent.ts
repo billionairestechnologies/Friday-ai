@@ -201,7 +201,8 @@ export async function runBuildAgent(opts: {
   signal?: AbortSignal;
   /** Usage meter (see runToolLoop): checked every round with the running token total; a non-null
    *  message stops the build right there instead of billing past the user's limit. */
-  budget?: (totalTokensSoFar: number) => Promise<string | null>;
+  /** Called each round with the turn's running usage; a string means "stop now" (limit reached). */
+  budget?: (usage: TokenUsage) => Promise<string | null>;
   /** Rounds this user's plan allows (entitlement buildMaxRounds); default MAX_ITERATIONS. */
   maxRounds?: number;
   /** The plan the user approved (plan.ts) — executed item by item and kept live as progress.
@@ -1040,7 +1041,7 @@ export async function runBuildAgent(opts: {
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     if (signal?.aborted) break;
     if (iteration > 1 && opts.budget) {
-      const stop = await opts.budget(usage.totalTokens).catch(() => null);
+      const stop = await opts.budget(usage).catch(() => null);
       if (stop) {
         emitText(`\n\n${stop} Your project is saved — continue once your usage resets or after upgrading.`);
         break;

@@ -104,6 +104,25 @@ export function modelLines(rows: UsageRow[], pricing: ModelPricing[], s: Finance
     .sort((a, b) => b.costInr - a.costInr);
 }
 
+/** Seconds of E2B sandbox time booked by Build turns in the window. */
+async function sandboxSeconds(from: string, to: string): Promise<number> {
+  let total = 0;
+  for (let offset = 0; offset < 500_000; offset += 1000) {
+    const { data, error } = await supabaseAdmin
+      .from("usage_events")
+      .select("quantity")
+      .eq("event_type", "sandbox_second")
+      .gte("created_at", from)
+      .lt("created_at", to)
+      .order("created_at")
+      .range(offset, offset + 999);
+    if (error) return total; // before migration 0047 the event type doesn't exist — no sandbox cost booked yet
+    total += (data ?? []).reduce((n, r) => n + Number(r.quantity ?? 0), 0);
+    if (!data || data.length < 1000) break;
+  }
+  return total;
+}
+
 async function sumPaid(from: string, to: string): Promise<number> {
   let total = 0;
   for (let offset = 0; offset < 200_000; offset += 1000) {
@@ -137,13 +156,14 @@ export async function financeReport(fromDate: string, toDate: string) {
   // Whole days in UTC: [from 00:00, to+1 00:00).
   const from = `${fromDate}T00:00:00.000Z`;
   const toExclusive = new Date(new Date(`${toDate}T00:00:00.000Z`).getTime() + 86_400_000).toISOString();
-  const [pricing, s, usage, revenueInr, images, expenses] = await Promise.all([
+  const [pricing, s, usage, revenueInr, images, expenses, sandboxSecs] = await Promise.all([
     loadPricing(),
     loadFinanceSettings(),
     supabaseAdmin.rpc("finance_model_usage", { since: from, until: toExclusive }),
     sumPaid(from, toExclusive),
     imageCount(from, toExclusive),
     listExpenses({ to: toDate }),
+    sandboxSeconds(from, toExclusive),
   ]);
   if (usage.error) throw new HttpError(500, `Usage aggregate failed: ${usage.error.message} (is migration 0040 applied?)`);
 
@@ -181,7 +201,8 @@ export async function financeReport(fromDate: string, toDate: string) {
 
   const aiCostInr = models.reduce((n, m) => n + m.costInr, 0) + (imageCostInr ?? 0);
   const valueInr = models.reduce((n, m) => n + m.valueInr, 0) + (imageValueInr != null ? imageValueInr * images : 0);
-  const grossProfit = revenueInr - aiCostInr;
+  const sandboxCostInr = (sandboxSecs / 3600) * s.e2b_cost_per_hour_inr;
+  const grossProfit = revenueInr - aiCostInr - sandboxCostInr;
   const netProfit = grossProfit - otherExpensesInr;
   return {
     window: { from: fromDate, to: toDate },
@@ -197,6 +218,8 @@ export async function financeReport(fromDate: string, toDate: string) {
     totals: {
       revenueInr: r2(revenueInr),
       aiCostInr: r2(aiCostInr),
+      sandboxHours: r2(sandboxSecs / 3600),
+      sandboxCostInr: r2(sandboxCostInr),
       usageValueInr: r2(valueInr),
       usageMarginPct: pct(valueInr - aiCostInr, valueInr),
       grossProfitInr: r2(grossProfit),

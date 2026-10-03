@@ -550,9 +550,6 @@ function QuotaBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-2 text-xs text-muted">
-        {formatTokens(Math.max(0, bucket.used))} / {formatTokens(bucket.limit)} tokens
-      </p>
       {breakdown && breakdown.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-3 border-t border-border pt-3">
           {breakdown.map((entry, i) => (

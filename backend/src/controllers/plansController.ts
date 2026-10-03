@@ -1,3 +1,4 @@
+import { planEconomics } from "../services/finance/planEconomics.js";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { supabaseAdmin } from "../config/supabase.js";
@@ -18,6 +19,10 @@ const entitlementsSchema = z.record(z.string(), z.union([z.boolean(), z.number()
 
 function audit(req: Request, action: string, targetType: string, targetId?: string, meta: Record<string, unknown> = {}) {
   void recordAdminAuditLog(req.user!.id, action, targetType, targetId, meta).catch(() => {});
+}
+
+export async function economics(_req: Request, res: Response) {
+  res.json(await planEconomics());
 }
 
 export async function overview(_req: Request, res: Response) {

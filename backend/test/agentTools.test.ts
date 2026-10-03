@@ -174,8 +174,8 @@ test("tool loop stops the moment the usage budget says the limit is reached", as
     onStep: () => {},
     maxRounds: 10,
     budget: async (spent) => {
-      totals.push(spent);
-      return spent >= 2000 ? "You've reached your weekly usage limit, so I stopped here." : null;
+      totals.push(spent.totalTokens);
+      return spent.totalTokens >= 2000 ? "You've reached your weekly usage limit, so I stopped here." : null;
     },
     resolve: async () => ({ adapter: looping, apiKey: "k" }),
   });

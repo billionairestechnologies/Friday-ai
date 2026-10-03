@@ -5,6 +5,7 @@ import { getRedisClient } from "../redisClient.js";
 import { logger } from "../../utils/logger.js";
 import type { TokenUsage } from "../tokenUsage.js";
 import { priceUsage } from "../finance/pricing.js";
+import { creditsForInputTokens, DEFAULT_RESERVE_RATES } from "./meter.js";
 import {
   decideQuota,
   ENTERPRISE_MIN_SEATS,
@@ -84,10 +85,14 @@ async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePl
  *  (single-flight) so the second call is free. Plan changes take effect within the TTL. */
 export const resolveEffectivePlan = memoAsync(15_000, resolveEffectivePlanUncached, (userId) => userId);
 
-/** Rough pre-flight estimate: ~4 chars/token for the prompt, plus a fixed completion buffer,
- *  reserved before dispatch and corrected to the real count once the provider reports usage. */
+/** Pre-flight hold, in credits: the prompt (~4 chars/token) as fresh input plus a fixed completion buffer,
+ *  both at the default rates. The real, model-priced figure replaces it as the turn is metered
+ *  (chargeProgress) and reconciled. Counters were raw tokens before the credit meter; the `quota:v2:`
+ *  key prefix keeps those stale numbers from being read as credits. */
 export function estimateReservationTokens(promptChars: number, completionBufferTokens = 800): number {
-  return Math.max(1, Math.ceil(promptChars / 4)) + completionBufferTokens;
+  const input = creditsForInputTokens(Math.max(1, Math.ceil(promptChars / 4)), DEFAULT_RESERVE_RATES);
+  const output = Math.ceil((completionBufferTokens * DEFAULT_RESERVE_RATES.output * 100_000) / 1_000_000);
+  return Math.max(1, input + output);
 }
 
 function monthKey(date = new Date()): string {
@@ -103,6 +108,13 @@ async function rollingWindowUsed(redis: NonNullable<Awaited<ReturnType<typeof ge
     if (Number.isFinite(tokens)) sum += tokens;
   }
   return sum;
+}
+
+/** When the oldest usage in the 5-hour window rolls off (the next moment the meter frees up); a full window from now if empty. */
+async function rollingResetAt(redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>, key: string, now: number): Promise<Date> {
+  const oldest = await redis.zRangeWithScores(key, 0, 0).catch(() => []);
+  const score = oldest[0]?.score;
+  return new Date((typeof score === "number" && score > 0 ? score : now) + ROLLING_WINDOW_SECONDS * 1000);
 }
 
 async function counterGet(redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>, key: string): Promise<number> {
@@ -208,8 +220,8 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
 
   if (effective.enterprise) {
     const orgId = effective.enterprise.organizationId;
-    const orgMonthKey = `quota:orgmonth:${orgId}:${month}`;
-    const memberCapKey = effective.customMonthlyCap != null ? `quota:membermonth:${orgId}:${userId}:${month}` : null;
+    const orgMonthKey = `quota:v2:orgmonth:${orgId}:${month}`;
+    const memberCapKey = effective.customMonthlyCap != null ? `quota:v2:membermonth:${orgId}:${userId}:${month}` : null;
 
     const orgUsed = await counterGet(redis, orgMonthKey);
     const memberUsed = memberCapKey ? await counterGet(redis, memberCapKey) : 0;
@@ -254,9 +266,9 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
 
   const limits = PLAN_LIMITS[effective.plan];
   const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap, await planLimitsFor(effective.plan).catch(() => undefined));
-  const rollingKey = `quota:roll:${userId}`;
-  const weekKey = `quota:week:${userId}`;
-  const monthTokenKey = eff.monthly != null ? `quota:month:${userId}:${month}` : null;
+  const rollingKey = `quota:v2:roll:${userId}`;
+  const weekKey = `quota:v2:week:${userId}`;
+  const monthTokenKey = eff.monthly != null ? `quota:v2:month:${userId}:${month}` : null;
 
   const [rollingUsed, weeklyUsed, monthlyUsed] = await Promise.all([
     rollingWindowUsed(redis, rollingKey, now),
@@ -273,7 +285,7 @@ export async function checkAndReserve(userId: string, reserveTokens: number): Pr
   if (!decision.allowed) {
     const resetAt =
       decision.reason === "rolling_window"
-        ? new Date(now + limits.rollingWindowSeconds * 1000)
+        ? await rollingResetAt(redis, rollingKey, now)
         : decision.reason === "monthly"
           ? nextMonthlyReset()
           : nextWeeklyReset();
@@ -469,12 +481,12 @@ export async function grantBonusTokens(userId: string, tokens: number): Promise<
   const month = monthKey();
 
   if (effective.enterprise) {
-    await redis.incrBy(`quota:orgmonth:${effective.enterprise.organizationId}:${month}`, -tokens);
+    await redis.incrBy(`quota:v2:orgmonth:${effective.enterprise.organizationId}:${month}`, -tokens);
     return;
   }
-  await redis.incrBy(`quota:week:${userId}`, -tokens);
+  await redis.incrBy(`quota:v2:week:${userId}`, -tokens);
   if (PLAN_LIMITS[effective.plan].monthlyTokens != null) {
-    await redis.incrBy(`quota:month:${userId}:${month}`, -tokens);
+    await redis.incrBy(`quota:v2:month:${userId}:${month}`, -tokens);
   }
 }
 
@@ -484,7 +496,7 @@ export async function resetUserQuotaNow(userId: string): Promise<void> {
   const redis = await getRedisClient();
   if (!redis) throw new Error("Redis is not configured — can't reset quota");
   const month = monthKey();
-  await redis.del([`quota:week:${userId}`, `quota:month:${userId}:${month}`, `quota:roll:${userId}`]);
+  await redis.del([`quota:v2:week:${userId}`, `quota:v2:month:${userId}:${month}`, `quota:v2:roll:${userId}`]);
 }
 
 /** Full status for the Usage settings panel and the 50/80/90/100% threshold toasts. */
@@ -496,8 +508,8 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
 
   if (effective.enterprise) {
     const orgId = effective.enterprise.organizationId;
-    const orgMonthKey = `quota:orgmonth:${orgId}:${month}`;
-    const memberCapKey = effective.customMonthlyCap != null ? `quota:membermonth:${orgId}:${userId}:${month}` : null;
+    const orgMonthKey = `quota:v2:orgmonth:${orgId}:${month}`;
+    const memberCapKey = effective.customMonthlyCap != null ? `quota:v2:membermonth:${orgId}:${userId}:${month}` : null;
     const orgUsed = redis ? await counterGet(redis, orgMonthKey) : 0;
     const memberUsed = redis && memberCapKey ? await counterGet(redis, memberCapKey) : 0;
     return {
@@ -518,9 +530,9 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
 
   const limits = PLAN_LIMITS[effective.plan];
   const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap, await planLimitsFor(effective.plan).catch(() => undefined));
-  const rollingKey = `quota:roll:${userId}`;
-  const weekKey = `quota:week:${userId}`;
-  const monthTokenKey = eff.monthly != null ? `quota:month:${userId}:${month}` : null;
+  const rollingKey = `quota:v2:roll:${userId}`;
+  const weekKey = `quota:v2:week:${userId}`;
+  const monthTokenKey = eff.monthly != null ? `quota:v2:month:${userId}:${month}` : null;
 
   const [rollingUsed, weeklyUsed, monthlyUsed] = redis
     ? await Promise.all([
@@ -538,7 +550,7 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
     rolling: {
       used: meterValue(rollingUsed, eff.rolling),
       limit: eff.rolling,
-      resetAt: new Date(now + limits.rollingWindowSeconds * 1000).toISOString(),
+      resetAt: (redis ? await rollingResetAt(redis, rollingKey, now) : new Date(now + limits.rollingWindowSeconds * 1000)).toISOString(),
     },
     weekly: { used: meterValue(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
     monthly:
