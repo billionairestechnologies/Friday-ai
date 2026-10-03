@@ -75,7 +75,7 @@ export default function MailHosting() {
           <p className="text-muted">
             Friday manages mailboxes on a <span className="text-foreground">mailcow</span> server you run (open-source: Postfix, Dovecot, spam filter, webmail). Set it up on a VPS with port 25 open, then set
             <span className="font-mono text-foreground"> MAILCOW_URL</span> and <span className="font-mono text-foreground">MAILCOW_API_KEY</span> on the Friday server. Full steps and DNS in
-            <span className="font-mono text-foreground"> docs/MAIL_HOSTING.md</span>.
+            <span className="font-mono text-foreground"> docs/operations/MAIL_HOSTING.md</span>.
           </p>
         </Card>
       ) : d ? (

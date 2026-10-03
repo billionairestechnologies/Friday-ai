@@ -15,7 +15,7 @@ CI runs the same checks on pull requests and pushes to `main`.
 
 ## Environment
 
-On AWS, see `docs/AWS_DEPLOY.md` — all of the settings below go into one Secrets Manager secret.
+On AWS, see `docs/operations/AWS_DEPLOY.md` — all of the settings below go into one Secrets Manager secret.
 
 Production must set:
 
@@ -45,7 +45,7 @@ Optional:
 - `FRIDAY_BUILD_MODELS` — regex replacing Build's frontier-model allow-list (`projectBuild/buildModels.ts`)
 - `MAILCOW_URL`, `MAILCOW_API_KEY` (+ optional `MAIL_SERVER_HOST`) — company mail hosting on our own
   mailcow server: Team Console → Mail hosting creates employee mailboxes; Mailbox is the webmail
-  (see `docs/MAIL_HOSTING.md`). Migrations `0040` (finance) and `0041` (mail) must be applied.
+  (see `docs/operations/MAIL_HOSTING.md`). Migrations `0040` (finance) and `0041` (mail) must be applied.
 - `FRIDAY_DRAIN_SECONDS` (default 20) — on deploy/stop, running turns get this long to finish before they are
   handed over (keep it under the platform's kill timeout); `FRIDAY_DISABLE_TURN_RESUME=1` stops the sweeper
   that resumes interrupted Builds and reports interrupted chats (migration `0042_add_active_turns`)

@@ -11,7 +11,7 @@ import { encryptSecret } from "../../utils/crypto.js";
  *
  * Why mailcow rather than writing a mail server: deliverability (SPF/DKIM/DMARC, spam filtering,
  * TLS, queues, IP reputation) is years of work that already exists; owning the server keeps the
- * data and the cost ours. See docs/MAIL_HOSTING.md for the server + DNS setup.
+ * data and the cost ours. See docs/operations/MAIL_HOSTING.md for the server + DNS setup.
  *
  * Env: MAILCOW_URL (https://mail.company.com), MAILCOW_API_KEY (read-write key from mailcow's
  * Configuration → Access → API), MAIL_SERVER_HOST (the hostname clients connect to; defaults to
@@ -48,7 +48,7 @@ type MailcowResult = { type?: string; msg?: unknown; log?: unknown };
 
 /** Calls mailcow; its API answers 200 even on failure, with `type: "danger" | "error"` in the body. */
 async function mailcow(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
-  if (!mailHostingConfigured()) throw new HttpError(503, "Mail hosting isn't connected — set MAILCOW_URL and MAILCOW_API_KEY on the server (see docs/MAIL_HOSTING.md).");
+  if (!mailHostingConfigured()) throw new HttpError(503, "Mail hosting isn't connected — set MAILCOW_URL and MAILCOW_API_KEY on the server (see docs/operations/MAIL_HOSTING.md).");
   const res = await fetch(`${process.env.MAILCOW_URL!.replace(/\/$/, "")}/api/v1/${path}`, {
     method,
     headers: { "X-API-Key": process.env.MAILCOW_API_KEY!, "Content-Type": "application/json", Accept: "application/json" },

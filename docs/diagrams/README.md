@@ -44,4 +44,4 @@ npx -p @mermaid-js/mermaid-cli mmdc -i 11-agent-tool-loop.mmd -o 11-agent-tool-l
 
 `BOSS_PACK.html` embeds the `.mmd` sources — regenerate its sections when a source changes.
 
-Written briefing (no images required): [`../PLATFORM_BRIEFING.md`](../PLATFORM_BRIEFING.md) · Upgrade roadmap: [`../UPGRADE_ROADMAP.md`](../UPGRADE_ROADMAP.md)
+Written briefing (no images required): [`../architecture/PLATFORM_BRIEFING.md`](../architecture/PLATFORM_BRIEFING.md) · Upgrade roadmap: [`../product/UPGRADE_ROADMAP.md`](../product/UPGRADE_ROADMAP.md)

@@ -6,8 +6,13 @@ Multi-model AI chat platform. Users chat with any AI model (OpenAI, Anthropic, G
 
 ```
 backend/    Node.js + TypeScript + Express API, Supabase (Postgres) as the database
-frontend/   React + Vite + TypeScript SPA (Auth, Chat, Admin Panel)
-supabase/   SQL migrations (schema for profiles, providers, api_keys, models, conversations, messages)
+frontend/   React + Vite + TypeScript SPA (chat, Build workspace, Library, Team Console at /admin)
+android/    Kotlin + Jetpack Compose app
+ios/        SwiftUI app
+cli/        Friday X — terminal coding agent (Rust; Apache-2.0 fork, own LICENSE/NOTICE)
+supabase/   SQL migrations, applied in order
+infra/      AWS deploy templates
+docs/       architecture/ · operations/ · product/ · diagrams/ — start at docs/README.md
 ```
 
 ## Branching model

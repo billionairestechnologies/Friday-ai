@@ -3,7 +3,7 @@
 > **Update (branch `claude/architecture-analysis-p7x2lr`):** Friday is now an agent platform — native tool
 > calling, connector + MCP tools, code execution, Deep Research, long-term memory, Automations, chat search,
 > share links, and a Build Mode coding agent that opens GitHub PRs. Migrations now run to `0027`. See
-> [`UPGRADE_ROADMAP.md`](./UPGRADE_ROADMAP.md) and diagrams 11–14 in [`diagrams/`](./diagrams/README.md);
+> [`UPGRADE_ROADMAP.md`](../product/UPGRADE_ROADMAP.md) and diagrams 11–14 in [`diagrams/`](../diagrams/README.md);
 > the sections below describe the platform as of PR #2.
 
 **Audience:** leadership and engineering  
@@ -12,7 +12,7 @@
 **Head commit:** `6168a05` — *feat: complete Google sign-in and remaining connectors*  
 **Base:** `main`
 
-**Downloadable diagrams (PNG / SVG / PDF via HTML):** see [`docs/diagrams/`](./diagrams/README.md) and the boss pack [`docs/diagrams/BOSS_COPY.md`](./diagrams/BOSS_COPY.md).
+**Downloadable diagrams (PNG / SVG / PDF via HTML):** see [`docs/diagrams/`](../diagrams/README.md) and the boss pack [`docs/diagrams/BOSS_COPY.md`](../diagrams/BOSS_COPY.md).
 
 ---
 
@@ -270,7 +270,7 @@ Friday-ai/
     src/services/           chat, providers, billing, connectors, usage
     src/services/providers/ one adapter per model vendor
   supabase/migrations/      0001–0014
-  docs/OPERATIONS.md        deploy + incident runbook
+  docs/operations/OPERATIONS.md        deploy + incident runbook
 ```
 
 **Local mental model**
@@ -377,7 +377,7 @@ Also apply SQL `0001` through `0014` on the Supabase project **before** deployin
 | UI settings / billing / team | `frontend/src/components/settings-modal.tsx` |
 | UI plugins | `frontend/src/components/plugins-drawer.tsx` |
 | Schema history | `supabase/migrations/` |
-| Incidents / rollback | `docs/OPERATIONS.md` |
+| Incidents / rollback | `docs/operations/OPERATIONS.md` |
 
 **Verify locally**
 

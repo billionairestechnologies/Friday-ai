@@ -190,7 +190,7 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
    `0036_add_skills`. The `generated-files` storage bucket is created by the backend on first use.
 2. **Environment** — required as before; new optional: `STATUS_ALERT_EMAILS`, `SUPPORT_INBOUND_SECRET`,
    and kill switches `FRIDAY_DISABLE_STATUS_MONITOR`, `FRIDAY_DISABLE_CAMPAIGNS`,
-   `FRIDAY_DISABLE_GRANT_EXPIRY` (see `docs/OPERATIONS.md`).
+   `FRIDAY_DISABLE_GRANT_EXPIRY` (see `docs/operations/OPERATIONS.md`).
 3. **Behaviour changes**: everyone re-accepts the updated policy once (version `2026-09-29`); long
    turns now stop at the usage limit instead of running past it; Build Mode length follows the plan's
    entitlement (Free 30 rounds, Pro 100, Premium/Enterprise 150).

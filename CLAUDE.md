@@ -19,7 +19,8 @@ backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist i
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
 supabase/   SQL migrations 0001…0044 (apply in order; RLS on, backend uses service role)
-docs/       OPERATIONS.md, PLATFORM_BRIEFING.md, UPGRADE_ROADMAP.md, diagrams/ (Mermaid .mmd → png/svg)
+cli/        Friday X — terminal coding agent (Rust, Apache-2.0 fork; own LICENSE/NOTICE). Under construction.
+docs/       README.md (index) · architecture/ · operations/ · product/ · diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
 
@@ -160,7 +161,7 @@ npm run verify                                        # migrations + typechecks 
 ```
 
 A fresh test environment (e.g. a Railway service "friday-test" + its own Supabase project) needs:
-all migrations `0001…0036` applied in order, the env vars in `docs/OPERATIONS.md` (at minimum Supabase
+all migrations `0001…0036` applied in order, the env vars in `docs/operations/OPERATIONS.md` (at minimum Supabase
 URL/keys, `KEY_ENCRYPTION_SECRET`, `RESEND_API_KEY`, `CORS_ORIGIN`, `PUBLIC_APP_URL`/`PUBLIC_API_URL`;
 `REDIS_URL` for quota metering/allowances/status leases; Razorpay **test** keys for checkout; `E2B_API_KEY`
 for Build Mode/run_code), at least one provider key added in `/admin → Models & keys`, and one account
@@ -171,11 +172,11 @@ test campaign to yourself, create a package/offer and redeem it, hit a usage lim
 
 ## Production (EC2)
 
-Live production is one EC2 instance with Docker + self-hosted Supabase, NOT the ECS stack below — see `docs/EC2_DEPLOY.md` (SSM access, image build, migrations, container swap, rollback).
+Live production is one EC2 instance with Docker + self-hosted Supabase, NOT the ECS stack below — see `docs/operations/EC2_DEPLOY.md` (SSM access, image build, migrations, container swap, rollback).
 
 ## Deploying on AWS
 
-`docs/AWS_DEPLOY.md` + `infra/aws/`: ECS Fargate behind an ALB (1 h idle timeout for SSE), ElastiCache
+`docs/operations/AWS_DEPLOY.md` + `infra/aws/`: ECS Fargate behind an ALB (1 h idle timeout for SSE), ElastiCache
 Redis, image built in CodeBuild (`friday-build.yaml`, `buildspec.yml`), settings in ONE Secrets Manager
 JSON secret read at startup as `FRIDAY_ENV_JSON` (`config/env.ts#expandJsonEnv`; explicit env wins).
 Deploy: `infra/aws/deploy.sh [--env-file infra/aws/app.env]` (deploys the committed HEAD). Lint the
@@ -196,7 +197,7 @@ Team Console → **Finance** (`services/finance/`: `model_pricing` cost vs sell 
 per-call cost in `token_ledger`, OpenRouter list-price sync, `finance_model_usage()` aggregate, P&L,
 expenses — migration 0040) and **Mailbox / Mail hosting** (`services/mail/`: mailcow REST API for
 company domains + employee mailboxes, IMAP/SMTP webmail for hosted + Gmail/Outlook/any accounts —
-migration 0041, `docs/MAIL_HOSTING.md`). Permissions `finance.view|manage`, `mailbox.use`.
+migration 0041, `docs/operations/MAIL_HOSTING.md`). Permissions `finance.view|manage`, `mailbox.use`.
 Claude-gap work on the same branch:
 - Deep Research fans out: `research_in_parallel` (`agent/tools/research.ts` → `runSubAgents` kind
   "research"; nested steps/usage merged into the turn).
@@ -215,7 +216,7 @@ Claude-gap work on the same branch:
 - Kill switches: `FRIDAY_DISABLE_TURN_RESUME=1`, `FRIDAY_DRAIN_SECONDS`, `FRIDAY_DISABLE_EMBEDDINGS=1`,
   `FRIDAY_DISABLE_BROWSER=1`.
 
-Latest on v2 (see `docs/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
+Latest on v2 (see `docs/product/UPGRADE_ROADMAP.md` sections L–N and the v2 deploy notes):
 Team Console (`/admin`: support, CRM, tasks, product updates, email campaigns, plans & offers, users, team
 & roles, team mail, status & crashes, models, billing, audit) · What's New popups once per account (web,
 Android, iOS) · Help & support center · plan catalog + public packages + offers/student passes + access
@@ -236,7 +237,7 @@ markdown streaming on web, and a direct/well-structured response-style prompt.
 
 Earlier:
 
-Shipped (see `docs/UPGRADE_ROADMAP.md` for the full list with status):
+Shipped (see `docs/product/UPGRADE_ROADMAP.md` for the full list with status):
 native tool calling · agent loop · web_search/fetch_url · run_code · GitHub/Gmail/Drive/Calendar/Notion/
 Vercel/Railway/Supabase/Razorpay tools · MCP servers · long-term memory (+ Settings UI) · Deep Research ·
 Automations (+ page) · full-text chat search · share links · Build Mode edit/grep/ls/GitHub import/PR ·
