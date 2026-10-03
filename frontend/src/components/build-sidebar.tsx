@@ -4,7 +4,8 @@ import { Code2, LibraryBig, MessageSquare, Plus, Puzzle, Search, Trash2, X } fro
 import { BrandWordmark } from "@/components/brand-mark";
 import { ProfileDock } from "@/components/profile-dock";
 import { api } from "@/lib/api";
-import { STATUS_META, useBuildSessions } from "@/lib/build-mode/sessions";
+import { STATUS_META, useBuildSessions, type BuildSessionStatus } from "@/lib/build-mode/sessions";
+import { useIsWorking, WorkingSpinner } from "@/components/working-indicator";
 import { filteredChats, useChat, type ServerConversation } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 
@@ -180,11 +181,7 @@ export function BuildSidebar({ onClose }: { onClose: () => void }) {
                       c.id === activeId ? "bg-selected text-foreground" : "text-muted hover:bg-chip-on hover:text-foreground",
                     )}
                   >
-                    <span
-                      className={cn("size-1.5 shrink-0 rounded-full", meta ? meta.dot : "bg-border")}
-                      title={meta?.label}
-                      aria-label={meta?.label}
-                    />
+                    <RowStatus chatId={c.id} status={status} dotClass={meta ? meta.dot : "bg-border"} label={meta?.label} />
                     <span className="truncate">{c.title}</span>
                   </button>
                   <button
@@ -204,4 +201,11 @@ export function BuildSidebar({ onClose }: { onClose: () => void }) {
       <ProfileDock />
     </>
   );
+}
+
+/** A running build (server status) or a reply streaming in this browser shows the round spinner; otherwise the status dot. */
+function RowStatus({ chatId, status, dotClass, label }: { chatId: string; status: BuildSessionStatus | undefined; dotClass: string; label?: string }) {
+  const working = useIsWorking(chatId);
+  if (working || status === "running") return <WorkingSpinner label={status === "running" ? "Running" : "Working"} />;
+  return <span className={cn("size-1.5 shrink-0 rounded-full", dotClass)} title={label} aria-label={label} />;
 }

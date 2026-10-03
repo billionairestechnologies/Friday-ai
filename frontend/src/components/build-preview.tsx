@@ -144,7 +144,7 @@ function SessionTerminal({ steps, building }: { steps: BuildStep[]; building: bo
         const el = e.currentTarget;
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
       }}
-      className="h-full overflow-auto bg-[#0c0c0d] px-4 py-3 font-mono text-[12px] leading-[1.6] text-[#c9ccd1]"
+      className="scroll-on-dark h-full overflow-auto bg-[#0c0c0d] px-4 py-3 font-mono text-[12px] leading-[1.6] text-[#c9ccd1]"
     >
       {entries.map((st) =>
         st.kind === "write" ? (

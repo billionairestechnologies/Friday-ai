@@ -497,6 +497,38 @@ html.light {
   scrollbar-color: var(--color-scrollbar) transparent;
 }
 
+/* Every scroll area follows the theme (thin, rounded, no white track) — the canvas, terminal, files and
+   code panes used to show the browser's chunky default scrollbar against the app's own surfaces. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-hover);
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* The terminal and command output are always dark, whatever the theme — light thumb on them. */
+.scroll-on-dark {
+  scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+}
+.scroll-on-dark::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+}
+.scroll-on-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
 .thread-scroll {
   overflow-y: auto;
   overflow-anchor: none;

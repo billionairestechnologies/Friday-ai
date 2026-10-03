@@ -112,7 +112,7 @@ const MiniTerminal = memo(function MiniTerminal({ step }: { step: BuildStep }) {
           <span className={cn("font-mono text-[10.5px]", step.exitCode === 0 ? "text-emerald-400/80" : "text-red-400")}>exit {step.exitCode}</span>
         )}
       </div>
-      <pre ref={body} className="max-h-56 overflow-auto px-3 py-2 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap text-[#c9ccd1]">
+      <pre ref={body} className="scroll-on-dark max-h-56 overflow-auto px-3 py-2 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap text-[#c9ccd1]">
         <span className="text-emerald-400">$ </span>
         <span className="text-[#e8eaed]">{step.cmd}</span>
         {output ? `\n${output.replace(/\s+$/, "")}` : ""}

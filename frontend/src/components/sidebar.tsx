@@ -1,3 +1,4 @@
+import { useIsWorking, WorkingSpinner } from "@/components/working-indicator";
 import { useEffect, useState } from "react";
 import {
   Building2,
@@ -378,6 +379,7 @@ export function Sidebar() {
                       >
                         {buildMode && <Hammer className="size-3.5 shrink-0 text-subtle" />}
                         <span className="truncate">{c.title}</span>
+                        <ChatWorking chatId={c.id} />
                       </button>
                       <button
                         type="button"
@@ -438,4 +440,9 @@ export function SidebarToggle() {
       <PanelLeft className="size-4" />
     </button>
   );
+}
+
+/** Round spinner at the end of a chat row while that chat is still producing its answer. */
+function ChatWorking({ chatId }: { chatId: string }) {
+  return useIsWorking(chatId) ? <WorkingSpinner className="ml-auto" /> : null;
 }
