@@ -92,6 +92,15 @@ Gotchas:
   (`BuildCanvas`: Preview / Files / Terminal) docked on the right.
 - `services/automations/` — schedule math (`schedule.ts`, DST-safe) + service/scheduler (atomic lease).
 - `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/connectorService.ts`.
+- **Usage unit = CREDITS** (`services/quota/meter.ts`, migration 0046): what a call really costs us, 100,000 credits = US$1, priced per call
+  from `effectiveCostRatesUsd` (`finance/pricing.ts`: blended ₹/1M for every model, or a model's own price when `cost_override`; cache
+  reads/writes at their own rates). Every limit (plan windows, org pools, packages, grants, personal caps) is in credits; the DB columns
+  keep their old `*_tokens` names. Users only ever see percent + reset time. Redis keys are `quota:v2:*`. Per-turn guards:
+  `agent/loopGuard.ts` (3–4 identical rounds → stop; a turn may spend ≤80% of the 5-hour window). Test hook: `setRedisClientForTests`
+  (`test/quotaAccounting.test.ts` runs the real accounting on a fake Redis).
+- Profit controls (migration 0047/0048): `finance_settings` blended cost, target cost share, free budget, E2B ₹/hour; Build time booked as
+  `sandbox_second` usage; `finance/planEconomics.ts` (Console → Plans → Profit: usage at cap + E2B + hosting/domains overhead, suggested
+  limits) and `finance/liveUsage.ts` (Console → Finance → Live usage); `token_ledger.feature` powers the cost-based Usage breakdown.
 - `services/quota/` — `tierConfig.ts` (code defaults + pure `decideQuota`), `planCatalog.ts` (the
   console-edited `plan_catalog`: prices, copy, limits, **entitlements**; `ENTITLEMENT_DEFS`,
   sanitize/merge), `entitlements.ts` (`entitlementsFor(user)` = plan ← catalog ← org ← personal package;

@@ -1,3 +1,4 @@
+import { LOOP_STOP_MESSAGE, LoopGuard, TURN_CAP_MESSAGE } from "../agent/loopGuard.js";
 import { getProviderAdapter } from "../providers/registry.js";
 import { recordProviderIssue } from "../status/providerIssues.js";
 import { friendlyProviderError } from "../../utils/providerError.js";
@@ -1038,12 +1039,13 @@ export async function runBuildAgent(opts: {
   };
 
   let pause: BuildPause | undefined;
+  const loopGuard = new LoopGuard(4); // a Build round is often one repeated fix attempt — a little more patience than chat
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     if (signal?.aborted) break;
     if (iteration > 1 && opts.budget) {
       const stop = await opts.budget(usage).catch(() => null);
       if (stop) {
-        emitText(`\n\n${stop} Your project is saved — continue once your usage resets or after upgrading.`);
+        emitText(stop === TURN_CAP_MESSAGE ? `\n\n${stop}` : `\n\n${stop} Your project is saved — continue once your usage resets or after upgrading.`);
         break;
       }
     }
@@ -1097,6 +1099,10 @@ export async function runBuildAgent(opts: {
       }
 
       if (unnoted.trim()) pushNote(unnoted);
+      if (loopGuard.record(result.toolCalls)) {
+        emitText(`\n\n${LOOP_STOP_MESSAGE} Your project is saved.`);
+        break;
+      }
       nativeMessages.push({ role: "assistant", content: text, toolCalls: result.toolCalls });
       const outputs: string[] = [];
       let doneIndex = -1;

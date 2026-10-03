@@ -11,8 +11,8 @@ type Toast = { id: string; message: string; danger: boolean };
 // The 5-hour rolling window is this app's closest analog to a "daily" throttle (there is no
 // literal daily bucket — see tokenQuotaService.ts), so it gets the same treatment requested for
 // daily usage; weekly gets the finer-grained 50/80/90/100 ladder since it's the harder wall.
-const ROLLING_THRESHOLDS = [80, 100];
-const WEEKLY_THRESHOLDS = [50, 80, 90, 100];
+const ROLLING_THRESHOLDS = [80, 95, 100];
+const WEEKLY_THRESHOLDS = [50, 80, 95, 100];
 const POLL_MS = 60_000;
 
 function armedKey(name: string, threshold: number): string {

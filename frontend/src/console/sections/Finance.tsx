@@ -117,14 +117,15 @@ const profitTone = (n: number) => (n > 0 ? "text-emerald-400" : n < 0 ? "text-da
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function Finance() {
-  const [tab, setTab] = useState<"pnl" | "pricing" | "expenses">("pnl");
+  const [tab, setTab] = useState<"pnl" | "live" | "pricing" | "expenses">("pnl");
   return (
     <>
       <PageHeader title="Finance" description="Model cost vs price per 1M tokens, profit by model, the company P&L and expenses — all in ₹." />
       <div className="mb-5">
-        <Segmented value={tab} onChange={setTab} options={[{ value: "pnl", label: "Profit & loss" }, { value: "pricing", label: "Model pricing" }, { value: "expenses", label: "Expenses" }]} />
+        <Segmented value={tab} onChange={setTab} options={[{ value: "pnl", label: "Profit & loss" }, { value: "live", label: "Live usage" }, { value: "pricing", label: "Model pricing" }, { value: "expenses", label: "Expenses" }]} />
       </div>
       {tab === "pnl" && <PnL />}
+      {tab === "live" && <LiveUsage />}
       {tab === "pricing" && <Pricing />}
       {tab === "expenses" && <Expenses />}
     </>
@@ -658,5 +659,75 @@ function ExpenseDrawer({ expense, categories, onClose, onSaved }: { expense: Par
         )}
       </div>
     </Drawer>
+  );
+}
+
+type Live = {
+  windowHours: number;
+  totalCostInr: number;
+  previousCostInr: number;
+  spikes: number;
+  hourly: { hour: string; costInr: number }[];
+  byFeature: { feature: string; costInr: number }[];
+  byModel: { provider: string; model: string; costInr: number }[];
+  topUsers: { userId: string; name: string | null; plan: string; costInr: number; calls: number; monthlyAllowanceInr: number; shareOfMonthlyPct: number | null; spike: boolean }[];
+};
+
+/** What the platform is spending on models in the last 24 hours, who is spending it, and who looks abnormal. */
+function LiveUsage() {
+  const live = useResource<Live>("/console/finance/live");
+  const d = live.data;
+  if (live.loading && !d) return <Loading />;
+  if (!d) return <ErrorNote error={live.error} />;
+  const peak = Math.max(1, ...d.hourly.map((h) => h.costInr));
+  const trend = d.previousCostInr > 0 ? ((d.totalCostInr - d.previousCostInr) / d.previousCostInr) * 100 : null;
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Stat label={`Model cost, last ${d.windowHours} h`} value={inr(d.totalCostInr, 0)} hint={trend == null ? "no earlier data" : `${trend >= 0 ? "+" : ""}${trend.toFixed(0)}% vs the 24 h before`} accent="#ff6b6b" />
+        <Stat label="Burn rate" value={`${inr(d.totalCostInr / d.windowHours, 1)}/h`} hint="average over the window" accent="#4dabf7" />
+        <Stat label="Users flagged" value={String(d.spikes)} hint="a day's usage ≥ 25% of their monthly allowance" accent={d.spikes ? "#f59f00" : "#51cf66"} />
+      </div>
+      <Card>
+        <div className="mb-3 flex items-center justify-between text-sm font-semibold">
+          <span>Cost per hour</span>
+          <Button size="sm" variant="ghost" onClick={() => void live.reload()}>Refresh</Button>
+        </div>
+        <div className="flex h-28 items-end gap-1" role="img" aria-label="Model cost per hour for the last 24 hours">
+          {d.hourly.map((h) => (
+            <div key={h.hour} title={`${new Date(h.hour).toLocaleTimeString([], { hour: "numeric" })}: ${inr(h.costInr, 1)}`} className="flex-1 rounded-t bg-search" style={{ height: `${Math.max(2, (h.costInr / peak) * 100)}%` }} />
+          ))}
+        </div>
+      </Card>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <div className="mb-2 text-sm font-semibold">By feature</div>
+          <ul className="grid gap-1 text-sm">{d.byFeature.map((f) => <li key={f.feature} className="flex justify-between"><span className="capitalize">{f.feature}</span><span>{inr(f.costInr, 1)}</span></li>)}</ul>
+        </Card>
+        <Card>
+          <div className="mb-2 text-sm font-semibold">By model</div>
+          <ul className="grid gap-1 text-sm">{d.byModel.map((m) => <li key={`${m.provider}/${m.model}`} className="flex justify-between"><span>{m.provider} / {m.model}</span><span>{inr(m.costInr, 1)}</span></li>)}</ul>
+        </Card>
+      </div>
+      <Card>
+        <div className="mb-2 text-sm font-semibold">Top consumers</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs text-muted"><tr><th className="py-1 pr-3">User</th><th className="pr-3">Plan</th><th className="pr-3 text-right">Cost</th><th className="pr-3 text-right">Calls</th><th className="text-right">Of monthly allowance</th></tr></thead>
+            <tbody>
+              {d.topUsers.map((u) => (
+                <tr key={u.userId} className="border-t border-border">
+                  <td className="py-1.5 pr-3">{u.name ?? u.userId.slice(0, 8)}{u.spike && <Badge tone="amber" className="ml-2">spike</Badge>}</td>
+                  <td className="pr-3 capitalize">{u.plan}</td>
+                  <td className="pr-3 text-right">{inr(u.costInr, 1)}</td>
+                  <td className="pr-3 text-right">{u.calls}</td>
+                  <td className="text-right">{u.shareOfMonthlyPct == null ? "—" : `${u.shareOfMonthlyPct}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
   );
 }

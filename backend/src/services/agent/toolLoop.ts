@@ -4,6 +4,7 @@ import { friendlyProviderError } from "../../utils/providerError.js";
 import type { AgentMessage, ToolCall, ToolTurnResult } from "../providers/toolCalling.js";
 import type { ChatMessage, ProviderAdapter } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
+import { LOOP_STOP_MESSAGE, LoopGuard } from "./loopGuard.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
 import type { BuildStep } from "../chat/types.js";
 import { clip, type FridayTool, type ToolContext } from "./tools/types.js";
@@ -95,6 +96,7 @@ export async function runToolLoop(opts: {
   let toolCallCount = 0;
   const toolNames: string[] = [];
   let candidate: ChatCandidate | null = null;
+  const loopGuard = new LoopGuard();
 
   // Between rounds the model often narrates ("Let me check…"); keep paragraphs separated.
   let needsBreak = false;
@@ -185,6 +187,12 @@ export async function runToolLoop(opts: {
     if (stop) {
       needsBreak = true;
       emit(`_${stop}_`);
+      break;
+    }
+
+    if (loopGuard.record(result.toolCalls)) {
+      needsBreak = true;
+      emit(`_${LOOP_STOP_MESSAGE}_`);
       break;
     }
 

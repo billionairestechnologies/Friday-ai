@@ -5,11 +5,18 @@ import { logger } from "../utils/logger.js";
 let client: RedisClientType | null = null;
 let connectAttempt: Promise<RedisClientType | null> | null = null;
 
+/** Test-only: lets quota tests run the real accounting against an in-memory fake instead of a server. */
+let testOverride: RedisClientType | null = null;
+export function setRedisClientForTests(fake: unknown | null) {
+  testOverride = fake as RedisClientType | null;
+}
+
 export function redisConfigured(): boolean {
-  return Boolean(env.redisUrl);
+  return Boolean(env.redisUrl) || testOverride !== null;
 }
 
 export async function getRedisClient(): Promise<RedisClientType | null> {
+  if (testOverride) return testOverride;
   if (!env.redisUrl) return null;
   if (client?.isOpen) return client;
   if (connectAttempt) return connectAttempt;

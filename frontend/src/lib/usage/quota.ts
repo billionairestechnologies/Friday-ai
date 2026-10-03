@@ -34,6 +34,13 @@ const EVENT_LABELS: Record<string, string> = {
   sandbox_run: "Build",
   attachment_upload: "Attachments",
   image_generation: "Image generation",
+  // Cost-based breakdown (what the usage actually cost, by feature).
+  chat: "Chat",
+  build: "Build",
+  research: "Deep Research",
+  teamup: "Team Up",
+  spark: "Spark",
+  automation: "Automations",
 };
 
 export function labelForEventType(type: string): string {

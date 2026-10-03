@@ -43,6 +43,34 @@ async function computeBreakdown(userId: string, since: Date) {
   })).sort((a, b) => b.quantity - a.quantity);
 }
 
+const FEATURES = ["chat", "build", "research", "teamup", "spark", "automation"];
+
+/**
+ * Where the usage went, by what it COST (the ledger's exact per-call cost), not by how many events
+ * happened: ten chat messages and one Build turn are nowhere near equal. Percent shares only —
+ * users never see money or credits. Empty (older server data / no calls yet) → null so the caller
+ * falls back to the event-count breakdown.
+ */
+async function computeCostBreakdown(userId: string, since: Date) {
+  const { data, error } = await supabaseAdmin
+    .from("token_ledger")
+    .select("feature, cost_usd")
+    .eq("user_id", userId)
+    .gte("created_at", since.toISOString())
+    .limit(5000);
+  if (error || !data?.length) return null;
+  const byFeature = new Map<string, number>();
+  for (const row of data) {
+    const feature = FEATURES.includes(row.feature as string) ? (row.feature as string) : "chat";
+    byFeature.set(feature, (byFeature.get(feature) ?? 0) + Number(row.cost_usd ?? 0));
+  }
+  const total = [...byFeature.values()].reduce((n, v) => n + v, 0);
+  if (total <= 0) return null;
+  return [...byFeature.entries()]
+    .map(([type, cost]) => ({ type, quantity: Math.round(cost * 100_000), percent: Math.round((cost / total) * 100) }))
+    .sort((a, b) => b.quantity - a.quantity);
+}
+
 /**
  * Everything the Usage settings panel needs in one call: the real token-quota status (rolling
  * 5h/weekly/monthly or org pool — see tokenQuotaService.getQuotaStatus) for the headline bars, plus
@@ -63,9 +91,9 @@ usageRouter.get(
     monthStart.setUTCHours(0, 0, 0, 0);
 
     const [breakdown, rollingBreakdown, monthlyBreakdown, access] = await Promise.all([
-      computeBreakdown(userId, weekStart),
-      computeBreakdown(userId, rollingStart),
-      computeBreakdown(userId, monthStart),
+      computeCostBreakdown(userId, weekStart).then((b) => b ?? computeBreakdown(userId, weekStart)),
+      computeCostBreakdown(userId, rollingStart).then((b) => b ?? computeBreakdown(userId, rollingStart)),
+      computeCostBreakdown(userId, monthStart).then((b) => b ?? computeBreakdown(userId, monthStart)),
       resolveEntitlements(userId).catch(() => null),
     ]);
 

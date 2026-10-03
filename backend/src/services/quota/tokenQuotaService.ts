@@ -409,6 +409,8 @@ export async function reconcileQuota(reservation: Reservation, actualTokens: num
 /** Fire-and-forget audit row for admin profitability reporting — distinct from usage_events'
  *  broader "token_usage" rows (kept for the existing monthly cost summary) in that this one
  *  carries the per-model input/output split and the original reservation for cross-checking. */
+export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation";
+
 export async function recordTokenLedger(
   userId: string,
   organizationId: string | null,
@@ -416,6 +418,7 @@ export async function recordTokenLedger(
   modelId: string,
   usage: TokenUsage,
   reservedTokens: number,
+  feature: LedgerFeature = "chat",
 ): Promise<void> {
   // Exact cost at today's price for this model (finance/pricing.ts); flagged when no price exists.
   const price = await priceUsage(providerSlug, modelId, usage);
@@ -435,7 +438,9 @@ export async function recordTokenLedger(
     estimated_cost_cents: Math.round(price.costUsd * 100 * 100) / 100,
     reserved_tokens: reservedTokens,
   };
-  let { error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns });
+  let { error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns, feature });
+  // A server deployed before migration 0048 must still record usage (quota + audit rely on it).
+  if (error && /feature/.test(error.message)) ({ error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns }));
   // A server deployed before migration 0040 ran must still record usage (quota + audit rely on it).
   if (error && /cost_usd|sell_inr|priced/.test(error.message)) ({ error } = await supabaseAdmin.from("token_ledger").insert(base));
   if (error) logger.warn("token_ledger_insert_failed", { userId, error: error.message });

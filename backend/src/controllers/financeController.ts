@@ -1,3 +1,4 @@
+import { liveUsage } from "../services/finance/liveUsage.js";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler.js";
@@ -113,6 +114,10 @@ export async function settings(req: Request, res: Response) {
   const saved = await saveFinanceSettings(input, req.user!.id);
   audit(req, "finance.settings_saved", null, input);
   res.json({ settings: saved });
+}
+
+export async function live(_req: Request, res: Response) {
+  res.json(await liveUsage(24));
 }
 
 export async function report(req: Request, res: Response) {

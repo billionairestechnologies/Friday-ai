@@ -661,7 +661,8 @@ private fun formatReset(iso: String?): String? = runCatching {
 
 private fun usageLabel(type: String): String = when (type) {
     "chat_message" -> "Chat"; "web_search" -> "Search"; "voice_second" -> "Voice"; "sandbox_run" -> "Build"
-    "attachment_upload" -> "Attachments"; "image_generation" -> "Image generation"; else -> type
+    "attachment_upload" -> "Attachments"; "image_generation" -> "Image generation"
+    "chat" -> "Chat"; "build" -> "Build"; "research" -> "Deep Research"; "teamup" -> "Team Up"; "spark" -> "Spark"; "automation" -> "Automations"; else -> type
 }
 
 /** Usage — the same windows as the web's Usage pane: weekly, 5-hour, monthly, organization pool and your cap, each with its
@@ -705,7 +706,7 @@ private fun UsageBar(title: String, bucket: UsageBreakdown?, breakdown: List<Usa
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(FridaySurface.copy(alpha = 0.5f)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            Text(if (bucket != null) "${formatTokens(maxOf(0.0, bucket.used))} / ${formatTokens(bucket.limit)} · ${bucket.pct}%" else "—", color = FridayMuted, fontSize = 13.sp)
+            Text(if (bucket != null) "${bucket.pct}% used" else "—", color = FridayMuted, fontSize = 13.sp)
         }
         if (bucket != null && bucket.limit > 0) {
             LinearProgressIndicator(

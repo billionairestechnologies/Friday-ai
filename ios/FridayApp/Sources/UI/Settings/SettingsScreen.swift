@@ -563,6 +563,12 @@ private func usageLabel(_ type: String) -> String {
     case "sandbox_run": return "Build"
     case "attachment_upload": return "Attachments"
     case "image_generation": return "Image generation"
+    case "chat": return "Chat"
+    case "build": return "Build"
+    case "research": return "Deep Research"
+    case "teamup": return "Team Up"
+    case "spark": return "Spark"
+    case "automation": return "Automations"
     default: return type
     }
 }
@@ -612,7 +618,7 @@ private struct UsagePage: View {
             HStack {
                 Text(title).font(.system(size: 15, weight: .medium)).foregroundColor(FridayColor.text)
                 Spacer()
-                Text(bucket.map { "\(formatTokens(max(0, $0.used))) / \(formatTokens($0.limit)) · \($0.pct)%" } ?? "—")
+                Text(bucket.map { "\($0.pct)% used" } ?? "—")
                     .font(.system(size: 13)).foregroundColor(FridayColor.muted)
             }
             if let bucket, bucket.limit > 0 {

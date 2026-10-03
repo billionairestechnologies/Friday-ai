@@ -72,6 +72,7 @@ import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js
 import { recordModelOutcome } from "../status/statusService.js";
 import { activeSkillPrompt, getSkill, listSkills, skillMenu, type Skill } from "../skills/skillService.js";
 import type { GeneratedFile } from "../documents/documentService.js";
+import { TURN_CAP_MESSAGE, turnCreditCap } from "../agent/loopGuard.js";
 import { creditsForInputTokens, creditsForUsage, DEFAULT_RESERVE_RATES, meterRatesFor, type MeterRates } from "../quota/meter.js";
 import {
   chargeProgress,
@@ -537,8 +538,13 @@ export async function streamMessage(
       onEvent({ t: "done" });
       return;
     }
+    // One turn may not spend more than a share of the 5-hour window: a runaway loop stops itself
+    // with the work saved instead of draining the whole allowance.
+    const turnCap = turnCreditCap(reservation?.limits?.rolling);
     const budget = async (spent: TokenUsage) => {
-      const r = await chargeProgress(reservation, creditsForUsage(spent, meterRates));
+      const credits = creditsForUsage(spent, meterRates);
+      if (turnCap != null && credits > turnCap) return TURN_CAP_MESSAGE;
+      const r = await chargeProgress(reservation, credits);
       return r.ok ? null : QUOTA_STOP_MESSAGE[r.reason]!;
     };
 
@@ -564,6 +570,7 @@ export async function streamMessage(
             candidate.modelId,
             usage,
             i === 0 ? (reservation?.reserveTokens ?? 0) : 0,
+            "teamup",
           );
         }
       }
@@ -751,7 +758,7 @@ export async function streamMessage(
           if (planner) {
             reconcileTokens = creditsForUsage(drafted.usage, await meterRatesFor(planner.slug, planner.modelId));
             void recordTokenUsage(userId, planner.slug, planner.modelId, drafted.usage, { conversationId, mode });
-            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0);
+            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0, "build");
           }
           onEvent({ t: "done" });
           return;
@@ -790,6 +797,7 @@ export async function streamMessage(
             built.candidate.modelId,
             built.usage,
             reservation?.reserveTokens ?? 0,
+            "build",
           );
         }
         // E2B bills for the time the sandbox runs — booked as sandbox_second so the P&L and plan economics carry it.
@@ -1013,6 +1021,7 @@ export async function streamMessage(
       usedCandidate.modelId,
       tokenUsage,
       reservation?.reserveTokens ?? 0,
+      research ? "research" : "chat",
     );
 
     const label =

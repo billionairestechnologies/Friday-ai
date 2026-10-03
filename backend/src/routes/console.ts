@@ -93,6 +93,7 @@ consoleRouter.post("/plans/redemptions/:redemptionId/review", can("plans.review"
 consoleRouter.get("/audit", can("audit.view"), h(c.auditLog));
 
 // Finance: model prices (cost vs sell), the P&L report and expenses.
+consoleRouter.get("/finance/live", can("finance.view"), h(fin.live));
 consoleRouter.get("/finance/report", can("finance.view"), h(fin.report));
 consoleRouter.get("/finance/pricing", can("finance.view"), h(fin.pricing));
 consoleRouter.post("/finance/pricing", can("finance.manage"), h(fin.savePrice));
