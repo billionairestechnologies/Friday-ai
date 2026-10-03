@@ -19,7 +19,8 @@ backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist i
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
 supabase/   SQL migrations 0001…0044 (apply in order; RLS on, backend uses service role)
-cli/        Friday X — terminal coding agent (Rust, Apache-2.0 fork; own LICENSE/NOTICE). Under construction.
+cli/        Friday X CLI — terminal coding agent (Rust, Apache-2.0 fork; own LICENSE/NOTICE). Under construction.
+ide/        Friday X IDE extensions (VS Code, JetBrains, other ACP editors) — thin clients over the same login + gateway. Planned.
 docs/       README.md (index) · architecture/ · operations/ · product/ · diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```

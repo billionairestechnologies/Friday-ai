@@ -9,7 +9,8 @@ backend/    Node.js + TypeScript + Express API, Supabase (Postgres) as the datab
 frontend/   React + Vite + TypeScript SPA (chat, Build workspace, Library, Team Console at /admin)
 android/    Kotlin + Jetpack Compose app
 ios/        SwiftUI app
-cli/        Friday X — terminal coding agent (Rust; Apache-2.0 fork, own LICENSE/NOTICE)
+cli/        Friday X CLI — terminal coding agent (Rust; Apache-2.0 fork, own LICENSE/NOTICE)
+ide/        Friday X IDE extensions (VS Code first, then JetBrains and other ACP editors)
 supabase/   SQL migrations, applied in order
 infra/      AWS deploy templates
 docs/       architecture/ · operations/ · product/ · diagrams/ — start at docs/README.md
