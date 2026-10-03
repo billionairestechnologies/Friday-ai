@@ -70,6 +70,10 @@ export async function saveProject(userId: string, conversationId: string, patch:
  * One sandbox per conversation. Reconnects to the recorded one; if it has expired, creates a fresh
  * sandbox and restores the last file snapshot into it (dependencies get reinstalled by the caller).
  */
+/** Vite (5.4.12+) rejects Host headers it doesn't know; the preview is served from a random *.e2b.app host. */
+const VITE_HOSTS_ENV = { __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ".e2b.app" };
+const STARTS_DEV_SERVER = /\bvite\b|npm\s+(run\s+)?(dev|start|preview)\b|yarn\s+(dev|start)\b|pnpm\s+(run\s+)?(dev|start)\b/;
+
 export class BuildSandbox {
   /** Mutable so a stale/expired connection can be swapped out transparently — see `withReconnect`. */
   private sandbox: Sandbox;
@@ -157,6 +161,19 @@ export class BuildSandbox {
       await this.reconnecting;
       return op();
     }
+  }
+
+  /**
+   * True when the dev server answers localhost but refuses the sandbox's PUBLIC hostname — Vite's
+   * "Blocked request. This host is not allowed" page. A plain localhost probe (isServing / probeApp)
+   * can't see it, which is how a "verified" app still showed an error in the preview pane.
+   */
+  async hostBlocked(port: number): Promise<boolean> {
+    const host = this.sandbox.getHost(port);
+    const probe = await this.withReconnect(() =>
+      this.sandbox.commands.run(`curl -s -m 8 -H "Host: ${host}" http://localhost:${port}/ | head -c 600 || true`, { timeoutMs: 12000 }),
+    ).catch(() => null);
+    return /Blocked request|host .{0,60}is not allowed/i.test(probe?.stdout ?? "");
   }
 
   /** True if the port answers a plain HTTP probe (200-499 — anything the server itself produced). */
@@ -249,11 +266,14 @@ export class BuildSandbox {
   async run(cmd: string, timeoutMs = 5 * 60_000, signal?: AbortSignal, onOutput?: (chunk: string) => void): Promise<RunOutcome> {
     this.touch();
     if (signal?.aborted) return { ok: false, exitCode: -1, output: "cancelled" };
+    // The agent often starts the dev server itself (`npm run dev &`, `npx vite`) instead of start_server —
+    // that process must also accept the sandbox's public *.e2b.app host or the preview shows "Blocked request".
+    if (STARTS_DEV_SERVER.test(cmd)) await this.allowPreviewHosts().catch(() => {});
     try {
       const result = await this.withReconnect(() =>
         this.sandbox.commands.run(`bash -lc ${JSON.stringify(`cd ${PROJECT_DIR} && ${cmd}`)}`, {
           timeoutMs,
-          envs: { ...this.projectEnv, CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
+          envs: { ...this.projectEnv, ...VITE_HOSTS_ENV, CI: "true", FORCE_COLOR: "0", NO_COLOR: "1" },
           ...(onOutput ? { onStdout: (d: string) => onOutput(d), onStderr: (d: string) => onOutput(d) } : {}),
         }),
       );
@@ -304,6 +324,8 @@ export class BuildSandbox {
           out = out.replace(new RegExp(`(\\b${key}\\s*:\\s*\\{[^}]*?allowedHosts\\s*:\\s*)(\\[[^\\]]*\\]|[^,}\\n]+)`), "$1true");
         } else if (new RegExp(`\\b${key}\\s*:\\s*\\{`).test(out)) {
           out = out.replace(new RegExp(`(\\b${key}\\s*:\\s*\\{)`), "$1 allowedHosts: true,");
+        } else if (/defineConfig\(\s*(?:\([^)]*\)|\w+)\s*=>\s*\(\s*\{/.test(out)) {
+          out = out.replace(/(defineConfig\(\s*(?:\([^)]*\)|\w+)\s*=>\s*\(\s*\{)/, `$1 ${key}: { allowedHosts: true },`);
         } else if (/defineConfig\(\s*\{/.test(out)) {
           out = out.replace(/defineConfig\(\s*\{/, `defineConfig({ ${key}: { allowedHosts: true },`);
         } else if (/export\s+default\s*\{/.test(out)) {
@@ -333,7 +355,7 @@ export class BuildSandbox {
       // Vite (5.4.12+) rejects unknown Host headers by default; the preview is served from *.e2b.app.
       // No PORT is injected on purpose: it leaked into multi-process stacks (an API that reads PORT
       // grabbed the frontend's port). Ports are set explicitly in the command / config.
-      envs: { ...this.projectEnv, HOST: "0.0.0.0", BROWSER: "none", __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ".e2b.app", FORCE_COLOR: "0" },
+      envs: { ...this.projectEnv, ...VITE_HOSTS_ENV, HOST: "0.0.0.0", BROWSER: "none", FORCE_COLOR: "0" },
     });
 
     const deadline = Date.now() + 90_000;
@@ -344,7 +366,18 @@ export class BuildSandbox {
         .catch(() => null);
       const code = Number(probe?.stdout.trim() ?? 0);
       if (code >= 200 && code < 500) {
-        return { ready: true, url: `https://${this.sandbox.getHost(port)}`, log: await this.logTail(logFile) };
+        // Serving on localhost is not the same as serving the preview URL — make sure the public host is accepted.
+        if (await this.hostBlocked(port)) {
+          await this.allowPreviewHosts().catch(() => {});
+          await new Promise((r) => setTimeout(r, 3500)); // Vite restarts itself when its config changes
+        }
+        const log = await this.logTail(logFile);
+        const stillBlocked = await this.hostBlocked(port);
+        return {
+          ready: true,
+          url: `https://${this.sandbox.getHost(port)}`,
+          log: stillBlocked ? `${log}\nWARNING: the preview host is still blocked by the dev server — set server.allowedHosts: true in the Vite config.` : log,
+        };
       }
     }
     return { ready: false, url: null, log: await this.logTail(logFile) };
@@ -418,8 +451,18 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text().slice(0, 300)); });
 page.on("pageerror", (e) => errors.push("uncaught: " + String(e.message).slice(0, 300)));
 page.on("requestfailed", (r) => { if (!/fonts\\.g|google/.test(r.url())) errors.push("request failed: " + r.url().slice(0, 150)); });
-try { await page.goto("http://localhost:${port}/", { waitUntil: "networkidle", timeout: 25000 }); } catch (e) { errors.push("navigation: " + e.message.slice(0, 200)); }
+// The PUBLIC preview address — exactly what the user's preview pane loads. localhost is always allowed by the
+// dev server, so checking it hid "Blocked request" pages and proxy problems from the agent.
+let target = "https://${this.sandbox.getHost(port)}/";
+try { await page.goto(target, { waitUntil: "networkidle", timeout: 30000 }); }
+catch (e) {
+  errors.push("public preview URL failed (" + e.message.slice(0, 120) + ") — fell back to localhost");
+  target = "http://localhost:${port}/";
+  try { await page.goto(target, { waitUntil: "networkidle", timeout: 25000 }); } catch (e2) { errors.push("navigation: " + e2.message.slice(0, 200)); }
+}
 await page.waitForTimeout(1200);
+const shownText = await page.evaluate(() => (document.body ? document.body.innerText.slice(0, 400) : ""));
+if (/Blocked request|host .{0,60}is not allowed/i.test(shownText)) errors.push("The preview page shows Vite's 'Blocked request' error: add server.allowedHosts: true (and preview.allowedHosts: true) to the Vite config and restart the dev server.");
 const len = await page.evaluate(() => (document.body ? document.body.innerText.length : 0));
 const height = await page.evaluate(() => document.documentElement.scrollHeight);
 await page.screenshot({ path: "/tmp/pw/shot.png", fullPage: true, clip: { x: 0, y: 0, width: 1280, height: Math.min(height, 2800) } });
@@ -489,7 +532,7 @@ export async function ensurePreview(userId: string, conversationId: string): Pro
   box.useEnv(await loadSecrets(conversationId));
   const { port, start_cmd: startCmd } = project;
 
-  if (!box.fresh && (await box.isServing(port))) {
+  if (!box.fresh && (await box.isServing(port)) && !(await box.hostBlocked(port))) {
     return { url: box.previewUrl(port), port };
   }
 

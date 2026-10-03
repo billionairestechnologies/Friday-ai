@@ -772,7 +772,11 @@ export async function runBuildAgent(opts: {
           build.port = action.port;
           onEvent({ t: "preview", url: res.url, port: action.port });
           // The port answering isn't proof the app works — crawl it and surface real errors.
-          const problems = await box.probeApp(action.port);
+          let problems = await box.probeApp(action.port);
+          // localhost is always allowed by the dev server; the user's preview pane loads the PUBLIC host.
+          if (!problems && (await box.hostBlocked(action.port))) {
+            problems = "The preview URL itself is refused by the dev server (\"Blocked request. This host is not allowed\"). Set server.allowedHosts: true and preview.allowedHosts: true in the Vite config (vite.config.js/ts), then start the server again.";
+          }
           if (problems) {
             finish("error", `The server is up but the app fails to load:\n${problems}`);
             const key = `probe::${tail(problems, 300)}`;
