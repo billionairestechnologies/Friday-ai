@@ -1,0 +1,16 @@
+flowchart LR
+  job[Job result]
+  settings[Friday settings]
+  spoken[Spoken choice on the call]
+  callCh[Call]
+  appCh[App]
+  tgCh[Telegram]
+  waCh[WhatsApp]
+  mailCh[Email]
+  spoken --> job
+  settings --> job
+  job --> callCh
+  job --> appCh
+  job --> tgCh
+  job --> waCh
+  job --> mailCh

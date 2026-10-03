@@ -8,6 +8,7 @@ Multi-model AI chat platform. Users chat with any AI model (OpenAI, Anthropic, G
 backend/    Node.js + TypeScript + Express API, Supabase (Postgres) as the database
 frontend/   React + Vite + TypeScript SPA (Auth, Chat, Admin Panel)
 supabase/   SQL migrations (schema for profiles, providers, api_keys, models, conversations, messages)
+friday-line/ phone session architecture — plan, models, flows, diagrams. Start at friday-line/README.md
 ```
 
 ## Branching model
