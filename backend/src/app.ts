@@ -23,6 +23,8 @@ import { statusRouter } from "./routes/status.js";
 import { filesRouter } from "./routes/files.js";
 import { skillsRouter } from "./routes/skills.js";
 import { pagesRouter } from "./routes/pages.js";
+import { cliRouter } from "./routes/cli.js";
+import { installRouter } from "./routes/install.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { buildRouter } from "./routes/build.js";
 import { voiceRouter } from "./routes/voice.js";
@@ -107,6 +109,9 @@ export function createApp() {
   app.use("/api/files", filesRouter);
   app.use("/api/skills", skillsRouter);
   app.use("/api/pages", pagesRouter);
+  app.use("/api/x", cliRouter);
+  // Registered before the SPA catch-all below, which would otherwise answer /x/install.sh with index.html.
+  app.use("/x", installRouter);
 
   if (existsSync(frontendDist)) {
     const indexPath = path.join(frontendDist, "index.html");

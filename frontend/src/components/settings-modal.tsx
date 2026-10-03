@@ -12,6 +12,7 @@ import {
   Plug,
   Shield,
   SlidersHorizontal,
+  Terminal,
   Trash2,
   UserRound,
   X,
@@ -45,6 +46,7 @@ const NAV = [
       { id: "behavior", label: "Behavior", icon: SlidersHorizontal },
       { id: "voice", label: "Voice", icon: AudioLines },
       { id: "notifications", label: "Notifications", icon: Bell },
+      { id: "friday-x", label: "Friday X", icon: Terminal },
     ],
   },
   {
@@ -132,6 +134,7 @@ export function SettingsModal() {
               {tab === "behavior" && <BehaviorPane />}
               {tab === "voice" && <VoicePane />}
               {tab === "notifications" && <NotificationsPane />}
+              {tab === "friday-x" && <FridayXPane />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}
               {tab === "memory" && <MemoryPane />}
@@ -652,6 +655,7 @@ function PlanIncludes({ e }: { e: NonNullable<QuotaResponse["entitlements"]> }) 
   const storage = e.libraryStorageMb >= 1024 ? `${+(e.libraryStorageMb / 1024).toFixed(1)} GB` : `${e.libraryStorageMb} MB`;
   const rows: [string, string][] = [
     ["Build Mode", e.buildMode ? `${e.buildMaxRounds} rounds per run` : "Not included"],
+    ["Friday X (terminal + editor)", e.fridayX === false ? "Not included" : "Included"],
     ["Deep Research", e.deepResearchPerDay ? `${e.deepResearchPerDay} per day` : "Not included"],
     ["Documents", `${e.documentsPerDay} per day`],
     ["Custom skills", String(e.customSkills)],
@@ -672,6 +676,101 @@ function PlanIncludes({ e }: { e: NonNullable<QuotaResponse["entitlements"]> }) 
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+type CliSession = { id: string; name: string; client: string; createdAt: string; lastUsedAt: string | null };
+
+/** Friday X: the one-line install, and the terminals/editors currently signed in (each can be signed out here). */
+function FridayXPane() {
+  const { user } = useCurrentUserState();
+  const signedIn = Boolean(user && !user.isDevFallback);
+  const [sessions, setSessions] = useState<CliSession[] | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const origin = window.location.origin;
+  const installs: [string, string][] = [
+    ["macOS, Linux, WSL", `curl -fsSL ${origin}/x/install.sh | bash`],
+    ["Windows PowerShell", `irm ${origin}/x/install.ps1 | iex`],
+  ];
+
+  useEffect(() => {
+    if (!signedIn) return;
+    api
+      .get<{ sessions: CliSession[] }>("/x/sessions")
+      .then((r) => setSessions(r.sessions))
+      .catch((err) => setNotice(err instanceof Error ? err.message : "Couldn't load signed-in devices"));
+  }, [signedIn]);
+
+  async function signOutDevice(id: string) {
+    setNotice(null);
+    try {
+      await api.delete(`/x/sessions/${id}`);
+      setSessions((prev) => (prev ?? []).filter((x) => x.id !== id));
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Couldn't sign that device out");
+    }
+  }
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(text);
+      window.setTimeout(() => setCopied(null), 1400);
+    } catch {
+      /* clipboard blocked — the command is selectable */
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h3 className="text-base font-semibold text-foreground">Friday X</h3>
+        <p className="mt-1 text-sm text-muted">Friday's coding agent for your terminal and editor. It uses your Friday plan, models and usage — the same meter as this app.</p>
+      </div>
+      <div className="flex flex-col gap-3">
+        {installs.map(([label, cmd]) => (
+          <div key={label}>
+            <p className="mb-1 text-xs text-muted">{label}</p>
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-chip px-3 py-2">
+              <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-foreground">{cmd}</code>
+              <button type="button" onClick={() => void copy(cmd)} className="shrink-0 rounded-full px-2 py-1 text-xs text-muted hover:bg-background hover:text-foreground">
+                {copied === cmd ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+        ))}
+        <p className="text-xs text-muted">Then run <span className="font-mono">friday</span> in any project. The first run opens your browser to sign in.</p>
+      </div>
+      <div>
+        <p className="mb-2 text-sm font-semibold text-foreground">Signed-in devices</p>
+        {!signedIn ? (
+          <p className="text-sm text-muted">Sign in to see your devices.</p>
+        ) : sessions === null ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-muted">No terminals or editors are signed in.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-2xl border border-border">
+            {sessions.map((x) => (
+              <li key={x.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate text-foreground">{x.name}</p>
+                  <p className="text-xs text-muted">
+                    {x.client === "ide" ? "Editor" : "Terminal"} · signed in {new Date(x.createdAt).toLocaleDateString()}
+                    {x.lastUsedAt ? ` · last used ${new Date(x.lastUsedAt).toLocaleDateString()}` : ""}
+                  </p>
+                </div>
+                <button type="button" onClick={() => void signOutDevice(x.id)} className="shrink-0 rounded-full border border-border px-3 py-1 text-xs hover:bg-chip">
+                  Sign out
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {notice ? <p className="text-sm text-danger">{notice}</p> : null}
     </div>
   );
 }

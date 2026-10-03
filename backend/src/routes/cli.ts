@@ -1,0 +1,175 @@
+import { Router } from "express";
+import { z } from "zod";
+import { supabaseAdmin } from "../config/supabase.js";
+import { env } from "../config/env.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireCliAuth } from "../middleware/cliAuth.js";
+import { HttpError, asyncHandler } from "../middleware/errorHandler.js";
+import { rateLimit } from "../middleware/rateLimit.js";
+import {
+  decideDeviceRequest,
+  describeDeviceRequest,
+  listCliSessions,
+  pollDeviceAuthorization,
+  revokeCliSession,
+  startDeviceAuthorization,
+} from "../services/cli/deviceAuth.js";
+import { assertFridayX, cliStatus, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
+
+/**
+ * Friday X API (terminal + IDE). Three audiences share one router, each behind its own gate:
+ *   public   — the device-login handshake the CLI starts before it has any identity
+ *   web      — the signed-in browser approving a code and managing its signed-in devices
+ *   cli      — everything the harness calls with a Friday X token (/me, /models, the model gateway)
+ */
+export const cliRouter = Router();
+
+// Plans, models and limits are edited in the Console at any time and must show up in every client at once,
+// so nothing under /api/x that describes them is ever cached by a client or proxy.
+cliRouter.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
+const startLimit = rateLimit({ name: "x-device-start", limit: 20, windowMs: 10 * 60_000 });
+// Polling is every 5s by design; the limit only has to stop abuse, not pace a well-behaved client.
+const pollLimit = rateLimit({ name: "x-device-poll", limit: 400, windowMs: 10 * 60_000 });
+const approveLimit = rateLimit({ name: "x-device-approve", limit: 30, windowMs: 10 * 60_000 });
+const gatewayLimit = rateLimit({ name: "x-gateway", limit: 240, windowMs: 60_000 });
+
+// ── public: device login ────────────────────────────────────────────────────────────────────────
+cliRouter.post(
+  "/auth/device",
+  startLimit,
+  asyncHandler(async (req, res) => {
+    const body = z.object({ client_name: z.string().max(80).optional(), client_version: z.string().max(40).optional() }).parse(req.body ?? {});
+    const started = await startDeviceAuthorization({ name: body.client_name, version: body.client_version });
+    const base = env.publicAppUrl.replace(/\/$/, "");
+    res.json({
+      ...started,
+      verification_uri: `${base}/device`,
+      verification_uri_complete: `${base}/device?code=${encodeURIComponent(started.user_code)}`,
+    });
+  }),
+);
+
+cliRouter.post(
+  "/auth/token",
+  pollLimit,
+  asyncHandler(async (req, res) => {
+    const { device_code } = z.object({ device_code: z.string().min(20).max(200) }).parse(req.body ?? {});
+    const result = await pollDeviceAuthorization(device_code);
+    if (result.status === "approved") {
+      const { data } = await supabaseAdmin.auth.admin.getUserById(result.userId);
+      const { data: profile } = await supabaseAdmin.from("profiles").select("full_name").eq("id", result.userId).maybeSingle();
+      res.json({
+        access_token: result.token,
+        token_type: "Bearer",
+        user: { id: result.userId, email: data.user?.email ?? null, name: profile?.full_name ?? null },
+      });
+      return;
+    }
+    // RFC 8628 §3.5 error codes, so a stock OAuth device client understands them.
+    const error = { pending: "authorization_pending", slow_down: "slow_down", expired: "expired_token", denied: "access_denied" }[result.status];
+    res.status(400).json({ error });
+  }),
+);
+
+// ── web: approve a code, manage signed-in devices ──────────────────────────────────────────────
+cliRouter.get(
+  "/auth/device/:code",
+  requireAuth,
+  approveLimit,
+  asyncHandler(async (req, res) => {
+    await assertFridayX(req.user!.id);
+    res.json(await describeDeviceRequest(String(req.params.code)));
+  }),
+);
+
+for (const decision of ["approve", "deny"] as const) {
+  cliRouter.post(
+    `/auth/device/${decision}`,
+    requireAuth,
+    approveLimit,
+    asyncHandler(async (req, res) => {
+      const { user_code } = z.object({ user_code: z.string().min(4).max(20) }).parse(req.body ?? {});
+      if (decision === "approve") await assertFridayX(req.user!.id);
+      await decideDeviceRequest(req.user!.id, user_code, decision === "approve");
+      res.json({ ok: true });
+    }),
+  );
+}
+
+cliRouter.get(
+  "/sessions",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    res.json({ sessions: await listCliSessions(req.user!.id) });
+  }),
+);
+
+cliRouter.delete(
+  "/sessions/:id",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    await revokeCliSession(req.user!.id, String(req.params.id));
+    res.json({ ok: true });
+  }),
+);
+
+// ── cli: everything below needs a Friday X token ───────────────────────────────────────────────
+cliRouter.post(
+  "/auth/logout",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    await revokeCliSession(req.user!.id, req.cliTokenId!);
+    res.json({ ok: true });
+  }),
+);
+
+cliRouter.get(
+  "/me",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id;
+    const [{ data }, profile, status] = await Promise.all([
+      supabaseAdmin.auth.admin.getUserById(userId),
+      supabaseAdmin.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+      cliStatus(userId),
+    ]);
+    res.json({ user: { id: userId, email: data.user?.email ?? null, name: profile.data?.full_name ?? null }, ...status });
+  }),
+);
+
+cliRouter.get(
+  "/models",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await listCliModels(req.user!.id));
+  }),
+);
+
+// OpenAI-style listing, for editor integrations that probe `/v1/models`.
+cliRouter.get(
+  "/v1/models",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    const { models } = await listCliModels(req.user!.id);
+    res.json({ object: "list", data: models.filter((m) => !m.locked).map((m) => ({ id: m.id, object: "model", owned_by: m.provider })) });
+  }),
+);
+
+cliRouter.post(
+  "/v1/chat/completions",
+  requireCliAuth,
+  gatewayLimit,
+  asyncHandler(async (req, res) => {
+    if (typeof req.body !== "object" || req.body === null) throw new HttpError(400, "Send a JSON body.");
+    // Aborts the provider call when the terminal closes or Ctrl-C's — otherwise a cancelled turn keeps spending credits.
+    const controller = new AbortController();
+    res.on("close", () => {
+      if (!res.writableEnded) controller.abort();
+    });
+    await runCompletion(req.user!.id, req.body as CompletionRequest, res, controller.signal);
+  }),
+);

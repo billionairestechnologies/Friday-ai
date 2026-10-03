@@ -57,6 +57,8 @@ export const env = {
   corsOrigins: commaSeparated(process.env.CORS_ORIGIN, "http://localhost:5173"),
   trustProxy: process.env.TRUST_PROXY ?? "",
   publicAppUrl: process.env.PUBLIC_APP_URL ?? "http://localhost:5173",
+  /** Where CI publishes Friday X release binaries: <url>/latest.json ({"version"}) and <url>/v<version>/friday-<platform>[.exe][.sha256]. */
+  fridayXReleasesUrl: (process.env.FRIDAY_X_RELEASES_URL ?? "").replace(/\/+$/, ""),
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",

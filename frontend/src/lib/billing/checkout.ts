@@ -24,6 +24,7 @@ export type BillingConfig = {
 
 export type Entitlements = {
   buildMode: boolean;
+  fridayX: boolean;
   buildMaxRounds: number;
   deepResearchPerDay: number;
   documentsPerDay: number;

@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
 import { TeamPage } from "@/routes/team";
+import { DevicePage } from "@/routes/device";
 import { LibraryPage } from "@/routes/library";
 import { AutomationsPage } from "@/routes/automations";
 import { SharePage } from "@/routes/share";
@@ -199,6 +200,13 @@ const teamRoute = createRoute({
   component: TeamPage,
 });
 
+// Friday X (CLI / IDE) device login: approve the code shown in the terminal.
+const deviceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/device",
+  component: DevicePage,
+});
+
 const mobileAuthBridgeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/mobile-auth-bridge",
@@ -273,6 +281,7 @@ const routeTree = rootRoute.addChildren([
   projectsRoute,
   projectDetailRoute,
   teamRoute,
+  deviceRoute,
   mobileAuthBridgeRoute,
   libraryRoute,
   automationsRoute,

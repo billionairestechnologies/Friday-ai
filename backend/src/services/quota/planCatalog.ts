@@ -16,6 +16,7 @@ export type CatalogPlanId = Plan | "enterprise";
 
 export const ENTITLEMENT_DEFS = [
   { key: "buildMode", label: "Build Mode", type: "boolean", hint: "Coding agent with a live sandbox" },
+  { key: "fridayX", label: "Friday X (CLI + IDE)", type: "boolean", hint: "Terminal and editor coding agent; uses the same credits" },
   { key: "buildMaxRounds", label: "Build rounds per run", type: "number", hint: "How long one build can work before stopping" },
   { key: "deepResearchPerDay", label: "Deep Research per day", type: "number", hint: "0 turns it off" },
   { key: "documentsPerDay", label: "Documents per day", type: "number", hint: "Generated PPTX, XLSX, DOCX, PDF…" },
@@ -30,6 +31,7 @@ export const ENTITLEMENT_DEFS = [
 export type EntitlementKey = (typeof ENTITLEMENT_DEFS)[number]["key"];
 export type Entitlements = {
   buildMode: boolean;
+  fridayX: boolean;
   buildMaxRounds: number;
   deepResearchPerDay: number;
   documentsPerDay: number;
@@ -42,10 +44,10 @@ export type Entitlements = {
 };
 
 export const DEFAULT_ENTITLEMENTS: Record<CatalogPlanId, Entitlements> = {
-  free: { buildMode: true, buildMaxRounds: 30, deepResearchPerDay: 3, documentsPerDay: 5, customSkills: 3, libraryStorageMb: 500, teamUpModels: 3, mcpServers: 2, automations: 3, prioritySupport: false },
-  pro: { buildMode: true, buildMaxRounds: 100, deepResearchPerDay: 40, documentsPerDay: 100, customSkills: 25, libraryStorageMb: 10_240, teamUpModels: 5, mcpServers: 10, automations: 20, prioritySupport: false },
-  premium: { buildMode: true, buildMaxRounds: 150, deepResearchPerDay: 150, documentsPerDay: 300, customSkills: 100, libraryStorageMb: 51_200, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
-  enterprise: { buildMode: true, buildMaxRounds: 150, deepResearchPerDay: 300, documentsPerDay: 500, customSkills: 200, libraryStorageMb: 102_400, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
+  free: { buildMode: true, fridayX: true, buildMaxRounds: 30, deepResearchPerDay: 3, documentsPerDay: 5, customSkills: 3, libraryStorageMb: 500, teamUpModels: 3, mcpServers: 2, automations: 3, prioritySupport: false },
+  pro: { buildMode: true, fridayX: true, buildMaxRounds: 100, deepResearchPerDay: 40, documentsPerDay: 100, customSkills: 25, libraryStorageMb: 10_240, teamUpModels: 5, mcpServers: 10, automations: 20, prioritySupport: false },
+  premium: { buildMode: true, fridayX: true, buildMaxRounds: 150, deepResearchPerDay: 150, documentsPerDay: 300, customSkills: 100, libraryStorageMb: 51_200, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
+  enterprise: { buildMode: true, fridayX: true, buildMaxRounds: 150, deepResearchPerDay: 300, documentsPerDay: 500, customSkills: 200, libraryStorageMb: 102_400, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
 };
 
 /**
