@@ -29,7 +29,9 @@ pub enum Error {
     Rejected(String),
 }
 
-const API_BASE_URL: &str = "https://api.mixpanel.com";
+/// Friday X sends no product analytics: with no base URL, `post` returns before any network call.
+/// (The `Telemetry` capability is also withheld, so nothing constructs a client; this is the second lock.)
+const API_BASE_URL: &str = "";
 const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl Mixpanel {
@@ -114,6 +116,9 @@ impl Mixpanel {
     /// Mixpanel answers a rejected payload with HTTP 200; `verbose=1` makes the
     /// body `{"status": 0|1, "error": ...}` instead of a bare `0`/`1`.
     async fn post(&self, path: &str, payload: &serde_json::Value) -> Result<(), Error> {
+        if self.base_url.is_empty() {
+            return Ok(());
+        }
         let json_bytes = serde_json::to_vec(payload)?;
         let encoded = base64::engine::general_purpose::STANDARD.encode(&json_bytes);
 

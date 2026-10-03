@@ -97,14 +97,20 @@ pub fn append_rules_section(
     workspace_rules: &[RuleEntry],
     user_rules: &[RuleEntry],
 ) {
-    let Some(block) = format_rules_section(workspace_rules, user_rules) else {
-        return;
-    };
+    if let Some(block) = format_rules_section(workspace_rules, user_rules) {
+        if !prefix.is_empty() && !prefix.ends_with('\n') {
+            prefix.push('\n');
+        }
+        prefix.push('\n');
+        prefix.push_str(&block);
+    }
+    // Friday X always keeps its own project memory (FRIDAY.md), whether or not the project has any rules.
     if !prefix.is_empty() && !prefix.ends_with('\n') {
         prefix.push('\n');
     }
-    prefix.push('\n');
-    prefix.push_str(&block);
+    prefix.push_str("\n<project_memory>\n");
+    prefix.push_str(crate::prompt::agents_md::FRIDAY_MEMORY_DIRECTIVE);
+    prefix.push_str("\n</project_memory>");
 }
 /// Selects the first-user-message rendering strategy for an agent.
 /// Built-in variants decrypt the XOR-obfuscated template on demand (obfuscation, not security).

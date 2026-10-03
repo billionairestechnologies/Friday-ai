@@ -14,6 +14,7 @@ import {
   toToolSpecs,
   toolCallsChunk,
 } from "../src/services/cli/openaiCompat.js";
+import { cliSettings, contextWindowFor } from "../src/services/cli/gateway.js";
 import { installCmd, installPowerShell, installShell, isPlatform, isVersion } from "../src/services/cli/installScripts.js";
 
 test("Friday X is an admin-editable entitlement, on by default for every plan", () => {
@@ -129,4 +130,29 @@ test("platform and version inputs are validated before they reach a URL", () => 
   assert.ok(!isPlatform("../../etc/passwd") && !isPlatform("freebsd-x64"));
   assert.ok(isVersion("1.2.3") && isVersion("0.1.0-beta.1"));
   assert.ok(!isVersion("1.2") && !isVersion("1.2.3/../x") && !isVersion("latest"));
+});
+
+test("the server decides each model's context window, vendor prefixes stripped", () => {
+  assert.equal(contextWindowFor("claude-sonnet-5-5"), 200_000);
+  assert.equal(contextWindowFor("anthropic/claude-opus-5-5"), 200_000);
+  assert.equal(contextWindowFor("gemini-3-pro"), 1_000_000);
+  assert.equal(contextWindowFor("gpt-5.1"), 400_000);
+  assert.equal(contextWindowFor("some-unknown-model"), 128_000);
+});
+
+test("server-driven client settings are a plain object or nothing", () => {
+  const prev = process.env.FRIDAY_X_SETTINGS_JSON;
+  try {
+    delete process.env.FRIDAY_X_SETTINGS_JSON;
+    assert.deepEqual(cliSettings(), {});
+    process.env.FRIDAY_X_SETTINGS_JSON = '{"release_channel":"stable"}';
+    assert.deepEqual(cliSettings(), { release_channel: "stable" });
+    for (const bad of ["not json", "[1,2]", '"str"', "null"]) {
+      process.env.FRIDAY_X_SETTINGS_JSON = bad;
+      assert.deepEqual(cliSettings(), {}, bad);
+    }
+  } finally {
+    if (prev === undefined) delete process.env.FRIDAY_X_SETTINGS_JSON;
+    else process.env.FRIDAY_X_SETTINGS_JSON = prev;
+  }
 });

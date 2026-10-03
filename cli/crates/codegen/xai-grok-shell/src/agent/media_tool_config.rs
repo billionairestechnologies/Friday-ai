@@ -47,7 +47,7 @@ pub fn load_media_tool_config(
         cli_web_search_model: None,
         cli_session_summary_model: None,
         memory_enabled_override: None,
-        disable_web_search: false,
+        disable_web_search: true,
         todo_gate: false,
         laziness_debug_log: None,
         storage_mode: None,

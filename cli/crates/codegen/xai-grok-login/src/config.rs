@@ -121,7 +121,8 @@ pub struct OAuth2ProviderConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub referrer: Option<String>,
 }
-pub const XAI_OAUTH2_ISSUER: &str = "https://auth.x.ai";
+/// Production Friday X API root, the only OAuth2 issuer this client knows (`FRIDAY_X_URL` moves it, see `xai_oauth2_issuer`).
+pub const XAI_OAUTH2_ISSUER: &str = "https://friday.billionairestechnologies.com/api/x";
 /// A separate const so the frozen contract test pins the production allowlist even when the non-production feature adds staging and local origins.
 const PROD_ACCOUNTS_APP_ORIGINS: &[&str] = &["https://accounts.x.ai"];
 /// Production build: accepts only the production accounts app.
@@ -156,18 +157,15 @@ pub fn use_local_auth() -> bool {
         .map(|v| !v.is_empty() && v != "0")
         .unwrap_or(false)
 }
-/// Returns the active xAI OAuth2 issuer: the local-dev issuer when `GROK_LOCAL_AUTH=1` is set, otherwise the production issuer.
+/// The Friday login issuer: `<FRIDAY_X_URL or the production origin>/api/x`.
 pub fn xai_oauth2_issuer() -> &'static str {
-    if use_local_auth() {
-        XAI_OAUTH2_LOCAL_ISSUER
-    } else {
-        XAI_OAUTH2_ISSUER
-    }
+    static ISSUER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    ISSUER.get_or_init(xai_grok_env::friday_api_base)
 }
-/// Whether `issuer` is a recognised xAI OAuth2 issuer (production or local-dev).
-/// Use this instead of comparing to [`XAI_OAUTH2_ISSUER`] so local-dev counts as first-party xAI auth.
+/// Whether `issuer` is the Friday issuer (production, or wherever `FRIDAY_X_URL` points).
+/// First-party credentials are exactly the ones Friday issued; every other issuer is foreign.
 pub fn is_xai_oauth2_issuer(issuer: &str) -> bool {
-    issuer == XAI_OAUTH2_ISSUER || issuer == XAI_OAUTH2_LOCAL_ISSUER
+    issuer == xai_oauth2_issuer() || issuer == XAI_OAUTH2_ISSUER
 }
 /// auth.json scope key used by the pre-OIDC `grok login --legacy` flow.
 /// Matches the key format produced by the original `accounts.x.ai` relay auth.

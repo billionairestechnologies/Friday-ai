@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { z } from "zod";
 import { supabaseAdmin } from "../config/supabase.js";
 import { env } from "../config/env.js";
@@ -14,7 +14,7 @@ import {
   revokeCliSession,
   startDeviceAuthorization,
 } from "../services/cli/deviceAuth.js";
-import { assertFridayX, cliStatus, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
+import { assertFridayX, cliSettings, cliStatus, cliUser, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
 
 /**
  * Friday X API (terminal + IDE). Three audiences share one router, each behind its own gate:
@@ -72,6 +72,64 @@ cliRouter.post(
     // RFC 8628 §3.5 error codes, so a stock OAuth device client understands them.
     const error = { pending: "authorization_pending", slow_down: "slow_down", expired: "expired_token", denied: "access_denied" }[result.status];
     res.status(400).json({ error });
+  }),
+);
+
+// ── public: the same handshake under the standard OAuth2 names ───────────────────────────────────
+// The terminal/editor client's existing device-code login speaks plain RFC 8628 (`/oauth2/device/code`,
+// `/oauth2/token`, form-encoded). Serving those names means that login code runs against Friday unchanged;
+// /auth/device + /auth/token above stay for clients that prefer JSON.
+const CLIENT_NAMES: Record<string, string> = {
+  "friday-x-cli": "Friday X (terminal)",
+  "friday-x-vscode": "Friday X for VS Code",
+  "friday-x-jetbrains": "Friday X for JetBrains",
+  "friday-x-zed": "Friday X for Zed",
+};
+const clientNameFor = (clientId: unknown, fallback?: unknown) =>
+  CLIENT_NAMES[String(clientId ?? "")] ?? (typeof fallback === "string" && fallback ? fallback : "Friday X");
+
+const oauthErrorDescriptions: Record<string, string> = {
+  authorization_pending: "The user hasn't approved this sign-in yet.",
+  slow_down: "Polling too fast; wait before trying again.",
+  expired_token: "This code expired. Run `friday login` again.",
+  access_denied: "The sign-in was denied.",
+};
+
+cliRouter.post(
+  "/oauth2/device/code",
+  express.urlencoded({ extended: false, limit: "8kb" }),
+  startLimit,
+  asyncHandler(async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const started = await startDeviceAuthorization({ name: clientNameFor(body.client_id), version: String(req.headers["x-friday-client-version"] ?? "") || undefined });
+    const base = env.publicAppUrl.replace(/\/$/, "");
+    res.json({ ...started, verification_uri: `${base}/device`, verification_uri_complete: `${base}/device?code=${encodeURIComponent(started.user_code)}` });
+  }),
+);
+
+cliRouter.post(
+  "/oauth2/token",
+  express.urlencoded({ extended: false, limit: "8kb" }),
+  pollLimit,
+  asyncHandler(async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    if (body.grant_type !== "urn:ietf:params:oauth:grant-type:device_code") {
+      res.status(400).json({ error: "unsupported_grant_type", error_description: "Only the device code grant is supported." });
+      return;
+    }
+    const deviceCode = typeof body.device_code === "string" ? body.device_code : "";
+    if (deviceCode.length < 20 || deviceCode.length > 200) {
+      res.status(400).json({ error: "invalid_request", error_description: "device_code is missing or malformed." });
+      return;
+    }
+    const result = await pollDeviceAuthorization(deviceCode);
+    if (result.status === "approved") {
+      // The token doesn't expire by itself (it's revoked from Settings), so the lifetime is long and a 401 means "sign in again".
+      res.json({ access_token: result.token, token_type: "Bearer", expires_in: 365 * 24 * 3600, scope: "friday-x" });
+      return;
+    }
+    const error = { pending: "authorization_pending", slow_down: "slow_down", expired: "expired_token", denied: "access_denied" }[result.status];
+    res.status(400).json({ error, error_description: oauthErrorDescriptions[error] });
   }),
 );
 
@@ -155,7 +213,39 @@ cliRouter.get(
   requireCliAuth,
   asyncHandler(async (req, res) => {
     const { models } = await listCliModels(req.user!.id);
-    res.json({ object: "list", data: models.filter((m) => !m.locked).map((m) => ({ id: m.id, object: "model", owned_by: m.provider })) });
+    // Extra fields beyond the OpenAI shape are what the harness reads to budget context and pick the wire format;
+    // plan-locked models are simply absent here (the richer /models above flags them for a picker that wants to upsell).
+    res.json({
+      object: "list",
+      data: models
+        .filter((m) => !m.locked)
+        .map((m) => ({
+          id: m.id,
+          object: "model",
+          owned_by: m.provider,
+          name: m.name,
+          description: `${m.provider}${m.recommended ? " · recommended for coding" : ""}`,
+          context_window: m.contextWindow,
+          api_backend: "chat_completions",
+          supports_vision: m.vision,
+        })),
+    });
+  }),
+);
+
+cliRouter.get(
+  "/v1/user",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await cliUser(req.user!.id));
+  }),
+);
+
+cliRouter.get(
+  "/v1/settings",
+  requireCliAuth,
+  asyncHandler(async (_req, res) => {
+    res.json(cliSettings());
   }),
 );
 

@@ -386,27 +386,32 @@ fn neutralize_reminder_tags(content: &str) -> String {
         .into_owned()
 }
 
-fn render_agents_md(configs: &[AgentConfigFile]) -> Option<String> {
-    if configs.is_empty() {
-        return None;
-    }
+/// The standing instruction that makes FRIDAY.md exist: Friday X's own project memory, same file and same
+/// shape as web Build Mode keeps, so a project moves between the two without translation. The model writes it
+/// with its normal file tools; nothing here touches the disk.
+pub const FRIDAY_MEMORY_DIRECTIVE: &str = "Project memory: Friday keeps a FRIDAY.md at the project root (the git root, or the working directory outside a repository) so future sessions start informed. When you do real work on a project (not for a greeting or a quick question): if FRIDAY.md does not exist, create it; if it exists, keep it accurate. Update it before you finish any task that changed the project's structure, commands, stack or decisions. It is a short markdown file (under about 80 lines) with these sections: ## Overview (what it is, for whom), ## Stack (frameworks and key versions), ## Run & test (exact commands, ports), ## Structure (key folders and files and what each does), ## Decisions (important choices and why), ## Status & next steps (what works, known gaps). Never put secrets, tokens or personal data in it. Instruction files written for other tools (AGENTS.md, CLAUDE.md, .cursor/rules) are read as well; treat them as authoritative project conventions and do not rewrite them.";
 
+fn render_agents_md(configs: &[AgentConfigFile]) -> Option<String> {
     let mut section = String::new();
     section.push_str(LEGACY_AGENTS_MD_REMINDER_PREFIX);
-    section.push_str(
-        " (ordered from repo root to current directory - deeper files take precedence on conflicts):\n",
-    );
-
-    for config in configs {
-        section.push_str(&format!(
-            "\n## From: {}\n",
-            neutralize_reminder_tags(&config.file_path)
-        ));
-        section.push_str(&neutralize_reminder_tags(&config.content));
-        section.push('\n');
+    if configs.is_empty() {
+        section.push_str(":\n");
+    } else {
+        section.push_str(
+            " (ordered from repo root to current directory - deeper files take precedence on conflicts):\n",
+        );
+        for config in configs {
+            section.push_str(&format!(
+                "\n## From: {}\n",
+                neutralize_reminder_tags(&config.file_path)
+            ));
+            section.push_str(&neutralize_reminder_tags(&config.content));
+            section.push('\n');
+        }
+        section.push_str("\nFollow these instructions exactly. When working in subdirectories not listed above, check for additional project instruction files (FRIDAY.md, AGENTS.md, CLAUDE.md, etc.).");
     }
-
-    section.push_str("\nFollow these instructions exactly. When working in subdirectories not listed above, check for additional project instruction files (AGENTS.md, Claude.md, etc.).");
+    section.push_str("\n\n");
+    section.push_str(FRIDAY_MEMORY_DIRECTIVE);
     section.push_str("\n</system-reminder>");
 
     Some(section)
@@ -530,7 +535,10 @@ mod tests {
 
     #[test]
     fn format_agents_md_section_empty_returns_none() {
-        assert!(format_agents_md_section(&[]).is_none());
+        // No instruction files still yields the FRIDAY.md memory directive: Friday X always keeps its own memory file.
+        let section = format_agents_md_section(&[]).expect("memory directive");
+        assert!(section.contains("FRIDAY.md"));
+        assert!(!section.contains("## From:"));
     }
 
     #[test]

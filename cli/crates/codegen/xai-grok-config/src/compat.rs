@@ -309,6 +309,10 @@ impl Default for VendorCompat {
 
 /// Bare file names, no path separators: read_file matches them against `Path::file_name()`; `agent_filenames()` prepends them to the vendor-gated `.claude/` paths.
 pub const INSTRUCTION_FILENAMES: &[&str] = &[
+    // Friday's own project memory comes first, then every other agent's convention (AGENTS.md, CLAUDE.md…),
+    // so a repo set up for any of them is understood the moment Friday X opens it.
+    "FRIDAY.md",
+    "Friday.md",
     "Agents.md",
     "Claude.md",
     "CLAUDE.md",

@@ -1,4 +1,5 @@
 import type { Response } from "express";
+import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { logger } from "../../utils/logger.js";
 import { sanitizeUserError } from "../../utils/providerError.js";
@@ -71,7 +72,22 @@ function hasTools(slug: string): boolean {
   }
 }
 
-export type CliModel = { id: string; name: string; provider: string; vision: boolean; recommended: boolean; locked: boolean; minTier: string };
+/**
+ * Context window the harness should budget for. The server owns this (not the client), so correcting a
+ * model's window is a backend change that every terminal and editor picks up at its next start. Matched on the
+ * model id with the vendor prefix stripped, because OpenRouter-style ids carry one ("anthropic/claude-…").
+ */
+export function contextWindowFor(modelId: string): number {
+  const id = modelId.toLowerCase().replace(/^[\w.-]+\//, "");
+  if (/^gemini/.test(id)) return 1_000_000;
+  if (/^gpt-4\.1/.test(id)) return 1_000_000;
+  if (/^(gpt-5|o\d)/.test(id)) return 400_000;
+  if (/^claude/.test(id)) return 200_000;
+  if (/^(llama|qwen|deepseek|mistral|mixtral|sarvam|grok)/.test(id)) return 128_000;
+  return 128_000;
+}
+
+export type CliModel = { id: string; name: string; provider: string; vision: boolean; recommended: boolean; locked: boolean; minTier: string; contextWindow: number };
 
 /** The models this user can pick in Friday X: chat models that can drive tools, with plan-locked ones flagged (not hidden). */
 export async function listCliModels(userId: string): Promise<{ default: string; models: CliModel[] }> {
@@ -86,6 +102,7 @@ export async function listCliModels(userId: string): Promise<{ default: string; 
       recommended: isBuildModel({ slug: c.slug, modelId: c.modelId, displayName: c.displayName }),
       locked: !(await canUseModelTier(userId, c.minTier)),
       minTier: c.minTier,
+      contextWindow: contextWindowFor(c.modelId),
     });
   }
   models.sort((a, b) => Number(a.locked) - Number(b.locked) || Number(b.recommended) - Number(a.recommended) || a.name.localeCompare(b.name));
@@ -131,6 +148,51 @@ export async function cliStatus(userId: string): Promise<CliStatus> {
   if (quota.org) windows.push({ label: "Team pool", percent: pct(quota.org.used, quota.org.limit), resetsAt: quota.org.resetAt });
   if (quota.memberCap) windows.push({ label: "Your cap", percent: pct(quota.memberCap.used, quota.memberCap.limit), resetsAt: quota.org?.resetAt ?? quota.weekly.resetAt });
   return { plan: resolved.plan, fridayX: resolved.entitlements.fridayX, usage: { windows } };
+}
+
+export type CliUser = {
+  userId: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  subscriptionTier: string;
+  codingDataRetentionOptOut: true;
+};
+
+/** `GET /v1/user` — who the terminal is signed in as (camelCase: that is the shape the client reads). */
+export async function cliUser(userId: string): Promise<CliUser> {
+  const [{ data }, profile, resolved] = await Promise.all([
+    supabaseAdmin.auth.admin.getUserById(userId),
+    supabaseAdmin.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+    resolveEntitlements(userId),
+  ]);
+  const [first = null, ...rest] = String(profile.data?.full_name ?? "").trim().split(/\s+/).filter(Boolean);
+  return {
+    userId,
+    email: data.user?.email ?? null,
+    firstName: first,
+    lastName: rest.length ? rest.join(" ") : null,
+    subscriptionTier: resolved.plan,
+    // Friday X keeps no transcripts of a user's code for training; the client treats this as "opted out".
+    codingDataRetentionOptOut: true,
+  };
+}
+
+/**
+ * `GET /v1/settings` — server-driven client settings. This is the lever for changing how every installed
+ * terminal and editor behaves without shipping a new binary (a fleet kill switch for a feature, a release
+ * channel…). Empty by default; `FRIDAY_X_SETTINGS_JSON` supplies a JSON object. Anything that isn't a plain
+ * object is ignored rather than served, so a typo in the env var can't break every client's startup.
+ */
+export function cliSettings(): Record<string, unknown> {
+  const raw = process.env.FRIDAY_X_SETTINGS_JSON?.trim();
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 export type CompletionRequest = {

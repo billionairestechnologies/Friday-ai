@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph build [Release pipeline - GitHub Actions]
+    Tag["Tag friday-x-v1.2.3"] --> Matrix["Build matrix - macOS arm64/x64, Linux gnu + musl x64/arm64, Windows x64/arm64"]
+    Matrix --> Sums["SHA-256 per binary"]
+    Sums --> Store[("Object storage + CDN<br/>/v1.2.3/friday-platform + .sha256")]
+    Store --> Latest["latest.json written LAST<br/>so half a release is never offered"]
+  end
+
+  subgraph serve [Friday backend - /x]
+    Ver["/x/version"]
+    Down["/x/download/platform"]
+    Sha["/x/sha256/platform"]
+    Pin["FRIDAY_X_VERSION_PIN - pause a bad release"]
+  end
+  Latest --> Ver
+  Store --> Down & Sha
+  Pin -. overrides .-> Ver
+
+  subgraph user [One line on the user's machine]
+    SH["curl -fsSL host/x/install.sh | bash"]
+    PS["irm host/x/install.ps1 | iex"]
+    CMD["install.cmd - Windows CMD"]
+    Verify["Download, verify SHA-256, then install to ~/.friday/bin and add to PATH"]
+    Run["friday"]
+  end
+  SH & PS & CMD --> Ver --> Down --> Sha --> Verify --> Run
+  Run -. "friday update" .-> Ver

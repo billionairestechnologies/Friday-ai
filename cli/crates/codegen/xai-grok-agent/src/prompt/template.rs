@@ -17,11 +17,22 @@ fn decrypt(data: &[u8], seed: u8) -> Zeroizing<String> {
         .enumerate()
         .map(|(i, &b)| b ^ seed.wrapping_add(i as u8))
         .collect();
-    Zeroizing::new(String::from_utf8(bytes).expect(
+    let plain = Zeroizing::new(String::from_utf8(bytes).expect(
         "prompt template decryption produced invalid UTF-8 — \
          prompt_encrypted.rs is likely stale; run: \
          python3 scripts/encrypt_templates.py",
-    ))
+    ));
+    Zeroizing::new(rebrand(&plain))
+}
+
+/// The templates are stored obfuscated and were written for the original product, so the identity and
+/// product names in them are rewritten after decryption (the model must introduce itself as Friday X, and
+/// the docs hint must point at this product's own directories). Everything else in the templates is the
+/// behavioural prompt and stays exactly as it was.
+pub(crate) fn rebrand(text: &str) -> String {
+    text.replace("released by xAI", "built by Friday")
+        .replace("Grok Build", "Friday X")
+        .replace("~/.grok/", "~/.friday/")
 }
 
 /// The base prompt template (decrypted fresh; zeroed on drop).
@@ -55,6 +66,16 @@ pub const COMPACT_SYSTEM_PROMPT: &str = "You are an AI coding agent. You operate
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn templates_introduce_friday_x_not_the_original_product() {
+        for template in [base_template(), apply_patch_template(), subagent_template()] {
+            for needle in ["xAI", "Grok Build", "~/.grok/"] {
+                assert!(!template.contains(needle), "template still says {needle:?}");
+            }
+        }
+        assert!(base_template().contains("built by Friday"));
+    }
 
     /// Inserts into `v` when it is an object; other values are left untouched.
     fn jset(v: &mut serde_json::Value, key: &str, val: serde_json::Value) {

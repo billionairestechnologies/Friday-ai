@@ -1205,7 +1205,8 @@ impl Default for Config {
             subagent_toggle: std::collections::HashMap::new(),
             subagent_roles: std::collections::HashMap::new(),
             subagent_personas: std::collections::HashMap::new(),
-            disable_web_search: false,
+            // Web search ran on a vendor-hosted search model; until the Friday gateway offers one it stays off.
+            disable_web_search: true,
             todo_gate: false,
             laziness_debug_log: None,
             respect_gitignore: false,
@@ -2084,7 +2085,8 @@ impl Config {
                     .as_ref()
                     .and_then(|s| s.image_gen_enabled),
             )
-            .default(true)
+            // Friday X has no image backend yet (the tool called a vendor image API), so it is off until the gateway has one.
+            .default(false)
             .resolve()
     }
     /// `image_edit` tool gate.
@@ -2101,7 +2103,7 @@ impl Config {
         {
             return Resolved::new(false, ConfigSource::Remote);
         }
-        BoolFlag::env("GROK_IMAGE_EDIT").default(true).resolve()
+        BoolFlag::env("GROK_IMAGE_EDIT").default(false).resolve()
     }
     /// `image_to_video` / `reference_to_video` (and `/imagine-video`). Default on.
     /// Registered as a pair; denylisting either tool name (or `video_gen`) disables both.
@@ -2127,7 +2129,7 @@ impl Config {
                     .as_ref()
                     .and_then(|s| s.video_gen_enabled),
             )
-            .default(true)
+            .default(false)
             .resolve()
     }
     /// Precedence: env `GROK_IMAGE_GEN_MODEL_OVERRIDE` > `[features] image_gen_model_override` config > remote settings `image_gen_model_override`.

@@ -1,0 +1,28 @@
+sequenceDiagram
+  actor U as User
+  participant C as friday (CLI or editor)
+  participant API as Friday /api/x
+  participant W as Web app /device
+  participant DB as cli_device_codes + cli_tokens
+
+  U->>C: friday login (or first run)
+  C->>API: POST /oauth2/device/code
+  API->>DB: Store hash(device_code) + user_code, 10 min
+  API-->>C: user_code, verification_uri_complete
+  C->>U: Opens browser, prints ABCD-EFGH
+  U->>W: Sign in to Friday (if needed)
+  W->>API: GET /auth/device/ABCD-EFGH
+  API-->>W: Which client is asking
+  U->>W: Check the code matches, Approve (or Deny)
+  W->>API: POST /auth/device/approve
+  API->>API: Friday X entitlement checked
+  API->>DB: status = approved (compare-and-set)
+  loop every 5 s
+    C->>API: POST /oauth2/token (device_code)
+    API-->>C: authorization_pending
+  end
+  C->>API: POST /oauth2/token
+  API->>DB: Claim once, store hash(fxt_ token)
+  API-->>C: access_token fxt_...
+  C->>C: Save token, then every request carries it
+  Note over U,DB: Settings, Friday X lists every signed-in device. Sign out revokes the token at once.

@@ -1,0 +1,22 @@
+flowchart TB
+  Req["POST /api/x/v1/chat/completions (one model turn)"]
+  Auth{"Token valid and not revoked?"}
+  Ent{"fridayX entitlement on?<br/>plan <- catalog <- org <- personal grant"}
+  Model{"Model allowed on this plan?<br/>auto = best coding model the plan allows"}
+  Reserve{"Reserve credits against the 5-hour,<br/>weekly and monthly windows (or org pool)"}
+  Charge["Charge the real prompt up front"]
+  Call["Provider adapter - OpenAI, Anthropic, Gemini ... (tool calling)"]
+  Stream["Stream chunks back as OpenAI SSE"]
+  Final["Reconcile to exact usage + write token_ledger (feature = code)"]
+
+  Req --> Auth
+  Auth -- no --> E401["401 - run friday login"]
+  Auth -- yes --> Ent
+  Ent -- no --> E403["403 - not included in your plan"]
+  Ent -- yes --> Model
+  Model -- no --> E403b["403 / 404 with a code the client uses to refresh its model list"]
+  Model -- yes --> Reserve
+  Reserve -- over --> E429["429 + Retry-After - percent and reset time only"]
+  Reserve -- ok --> Charge --> Call --> Stream --> Final
+  Final -. same counters .-> Meter[("Redis quota keys<br/>shared with web and mobile")]
+  Meter -. one usage bar .-> Apps["Settings, Usage in every app"]

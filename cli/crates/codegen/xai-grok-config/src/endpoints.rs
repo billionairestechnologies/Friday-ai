@@ -133,7 +133,7 @@ impl EndpointsConfig {
     /// The cli-chat-proxy base URL for the auxiliary services and for inference with OAuth or session auth.
     pub fn proxy_url(&self) -> String {
         blank_as_unset(&self.cli_chat_proxy_base_url)
-            .unwrap_or_else(|| CLI_CHAT_PROXY_BASE_URL_DEFAULT.to_owned())
+            .unwrap_or_else(xai_grok_env::friday_inference_base)
     }
     pub fn resolve_inference_base_url(&self) -> String {
         self.models_base_url
@@ -267,13 +267,12 @@ fn parse_otlp_header_list(raw: &str) -> Vec<(String, String)> {
         })
         .collect()
 }
-const XAI_API_BASE_URL_DEFAULT: &str = "https://api.x.ai/v1";
 impl Default for EndpointsConfig {
     fn default() -> Self {
         Self {
             cli_chat_proxy_base_url: std::env::var("GROK_CLI_CHAT_PROXY_BASE_URL").ok(),
             xai_api_base_url: std::env::var("GROK_XAI_API_BASE_URL")
-                .unwrap_or_else(|_| XAI_API_BASE_URL_DEFAULT.to_owned()),
+                .unwrap_or_else(|_| xai_grok_env::friday_inference_base()),
             alpha_test_key: None,
             models_base_url: env_string("GROK_MODELS_BASE_URL"),
             models_list_url: env_string("GROK_MODELS_LIST_URL"),

@@ -941,7 +941,7 @@ pub async fn run(
         no_subagents: args.no_subagents,
         memory_enabled_override: args.memory_enabled_override(),
         memory_override_flag: args.memory_override_flag(),
-        disable_web_search: args.disable_web_search,
+        disable_web_search: true, // vendor-hosted search is removed; see Friday X docs
         todo_gate: args.todo_gate,
         laziness_debug_log: None,
         storage_mode: args.storage_mode.clone(),

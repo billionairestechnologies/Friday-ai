@@ -94,6 +94,7 @@ pub fn matches_trusted_base_url(candidate: &str, trusted_base: &str) -> bool {
 /// Those must not become env toggles via `GROK_CLI_CHAT_PROXY_BASE_URL` (or similar) pointing at an attacker-controlled origin.
 pub fn is_prod_cli_chat_proxy_url(url: &str) -> bool {
     matches_trusted_base_url(url, crate::env::PROD_CLI_CHAT_PROXY_BASE_URL)
+        || matches_trusted_base_url(url, &xai_grok_env::friday_inference_base())
 }
 /// True for configured first-party cli-chat-proxy routes, excluding arbitrary loopback URLs.
 /// Unlike [`is_cli_chat_proxy_url`], this only trusts the exact compiled or environment-selected route.
@@ -137,6 +138,11 @@ pub fn is_trusted_xai_https_url(url: &str) -> bool {
     let Ok(parsed) = reqwest::Url::parse(url) else {
         return false;
     };
+    // Local development only: a developer who points the whole client at a local Friday server with
+    // `FRIDAY_X_URL=http://localhost:4000` trusts exactly that origin (and nothing else on loopback).
+    if is_friday_dev_loopback(&parsed) {
+        return true;
+    }
     if parsed.scheme() != "https" {
         return false;
     }
@@ -146,9 +152,22 @@ pub fn is_trusted_xai_https_url(url: &str) -> bool {
     if is_trusted_cli_chat_proxy_url(url) {
         return true;
     }
-    parsed
-        .host_str()
-        .is_some_and(|host| host == "x.ai" || host.ends_with(".x.ai"))
+    is_friday_host(&parsed)
+}
+/// The Friday host: the one origin in this build that may receive a session bearer.
+fn is_friday_host(parsed: &reqwest::Url) -> bool {
+    reqwest::Url::parse(&xai_grok_env::friday_origin())
+        .ok()
+        .is_some_and(|origin| origin.host_str().is_some() && origin.host_str() == parsed.host_str())
+}
+fn is_friday_dev_loopback(parsed: &reqwest::Url) -> bool {
+    let Ok(origin) = reqwest::Url::parse(&xai_grok_env::friday_origin()) else {
+        return false;
+    };
+    is_loopback_host(&origin)
+        && is_loopback_host(parsed)
+        && origin.scheme() == parsed.scheme()
+        && origin.port_or_known_default() == parsed.port_or_known_default()
 }
 fn is_xai_api_url_impl(url: &str, require_https: bool) -> bool {
     if require_https {
@@ -159,8 +178,7 @@ fn is_xai_api_url_impl(url: &str, require_https: bool) -> bool {
     }
     reqwest::Url::parse(url)
         .ok()
-        .and_then(|url| url.host_str().map(str::to_owned))
-        .is_some_and(|host| host == "x.ai" || host.ends_with(".x.ai"))
+        .is_some_and(|parsed| is_friday_host(&parsed))
 }
 fn is_loopback_host(parsed: &reqwest::Url) -> bool {
     match parsed.host() {

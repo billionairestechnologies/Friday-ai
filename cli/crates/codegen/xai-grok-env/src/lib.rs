@@ -8,6 +8,33 @@
 #![deny(clippy::indexing_slicing)]
 mod registry;
 pub use registry::{FIRST_PARTY_CREDENTIAL_ENV_VARS, env_bool, env_string};
+// ── Friday ──────────────────────────────────────────────────────────────────────────────────────
+// Friday X talks to exactly one server: the Friday backend. Everything the CLI used to resolve against
+// vendor hosts (login, model list, inference) now derives from this origin, so a deployment, a staging
+// server or a local backend is one variable: `FRIDAY_X_URL`.
+/// Production Friday origin; the compiled default when `FRIDAY_X_URL` is unset.
+pub const FRIDAY_DEFAULT_ORIGIN: &str = "https://friday.billionairestechnologies.com";
+/// The Friday origin without a trailing slash (`FRIDAY_X_URL` overrides the default).
+pub fn friday_origin() -> String {
+    let raw = std::env::var("FRIDAY_X_URL").ok().filter(|v| !v.trim().is_empty());
+    raw.unwrap_or_else(|| FRIDAY_DEFAULT_ORIGIN.to_string())
+        .trim()
+        .trim_end_matches('/')
+        .to_string()
+}
+/// `<origin>/api/x`: the Friday X API root (device login, `/me`, `/models`).
+pub fn friday_api_base() -> String {
+    format!("{}/api/x", friday_origin())
+}
+/// `<origin>/api/x/v1`: the OpenAI-compatible model gateway.
+pub fn friday_inference_base() -> String {
+    format!("{}/v1", friday_api_base())
+}
+/// Where the installer's version endpoint lives (`friday update`).
+pub fn friday_version_url() -> String {
+    format!("{}/x/version", friday_origin())
+}
+
 /// The endpoint set for one backend environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GrokBuildEndpoints {
@@ -18,11 +45,13 @@ pub struct GrokBuildEndpoints {
     pub ws_origin: &'static str,
 }
 const PRODUCTION_ENDPOINTS: GrokBuildEndpoints = GrokBuildEndpoints {
-    cli_chat_proxy_base_url: "https://cli-chat-proxy.grok.com/v1",
-    asset_server_url: "https://assets.grok.com",
-    relay_ws_url: "wss://code.grok.com/ws/code-agent",
-    gateway_ws_url: "wss://grok.com/ws/gw/",
-    ws_origin: "https://grok.com",
+    // Friday X has one server. The vendor asset/relay/cloud-gateway services this client once knew do not
+    // exist here; those constants stay (the types still carry them) but point nowhere real.
+    cli_chat_proxy_base_url: "https://friday.billionairestechnologies.com/api/x/v1",
+    asset_server_url: "https://friday.billionairestechnologies.com/unsupported/assets",
+    relay_ws_url: "wss://friday.billionairestechnologies.com/unsupported/relay",
+    gateway_ws_url: "wss://friday.billionairestechnologies.com/unsupported/gateway",
+    ws_origin: "https://friday.billionairestechnologies.com",
 };
 pub const PROD_CLI_CHAT_PROXY_BASE_URL: &str = PRODUCTION_ENDPOINTS.cli_chat_proxy_base_url;
 pub const PROD_ASSET_SERVER_URL: &str = PRODUCTION_ENDPOINTS.asset_server_url;
@@ -64,10 +93,9 @@ impl GrokBuildEnvironment {
             .unwrap_or_else(|_| compiled.to_string())
     }
     pub fn cli_chat_proxy_base_url(&self) -> String {
-        self.resolve(
-            "_CLI_CHAT_PROXY_BASE_URL",
-            self.endpoints().cli_chat_proxy_base_url,
-        )
+        // FRIDAY_X_URL (see `friday_origin`) moves the whole client to another Friday server.
+        std::env::var(format!("{}_CLI_CHAT_PROXY_BASE_URL", self.env_prefix()))
+            .unwrap_or_else(|_| friday_inference_base())
     }
     pub fn ws_origin(&self) -> String {
         self.resolve("_WS_ORIGIN", self.endpoints().ws_origin)

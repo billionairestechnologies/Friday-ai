@@ -197,7 +197,7 @@ pub async fn connect(cancel: &CancellationToken, flags: ConnectFlags) -> Result<
                 cli_web_search_model: None,
                 cli_session_summary_model: None,
                 memory_enabled_override: flags.memory_enabled_override,
-                disable_web_search: flags.disable_web_search,
+                disable_web_search: true, // vendor-hosted search is removed; see Friday X docs
                 todo_gate: flags.todo_gate,
                 laziness_debug_log: flags.laziness_debug_log.as_deref(),
                 storage_mode: flags.storage_mode.as_deref(),

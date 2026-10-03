@@ -20,8 +20,21 @@ fn a_distribution_withholds_exactly_what_it_names() {
     }
 }
 #[test]
-fn a_default_build_is_stock() {
-    assert_eq!(Distribution::STOCK, Distribution::current());
+fn friday_x_withholds_telemetry_error_reports_remote_control_and_voice_only() {
+    let current = Distribution::current();
+    for capability in Capability::iter() {
+        let withheld = matches!(
+            capability,
+            Capability::Telemetry
+                | Capability::ErrorReporting
+                | Capability::RemoteControl
+                | Capability::Voice
+        );
+        assert_eq!(!withheld, current.allows(capability), "{capability:?}");
+    }
+    // Login and the models/settings fetch are how this build talks to Friday, so they must stay on.
+    assert!(current.allows(Capability::AccountLogin));
+    assert!(current.allows(Capability::RemoteFetch));
 }
 #[test]
 fn only_a_withheld_capability_that_a_surface_offers_has_a_refusal() {

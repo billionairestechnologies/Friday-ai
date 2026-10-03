@@ -43,9 +43,19 @@ impl Distribution {
         }
         Self { withheld }
     }
-    /// This build's distribution.
+    /// This build's distribution: Friday X.
+    ///
+    /// Withheld, whatever config, requirements or the environment say: product telemetry and trace upload,
+    /// crash/error reporting, remote control from other devices, and voice dictation (its speech would go to a
+    /// third-party speech service). What stays: account login and the models/settings fetch, because those
+    /// talk to the Friday backend and nothing else.
     pub const fn current() -> Self {
-        Self::STOCK
+        Self::withholding(&[
+            Capability::Telemetry,
+            Capability::ErrorReporting,
+            Capability::RemoteControl,
+            Capability::Voice,
+        ])
     }
     pub const fn allows(self, capability: Capability) -> bool {
         self.withheld & capability.bit() == 0
