@@ -317,7 +317,15 @@ fun DrawerPane(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val dot = if (workspace == "build") com.friday.app.ui.buildmode.buildStatusMeta(buildStatuses[chat.id]) else null
-                            if (dot != null) {
+                            // A chat still producing its answer shows a round spinner until it finishes (like web).
+                            if (chat.messages.any { it.isStreaming }) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = androidx.compose.ui.graphics.Color(0xFF0EA5E9),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            } else if (dot != null) {
                                 Box(Modifier.size(7.dp).clip(CircleShape).background(dot.first))
                                 Spacer(Modifier.width(8.dp))
                             }
