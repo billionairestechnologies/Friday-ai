@@ -90,8 +90,8 @@ export type CatalogPlan = {
 
 const DEFAULT_CATALOG: CatalogPlan[] = [
   { id: "free", name: "Free", tagline: "Everything you need to get started.", monthlyPricePaise: 0, features: ["Light daily usage, refreshed every 5 hours and weekly", "Chat, search, Canvas and images", "Build Mode trial projects"], highlight: false },
-  { id: "pro", name: "Pro", tagline: "For daily work, research and building.", monthlyPricePaise: 99_900, features: ["Everything in Free", "About 10x Free: generous 5-hour, weekly and monthly usage", "Flagship models", "Full Build Mode with GitHub PRs", "Deep Research, documents and skills"], highlight: true },
-  { id: "premium", name: "Premium", tagline: "The most capable Friday for power users.", monthlyPricePaise: 199_900, features: ["Everything in Pro", "About 25x Free: the highest individual usage", "Reasoning and heavy models", "Longest Build Mode runs", "Largest Team Up panels and Library"], highlight: false },
+  { id: "pro", name: "Pro", tagline: "For daily work, research and building.", monthlyPricePaise: 99_900, features: ["Everything in Free", "Generous usage every 5 hours, week and month", "Flagship models", "Full Build Mode with GitHub PRs", "Deep Research, documents and skills"], highlight: true },
+  { id: "premium", name: "Premium", tagline: "The most capable Friday for power users.", monthlyPricePaise: 199_900, features: ["Everything in Pro", "About 2x Pro's usage, the most for one person", "Reasoning and heavy models", "Longest Build Mode runs", "Largest Team Up panels and Library"], highlight: false },
   { id: "enterprise", name: "Enterprise", tagline: "Pooled usage, admin controls and priority support for teams.", monthlyPricePaise: 249_900, features: ["Org-pooled monthly usage, no 5-hour lockout", "Per-member caps set by your admins", "Every model, priority handling", "Centralized billing", "Priority support"], highlight: false },
 ].map((p, i) => ({
   ...p,
