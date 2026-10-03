@@ -824,7 +824,7 @@ fn path_names_directory_windows_separators() {
 #[cfg(windows)]
 #[test]
 fn splice_preserves_windows_root_relative_symlink_target() {
-    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.grok\config.toml");
+    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.friday\config.toml");
     let rest = splice_symlink_target(
         &mut resolved,
         std::path::Path::new(r"\dotfiles\config.toml"),
@@ -844,7 +844,7 @@ fn splice_preserves_windows_root_relative_symlink_target() {
 #[cfg(windows)]
 #[test]
 fn splice_rejects_windows_drive_relative_symlink_target() {
-    let mut resolved = std::path::PathBuf::from(r"D:\Users\me\.grok\config.toml");
+    let mut resolved = std::path::PathBuf::from(r"D:\Users\me\.friday\config.toml");
     let err = splice_symlink_target(
         &mut resolved,
         std::path::Path::new(r"C:foo.toml"),
@@ -1032,7 +1032,7 @@ fn splice_refuses_windows_relative_forward_slash_target() {
 #[cfg(windows)]
 #[test]
 fn splice_refuses_windows_root_relative_forward_slash_target() {
-    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.grok\config.toml");
+    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.friday\config.toml");
     let err = splice_symlink_target(
         &mut resolved,
         std::path::Path::new(r"\dotfiles/config.toml"),
@@ -1059,7 +1059,7 @@ fn reparse_slash_rejects_relative_root_relative_and_absolute() {
 #[cfg(windows)]
 #[test]
 fn splice_refuses_windows_absolute_forward_slash_target() {
-    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.grok\config.toml");
+    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.friday\config.toml");
     let err = splice_symlink_target(
         &mut resolved,
         std::path::Path::new(r"C:\safe/file"),
@@ -1092,7 +1092,7 @@ fn nt_native_device_path_is_fully_qualified() {
 /// Win32 opens it via `\\?\GLOBALROOT\Device\…`.
 #[test]
 fn splice_maps_nt_native_device_path_for_win32() {
-    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.grok\config.toml");
+    let mut resolved = std::path::PathBuf::from(r"C:\Users\me\.friday\config.toml");
     let rest = splice_symlink_target(
         &mut resolved,
         std::path::Path::new(r"\Device\HarddiskVolume2\Users\me\config.toml"),
@@ -1104,7 +1104,7 @@ fn splice_maps_nt_native_device_path_for_win32() {
         std::path::Path::new(r"\\?\GLOBALROOT\Device\HarddiskVolume2\Users\me\config.toml"),
         resolved.as_path()
     );
-    let mut dos = std::path::PathBuf::from(r"C:\Users\me\.grok\config.toml");
+    let mut dos = std::path::PathBuf::from(r"C:\Users\me\.friday\config.toml");
     splice_symlink_target(
         &mut dos,
         std::path::Path::new(r"\??\C:\Users\me\config.toml"),

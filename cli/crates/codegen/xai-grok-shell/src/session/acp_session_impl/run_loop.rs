@@ -1482,7 +1482,7 @@ pub(super) async fn run_session(
                                 mcp_servers.len()
                             );
 
-                            // Re-seed the session-scoped MCP output cap (repo `[mcp] max_output_bytes`) BEFORE the unchanged-diff early-exit below: this command also fires for `<cwd>/.grok/config.toml` edits, and a cap-only edit changes no server.
+                            // Re-seed the session-scoped MCP output cap (repo `[mcp] max_output_bytes`) BEFORE the unchanged-diff early-exit below: this command also fires for `<cwd>/.friday/config.toml` edits, and a cap-only edit changes no server.
                             session.reseed_mcp_output_cap().await;
 
                             // Capture the dispatcher's event sender alongside the diff

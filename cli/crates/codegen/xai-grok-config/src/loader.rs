@@ -81,13 +81,13 @@ pub fn load_config_file(path: &Path) -> std::io::Result<toml::Value> {
 }
 
 pub fn load_from_disk() -> std::io::Result<toml::Value> {
-    // Live `$GROK_HOME`: `user_grok_home()` / `grok_home()` are OnceLock and miss
+    // Live `$FRIDAY_HOME`: `user_grok_home()` / `grok_home()` are OnceLock and miss
     // EnvGuard/tests (same reason user `config.toml` persist resolves live). A
     // stale cache would read a different file than the last settings write.
     load_user_config_layer(resolve_grok_home().as_deref(), USER_CONFIG_FILENAME)
 }
 
-/// User config filename (`$GROK_HOME/config.toml`), shared by the loaders here.
+/// User config filename (`$FRIDAY_HOME/config.toml`), shared by the loaders here.
 pub const USER_CONFIG_FILENAME: &str = "config.toml";
 
 /// Managed config filename, shared by the loaders in this module.
@@ -96,17 +96,17 @@ pub const MANAGED_CONFIG_FILENAME: &str = "managed_config.toml";
 /// Requirements (cloud-cache) filename, synced from the server alongside the managed config.
 pub const REQUIREMENTS_FILENAME: &str = "requirements.toml";
 
-/// Unsigned folder-trust store (`$GROK_HOME/trusted_folders.toml`).
+/// Unsigned folder-trust store (`$FRIDAY_HOME/trusted_folders.toml`).
 pub const TRUSTED_FOLDERS_FILENAME: &str = "trusted_folders.toml";
 
-/// User-global sandbox profile definitions (`$GROK_HOME/sandbox.toml`).
+/// User-global sandbox profile definitions (`$FRIDAY_HOME/sandbox.toml`).
 pub const SANDBOX_CONFIG_FILENAME: &str = "sandbox.toml";
 
-/// Legacy project-hook trust list (`$GROK_HOME/trusted-hook-projects`).
+/// Legacy project-hook trust list (`$FRIDAY_HOME/trusted-hook-projects`).
 /// Migrated into [`TRUSTED_FOLDERS_FILENAME`] on the next unsandboxed start.
 pub const TRUSTED_HOOK_PROJECTS_FILENAME: &str = "trusted-hook-projects";
 
-/// Plugin trust list (`$GROK_HOME/trusted-plugins`).
+/// Plugin trust list (`$FRIDAY_HOME/trusted-plugins`).
 pub const TRUSTED_PLUGINS_FILENAME: &str = "trusted-plugins";
 
 pub fn load_managed_config() -> std::io::Result<toml::Value> {
@@ -114,8 +114,8 @@ pub fn load_managed_config() -> std::io::Result<toml::Value> {
 }
 
 /// Load a user-tier config layer from `<home>/<filename>`.
-/// With no resolvable user home, returns an empty table rather than reading a cwd-relative `.grok/<filename>`.
-/// The cwd fallback would silently promote an untrusted project `.grok` to the user tier.
+/// With no resolvable user home, returns an empty table rather than reading a cwd-relative `.friday/<filename>`.
+/// The cwd fallback would silently promote an untrusted project `.friday` to the user tier.
 fn load_user_config_layer(home: Option<&Path>, filename: &str) -> std::io::Result<toml::Value> {
     match home {
         Some(g) => load_config_file(&g.join(filename)),
@@ -137,7 +137,7 @@ pub fn load_system_managed_config() -> std::io::Result<toml::Value> {
 pub struct ManagedConfigLayer {
     pub value: toml::Value,
     pub path: std::path::PathBuf,
-    /// `true` for the root-owned system layer (`/etc/grok`), derived from the load directory.
+    /// `true` for the root-owned system layer (`/etc/friday`), derived from the load directory.
     pub is_system: bool,
 }
 
@@ -192,17 +192,17 @@ pub fn managed_config_layers_at(
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum HookProvenance {
-    /// `/etc/grok/managed_config.toml` (root-owned).
+    /// `/etc/friday/managed_config.toml` (root-owned).
     SystemManaged,
-    /// `$GROK_HOME/managed_config.toml` (server-synced, user-writable).
+    /// `$FRIDAY_HOME/managed_config.toml` (server-synced, user-writable).
     Managed,
-    /// System-tier `requirements.toml` (root-owned, e.g. `/etc/grok`).
+    /// System-tier `requirements.toml` (root-owned, e.g. `/etc/friday`).
     Requirements,
-    /// `$GROK_HOME/requirements.toml` while its bytes match the server-signed envelope (see [`crate::signed_policy::signed_requirements_attest`]).
+    /// `$FRIDAY_HOME/requirements.toml` while its bytes match the server-signed envelope (see [`crate::signed_policy::signed_requirements_attest`]).
     SignedRequirements,
-    /// `$GROK_HOME/requirements.toml` without a signed attestation (user-writable).
+    /// `$FRIDAY_HOME/requirements.toml` without a signed attestation (user-writable).
     UserRequirements,
-    /// `$GROK_HOME/config.toml`.
+    /// `$FRIDAY_HOME/config.toml`.
     User,
     /// A JSON hook file (the hooks directory, a vendor settings file, or a configured hooks path).
     File,
@@ -226,7 +226,7 @@ impl HookProvenance {
     /// Every disable path must consult this predicate rather than re-derive the rule from names or paths.
     /// Root-owned tiers qualify by OS ownership, `SignedRequirements` by the server's signature over the exact bytes.
     /// `Managed` stays disableable even though the same envelope signs `managed_config.toml`: that file is distribution (defaults the user may override), requirements is enforcement.
-    /// The unsigned `$GROK_HOME` tiers never qualify, since the user owns that directory.
+    /// The unsigned `$FRIDAY_HOME` tiers never qualify, since the user owns that directory.
     pub fn is_managed_policy(self) -> bool {
         matches!(
             self,
@@ -499,7 +499,7 @@ pub fn hook_config_layers_at(
 }
 
 /// Applies matching `[[version_overrides]]` patches against the running CLI version; strips the section either way.
-/// If the installed version can't be parsed (broken `GROK_TEST_VERSION` in dev), it silently strips without applying, keeping the CLI usable.
+/// If the installed version can't be parsed (broken `FRIDAY_TEST_VERSION` in dev), it silently strips without applying, keeping the CLI usable.
 pub fn apply_version_overrides_with_registered(value: &mut toml::Value) -> std::io::Result<()> {
     match xai_grok_version::installed_semver() {
         Ok(version) => apply_version_overrides(value, &version)
@@ -642,7 +642,7 @@ mod tests {
         assert_eq!(cmd, Some("${HOME}/u.sh"));
     }
 
-    /// The user-writable `$GROK_HOME/requirements.toml` stamps `UserRequirements`, never the exempt `Requirements`.
+    /// The user-writable `$FRIDAY_HOME/requirements.toml` stamps `UserRequirements`, never the exempt `Requirements`.
     /// A file the user owns cannot grant itself the no-disable exemption.
     #[test]
     fn user_requirements_layer_is_not_managed_policy() {
@@ -662,7 +662,7 @@ mod tests {
         assert!(!layer.provenance().is_managed_policy());
     }
 
-    /// The same `$GROK_HOME/requirements.toml` stamps the exempt `SignedRequirements` while its bytes verify against the server's signature, and drops back to `UserRequirements` the moment they differ.
+    /// The same `$FRIDAY_HOME/requirements.toml` stamps the exempt `SignedRequirements` while its bytes verify against the server's signature, and drops back to `UserRequirements` the moment they differ.
     #[test]
     fn signed_requirements_layer_is_managed_policy_until_edited() {
         use crate::signed_policy::tests::{payload, sign, test_keypair};
@@ -936,14 +936,14 @@ mod tests {
 
     #[test]
     fn load_user_config_layer_is_empty_without_user_home() {
-        // No resolvable user home: no user layer, and no cwd-relative .grok read
+        // No resolvable user home: no user layer, and no cwd-relative .friday read
         let v = load_user_config_layer(None, "config.toml").unwrap();
         assert_eq!(v.as_table().map(|t| t.is_empty()), Some(true));
     }
 
     #[test]
     fn load_user_config_layer_treats_empty_file_as_empty_table() {
-        let dir = std::env::temp_dir().join(format!("grok-load-empty-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-load-empty-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("config.toml"), b"").unwrap();
         let v = load_user_config_layer(Some(&dir), "config.toml").unwrap();
@@ -955,7 +955,7 @@ mod tests {
     fn load_user_config_layer_reads_file_when_home_present() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-load-layer-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-load-layer-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut f = std::fs::File::create(dir.join("config.toml")).unwrap();
         writeln!(f, "[telemetry]\nmode = \"from_file\"\n").unwrap();
@@ -973,7 +973,7 @@ mod tests {
     /// The returned error keeps the parser's kind and location but never the source snippet, which can carry a secret and would reach clients.
     #[test]
     fn parse_error_keeps_kind_but_not_snippet() {
-        let dir = std::env::temp_dir().join(format!("grok-toml-leak-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-toml-leak-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("bad.toml");
         // Duplicate key: the message names the key; the secret-bearing source line is only in Display.

@@ -24,9 +24,9 @@ pub enum SettingsCacheMode {
 }
 
 impl SettingsCacheMode {
-    /// `GROK_SETTINGS_CACHE=false` disables the cache.
+    /// `FRIDAY_SETTINGS_CACHE=false` disables the cache.
     pub fn from_process() -> SettingsCacheMode {
-        if xai_grok_config::env_bool("GROK_SETTINGS_CACHE") == Some(false) {
+        if xai_grok_config::env_bool("FRIDAY_SETTINGS_CACHE") == Some(false) {
             SettingsCacheMode::Disabled
         } else {
             SettingsCacheMode::Enabled

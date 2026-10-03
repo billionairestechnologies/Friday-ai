@@ -412,14 +412,14 @@ fn auto_respond_to_permissions(
 /// "Not signed in" error message, tailored to the session type.
 fn auth_required_message(interactive: bool) -> String {
     if interactive {
-        "Not signed in. Run `grok login` to authenticate \
-         (or `grok login --device-code` if no browser is available)."
+        "Not signed in. Run `friday login` to authenticate \
+         (or `friday login --device-code` if no browser is available)."
             .to_string()
     } else {
         "Not signed in. To authenticate without a browser, run:\n  \
-         grok login --device-code\n\n\
-         Alternatively, set the XAI_API_KEY environment variable \
-         or run `grok login` on a machine with a browser."
+         friday login --device-code\n\n\
+         Alternatively, set the FRIDAY_X_TOKEN environment variable \
+         or run `friday login` on a machine with a browser."
             .to_string()
     }
 }
@@ -764,7 +764,7 @@ async fn apply_headless_model_and_effort(
     .map_err(|e| {
         if let Some(name) = model_name {
             anyhow::anyhow!(
-                "Couldn't set model '{}': {}. Run 'grok models' to see available models.",
+                "Couldn't set model '{}': {}. Run 'friday models' to see available models.",
                 name,
                 e
             )
@@ -1075,7 +1075,7 @@ pub async fn run_single_turn(
         session_id = %session_id.0,
         "headless: open_session complete"
     );
-    let track_active = std::env::var("GROK_TRACK_HEADLESS").is_ok();
+    let track_active = std::env::var("FRIDAY_TRACK_HEADLESS").is_ok();
     if track_active {
         let _ = xai_grok_active_sessions::register(xai_grok_active_sessions::ActiveSession {
             session_id: session_id.clone(),

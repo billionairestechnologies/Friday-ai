@@ -1,4 +1,4 @@
-//! Agent definition types, parsed from `.grok/agents/*.md` files.
+//! Agent definition types, parsed from `.friday/agents/*.md` files.
 use crate::error::AgentBuildError;
 use crate::prompt::context::TemplateOverride;
 use crate::prompt::user_message::UserMessageTemplate;
@@ -160,7 +160,7 @@ pub fn workspace_grok_build_toolset() -> ToolServerConfig {
         behavior_preset: None,
     }
 }
-/// Fully qualified ids of the workspace tools that call the Grok API with the workspace server's own credential.
+/// Fully qualified ids of the workspace tools that call the Friday X API with the workspace server's own credential.
 /// A server whose credential only serves the hub cannot run them, so it neither advertises nor serves them.
 pub fn api_backed_tool_ids() -> Vec<String> {
     #[allow(unused_mut)]
@@ -689,7 +689,7 @@ impl BuiltinAgentName {
         &[Self::GeneralPurpose, Self::Explore, Self::Plan]
     }
 }
-/// Portable agent identity, parsed from .grok/agents/*.md. Usable as a top-level agent or a subagent.
+/// Portable agent identity, parsed from .friday/agents/*.md. Usable as a top-level agent or a subagent.
 /// Does not contain session-level policies; those are provided by the AgentBuilder at build time.
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -839,11 +839,11 @@ fn default_prompt_mode() -> PromptMode {
 /// Where the agent definition was discovered.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum AgentScope {
-    /// .grok/agents/ (project-level, highest priority)
+    /// .friday/agents/ (project-level, highest priority)
     Project,
-    /// ~/.grok/agents/ (user-level)
+    /// ~/.friday/agents/ (user-level)
     User,
-    /// ~/.grok/bundled/agents/ (lowest-priority bundled cache)
+    /// ~/.friday/bundled/agents/ (lowest-priority bundled cache)
     Bundled,
     /// Built-in agent (e.g., default_grok_build(), browser_use()).
     #[default]
@@ -1058,11 +1058,11 @@ where
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum MemoryScope {
-    /// `~/.grok/agent-memory/<name>/`
+    /// `~/.friday/agent-memory/<name>/`
     User,
-    /// `<project>/.grok/agent-memory/<name>/`
+    /// `<project>/.friday/agent-memory/<name>/`
     Project,
-    /// `<project>/.grok/agent-memory-local/<name>/`
+    /// `<project>/.friday/agent-memory-local/<name>/`
     Local,
 }
 impl MemoryScope {
@@ -1085,12 +1085,12 @@ impl MemoryScope {
                 is_project_scoped: false,
             },
             Self::Project => ResolvedMemoryDir {
-                path: project_cwd.join(".grok/agent-memory").join(agent_name),
+                path: project_cwd.join(".friday/agent-memory").join(agent_name),
                 is_project_scoped: true,
             },
             Self::Local => ResolvedMemoryDir {
                 path: project_cwd
-                    .join(".grok/agent-memory-local")
+                    .join(".friday/agent-memory-local")
                     .join(agent_name),
                 is_project_scoped: true,
             },
@@ -1302,11 +1302,11 @@ impl AgentDefinition {
                 return scope;
             }
         }
-        if path_str.contains(".grok/agents/") || path_str.contains(".grok\\agents\\") {
+        if path_str.contains(".friday/agents/") || path_str.contains(".friday\\agents\\") {
             return AgentScope::Project;
         }
-        if path_str.contains(".grok/bundled/agents/")
-            || path_str.contains(".grok\\bundled\\agents\\")
+        if path_str.contains(".friday/bundled/agents/")
+            || path_str.contains(".friday\\bundled\\agents\\")
         {
             return AgentScope::Bundled;
         }
@@ -1452,7 +1452,7 @@ impl AgentDefinition {
             tool_config: default_grok_build_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuild,
-                "Grok Build agent for software engineering tasks.",
+                "Friday X agent for software engineering tasks.",
             )
         }
     }
@@ -1463,7 +1463,7 @@ impl AgentDefinition {
             agents_md: false,
             ..Self::base(
                 BuiltinAgentName::GrokBuildConcise,
-                "Grok Build agent with concise output format.",
+                "Friday X agent with concise output format.",
             )
         }
     }
@@ -1472,7 +1472,7 @@ impl AgentDefinition {
             tool_config: grok_build_plan_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuildPlan,
-                "Grok Build agent with plan mode support.",
+                "Friday X agent with plan mode support.",
             )
         }
     }
@@ -1481,7 +1481,7 @@ impl AgentDefinition {
             tool_config: grok_build_plan_no_subagents_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuildPlanNoSubagents,
-                "Grok Build agent with plan mode (no subagents).",
+                "Friday X agent with plan mode (no subagents).",
             )
         }
     }
@@ -1490,7 +1490,7 @@ impl AgentDefinition {
             tool_config: grok_build_ask_user_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuildAskUser,
-                "Grok Build agent with ask-user-question tool.",
+                "Friday X agent with ask-user-question tool.",
             )
         }
     }
@@ -2112,13 +2112,13 @@ description: Minimal agent
         let proj = MemoryScope::Project.resolve_dir("a", cwd);
         assert_eq!(
             proj.path,
-            std::path::PathBuf::from("/project/.grok/agent-memory/a")
+            std::path::PathBuf::from("/project/.friday/agent-memory/a")
         );
         assert!(proj.is_project_scoped);
         let local = MemoryScope::Local.resolve_dir("a", cwd);
         assert_eq!(
             local.path,
-            std::path::PathBuf::from("/project/.grok/agent-memory-local/a")
+            std::path::PathBuf::from("/project/.friday/agent-memory-local/a")
         );
         assert!(local.is_project_scoped);
     }
@@ -2306,7 +2306,7 @@ description: Test default tool config
         let bundled = tmp
             .path()
             .join("nested")
-            .join(".grok")
+            .join(".friday")
             .join("bundled")
             .join("agents")
             .join("bundled-agent.md");

@@ -25,7 +25,7 @@ pub type SessionMetricsGate = Arc<dyn Fn() -> bool + Send + Sync>;
 /// so this foundation crate holds no product-specific field policy.
 pub type SpanRedactor = Arc<dyn Fn(&mut [opentelemetry_sdk::trace::SpanData]) + Send + Sync>;
 
-const ENV_OTEL_FILTER: &str = "GROK_OTEL_FILTER";
+const ENV_OTEL_FILTER: &str = "FRIDAY_OTEL_FILTER";
 const DEFAULT_OTEL_FILTER: &str = "info";
 
 pub fn build_otel_layer<S>(
@@ -51,7 +51,7 @@ where
     let otel_filter = tracing_subscriber::filter::EnvFilter::try_new(&otel_filter)
         .unwrap_or_else(|e| {
             eprintln!(
-                "[otel] Invalid GROK_OTEL_FILTER '{}': {}. Using default '{}'.",
+                "[otel] Invalid FRIDAY_OTEL_FILTER '{}': {}. Using default '{}'.",
                 otel_filter, e, DEFAULT_OTEL_FILTER
             );
 

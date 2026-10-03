@@ -180,13 +180,13 @@ pub fn canonical_name(value: &str) -> Option<&'static str> {
     ThemeKind::from_name(value).map(|k| k.display_name())
 }
 
-/// Human-friendly display name for a canonical theme value (e.g. `"groknight"` becomes `"Grok Night"`).
+/// Human-friendly display name for a canonical theme value (e.g. `"groknight"` becomes `"Friday X Night"`).
 /// Falls back to `value` verbatim.
 pub fn display_name_for_canonical(value: &str) -> &str {
     match value {
         "auto" => "Auto",
-        "groknight" => "Grok Night",
-        "grokday" => "Grok Day",
+        "groknight" => "Friday X Night",
+        "grokday" => "Friday X Day",
         "tokyonight" => "Tokyo Night",
         "rosepine-moon" => "Rose Pine Moon",
         "terminal" => "Terminal",

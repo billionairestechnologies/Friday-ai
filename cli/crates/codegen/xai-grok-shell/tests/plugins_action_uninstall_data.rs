@@ -1,5 +1,5 @@
 //! E2E: the pager modal Uninstall (`x.ai/plugins/action`) must clean up
-//! `~/.grok/plugin-data/<id>/` like the CLI uninstall path, not orphan it.
+//! `~/.friday/plugin-data/<id>/` like the CLI uninstall path, not orphan it.
 
 mod acp_harness;
 
@@ -16,7 +16,7 @@ fn action_outcome(response: &serde_json::Value) -> xai_hooks_plugins_types::Acti
 fn plugins_action_uninstall_removes_plugin_data_dir() {
     acp_harness::run_agent_test(|cwd, _server| async move {
         let grok_home =
-            std::path::PathBuf::from(std::env::var("GROK_HOME").expect("harness sets GROK_HOME"));
+            std::path::PathBuf::from(std::env::var("FRIDAY_HOME").expect("harness sets FRIDAY_HOME"));
 
         let plugin_dir = cwd.join("data-demo");
         std::fs::create_dir_all(&plugin_dir).unwrap();

@@ -1,4 +1,4 @@
-//! E2E path-deny and Grok hook write-deny (subprocess; arm64-tagged).
+//! E2E path-deny and Friday X hook write-deny (subprocess; arm64-tagged).
 //! Soft-skips when enforcement is unavailable; only `SANDBOX_E2E_REQUIRE_ENFORCEMENT` hard-requires a usable backend.
 #![cfg(all(unix, feature = "enforce"))]
 use std::fs;
@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 const SCENARIO_ENV: &str = "SANDBOX_E2E_SCENARIO";
 const WORKSPACE_ENV: &str = "SANDBOX_E2E_WORKSPACE";
-const GROK_HOME_ENV: &str = "SANDBOX_E2E_GROK_HOME";
+const FRIDAY_HOME_ENV: &str = "SANDBOX_E2E_GROK_HOME";
 const HOME_ENV: &str = "SANDBOX_E2E_HOME";
 const PROFILE_ENV: &str = "SANDBOX_E2E_PROFILE";
 const TARGETS_ENV: &str = "SANDBOX_E2E_TARGETS";
@@ -21,9 +21,9 @@ const REQUIRE_ENV: &str = "SANDBOX_E2E_REQUIRE_ENFORCEMENT";
 fn apply_fixture_env(cmd: &mut Command, home: &Path, grok_home: &Path, workspace: &Path) {
     cmd.env(WORKSPACE_ENV, workspace.as_os_str())
         .env(HOME_ENV, home.as_os_str())
-        .env(GROK_HOME_ENV, grok_home.as_os_str())
+        .env(FRIDAY_HOME_ENV, grok_home.as_os_str())
         .env("HOME", home.as_os_str())
-        .env("GROK_HOME", grok_home.as_os_str());
+        .env("FRIDAY_HOME", grok_home.as_os_str());
 }
 /// Re-invoke this test binary as a subprocess driving `profile` over `targets` (denied) and `controls` (must stay readable).
 /// `postlaunch` paths are created AFTER apply to exercise the macOS runtime-regex (post-launch) coverage.
@@ -227,10 +227,10 @@ fn subprocess_entry() {
     let workspace = dunce::canonicalize(&workspace).expect("canonicalize workspace");
     let workspace = workspace.as_path();
     let home = PathBuf::from(std::env::var(HOME_ENV).expect(HOME_ENV));
-    let grok_home = PathBuf::from(std::env::var(GROK_HOME_ENV).expect(GROK_HOME_ENV));
+    let grok_home = PathBuf::from(std::env::var(FRIDAY_HOME_ENV).expect(FRIDAY_HOME_ENV));
     unsafe {
         std::env::set_var("HOME", &home);
-        std::env::set_var("GROK_HOME", &grok_home);
+        std::env::set_var("FRIDAY_HOME", &grok_home);
     }
     match scenario.as_str() {
         "block_deny" => subprocess_block_deny(workspace),
@@ -633,9 +633,9 @@ fn subprocess_devbox_genuine(workspace: &Path) {
     eprintln!("OK: devbox enforcement applied inside genuine bwrap");
     std::process::exit(0);
 }
-/// Workspace-profile Grok-owned hook write-deny probes (existing sources and first-run).
+/// Workspace-profile Friday X-owned hook write-deny probes (existing sources and first-run).
 fn subprocess_hook_write_deny(workspace: &Path, first_run: bool) {
-    let home = PathBuf::from(std::env::var(GROK_HOME_ENV).expect(GROK_HOME_ENV));
+    let home = PathBuf::from(std::env::var(FRIDAY_HOME_ENV).expect(FRIDAY_HOME_ENV));
     let profile = xai_grok_sandbox::ProfileName::Workspace;
     subprocess_profile_and_bwrap_reexec(&profile, workspace);
     let mut sandbox = xai_grok_sandbox::SandboxManager::new(profile, workspace);
@@ -677,7 +677,7 @@ fn subprocess_hook_write_deny(workspace: &Path, first_run: bool) {
             }
             assert_write_denied(&format!("{name} (first-run)"), path);
         }
-        eprintln!("OK: first-run Grok hook slots denied");
+        eprintln!("OK: first-run Friday X hook slots denied");
     } else {
         let keep = hooks_dir.join("keep.json");
         match fs::read_to_string(&keep) {
@@ -821,7 +821,7 @@ fn subprocess_hook_write_deny(workspace: &Path, first_run: bool) {
     eprintln!("OK: hook write-deny e2e passed");
     std::process::exit(0);
 }
-/// Create isolated HOME and GROK_HOME fixture dirs for a scenario.
+/// Create isolated HOME and FRIDAY_HOME fixture dirs for a scenario.
 fn fixture_homes(
     tag: &str,
 ) -> (
@@ -866,9 +866,9 @@ fn run_deny_case(
         .map(|p| format!("\"{p}\""))
         .collect::<Vec<_>>()
         .join(", ");
-    fs::create_dir_all(tmp.join(".grok")).expect("mkdir .grok");
+    fs::create_dir_all(tmp.join(".friday")).expect("mkdir .friday");
     fs::write(
-        tmp.join(".grok")
+        tmp.join(".friday")
             .join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
         format!("[profiles.{profile}]\nextends = \"workspace\"\ndeny = [{deny_list}]\n"),
     )
@@ -982,9 +982,9 @@ fn deny_globs_block_read_write_rename() {
 #[cfg(target_os = "linux")]
 fn read_deny_marker_spoof_refused() {
     let (home, grok, workspace, _ch, _cg, _cw) = fixture_homes("read-deny-spoof");
-    fs::create_dir_all(workspace.join(".grok")).expect("mkdir .grok");
+    fs::create_dir_all(workspace.join(".friday")).expect("mkdir .friday");
     fs::write(
-            workspace.join(".grok").join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
+            workspace.join(".friday").join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
             "[profiles.netspoof]\nextends = \"devbox\"\nrestrict_network = true\ndeny = [\"secret.pem\"]\n",
         )
         .expect("write sandbox.toml");
@@ -1016,10 +1016,10 @@ fn read_deny_forged_mounts_are_refused() {
     }
     use std::os::unix::fs::PermissionsExt;
     let (home, grok, workspace, _ch, _cg, _cw) = fixture_homes("read-deny-forged");
-    fs::create_dir_all(workspace.join(".grok")).expect("mkdir .grok");
+    fs::create_dir_all(workspace.join(".friday")).expect("mkdir .friday");
     fs::write(
         workspace
-            .join(".grok")
+            .join(".friday")
             .join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
         "[profiles.forged]\nextends = \"devbox\"\ndeny = [\"secret.pem\"]\n",
     )
@@ -1062,10 +1062,10 @@ fn read_deny_empty_set_verifies_inside_bwrap() {
         return;
     }
     let (home, grok, workspace, _ch, _cg, _cw) = fixture_homes("read-deny-empty");
-    fs::create_dir_all(workspace.join(".grok")).expect("mkdir .grok");
+    fs::create_dir_all(workspace.join(".friday")).expect("mkdir .friday");
     fs::write(
         workspace
-            .join(".grok")
+            .join(".friday")
             .join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
         "[profiles.netempty]\nextends = \"devbox\"\nrestrict_network = true\n",
     )
@@ -1186,9 +1186,9 @@ fn hardlinked_hooks_paths_refuses_startup() {
         "expected hard-link refusal signal\nstderr: {stderr}"
     );
 }
-/// Workspace profile: Grok-owned direct hook sources are write-denied but readable.
+/// Workspace profile: Friday X-owned direct hook sources are write-denied but readable.
 /// Create / overwrite / unlink / rename / mkdir fail; absolute hooks-paths targets are denied; parent rename is blocked.
-/// Grok/CWD/temp siblings stay writable.
+/// Friday X/CWD/temp siblings stay writable.
 #[test]
 fn workspace_protects_direct_hook_sources() {
     if skip_if_enforcement_unavailable() {
@@ -1295,7 +1295,7 @@ fn symlinked_hooks_json_refuses_startup() {
         "symlinked hooks JSON must refuse startup\nstderr: {stderr}"
     );
 }
-/// First-run: missing fixed slots are created as real Grok state before apply, then write-denied.
+/// First-run: missing fixed slots are created as real Friday X state before apply, then write-denied.
 /// Parent asserts post-exit host tree is valid (no vendor stubs).
 #[test]
 fn workspace_protects_direct_hook_sources_first_run() {
@@ -1314,7 +1314,7 @@ fn workspace_protects_direct_hook_sources_first_run() {
         "missing pass marker\nstderr: {stderr}"
     );
     for needle in [
-        "OK: first-run Grok hook slots denied",
+        "OK: first-run Friday X hook slots denied",
         "OK: hooks-paths (first-run) write denied",
         "OK: hooks nested (first-run) mkdir denied",
         "OK: hooks nested file (first-run) write denied",

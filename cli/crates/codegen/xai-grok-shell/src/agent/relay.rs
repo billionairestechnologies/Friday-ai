@@ -163,7 +163,7 @@ async fn attempt_auth_recovery(
     context: &str,
 ) -> bool {
     let Some(ref am) = config.auth_manager else {
-        teprintln!("Authentication required. Run `grok login` to re-authenticate.");
+        teprintln!("Authentication required. Run `friday login` to re-authenticate.");
         cancel.cancel();
         return false;
     };
@@ -316,7 +316,7 @@ async fn run_relay_loop(
                     event = "relay_disconnected",
                     ws_url = %config.ws_url,
                 );
-                tprintln!("Disconnected from Grok WebSocket server");
+                tprintln!("Disconnected from Friday X WebSocket server");
                 info!("WebSocket disconnected, will reconnect");
             }
             Err(e) => {
@@ -380,7 +380,7 @@ fn build_relay_request(config: &RelayConfig) -> anyhow::Result<axum::http::Reque
         axum::http::header::HeaderValue::from_str(&format!("Bearer {}", config.auth.key))?,
     );
     req.headers_mut().insert(
-        "X-XAI-Token-Auth",
+        "X-Friday-Token-Auth",
         axum::http::header::HeaderValue::from_str(&config.token_header)?,
     );
     req.headers_mut().insert(
@@ -388,7 +388,7 @@ fn build_relay_request(config: &RelayConfig) -> anyhow::Result<axum::http::Reque
         axum::http::header::HeaderValue::from_str(&config.auth.user_id)?,
     );
     req.headers_mut().insert(
-        "x-grok-client-version",
+        "x-friday-client-version",
         axum::http::header::HeaderValue::from_static(xai_grok_version::VERSION),
     );
     req.headers_mut().insert(

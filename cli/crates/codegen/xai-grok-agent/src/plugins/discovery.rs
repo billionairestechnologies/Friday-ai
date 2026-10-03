@@ -2,11 +2,11 @@
 //!
 //! Discovers plugins from multiple sources in priority order:
 //! 1. CLI `--plugin-dir` paths (scope: `CliOverride`)
-//! 2. `.grok/plugins/*/` (scope: `Project`, walked from cwd to worktree root)
+//! 2. `.friday/plugins/*/` (scope: `Project`, walked from cwd to worktree root)
 //! 3. `.claude/plugins/*/` (scope: `Project`, compat)
-//! 4. `~/.grok/plugins/*/` (scope: `User`)
+//! 4. `~/.friday/plugins/*/` (scope: `User`)
 //! 5. `~/.claude/plugins/*/` (scope: `User`, compat)
-//!    `~/.grok/installed-plugins/*/` (scope: `User`, marketplace installs)
+//!    `~/.friday/installed-plugins/*/` (scope: `User`, marketplace installs)
 //!    Installed plugins from `~/.claude/plugins/installed_plugins.json` (scope: `User`)
 //! 6. Paths from `[plugins].paths` in config (scope: `ConfigPath`)
 //!
@@ -27,9 +27,9 @@ use super::trust::TrustStore;
 pub enum PluginScope {
     /// `--plugin-dir` (highest priority, always trusted)
     CliOverride = 0,
-    /// `.grok/plugins/` or `.claude/plugins/` in project (requires trust)
+    /// `.friday/plugins/` or `.claude/plugins/` in project (requires trust)
     Project = 1,
-    /// `~/.grok/plugins/` or `~/.claude/plugins/` (always trusted)
+    /// `~/.friday/plugins/` or `~/.claude/plugins/` (always trusted)
     User = 2,
     /// `[plugins].paths` in config (trust depends on location)
     ConfigPath = 3,
@@ -76,11 +76,11 @@ impl std::fmt::Display for PluginScope {
 pub enum PluginOrigin {
     /// CLI `--plugin-dir`.
     CliOverride,
-    /// Project `.grok/plugins/`.
+    /// Project `.friday/plugins/`.
     ProjectGrok,
     /// Project `.claude/plugins/`.
     ProjectClaude,
-    /// `$GROK_HOME/plugins/`.
+    /// `$FRIDAY_HOME/plugins/`.
     UserGrok,
     /// `~/.claude/plugins/`.
     UserClaude,
@@ -94,7 +94,7 @@ pub enum PluginOrigin {
         /// Marketplace name from the `name@marketplace` JSON key, when present.
         marketplace: Option<String>,
     },
-    /// Grok's install registry (`~/.grok/installed-plugins`).
+    /// Friday X's install registry (`~/.friday/installed-plugins`).
     MarketplaceInstall {
         /// Marketplace source display name (None for direct git/local installs).
         source_name: Option<String>,
@@ -206,8 +206,8 @@ impl DiscoveryConfig {
 
 // ── Discovery entry point ─────────────────────────────────────────────
 
-/// User plugin directories in priority order: `$GROK_HOME/plugins` then `~/.claude/plugins`.
-/// Plugins are intentionally not discovered from legacy `~/.grok/plugins`.
+/// User plugin directories in priority order: `$FRIDAY_HOME/plugins` then `~/.claude/plugins`.
+/// Plugins are intentionally not discovered from legacy `~/.friday/plugins`.
 /// Trust, persisted data, and install paths all resolve under `grok_home()`, so a legacy scan would be half-initialized.
 fn user_plugin_dirs(home: Option<&Path>, grok: Option<&Path>) -> Vec<(PathBuf, PluginOrigin)> {
     let mut dirs = Vec::new();
@@ -220,7 +220,7 @@ fn user_plugin_dirs(home: Option<&Path>, grok: Option<&Path>) -> Vec<(PathBuf, P
     dirs
 }
 
-/// Origin for a project plugins parent dir: `.claude/plugins` vs `.grok/plugins`.
+/// Origin for a project plugins parent dir: `.claude/plugins` vs `.friday/plugins`.
 fn project_plugins_dir_origin(plugins_dir: &Path) -> PluginOrigin {
     let is_claude = plugins_dir
         .parent()
@@ -244,10 +244,10 @@ pub fn project_plugin_dirs(cwd: Option<&Path>) -> (Vec<PathBuf>, Option<PathBuf>
     (project_plugin_dirs_in(&chain.dirs), chain.git_root)
 }
 
-/// Existing project plugin parent dirs (`.grok/plugins`, `.claude/plugins`) under each dir of a precomputed [`crate::repo::RepoDirChain`].
+/// Existing project plugin parent dirs (`.friday/plugins`, `.claude/plugins`) under each dir of a precomputed [`crate::repo::RepoDirChain`].
 /// The folder-trust gate reuses its one shared chain here so detection and discovery can never drift.
 pub fn project_plugin_dirs_in(chain_dirs: &[PathBuf]) -> Vec<PathBuf> {
-    crate::repo::existing_subdirs_along(chain_dirs, &[".grok/plugins", ".claude/plugins"])
+    crate::repo::existing_subdirs_along(chain_dirs, &[".friday/plugins", ".claude/plugins"])
 }
 
 /// `cwd` is used to find the git worktree root for project-scope plugins.
@@ -280,7 +280,7 @@ pub fn discover_plugins(
         }
     }
 
-    // 2-3. Project plugins (.grok/plugins/, .claude/plugins/).
+    // 2-3. Project plugins (.friday/plugins/, .claude/plugins/).
     // Scan the same dirs the folder-trust gate detects, via the shared `project_plugin_dirs` walk, so discovery and gating can never drift
     if let Some(cwd) = cwd {
         let (project_dirs, git_root) = project_plugin_dirs(Some(cwd));
@@ -318,8 +318,8 @@ pub fn discover_plugins(
         }
     }
 
-    // 4-5. User plugins: $GROK_HOME/plugins, legacy ~/.grok/plugins, ~/.claude/plugins.
-    // Gate the grok plugins dir on user_grok_home() so a project's .grok/plugins is never scanned as user-global when no home resolves
+    // 4-5. User plugins: $FRIDAY_HOME/plugins, legacy ~/.friday/plugins, ~/.claude/plugins.
+    // Gate the friday plugins dir on user_grok_home() so a project's .friday/plugins is never scanned as user-global when no home resolves
     let grok = xai_grok_config::user_grok_home();
     let plugin_dirs = user_plugin_dirs(xai_dirs::home_dir().as_deref(), grok.as_deref());
     for (plugins_dir, origin) in plugin_dirs {
@@ -461,7 +461,7 @@ pub fn discover_plugins(
 
 // ── Internal helpers ──────────────────────────────────────────────────
 
-/// Scan a plugins parent directory (e.g. `~/.grok/plugins/`) and collect
+/// Scan a plugins parent directory (e.g. `~/.friday/plugins/`) and collect
 /// each subdirectory as a plugin candidate.
 fn scan_plugin_dir(
     plugins_dir: &Path,
@@ -903,11 +903,11 @@ mod tests {
             home.join(".claude").join("plugins"),
             PluginOrigin::UserClaude
         )));
-        // Plugins are not discovered from the legacy ~/.grok tree.
+        // Plugins are not discovered from the legacy ~/.friday tree.
         assert!(
             !dirs
                 .iter()
-                .any(|(p, _)| p == &home.join(".grok").join("plugins"))
+                .any(|(p, _)| p == &home.join(".friday").join("plugins"))
         );
     }
 
@@ -947,7 +947,7 @@ mod tests {
     #[test]
     fn project_plugins_dir_origin_distinguishes_grok_and_claude() {
         assert_eq!(
-            project_plugins_dir_origin(Path::new("/repo/.grok/plugins")),
+            project_plugins_dir_origin(Path::new("/repo/.friday/plugins")),
             PluginOrigin::ProjectGrok
         );
         assert_eq!(
@@ -960,8 +960,8 @@ mod tests {
     fn discover_user_plugins() {
         let tmp = tempfile::tempdir().unwrap();
 
-        // Create ~/.grok/plugins/ structure
-        let grok_plugins = tmp.path().join(".grok").join("plugins");
+        // Create ~/.friday/plugins/ structure
+        let grok_plugins = tmp.path().join(".friday").join("plugins");
         std::fs::create_dir_all(&grok_plugins).unwrap();
         make_manifest_plugin(&grok_plugins, "user-tool");
 
@@ -1393,7 +1393,7 @@ mod tests {
     fn plugin_id_format() {
         let id = PluginId::new(
             PluginScope::User,
-            Path::new("/home/user/.grok/plugins/my-plugin"),
+            Path::new("/home/user/.friday/plugins/my-plugin"),
             "my-plugin",
         );
         assert!(id.0.starts_with("user/"));
@@ -1537,11 +1537,11 @@ mod tests {
 
     #[test]
     fn discover_real_project_plugin_gated_on_project_trusted() {
-        // Drives discover_plugins end to end with a repo-local `.grok/plugins/<x>/` plugin that has an MCP component
+        // Drives discover_plugins end to end with a repo-local `.friday/plugins/<x>/` plugin that has an MCP component
         // The plugin is trusted iff the folder-trust verdict (project_trusted) allows it
         // The plugin is found by name so any user-scoped plugins on the test host are irrelevant
         let tmp = tempfile::tempdir().unwrap();
-        let plugin_dir = tmp.path().join(".grok").join("plugins").join("proj-mcp");
+        let plugin_dir = tmp.path().join(".friday").join("plugins").join("proj-mcp");
         std::fs::create_dir_all(&plugin_dir).unwrap();
         std::fs::write(plugin_dir.join("plugin.json"), r#"{"name": "proj-mcp"}"#).unwrap();
         std::fs::write(plugin_dir.join(".mcp.json"), r#"{"mcpServers":{}}"#).unwrap();

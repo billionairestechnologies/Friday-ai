@@ -2,28 +2,28 @@
 
 `grok clone` fetches a Git repository into a Grove content store and mounts a
 projected working tree (NFS on macOS, FUSE on Linux). Each invocation reads
-`GROK_CLONE` / `GROVE_CLONE` in this process, then grok enable-all
-(`GROK_GROVE` or `[cli] grove` in `~/.grok/config.toml`), then `[clone] enabled`
+`FRIDAY_CLONE` / `GROVE_CLONE` in this process, then grok enable-all
+(`FRIDAY_GROVE` or `[cli] grove` in `~/.friday/config.toml`), then `[clone] enabled`
 authorize Clone IPC.
 
 This does **not** enable Grove for session / `-w` worktrees. Those use a
-separate gate (`GROK_WORKTREE_TYPE` and `[cli] grove_worktree` in
-`~/.grok/config.toml`; see [Configuration reference](26-config-reference.md)).
-`GROK_WORKTREE_TYPE` and `[cli] grove_worktree` do **not** enable `grok clone`.
-`GROK_CLONE` / `GROVE_CLONE` / `[clone] enabled` do **not** enable session /
+separate gate (`FRIDAY_WORKTREE_TYPE` and `[cli] grove_worktree` in
+`~/.friday/config.toml`; see [Configuration reference](26-config-reference.md)).
+`FRIDAY_WORKTREE_TYPE` and `[cli] grove_worktree` do **not** enable `grok clone`.
+`FRIDAY_CLONE` / `GROVE_CLONE` / `[clone] enabled` do **not** enable session /
 `-w` Grove.
 
 To turn **both** surfaces on without touching the specific knobs:
 
 ```bash
-export GROK_GROVE=1
-# or in ~/.grok/config.toml:
+export FRIDAY_GROVE=1
+# or in ~/.friday/config.toml:
 # [cli]
 # grove = true
 ```
 
-Specific knobs still win: `GROK_WORKTREE_TYPE=copy` keeps session worktrees on
-copy while clone can stay on; `GROK_CLONE=0` keeps `grok clone` off while
+Specific knobs still win: `FRIDAY_WORKTREE_TYPE=copy` keeps session worktrees on
+copy while clone can stay on; `FRIDAY_CLONE=0` keeps `grok clone` off while
 worktrees can stay on.
 
 ```bash
@@ -70,9 +70,9 @@ The two are separate worlds:
 
 | World | Covers | Commands | Store |
 |-------|--------|----------|-------|
-| Grok | the model and API | `grok login`, `grok logout` | `~/.grok/auth.json` |
+| Friday X | the model and API | `friday login`, `friday logout` | `~/.friday/auth.json` |
 
-`grok clone` never reads `~/.grok/auth.json` for Git. Signing into Grok does not
+`grok clone` never reads `~/.friday/auth.json` for Git. Signing into Friday X does not
 give the daemon a credential for the remote, and neither does
 `[clone] enabled = true`: that flag is a **product gate** deciding whether
 `grok clone` runs at all, not authorization for GitHub.
@@ -126,10 +126,10 @@ carrier token, configure `git credential` or `gh auth` first, then reload.
 
 ## Daemon
 
-`grok` does not take the daemon or its mounts down) and waits for the socket.
+`friday` does not take the daemon or its mounts down) and waits for the socket.
 
 The `grove` binary is resolved from `PATH`, then from the directory of the
-`grok` executable (for example `~/.grok/bin/grove` next to `grok`). There is
+`friday` executable (for example `~/.friday/bin/grove` next to `friday`). There is
 no separate install location. macOS has no PATH package for grove; build it
 from the monorepo:
 

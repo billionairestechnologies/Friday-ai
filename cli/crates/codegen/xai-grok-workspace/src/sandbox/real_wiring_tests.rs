@@ -149,7 +149,7 @@ impl Fixture {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("ws");
         let grok_home = tmp.path().join("grok-home");
-        std::fs::create_dir_all(root.join(".grok")).unwrap();
+        std::fs::create_dir_all(root.join(".friday")).unwrap();
         std::fs::create_dir_all(&grok_home).unwrap();
         std::fs::write(
             crate::sandbox_mode::workspace_config_path(&root),
@@ -328,7 +328,7 @@ async fn observe_runs_the_real_child_unwrapped_counts_it_and_never_shows_a_card(
     let result = run_bash(
         &handle,
         &format!(
-            "echo \"sandboxed=${{GROK_SANDBOXED:-unset}}\"; touch {} && echo wrote",
+            "echo \"sandboxed=${{FRIDAY_SANDBOXED:-unset}}\"; touch {} && echo wrote",
             marker.display()
         ),
     )
@@ -619,7 +619,7 @@ async fn an_unpinned_shell_call_spawns_no_weaker_than_its_dispatch_mode_after_a_
 
         let (_, effective) = sandbox
             .set_workspace_mode(flip)
-            .expect("the folder's .grok/ is writable");
+            .expect("the folder's .friday/ is writable");
         assert_eq!(flip, effective.mode);
         assert_eq!(flip, sandbox.mode());
         assert_eq!(
@@ -1049,7 +1049,7 @@ async fn a_file_tool_never_writes_a_mode_layer_under_enforce() {
     let handle = fx.handle(fx.sandbox(BackendSource::Fixed(None)).await);
     let notes = fx.root.join("notes.txt");
     let patch = "*** Begin Patch\n*** Add File: notes.txt\n+kept out\n\
-                 *** Delete File: .grok/workspaced.toml\n*** End Patch";
+                 *** Delete File: .friday/workspaced.toml\n*** End Patch";
     for (tool, args) in [
         (
             "search_replace",
@@ -1061,15 +1061,15 @@ async fn a_file_tool_never_writes_a_mode_layer_under_enforce() {
         ),
         (
             "write",
-            json!({ "file_path": ".grok/./workspaced.toml", "content": lowered }),
+            json!({ "file_path": ".friday/./workspaced.toml", "content": lowered }),
         ),
         (
             "write",
-            json!({ "file_path": "missing/../.grok/workspaced.toml", "content": lowered }),
+            json!({ "file_path": "missing/../.friday/workspaced.toml", "content": lowered }),
         ),
         (
             "write",
-            json!({ "file_path": ".grok/workspaced.toml/workspaced.toml", "content": lowered }),
+            json!({ "file_path": ".friday/workspaced.toml/workspaced.toml", "content": lowered }),
         ),
         ("apply_patch", json!({ "patch": patch })),
     ] {
@@ -1158,7 +1158,7 @@ async fn a_file_tool_never_creates_a_missing_mode_layer_under_enforce() {
 
     std::fs::write(&user_layer, enforce).unwrap();
     std::fs::remove_file(&workspace_layer).unwrap();
-    let patch = "*** Begin Patch\n*** Add File: .grok/workspaced.toml\n+[sandbox]\n\
+    let patch = "*** Begin Patch\n*** Add File: .friday/workspaced.toml\n+[sandbox]\n\
                  +mode = \"off\"\n*** End Patch";
     for (tool, args) in [
         (
@@ -1396,7 +1396,7 @@ async fn shell_call_dispatched_under_observe_runs_observed_after_a_flip_to_enfor
     // edited by hand reaches the next command once the layers are re-read, not on the instant
     let (_, effective) = sandbox
         .set_workspace_mode(SandboxMode::Enforce)
-        .expect("the folder's .grok/ is writable");
+        .expect("the folder's .friday/ is writable");
     assert_eq!(SandboxMode::Enforce, effective.mode);
     assert_eq!(SandboxMode::Enforce, sandbox.mode());
     assert_eq!(
@@ -1487,7 +1487,7 @@ async fn off_starts_no_proxy_and_the_real_child_sees_no_sandbox() {
         "http_proxy=",
         "https_proxy=",
         "ALL_PROXY=",
-        "GROK_SANDBOX",
+        "FRIDAY_SANDBOX",
     ] {
         assert!(
             !text.contains(var),

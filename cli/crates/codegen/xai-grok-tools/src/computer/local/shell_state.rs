@@ -52,8 +52,8 @@ pub fn shell_env_overrides() -> HashMap<String, String> {
         // Re-applied last via [`crate::util::apply_grok_agent_marker`] so request
         // env cannot clear it.
         (
-            crate::util::GROK_AGENT_ENV.to_string(),
-            crate::util::GROK_AGENT_ENV_VALUE.to_string(),
+            crate::util::FRIDAY_AGENT_ENV.to_string(),
+            crate::util::FRIDAY_AGENT_ENV_VALUE.to_string(),
         ),
     ])
 }
@@ -90,7 +90,7 @@ dump_bash_state() {
     local content="$1"
     local var_name="$2"
     if [[ -n "$content" ]]; then
-      builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'GROK_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
+      builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'FRIDAY_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
       command base64 <<<"$content" | command tr -d '\n'
       builtin printf '\nGROK_SNAP_EOF_%s\n' "$var_name"
       builtin printf ')\n'
@@ -103,7 +103,7 @@ dump_bash_state() {
   _emit "$PWD"
 
   local env_vars
-  env_vars=$(builtin export -p 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
+  env_vars=$(builtin export -p 2>/dev/null | command grep -viE '_proxy=|FRIDAY_SANDBOX|FRIDAY_AGENT=|SUDO_ASKPASS|FRIDAY_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
   _emit_encoded "$env_vars" "ENV_VARS_B64"
 
   # errexit/pipefail here are this function's own `set -euo pipefail` (set is
@@ -146,7 +146,7 @@ function dump_zsh_state() {
     local content="$1"
     local var_name="$2"
     if [[ -n "$content" ]]; then
-      builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'GROK_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
+      builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'FRIDAY_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
       command base64 <<<"$content" | command tr -d '\n'
       builtin printf '\nGROK_SNAP_EOF_%s\n' "$var_name"
       builtin printf ')\n'
@@ -159,7 +159,7 @@ function dump_zsh_state() {
   _emit "$PWD"
 
   local env_vars
-  env_vars=$(builtin typeset -xp 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
+  env_vars=$(builtin typeset -xp 2>/dev/null | command grep -viE '_proxy=|FRIDAY_SANDBOX|FRIDAY_AGENT=|SUDO_ASKPASS|FRIDAY_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
   _emit_encoded "$env_vars" "ENV_VARS_B64"
 
   # errreturn/pipefail here are this function's own `emulate -L` options
@@ -390,12 +390,12 @@ impl ShellState {
         let wrapper = match self.shell {
             ShellKind::Bash => format!(
                 // Merge the user command's stderr into its stdout via `2>&1` so the captured byte stream preserves chronological write order. Shell-level
-                // diagnostics (eval syntax errors, etc.) still land on the outer shell's stderr — those are unaffected. Re-export GROK_AGENT=1 after snapshot
+                // diagnostics (eval syntax errors, etc.) still land on the outer shell's stderr — those are unaffected. Re-export FRIDAY_AGENT=1 after snapshot
                 // eval so agent-definition selectors (or other values) from prior shells cannot clear the agent sentinel (process env alone is insufficient).
                 "{dump_script} \
                  snap=$(command cat <&3) && builtin shopt -s extglob && builtin eval -- \"$snap\" && \
                  {{ builtin set +u 2>/dev/null || true; \
-                 builtin export GROK_AGENT=1; \
+                 builtin export FRIDAY_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin shopt -s expand_aliases 2>/dev/null; {sudo_inject}{search_inject}\
                  builtin printf '%s' \"${{2:-}}\"; \
@@ -414,7 +414,7 @@ impl ShellState {
                  builtin eval \"$snap\" && \
                  {{ builtin unsetopt nounset 2>/dev/null || true; \
                  builtin setopt nonomatch 2>/dev/null || true; \
-                 builtin export GROK_AGENT=1; \
+                 builtin export FRIDAY_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin setopt aliases 2>/dev/null; {sudo_inject}{search_inject}\
                  builtin printf '%s' \"${{2:-}}\"; \
@@ -582,7 +582,7 @@ fn parse_after_marker<'a>(output: &'a str, marker: &str) -> &'a str {
 /// (zsh) block, decoded and read back. A name exported without a value is left out, and so is
 /// every command this does not read in full: nothing is guessed.
 pub fn snapshot_exports(snapshot: &str) -> Vec<(OsString, OsString)> {
-    let header = "grok_snap_ENV_VARS_B64=$(command base64 -d <<'GROK_SNAP_EOF_ENV_VARS_B64'";
+    let header = "grok_snap_ENV_VARS_B64=$(command base64 -d <<'FRIDAY_SNAP_EOF_ENV_VARS_B64'";
     let Some(payload) = snapshot.lines().skip_while(|line| *line != header).nth(1) else {
         return Vec::new();
     };
@@ -862,8 +862,8 @@ mod tests {
     fn shell_env_overrides_marks_agent_terminal() {
         let env = shell_env_overrides();
         assert_eq!(
-            env.get(crate::util::GROK_AGENT_ENV).map(String::as_str),
-            Some(crate::util::GROK_AGENT_ENV_VALUE)
+            env.get(crate::util::FRIDAY_AGENT_ENV).map(String::as_str),
+            Some(crate::util::FRIDAY_AGENT_ENV_VALUE)
         );
         assert_eq!(env.get("TERM").map(String::as_str), Some("dumb"));
         assert_eq!(env.get("NO_COLOR").map(String::as_str), Some("1"));
@@ -1005,7 +1005,7 @@ mod tests {
     fn snapshot_with_exports(script: &str) -> String {
         let payload = base64::engine::general_purpose::STANDARD.encode(script);
         format!(
-            "\ngrok_snap_ENV_VARS_B64=$(command base64 -d <<'GROK_SNAP_EOF_ENV_VARS_B64'\n\
+            "\ngrok_snap_ENV_VARS_B64=$(command base64 -d <<'FRIDAY_SNAP_EOF_ENV_VARS_B64'\n\
              {payload}\nGROK_SNAP_EOF_ENV_VARS_B64\n)\neval \"$grok_snap_ENV_VARS_B64\"\n"
         )
     }
@@ -1118,10 +1118,10 @@ mod tests {
             .await
             .unwrap();
 
-        // Run "export GROK_TEST_VAR=hello" and capture the new state
+        // Run "export FRIDAY_TEST_VAR=hello" and capture the new state
         let prep = state
             .prepare_command(
-                "export GROK_TEST_VAR=hello",
+                "export FRIDAY_TEST_VAR=hello",
                 None,
                 crate::computer::local::SearchShadowConfig::default(),
                 None,

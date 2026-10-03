@@ -26,8 +26,8 @@ fn fail_closed_flag(requirements: &toml::Value) -> bool {
 }
 
 /// Env override for [`FAIL_CLOSED_KEY`]; only applies to `requirements.toml`.
-/// The name shares the `GROK_MANAGED_CONFIG_URL` prefix.
-pub(crate) const FAIL_CLOSED_ENV: &str = "GROK_MANAGED_CONFIG_FAIL_CLOSED";
+/// The name shares the `FRIDAY_MANAGED_CONFIG_URL` prefix.
+pub(crate) const FAIL_CLOSED_ENV: &str = "FRIDAY_MANAGED_CONFIG_FAIL_CLOSED";
 
 /// Where a requirements layer came from: a file on disk, or the macOS MDM managed-preferences layer (admin-forced, no file).
 /// The typed split keeps a caller from calling `exists()` on or reading a layer that has no path.
@@ -54,7 +54,7 @@ pub struct RequirementsLayer {
     pub value: toml::Value,
     pub source: RequirementsSource,
     /// `true` means the root-owned system layer.
-    /// Security decisions must trust this flag, not re-derive it from the source, which is `GROK_HOME`-influenced and could carry `..`.
+    /// Security decisions must trust this flag, not re-derive it from the source, which is `FRIDAY_HOME`-influenced and could carry `..`.
     pub is_system: bool,
 }
 
@@ -109,7 +109,7 @@ pub(crate) fn load_requirements() -> Option<toml::Value> {
     load_user_requirements(user_grok_home().as_deref())
 }
 
-/// User requirements layer from `<home>/requirements.toml`, or `None` with no resolvable user home (rather than reading a cwd-relative `.grok`).
+/// User requirements layer from `<home>/requirements.toml`, or `None` with no resolvable user home (rather than reading a cwd-relative `.friday`).
 fn load_user_requirements(home: Option<&Path>) -> Option<toml::Value> {
     load_requirements_layer(&home?.join("requirements.toml"))
 }
@@ -219,7 +219,7 @@ pub fn validate_requirements() -> Result<(), RequirementsError> {
     Ok(())
 }
 
-/// Validate the user requirements layer if a user home resolves; otherwise a no-op (no cwd-relative `.grok/requirements.toml` is read or enforced).
+/// Validate the user requirements layer if a user home resolves; otherwise a no-op (no cwd-relative `.friday/requirements.toml` is read or enforced).
 fn validate_user_requirements(home: Option<&Path>) -> Result<(), RequirementsError> {
     match home {
         Some(g) => validate_requirements_layer(&g.join("requirements.toml")),
@@ -242,7 +242,7 @@ mod tests {
     fn load_requirements_layer_soft_fails_on_invalid_version_overrides() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-vo-soft-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-vo-soft-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("requirements.toml");
         let mut f = std::fs::File::create(&path).unwrap();
@@ -266,7 +266,7 @@ telemetry = true
     fn validate_requirements_layer_errs_on_fail_closed_violation() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-vo-validate-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-vo-validate-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("requirements.toml");
         let mut f = std::fs::File::create(&path).unwrap();
@@ -292,7 +292,7 @@ minimum_version = "not-a-version"
     fn validate_requirements_layer_ok_without_fail_closed() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-vo-soft2-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-vo-soft2-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("requirements.toml");
         let mut f = std::fs::File::create(&path).unwrap();
@@ -356,7 +356,7 @@ minimum_version = "not-a-version"
     fn fail_closed_key_is_stripped_from_returned_layer() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-vo-strip-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-vo-strip-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("requirements.toml");
         let mut f = std::fs::File::create(&path).unwrap();
@@ -388,7 +388,7 @@ minimum_version = "not-a-version"
     fn load_user_requirements_reads_layer_when_home_present() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-req-load-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-req-load-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut f = std::fs::File::create(dir.join("requirements.toml")).unwrap();
         writeln!(f, "[features]\ntelemetry = true\n").unwrap();
@@ -413,7 +413,7 @@ minimum_version = "not-a-version"
     fn validate_user_requirements_errs_on_fail_closed_violation() {
         use std::io::Write;
 
-        let dir = std::env::temp_dir().join(format!("grok-req-validate-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-req-validate-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut f = std::fs::File::create(dir.join("requirements.toml")).unwrap();
         writeln!(

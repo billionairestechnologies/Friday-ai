@@ -5,7 +5,7 @@
 //! PowerShell is preferred over Git Bash: MSYS2 path translation mangles every flag starting with `/` (e.g. MSBuild `/t:Build`, cl.exe `/nologo`).
 //! This breaks native Windows C++/C#/.NET builds.
 //!
-//! Set `GROK_SHELL` to override auto-detection: `pwsh`, `powershell`, `bash`, or `cmd`.
+//! Set `FRIDAY_SHELL` to override auto-detection: `pwsh`, `powershell`, `bash`, or `cmd`.
 //! The result is cached for the process lifetime.
 
 /// Detected Windows shell and how to invoke it.
@@ -19,7 +19,7 @@ pub enum WindowsShell {
 }
 
 /// Detect the best available shell on Windows.
-/// If `GROK_SHELL` is set, it takes precedence over auto-detection.
+/// If `FRIDAY_SHELL` is set, it takes precedence over auto-detection.
 /// Result is cached for the process lifetime.
 #[cfg(not(unix))]
 pub fn detect_windows_shell() -> &'static WindowsShell {
@@ -27,36 +27,36 @@ pub fn detect_windows_shell() -> &'static WindowsShell {
     static CACHED: OnceLock<WindowsShell> = OnceLock::new();
 
     CACHED.get_or_init(|| {
-        // Explicit override via GROK_SHELL.
-        if let Ok(val) = std::env::var("GROK_SHELL") {
+        // Explicit override via FRIDAY_SHELL.
+        if let Ok(val) = std::env::var("FRIDAY_SHELL") {
             match val.trim().to_ascii_lowercase().as_str() {
                 "pwsh" => {
-                    tracing::info!("Windows shell (GROK_SHELL override): pwsh");
+                    tracing::info!("Windows shell (FRIDAY_SHELL override): pwsh");
                     return WindowsShell::Pwsh;
                 }
                 "powershell" => {
-                    tracing::info!("Windows shell (GROK_SHELL override): powershell.exe");
+                    tracing::info!("Windows shell (FRIDAY_SHELL override): powershell.exe");
                     return WindowsShell::PowerShell;
                 }
                 "bash" | "gitbash" | "git-bash" => {
                     if let Some(path) = find_git_bash() {
                         tracing::info!(
                             shell = path,
-                            "Windows shell (GROK_SHELL override): Git Bash"
+                            "Windows shell (FRIDAY_SHELL override): Git Bash"
                         );
                         return WindowsShell::GitBash(path);
                     }
                     tracing::warn!(
-                        "GROK_SHELL={val} but Git Bash not found; falling through to auto-detect"
+                        "FRIDAY_SHELL={val} but Git Bash not found; falling through to auto-detect"
                     );
                 }
                 "cmd" | "cmd.exe" => {
-                    tracing::info!("Windows shell (GROK_SHELL override): cmd.exe");
+                    tracing::info!("Windows shell (FRIDAY_SHELL override): cmd.exe");
                     return WindowsShell::Cmd;
                 }
                 other => {
                     tracing::warn!(
-                        "GROK_SHELL={other} is not recognized \
+                        "FRIDAY_SHELL={other} is not recognized \
                          (expected pwsh|powershell|bash|cmd); falling through to auto-detect"
                     );
                 }
@@ -301,7 +301,7 @@ fn invocation_for(shell: &WindowsShell, command: &str) -> ShellInvocation {
     }
 }
 
-// `$GROK_SHELL` override, if it names the requested kind and is runnable; `$SHELL`, if it names the requested kind and is runnable. Covers most NixOS / Homebrew / `nix-darwin` setups There the user's login shell already lives at the resolved path; `which::which(name)` walks `$PATH`. Catches NixOS profile shells in `/nix/store/...` or `/etc/profiles/per-user/<u>/bin/` when `/bin/bash` is absent; A fixed candidate list: `{/bin, /usr/bin, /usr/local/bin, /opt/homebrew/bin} × {bash,zsh}`; Hardcoded `/bin/<name>`: historical behavior, only reached when every earlier step has failed.
+// `$FRIDAY_SHELL` override, if it names the requested kind and is runnable; `$SHELL`, if it names the requested kind and is runnable. Covers most NixOS / Homebrew / `nix-darwin` setups There the user's login shell already lives at the resolved path; `which::which(name)` walks `$PATH`. Catches NixOS profile shells in `/nix/store/...` or `/etc/profiles/per-user/<u>/bin/` when `/bin/bash` is absent; A fixed candidate list: `{/bin, /usr/bin, /usr/local/bin, /opt/homebrew/bin} × {bash,zsh}`; Hardcoded `/bin/<name>`: historical behavior, only reached when every earlier step has failed.
 // The result is cached per kind in a process-wide `OnceLock`, so the cascade is run at most once per shell kind per process
 
 /// Bash and zsh are the only kinds supported by the persistent shell-state backend (the dump scripts are bash/zsh-specific).
@@ -365,8 +365,8 @@ fn resolve_unix_shell_path(kind: UnixShellKind) -> String {
     let name = kind.name();
     let matches_kind = |p: &std::path::Path| p.file_name().and_then(|n| n.to_str()) == Some(name);
 
-    // 1) Explicit override via $GROK_SHELL.
-    if let Ok(s) = std::env::var("GROK_SHELL") {
+    // 1) Explicit override via $FRIDAY_SHELL.
+    if let Ok(s) = std::env::var("FRIDAY_SHELL") {
         let p = std::path::PathBuf::from(&s);
         if matches_kind(&p) && is_executable(&p) {
             return s;

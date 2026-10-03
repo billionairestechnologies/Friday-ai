@@ -5802,15 +5802,15 @@ fn clear_manual_scroll_re_engages_snap_to_selection() {
 
 /// Env var force-disables. A function-local `Mutex` would only serialize against itself; readers in
 /// other tests could still observe the transient `0` value.
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn env_var_force_disables() {
     // SAFETY: the test temporarily mutates a process-wide env var.
     // `serial_test`'s lock ensures no other test marked with the
-    // same `GROK_AGENT_DASHBOARD` key reads it concurrently.
-    unsafe { std::env::set_var("GROK_AGENT_DASHBOARD", "0") };
+    // same `FRIDAY_AGENT_DASHBOARD` key reads it concurrently.
+    unsafe { std::env::set_var("FRIDAY_AGENT_DASHBOARD", "0") };
     assert!(!super::super::dashboard_enabled());
-    unsafe { std::env::remove_var("GROK_AGENT_DASHBOARD") };
+    unsafe { std::env::remove_var("FRIDAY_AGENT_DASHBOARD") };
 }
 
 fn location_candidate(path: &str, label: &str) -> LocationCandidate {

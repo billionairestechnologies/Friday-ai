@@ -146,7 +146,7 @@ pub(crate) fn resolve_default_model(
 
     let model_pref = config::resolve_string_flag(
         cfg.default_model_override.as_deref(),
-        "GROK_DEFAULT_MODEL",
+        "FRIDAY_DEFAULT_MODEL",
         cfg.models.default.as_deref(),
         cfg.remote_settings
             .as_ref()
@@ -476,7 +476,7 @@ pub(crate) fn models_endpoint_empty_message(
         )
     } else {
         format!(
-            "No models are available: `[features] remote_fetch = false` stops Grok from reading {url}. \
+            "No models are available: `[features] remote_fetch = false` stops Friday X from reading {url}. \
              Add a `[model.<id>]` table that names an endpoint id, or turn remote_fetch on."
         )
     }

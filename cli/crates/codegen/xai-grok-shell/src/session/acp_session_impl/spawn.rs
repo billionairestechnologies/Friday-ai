@@ -575,7 +575,7 @@ pub(crate) async fn spawn_session_actor(
         },
         |mc| mc.pruning.clone(),
     );
-    let context_window_override = std::env::var("GROK_DEBUG_CONTEXT_WINDOW")
+    let context_window_override = std::env::var("FRIDAY_DEBUG_CONTEXT_WINDOW")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .and_then(std::num::NonZeroU64::new);
@@ -588,7 +588,7 @@ pub(crate) async fn spawn_session_actor(
         tracing::warn!(
             override_context_window = cw.get(),
             original_context_window = baseline_context_window.get(),
-            "GROK_DEBUG_CONTEXT_WINDOW override active"
+            "FRIDAY_DEBUG_CONTEXT_WINDOW override active"
         );
     }
     let resolved_max_retries = xai_grok_sampler::resolve_max_retries(session_max_retries_source(
@@ -936,7 +936,7 @@ pub(crate) async fn spawn_session_actor(
                         stage = failure.stage,
                         error = %failure.error,
                         "MEMORY_INIT: memory-v2 {} failed; memory is disabled for this session. \
-                         Restart to retry, or start with `--no-memory` / `GROK_MEMORY=0` to skip memory.",
+                         Restart to retry, or start with `--no-memory` / `FRIDAY_MEMORY=0` to skip memory.",
                         failure.stage,
                     );
                     memory_storage_for_session = None;

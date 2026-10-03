@@ -12,7 +12,7 @@
 //! │  ┌─────────────────────────────────────────────────────────┐│
 //! │  │                      Agent (MvpAgent)                    ││
 //! │  │   - Shared state across all clients                      ││
-//! │  │   - Persists to ~/.grok/                                 ││
+//! │  │   - Persists to ~/.friday/                                 ││
 //! │  └─────────────────────────────────────────────────────────┘│
 //! │                           ▲                                  │
 //! │                           │ ACP                              │
@@ -23,7 +23,7 @@
 //! │  │   - Tracks session ownership for routing                 ││
 //! │  └────────────────────────┬────────────────────────────────┘│
 //! └───────────────────────────┼──────────────────────────────────┘
-//!                             │ IPC (Unix socket at ~/.grok/leader.sock)
+//!                             │ IPC (Unix socket at ~/.friday/leader.sock)
 //!         ┌───────────────────┼───────────────────┐
 //!         ▼                   ▼                   ▼
 //! ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
@@ -1565,18 +1565,18 @@ pub async fn connect_or_spawn(
         }
     }
 }
-/// For a **managed install** — the running binary lives under `grok_home` (e.g. `~/.grok/...`) — prefer the managed `~/.grok/bin/grok` symlink. After an auto-update or `grok update` atomically swaps that symlink, `current_exe()` still resolves (via `/proc/self/exe` on Linux) to the *old* versioned target, so spawning it would relaunch the stale binary.
+/// For a **managed install** — the running binary lives under `grok_home` (e.g. `~/.friday/...`) — prefer the managed `~/.friday/bin/grok` symlink. After an auto-update or `friday update` atomically swaps that symlink, `current_exe()` still resolves (via `/proc/self/exe` on Linux) to the *old* versioned target, so spawning it would relaunch the stale binary.
 /// The symlink always points to the freshly-installed version.
-/// For a **dev / out-of-tree binary** (`cargo run`, integration tests, installs not under `grok_home`), keep `current_exe()` so the spawned leader matches the calling binary. Falls back to `~/.grok/bin/grok` only when `current_exe()` is unavailable.
+/// For a **dev / out-of-tree binary** (`cargo run`, integration tests, installs not under `grok_home`), keep `current_exe()` so the spawned leader matches the calling binary. Falls back to `~/.friday/bin/grok` only when `current_exe()` is unavailable.
 fn resolve_exe_for_spawn() -> Result<std::path::PathBuf, ConnectionError> {
     resolve_binary_with_home(&crate::util::grok_home::grok_home())
 }
 fn resolve_binary_with_home(grok_home: &Path) -> Result<std::path::PathBuf, ConnectionError> {
     resolve_binary_impl(grok_home, std::env::current_exe().ok())
 }
-/// Binary file name for the managed grok install (`grok` / `grok.exe`).
+/// Binary file name for the managed Friday X install (`friday` / `friday.exe`).
 fn managed_grok_bin_name() -> &'static str {
-    if cfg!(windows) { "grok.exe" } else { "grok" }
+    if cfg!(windows) { "friday.exe" } else { "friday" }
 }
 /// Core leader-binary resolution with the current-exe path injected, for testability.
 fn resolve_binary_impl(
@@ -1620,7 +1620,7 @@ fn open_leader_log(log_path: &Path) -> std::io::Result<std::fs::File> {
         .append(true)
         .open(log_path)
 }
-/// Fallback leader RUST_LOG when neither GROK_LEADER_LOG nor RUST_LOG is set.
+/// Fallback leader RUST_LOG when neither FRIDAY_LEADER_LOG nor RUST_LOG is set.
 /// Crates that took code out of `xai_grok_shell` are listed so their events keep reaching the leader log.
 const LEADER_DEFAULT_LOG_DIRECTIVES: &str = "xai_grok_shell=info,xai_grok_gateway=info,xai_grok_config=info,xai_grok_cloud_config=info,xai_grok_agent_config=info,xai_grok_external_agent_migration=info,xai_grok_login=info,xai_acp_lib=warn,xai_grok_mcp=warn";
 fn spawn_leader_subprocess(env_urls: &LeaderEnvUrls) -> Result<u32, ConnectionError> {
@@ -1635,10 +1635,10 @@ fn spawn_leader_subprocess(env_urls: &LeaderEnvUrls) -> Result<u32, ConnectionEr
         cmd.env(crate::leader::LEADER_SOCKET_ENV, socket);
     }
     for key in [
-        "GROK_DEBUG_LOG",
-        "GROK_HOOKS_LOG",
-        "GROK_LOG_SAMPLING",
-        "GROK_INSTRUMENTATION",
+        "FRIDAY_DEBUG_LOG",
+        "FRIDAY_HOOKS_LOG",
+        "FRIDAY_LOG_SAMPLING",
+        "FRIDAY_INSTRUMENTATION",
     ] {
         if let Some(v) = std::env::var_os(key) {
             cmd.env(key, v);
@@ -1657,7 +1657,7 @@ fn spawn_leader_subprocess(env_urls: &LeaderEnvUrls) -> Result<u32, ConnectionEr
             cmd.stderr(std::process::Stdio::null());
         }
     }
-    let leader_log = std::env::var("GROK_LEADER_LOG")
+    let leader_log = std::env::var("FRIDAY_LEADER_LOG")
         .or_else(|_| std::env::var("RUST_LOG"))
         .unwrap_or_else(|_| LEADER_DEFAULT_LOG_DIRECTIVES.into());
     cmd.env("RUST_LOG", leader_log);
@@ -2538,7 +2538,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let bin_dir = temp.path().join("bin");
         std::fs::create_dir_all(&bin_dir).unwrap();
-        std::fs::write(bin_dir.join("grok"), "fake-binary").unwrap();
+        std::fs::write(bin_dir.join("friday"), "fake-binary").unwrap();
         let result = resolve_binary_with_home(temp.path()).unwrap();
         let current = std::env::current_exe().unwrap();
         assert_eq!(result, current);
@@ -2557,7 +2557,7 @@ mod tests {
         std::fs::create_dir_all(&bin_dir).unwrap();
         let target_v2 = bin_dir.join("grok-v2");
         std::fs::write(&target_v2, "new-binary").unwrap();
-        std::os::unix::fs::symlink(&target_v2, bin_dir.join("grok")).unwrap();
+        std::os::unix::fs::symlink(&target_v2, bin_dir.join("friday")).unwrap();
         let result = resolve_binary_with_home(temp.path()).unwrap();
         let current = std::env::current_exe().unwrap();
         assert_eq!(result, current);
@@ -2570,7 +2570,7 @@ mod tests {
         std::fs::create_dir_all(&bin_dir).unwrap();
         let new_target = bin_dir.join("grok-v2");
         std::fs::write(&new_target, "new-binary").unwrap();
-        let managed = bin_dir.join("grok");
+        let managed = bin_dir.join("friday");
         std::os::unix::fs::symlink(&new_target, &managed).unwrap();
         let stale_target = bin_dir.join("grok-v1");
         std::fs::write(&stale_target, "old-binary").unwrap();

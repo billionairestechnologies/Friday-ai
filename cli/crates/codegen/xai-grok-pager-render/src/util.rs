@@ -7,7 +7,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 pub use xai_grok_config::grok_home;
 pub use xai_grok_tools::util::format_bytes;
 
-/// A closed stdout (`grok du | head`) is a clean stop, not a failure.
+/// A closed stdout (`friday du | head`) is a clean stop, not a failure.
 pub fn ignore_broken_pipe(result: std::io::Result<()>) -> std::io::Result<()> {
     match result {
         Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
@@ -15,13 +15,13 @@ pub fn ignore_broken_pipe(result: std::io::Result<()>) -> std::io::Result<()> {
     }
 }
 
-/// Path to `$GROK_HOME/pager.toml`.
+/// Path to `$FRIDAY_HOME/pager.toml`.
 pub fn pager_toml_path() -> PathBuf {
     grok_home().join("pager.toml")
 }
 
-/// `~/.grok` or `$GROK_HOME`, decided by the resolved home rather than by
-/// whether `GROK_HOME` is set in the environment.
+/// `~/.friday` or `$FRIDAY_HOME`, decided by the resolved home rather than by
+/// whether `FRIDAY_HOME` is set in the environment.
 pub fn display_grok_home_prefix() -> String {
     display_grok_home_prefix_for(&grok_home())
 }
@@ -29,13 +29,13 @@ pub fn display_grok_home_prefix() -> String {
 pub fn display_grok_home_prefix_for(home: &Path) -> String {
     let default = xai_grok_config::default_grok_home();
     if home == default || home == dunce::canonicalize(&default).unwrap_or(default) {
-        "~/.grok".to_string()
+        "~/.friday".to_string()
     } else {
-        "$GROK_HOME".to_string()
+        "$FRIDAY_HOME".to_string()
     }
 }
 
-/// User-facing path under [`grok_home()`], e.g. ``~/.grok/config.toml``.
+/// User-facing path under [`grok_home()`], e.g. ``~/.friday/config.toml``.
 pub fn display_user_grok_path(relative: impl AsRef<Path>) -> String {
     display_user_grok_path_for(&grok_home(), relative)
 }
@@ -81,7 +81,7 @@ pub fn display_location_path(path: impl AsRef<Path>) -> String {
     crate::location_path::shorten_location_path(&abbreviate_path(&lossy)).into_owned()
 }
 
-/// True when `path` is under user [`grok_home()`] (not project `{cwd}/.grok`).
+/// True when `path` is under user [`grok_home()`] (not project `{cwd}/.friday`).
 pub fn is_under_user_grok_home(path: &Path) -> bool {
     path.starts_with(grok_home())
 }
@@ -397,17 +397,17 @@ mod tests {
 
     #[test]
     fn display_grok_home_prefix_default_install() {
-        if std::env::var("GROK_HOME").is_ok() {
+        if std::env::var("FRIDAY_HOME").is_ok() {
             return;
         }
-        assert_eq!(display_grok_home_prefix(), "~/.grok");
+        assert_eq!(display_grok_home_prefix(), "~/.friday");
     }
 
     #[test]
     fn display_user_grok_path_joins_relative() {
         let path = display_user_grok_path(xai_grok_config::USER_CONFIG_FILENAME);
         assert!(path.ends_with("/config.toml") || path.ends_with("\\config.toml"));
-        assert!(path.contains(".grok") || path.contains("$GROK_HOME"));
+        assert!(path.contains(".friday") || path.contains("$FRIDAY_HOME"));
     }
 
     #[test]
@@ -415,11 +415,11 @@ mod tests {
         let custom = std::env::temp_dir().join("grok-home-display-regression");
         assert_eq!(
             display_user_grok_path_for(&custom, xai_grok_config::USER_CONFIG_FILENAME),
-            "$GROK_HOME/config.toml"
+            "$FRIDAY_HOME/config.toml"
         );
         assert_eq!(
             display_user_grok_path_for(&custom, xai_grok_config::SANDBOX_CONFIG_FILENAME),
-            format!("$GROK_HOME/{}", xai_grok_config::SANDBOX_CONFIG_FILENAME)
+            format!("$FRIDAY_HOME/{}", xai_grok_config::SANDBOX_CONFIG_FILENAME)
         );
     }
 
@@ -432,7 +432,7 @@ mod tests {
         if home.is_empty() {
             return;
         }
-        let full = format!("{home}/.grok/memory/MEMORY.md");
+        let full = format!("{home}/.friday/memory/MEMORY.md");
         let abbreviated = abbreviate_path(&full);
         assert!(
             abbreviated.contains("memory/MEMORY.md"),
@@ -448,7 +448,7 @@ mod tests {
         if home.as_os_str().is_empty() {
             return;
         }
-        // Stay outside grok_home so this hits the $HOME branch, not ~/.grok.
+        // Stay outside grok_home so this hits the $HOME branch, not ~/.friday.
         let full = home.join("not-grok-home").join("file.txt");
         let full_str = full.to_string_lossy();
         let abbreviated = abbreviate_path(&full_str);

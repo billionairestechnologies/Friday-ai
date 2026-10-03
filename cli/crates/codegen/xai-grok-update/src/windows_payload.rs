@@ -6,7 +6,7 @@
 //! Fetched after the grok binary is smoke-tested, activated after the managed
 //! bin swap, always best-effort: a release without the payload (anything
 //! before it shipped), a signer that has not published the hook exes yet, or a
-//! failed fetch leaves grok updated and the payload as it was. The pure parts
+//! failed fetch leaves friday updated and the payload as it was. The pure parts
 //! (names, sidecar parsing, the prune rule, archive extraction) build and test
 //! everywhere; the network and install steps are Windows-only.
 
@@ -58,7 +58,7 @@ pub(super) fn grove_object_name(exe: &str, version: &str, platform: &str) -> Str
 
 /// `grok-<ver>-<platform>-mingit`; `.zip`, `.zip.sha256` and `.version` hang off it.
 pub(super) fn mingit_object_base(version: &str, platform: &str) -> String {
-    format!("grok-{version}-{platform}-mingit")
+    format!("friday-{version}-{platform}-mingit")
 }
 
 /// The digest from a `sha256sum` sidecar (`<hex>  <name>`), lowercased.
@@ -203,7 +203,7 @@ mod windows {
     /// `%LOCALAPPDATA%\grok\git`, the root `xai_tty_utils::bundled_git` scans.
     fn mingit_root() -> Option<PathBuf> {
         let local = std::env::var_os("LOCALAPPDATA")?;
-        Some(PathBuf::from(local).join("grok").join("git"))
+        Some(PathBuf::from(local).join("friday").join("git"))
     }
 
     /// `Ok(None)` on 404 (the release predates the object), the body

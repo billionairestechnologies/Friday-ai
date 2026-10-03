@@ -73,8 +73,8 @@ async fn fetch_user_info(manager: &AuthManager, key: &str, log_label: &str) -> O
         .get(&user_url)
         .timeout(USER_FETCH_TIMEOUT)
         .header("Authorization", format!("Bearer {}", key))
-        .header("X-XAI-Token-Auth", token_header.as_str())
-        .header("x-grok-client-version", xai_grok_version::VERSION)
+        .header("X-Friday-Token-Auth", token_header.as_str())
+        .header("x-friday-client-version", xai_grok_version::VERSION)
         .header(
             xai_grok_http::CLIENT_MODE_HEADER,
             xai_grok_http::process_client_mode(),

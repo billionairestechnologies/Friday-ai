@@ -389,7 +389,7 @@ impl<'a> SkillListing<'a> {
 
 /// Extract the skill source directory from a SKILL.md display path.
 ///
-/// `"/path/.grok/skills/my-skill/SKILL.md"` -> `"/path/.grok/skills/"`
+/// `"/path/.friday/skills/my-skill/SKILL.md"` -> `"/path/.friday/skills/"`
 fn skill_source_dir(display_path: &str) -> Option<&str> {
     let p = std::path::Path::new(display_path);
     // SKILL.md -> skill-name dir -> skills dir
@@ -524,7 +524,7 @@ pub enum XmlRenderMode {
     /// Verbatim rendering: every skill with its full description; no
     /// budget cap, minimal escaping.
     Verbatim,
-    /// Grok build harness: budget-capped three-tier rendering with full
+    /// Friday X build harness: budget-capped three-tier rendering with full
     /// XML entity escaping.
     Budgeted {
         /// Character budget for the listing; `None` uses the default.

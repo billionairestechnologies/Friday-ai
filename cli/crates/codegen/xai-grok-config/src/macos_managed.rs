@@ -142,13 +142,13 @@ mod tests {
     #[test]
     fn forced_payload_is_not_env_expanded() {
         // SAFETY: process-global env mutation, restored before return.
-        let prior = std::env::var("GROK_MDM_NO_EXPAND_TEST").ok();
-        unsafe { std::env::set_var("GROK_MDM_NO_EXPAND_TEST", "attacker") };
-        let decoded = decode_managed_toml(&b64("base_url = \"${GROK_MDM_NO_EXPAND_TEST}/v1\"\n"));
+        let prior = std::env::var("FRIDAY_MDM_NO_EXPAND_TEST").ok();
+        unsafe { std::env::set_var("FRIDAY_MDM_NO_EXPAND_TEST", "attacker") };
+        let decoded = decode_managed_toml(&b64("base_url = \"${FRIDAY_MDM_NO_EXPAND_TEST}/v1\"\n"));
         unsafe {
             match prior {
-                Some(p) => std::env::set_var("GROK_MDM_NO_EXPAND_TEST", p),
-                None => std::env::remove_var("GROK_MDM_NO_EXPAND_TEST"),
+                Some(p) => std::env::set_var("FRIDAY_MDM_NO_EXPAND_TEST", p),
+                None => std::env::remove_var("FRIDAY_MDM_NO_EXPAND_TEST"),
             }
         }
         assert_eq!(
@@ -156,7 +156,7 @@ mod tests {
                 .as_ref()
                 .and_then(|v| v.get("base_url"))
                 .and_then(|v| v.as_str()),
-            Some("${GROK_MDM_NO_EXPAND_TEST}/v1"),
+            Some("${FRIDAY_MDM_NO_EXPAND_TEST}/v1"),
             "forced payload must keep ${{VAR}} literal, not expand from the user env",
         );
     }

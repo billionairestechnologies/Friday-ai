@@ -1,4 +1,4 @@
-//! Grok tools library.
+//! Friday X tools library.
 
 #![deny(clippy::indexing_slicing)]
 

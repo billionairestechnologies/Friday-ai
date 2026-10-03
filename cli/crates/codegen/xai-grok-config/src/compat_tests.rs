@@ -249,7 +249,7 @@ fn resolve_compat_sessions_load_failure_fails_closed() {
 
 #[test]
 fn resolve_compat_sessions_load_failure_allows_env_override() {
-    let env = env_with(&[("GROK_CODEX_SESSIONS_ENABLED", true)]);
+    let env = env_with(&[("FRIDAY_CODEX_SESSIONS_ENABLED", true)]);
 
     let resolved = resolve_compat_sessions(None, &env, None);
 
@@ -321,9 +321,9 @@ fn remote_keys_are_one_hot_and_false_overrides_default() {
 #[test]
 fn resolve_compat_env_sessions_disable_independently() {
     for (vendor, env_var) in [
-        (CompatVendor::Cursor, "GROK_CURSOR_SESSIONS_ENABLED"),
-        (CompatVendor::Claude, "GROK_CLAUDE_SESSIONS_ENABLED"),
-        (CompatVendor::Codex, "GROK_CODEX_SESSIONS_ENABLED"),
+        (CompatVendor::Cursor, "FRIDAY_CURSOR_SESSIONS_ENABLED"),
+        (CompatVendor::Claude, "FRIDAY_CLAUDE_SESSIONS_ENABLED"),
+        (CompatVendor::Codex, "FRIDAY_CODEX_SESSIONS_ENABLED"),
     ] {
         assert_session_one_disabled(
             resolve_compat_config(
@@ -351,8 +351,8 @@ fn resolve_compat_precedence_and_reserved_codex_hook() {
     assert!(resolved.claude.hooks);
 
     let env = env_with(&[
-        ("GROK_CURSOR_SESSIONS_ENABLED", true),
-        ("GROK_CODEX_HOOKS_ENABLED", true),
+        ("FRIDAY_CURSOR_SESSIONS_ENABLED", true),
+        ("FRIDAY_CODEX_HOOKS_ENABLED", true),
     ]);
     let resolved = resolve_compat_config(&config, &env, Some(&remote));
     assert!(resolved.cursor.sessions);
@@ -440,7 +440,7 @@ fn registry_and_defaults_cover_every_cell() {
 #[test]
 fn skill_config_dirs_all_on_lists_every_vendor() {
     assert_eq!(
-        vec![".grok", ".agents", ".claude", ".cursor"],
+        vec![".friday", ".agents", ".claude", ".cursor"],
         CompatConfig::default().skill_config_dirs()
     );
 }
@@ -449,20 +449,20 @@ fn skill_config_dirs_all_on_lists_every_vendor() {
 fn skill_config_dirs_gates_each_vendor() {
     let mut c = CompatConfig::default();
     c.cursor.skills = false;
-    assert_eq!(vec![".grok", ".agents", ".claude"], c.skill_config_dirs());
+    assert_eq!(vec![".friday", ".agents", ".claude"], c.skill_config_dirs());
 
     c.claude.skills = false;
-    assert_eq!(vec![".grok", ".agents"], c.skill_config_dirs());
+    assert_eq!(vec![".friday", ".agents"], c.skill_config_dirs());
 
     let mut c2 = CompatConfig::default();
     c2.claude.skills = false;
-    assert_eq!(vec![".grok", ".agents", ".cursor"], c2.skill_config_dirs());
+    assert_eq!(vec![".friday", ".agents", ".cursor"], c2.skill_config_dirs());
 }
 
 #[test]
 fn rules_dirs_all_on_lists_every_vendor() {
     assert_eq!(
-        vec![".grok/rules", ".claude/rules", ".cursor/rules"],
+        vec![".friday/rules", ".claude/rules", ".cursor/rules"],
         CompatConfig::default().rules_dirs()
     );
 }
@@ -471,9 +471,9 @@ fn rules_dirs_all_on_lists_every_vendor() {
 fn rules_dirs_gates_each_vendor() {
     let mut c = CompatConfig::default();
     c.cursor.rules = false;
-    assert_eq!(vec![".grok/rules", ".claude/rules"], c.rules_dirs());
+    assert_eq!(vec![".friday/rules", ".claude/rules"], c.rules_dirs());
     c.claude.rules = false;
-    assert_eq!(vec![".grok/rules"], c.rules_dirs());
+    assert_eq!(vec![".friday/rules"], c.rules_dirs());
 }
 
 #[test]

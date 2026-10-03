@@ -117,7 +117,7 @@ impl Fixture {
         }
     }
 
-    /// The workspace's `.grok/workspaced.toml` layer: it may only tighten the user's
+    /// The workspace's `.friday/workspaced.toml` layer: it may only tighten the user's
     /// mode, so `enforce` lands and `off` is ignored.
     fn set_mode(&self, mode: &str) {
         let path = crate::sandbox_mode::workspace_config_path(&self.root);
@@ -1880,7 +1880,7 @@ async fn net_rows_carry_allow_and_deny_rows_and_no_fs_rows() {
     );
 }
 
-/// The workspace's `.grok/workspaced.toml` is read whatever the folder's trust: it can only
+/// The workspace's `.friday/workspaced.toml` is read whatever the folder's trust: it can only
 /// tighten, so an untrusted folder's `enforce` over the user's `observe` holds.
 #[tokio::test]
 async fn an_untrusted_workspace_can_tighten_the_mode() {
@@ -2022,8 +2022,8 @@ async fn the_control_socket_dir_is_protected_by_every_built_policy() {
         policy.protected
     );
     assert!(
-        policy.is_protected(&fx.root.join(".grok/settings.toml")),
-        "the workspace layer lives under the protected .grok/"
+        policy.is_protected(&fx.root.join(".friday/settings.toml")),
+        "the workspace layer lives under the protected .friday/"
     );
 
     let mut stripped = sandbox

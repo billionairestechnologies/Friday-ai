@@ -1,13 +1,13 @@
 pub const FIRST_PARTY_CREDENTIAL_ENV_VARS: &[&str] = &[
-    "GROK_AUTH",
-    "GROK_AUTH_PATH",
-    "XAI_API_KEY",
-    "GROK_DEPLOYMENT_KEY",
-    "GROK_CODE_XAI_API_KEY",
-    "GROK_EXTRA_AUTH_KEY",
-    "GROK_TRACE_UPLOAD_CREDENTIALS_FILE",
+    "FRIDAY_AUTH",
+    "FRIDAY_AUTH_PATH",
+    "FRIDAY_X_TOKEN",
+    "FRIDAY_DEPLOYMENT_KEY",
+    "FRIDAY_X_LEGACY_TOKEN",
+    "FRIDAY_EXTRA_AUTH_KEY",
+    "FRIDAY_TRACE_UPLOAD_CREDENTIALS_FILE",
     "OTEL_EXPORTER_OTLP_HEADERS",
-    "GROK_INTERNAL_OTLP_HEADERS",
+    "FRIDAY_INTERNAL_OTLP_HEADERS",
 ];
 
 fn parse_bool(value: &str) -> Option<bool> {
@@ -52,9 +52,9 @@ mod tests {
 
     #[test]
     fn env_string_trims_and_treats_blank_as_unset() {
-        let guard = EnvVarGuard::set("GROK_TEST_ENV_STRING", "  hi  ");
-        assert_eq!(env_string("GROK_TEST_ENV_STRING"), Some("hi".to_string()));
+        let guard = EnvVarGuard::set("FRIDAY_TEST_ENV_STRING", "  hi  ");
+        assert_eq!(env_string("FRIDAY_TEST_ENV_STRING"), Some("hi".to_string()));
         guard.set_value("   ");
-        assert_eq!(env_string("GROK_TEST_ENV_STRING"), None);
+        assert_eq!(env_string("FRIDAY_TEST_ENV_STRING"), None);
     }
 }

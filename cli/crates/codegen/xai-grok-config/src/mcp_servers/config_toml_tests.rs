@@ -276,9 +276,9 @@ fn toml(source: &str) -> toml::Value {
 }
 
 fn write_project_config(dir: &Path, source: &str) -> PathBuf {
-    let path = dir.join(".grok").join("config.toml");
+    let path = dir.join(".friday").join("config.toml");
     std::fs::create_dir_all(path.parent().expect("config path has a parent"))
-        .expect("create .grok dir");
+        .expect("create .friday dir");
     std::fs::write(&path, source).expect("write project config");
     path
 }

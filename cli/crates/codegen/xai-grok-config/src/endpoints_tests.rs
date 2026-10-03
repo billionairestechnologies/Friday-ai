@@ -161,7 +161,7 @@ fn internal_otlp_endpoint_grok_internal_wins_regardless_of_switch() {
         assert_eq!(
             cfg.resolve_otlp_traces_endpoint(),
             "https://internal.example/traces",
-            "switch={switch}: GROK_INTERNAL_OTLP_TRACES_ENDPOINT must win verbatim (trailing / trimmed)"
+            "switch={switch}: FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT must win verbatim (trailing / trimmed)"
         );
     }
 }

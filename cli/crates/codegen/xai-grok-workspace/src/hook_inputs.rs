@@ -31,7 +31,7 @@ impl ProcessHookInputs {
         }
     }
 
-    /// [`Self::read`] plus the disabled-hooks file under the same Grok home.
+    /// [`Self::read`] plus the disabled-hooks file under the same Friday X home.
     /// Returned on its own so a dispatcher consumes it once and a caller that only lists hooks never reads it.
     pub fn read_with_disabled(
         managed: &ManagedSettings,

@@ -32,7 +32,7 @@ pub struct CredentialSnapshot {
 #[async_trait::async_trait]
 pub trait AuthCredentialProvider: HttpAuth + Send + Sync + 'static {
     /// Implementations should issue a cheap disk re-read (`AuthManager::refresh`) before snapshotting.
-    /// This lets callers see updates from sibling processes (`grok-desktop`, `grok login`).
+    /// This lets callers see updates from sibling processes (`grok-desktop`, `friday login`).
     /// The `token` field MUST mirror the bearer that `HttpAuth::apply` would send on the wire so 401-attribution prefixes match the actual request.
     fn snapshot(&self) -> CredentialSnapshot;
 
@@ -41,7 +41,7 @@ pub trait AuthCredentialProvider: HttpAuth + Send + Sync + 'static {
     /// Returns `false` if no refresher is configured or refresh failed.
     async fn refresh_after_unauthorized(&self) -> bool;
 
-    /// Whether `X-XAI-Token-Auth` should be sent with the bearer token.
+    /// Whether `X-Friday-Token-Auth` should be sent with the bearer token.
     /// `false` for deployment keys (bare Bearer), `true` for user/OAuth tokens.
     /// See `GrokAuthCredentials::apply()` for the wire format contract.
     fn needs_token_auth_header(&self) -> bool {

@@ -599,10 +599,10 @@ fn announcements_push_payload(
     };
     push.then_some(current)
 }
-/// Override with `GROK_ANNOUNCEMENTS_REFRESH_INTERVAL_SECS`.
+/// Override with `FRIDAY_ANNOUNCEMENTS_REFRESH_INTERVAL_SECS`.
 /// Clamped to at least 1s: `tokio::time::interval` panics on a zero period.
 fn announcements_refresh_interval() -> std::time::Duration {
-    if let Ok(s) = std::env::var("GROK_ANNOUNCEMENTS_REFRESH_INTERVAL_SECS")
+    if let Ok(s) = std::env::var("FRIDAY_ANNOUNCEMENTS_REFRESH_INTERVAL_SECS")
         && let Ok(secs) = s.parse::<u64>()
     {
         return std::time::Duration::from_secs(secs.max(1));
@@ -735,7 +735,7 @@ pub struct MvpAgent {
     memory_config: RefCell<Option<crate::config::MemoryConfig>>,
     /// Optional channel to the leader's `ConfigFileWatcher` for dynamic per-cwd registration as new sessions open.
     /// Each successful session insert in `spawn_and_register_session` sends the session's cwd to the watcher task spawned in `agent/app.rs`.
-    /// That task calls [`crate::config::watcher::ConfigFileWatcher::watch_path`] (a **non-recursive** watch on `<cwd>/` and `<cwd>/.grok/`). `None` outside leader mode and in tests; the registration is a no-op in that case. That is fine: the existing per-extra-path loop already covers the leader's startup cwd. Plain `Option` (not `RefCell`). It is only read thereafter, so no interior mutability is required.
+    /// That task calls [`crate::config::watcher::ConfigFileWatcher::watch_path`] (a **non-recursive** watch on `<cwd>/` and `<cwd>/.friday/`). `None` outside leader mode and in tests; the registration is a no-op in that case. That is fine: the existing per-extra-path loop already covers the leader's startup cwd. Plain `Option` (not `RefCell`). It is only read thereafter, so no interior mutability is required.
     pub(crate) config_watcher_path_tx: Option<
         tokio::sync::mpsc::UnboundedSender<std::path::PathBuf>,
     >,
@@ -755,7 +755,7 @@ pub struct MvpAgent {
     pub(crate) worktree_type: crate::util::config::WorktreeType,
     /// Restore codebase state on worktree resume (resolved: local config, then remote, then default false).
     pub(crate) restore_code: bool,
-    /// Local session-registry override: `GROK_SESSION_REGISTRY` env, else `[cli] session_registry`.
+    /// Local session-registry override: `FRIDAY_SESSION_REGISTRY` env, else `[cli] session_registry`.
     /// `Some(true)` enables, `Some(false)` disables, `None` defers to remote settings.
     session_registry_local: Option<bool>,
     /// Managed MCP configs and gateway tool catalog; lazily fetched.
@@ -1136,7 +1136,7 @@ pub(crate) fn resolve_subagent_rate_limit_max_attempts(
 }
 pub(crate) fn subagent_rate_limit_max_attempts_env() -> Option<u32> {
     parse_subagent_rate_limit_max_attempts(
-        std::env::var("GROK_SUBAGENT_RATE_LIMIT_MAX_ATTEMPTS").ok().as_deref(),
+        std::env::var("FRIDAY_SUBAGENT_RATE_LIMIT_MAX_ATTEMPTS").ok().as_deref(),
     )
 }
 /// Empty is unset; an invalid value (non-numeric, negative, or overflowing `u32`) is ignored with one warning per spawn.
@@ -1151,7 +1151,7 @@ fn parse_subagent_rate_limit_max_attempts(raw: Option<&str>) -> Option<u32> {
         Err(_) => {
             tracing::warn!(
                 value,
-                "ignoring invalid GROK_SUBAGENT_RATE_LIMIT_MAX_ATTEMPTS"
+                "ignoring invalid FRIDAY_SUBAGENT_RATE_LIMIT_MAX_ATTEMPTS"
             );
             None
         }
@@ -1845,7 +1845,7 @@ impl MvpAgent {
             auto_gc_policy,
         ));
     }
-    /// The caller resolves the home: read here, $GROK_HOME would be read when the blocking thread starts.
+    /// The caller resolves the home: read here, $FRIDAY_HOME would be read when the blocking thread starts.
     /// This deletes worktrees under what it finds.
     pub(super) fn reclaim_worktrees(
         grok_home: anyhow::Result<std::path::PathBuf>,
@@ -2010,7 +2010,7 @@ impl MvpAgent {
     }
     /// Spawn a best-effort bundle sync. Re-fires on every call site (init, cached_token, grok.com/oidc); the cheap pre-checks below absorb repeats so reconnects are cheap.
     /// Pre-spawn gating order (cheapest first, all synchronous): Auth gate: avoid spawning a no-op task on every init.
-    /// Single-flight guard: if a previous sync is still in flight (e.g., initialize, cached_token, and oidc fired in quick succession before the first sync's tar extract finished), drop this call to avoid racing concurrent extracts that would interleave per-file writes against `~/.grok/bundled/` and the manifest.
+    /// Single-flight guard: if a previous sync is still in flight (e.g., initialize, cached_token, and oidc fired in quick succession before the first sync's tar extract finished), drop this call to avoid racing concurrent extracts that would interleave per-file writes against `~/.friday/bundled/` and the manifest.
     pub(crate) fn maybe_sync_bundle_in_background(&self, force: bool) {
         use crate::extensions::bundle::{
             BUNDLE_SYNC_TTL, bundle_cache_is_fresh, has_bundle_credentials,

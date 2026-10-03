@@ -125,7 +125,7 @@ use xai_grok_update::enforce_version_policy_or_exit;
 use xai_grok_update::{UpdateConfig, auto_update};
 #[cfg(all(feature = "test-seams", debug_assertions))]
 mod test_seam {
-    const TEST_TRUSTED_PUBKEY_FILE_ENV: &str = "GROK_TEST_TRUSTED_PUBKEY_FILE";
+    const TEST_TRUSTED_PUBKEY_FILE_ENV: &str = "FRIDAY_TEST_TRUSTED_PUBKEY_FILE";
     pub(super) fn install() {
         let Ok(path) = std::env::var(TEST_TRUSTED_PUBKEY_FILE_ENV) else {
             return;
@@ -202,7 +202,7 @@ fn resolve_agent_profile_path(path: &std::path::Path) -> std::path::PathBuf {
 /// Print startup information for the serve command.
 fn print_serve_startup_info(bind_addr: SocketAddr, secret: &str) {
     eprintln!();
-    eprintln!("   Grok agent server starting...");
+    eprintln!("   Friday X agent server starting...");
     eprintln!();
     eprintln!("   Address:  {}:{}", bind_addr.ip(), bind_addr.port());
     eprintln!("   Secret:   {}", secret);
@@ -269,23 +269,23 @@ async fn run_setup_command(json: bool) {
     if !managed_config::has_principal() {
         eprintln!("No deployment key or team sign-in found.");
         eprintln!();
-        eprintln!("To install managed configuration, sign in with a team using `grok login`,");
+        eprintln!("To install managed configuration, sign in with a team using `friday login`,");
         eprintln!("or set a deployment key:");
         eprintln!();
         if cfg!(unix) {
-            eprintln!("  export GROK_DEPLOYMENT_KEY=<your-key>");
+            eprintln!("  export FRIDAY_DEPLOYMENT_KEY=<your-key>");
         } else {
-            eprintln!("  $env:GROK_DEPLOYMENT_KEY=\"<your-key>\"");
+            eprintln!("  $env:FRIDAY_DEPLOYMENT_KEY=\"<your-key>\"");
         }
-        eprintln!("  grok setup");
+        eprintln!("  friday setup");
         eprintln!();
-        eprintln!("Or add the key to ~/.grok/config.toml:");
+        eprintln!("Or add the key to ~/.friday/config.toml:");
         eprintln!();
         eprintln!("  [endpoints]");
         eprintln!("  deployment_key = \"<your-key>\"");
         eprintln!();
         eprintln!(
-            "If you don't have a deployment key, contact your organization's Grok administrator."
+            "If you don't have a deployment key, contact your organization's Friday X administrator."
         );
         std::process::exit(1);
     }
@@ -317,12 +317,12 @@ async fn run_setup_command(json: bool) {
         }
         SetupOutcome::Skipped => {
             eprintln!(
-                "Managed configuration was not applied this run (another process held the apply lock, or the credential changed during the fetch). Run `grok setup` again."
+                "Managed configuration was not applied this run (another process held the apply lock, or the credential changed during the fetch). Run `friday setup` again."
             );
         }
         SetupOutcome::Staged => {
             eprintln!(
-                "Managed configuration update verified; it takes effect the next time Grok starts."
+                "Managed configuration update verified; it takes effect the next time Friday X starts."
             );
         }
         SetupOutcome::Failed(e) => {
@@ -492,7 +492,7 @@ fn ensure_control_caps(reg: &LeaderRegistration) -> Result<&LeaderCapabilities> 
 }
 /// Env override for the `grok workspace` gate: any truthy value enables the command locally, a falsy one disables it.
 /// Either way it bypasses the remote settings flag.
-const WORKSPACE_COMMAND_ENV: &str = "GROK_WORKSPACE_COMMAND";
+const WORKSPACE_COMMAND_ENV: &str = "FRIDAY_WORKSPACE_COMMAND";
 /// One leader door's CLI identity, shared by `connect_leader_control` and `spawn_and_connect_leader`.
 struct LeaderDoorCli {
     /// The command name as the user types it (`grok workspace`); `<name> start` is its start command.
@@ -516,7 +516,7 @@ enum WorkspaceGate {
     Disabled,
     Unknown,
 }
-/// The `GROK_WORKSPACE_COMMAND` override, if set (`Some(true)`/`Some(false)`); `None` defers to the remote settings flag.
+/// The `FRIDAY_WORKSPACE_COMMAND` override, if set (`Some(true)`/`Some(false)`); `None` defers to the remote settings flag.
 fn workspace_command_env_override() -> Option<bool> {
     std::env::var(WORKSPACE_COMMAND_ENV)
         .ok()
@@ -609,7 +609,7 @@ async fn run_workspace_mgmt(args: WorkspaceMgmtArgs) -> Result<()> {
         WorkspaceGate::Unknown => {
             anyhow::bail!(
                 "Could not load your settings for `grok workspace`. Check your \
-             network connection (run `grok login` if you are signed out), then \
+             network connection (run `friday login` if you are signed out), then \
              try again."
             )
         }
@@ -708,7 +708,7 @@ async fn spawn_and_connect_leader(
     if !use_leader {
         anyhow::bail!(
             "`{}` requires leader mode ({}).\n\
-             Enable it with `[cli] use_leader = true` in ~/.grok/config.toml, or pass --leader.",
+             Enable it with `[cli] use_leader = true` in ~/.friday/config.toml, or pass --leader.",
             door.name,
             door.leader_mode_reason
         );
@@ -718,7 +718,7 @@ async fn spawn_and_connect_leader(
         agent_config.login_device_flow,
         agent_config.endpoints.proxy_url(),
         false,
-        Some("No cached credentials found. Run `grok login` first."),
+        Some("No cached credentials found. Run `friday login` first."),
     )
     .await?;
     let env_urls = LeaderEnvUrls::from(&agent_config.grok_com_config);
@@ -1271,7 +1271,7 @@ async fn run_agent_command(
     let is_leader = matches!(agent_args.mode, Some(AgentCmd::Leader(_)));
     if !is_stdio && !is_leader {
         eprintln!(
-            "Grok Build (pager) - v{}",
+            "Friday X (pager) - v{}",
             xai_grok_version::display_version_with_commit(
                 env!("VERSION_WITH_COMMIT"),
                 xai_grok_update::channel_label(),
@@ -1725,7 +1725,7 @@ fn raise_fd_limit() {
 #[cfg(not(unix))]
 fn raise_fd_limit() {}
 /// Clears `args.command` so the regular subcommand match doesn't try to handle it. The only gate is the feature
-/// flag: a disabled dashboard (`[dashboard].enabled = false` / `GROK_AGENT_DASHBOARD=0`) is a CLI error. It fires
+/// flag: a disabled dashboard (`[dashboard].enabled = false` / `FRIDAY_AGENT_DASHBOARD=0`) is a CLI error. It fires
 /// here, before the TUI starts, because the welcome view silently drops the equivalent runtime toast.
 fn flag_dashboard_at_startup_if_requested(args: &mut PagerArgs) -> Result<()> {
     if !matches!(args.command, Some(Command::Dashboard)) {
@@ -1734,12 +1734,12 @@ fn flag_dashboard_at_startup_if_requested(args: &mut PagerArgs) -> Result<()> {
     if !xai_grok_pager::views::dashboard::dashboard_enabled() {
         anyhow::bail!(
             "the Agent Dashboard is disabled. Enable it by removing \
-             `[dashboard] enabled = false` from ~/.grok/config.toml and \
-             unsetting GROK_AGENT_DASHBOARD=0."
+             `[dashboard] enabled = false` from ~/.friday/config.toml and \
+             unsetting FRIDAY_AGENT_DASHBOARD=0."
         );
     }
     args.command = None;
-    unsafe { std::env::set_var("GROK_OPEN_DASHBOARD_AT_STARTUP", "1") };
+    unsafe { std::env::set_var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP", "1") };
     Ok(())
 }
 /// Kick off background work that overlaps startup. Add new prewarms here.
@@ -1751,42 +1751,42 @@ fn configure_process_env(mut args: PagerArgs) -> Result<PagerArgs> {
     let args = args.apply_cwd()?;
     unsafe {
         if let Some(mode) = args.compaction_mode.as_deref() {
-            std::env::set_var("GROK_COMPACTION_MODE", mode);
+            std::env::set_var("FRIDAY_COMPACTION_MODE", mode);
         }
         if let Some(detail) = args.compaction_detail.as_deref() {
-            std::env::set_var("GROK_COMPACTION_DETAIL", detail);
+            std::env::set_var("FRIDAY_COMPACTION_DETAIL", detail);
         }
         if args.chat() {
-            std::env::set_var(xai_grok_shell::agent::chat_modes::GROK_CHAT_MODE_ENV, "1");
+            std::env::set_var(xai_grok_shell::agent::chat_modes::FRIDAY_CHAT_MODE_ENV, "1");
         }
         if let Some(socket) = args.leader_socket.as_deref() {
             std::env::set_var(xai_grok_shell::leader::LEADER_SOCKET_ENV, socket);
         }
         if args.log_sampling {
-            std::env::set_var("GROK_LOG_SAMPLING", "1");
+            std::env::set_var("FRIDAY_LOG_SAMPLING", "1");
         }
         if let Some(path) = args.debug_file.as_deref() {
-            std::env::set_var("GROK_DEBUG_LOG", path);
-            std::env::remove_var("GROK_LOG_FILE");
+            std::env::set_var("FRIDAY_DEBUG_LOG", path);
+            std::env::remove_var("FRIDAY_LOG_FILE");
         }
         if args.debug || args.debug_file.is_some() {
-            if std::env::var_os("GROK_DEBUG_LOG").is_none() {
-                std::env::set_var("GROK_DEBUG_LOG", "1");
+            if std::env::var_os("FRIDAY_DEBUG_LOG").is_none() {
+                std::env::set_var("FRIDAY_DEBUG_LOG", "1");
             }
-            if std::env::var_os("GROK_HOOKS_LOG").is_none() {
-                std::env::set_var("GROK_HOOKS_LOG", "1");
+            if std::env::var_os("FRIDAY_HOOKS_LOG").is_none() {
+                std::env::set_var("FRIDAY_HOOKS_LOG", "1");
             }
         }
     }
     Ok(args)
 }
 const RUNTIME_SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
-const GROK_WORKER_THREADS_ENV: &str = "GROK_WORKER_THREADS";
+const FRIDAY_WORKER_THREADS_ENV: &str = "FRIDAY_WORKER_THREADS";
 /// tokio defaults to one worker per logical CPU.
 /// On a host with hundreds of CPUs that can exhaust a cgroup thread budget at startup and abort under `panic = "abort"`.
 /// A terminal UI is I/O-bound, so cap at 8.
 const DEFAULT_MAX_WORKER_THREADS: NonZeroUsize = NonZeroUsize::new(8).unwrap();
-/// How `GROK_WORKER_THREADS` resolved.
+/// How `FRIDAY_WORKER_THREADS` resolved.
 #[derive(Debug, PartialEq, Eq)]
 enum WorkerCount {
     Accepted(NonZeroUsize),
@@ -1814,17 +1814,17 @@ impl WorkerCount {
                 used,
                 cores,
             } => Some(format!(
-                "grok: clamped {GROK_WORKER_THREADS_ENV}={requested} to {used} (valid range is 1..={cores})"
+                "grok: clamped {FRIDAY_WORKER_THREADS_ENV}={requested} to {used} (valid range is 1..={cores})"
             )),
             Self::Ignored { value, .. } => Some(format!(
-                "grok: ignoring {GROK_WORKER_THREADS_ENV}={value:?} (not a valid integer)"
+                "grok: ignoring {FRIDAY_WORKER_THREADS_ENV}={value:?} (not a valid integer)"
             )),
         }
     }
 }
 fn cli_worker_threads() -> NonZeroUsize {
     let cores = std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN);
-    let resolved = match std::env::var(GROK_WORKER_THREADS_ENV) {
+    let resolved = match std::env::var(FRIDAY_WORKER_THREADS_ENV) {
         Ok(value) => worker_threads_from(Some(&value), cores),
         Err(std::env::VarError::NotPresent) => worker_threads_from(None, cores),
         Err(std::env::VarError::NotUnicode(value)) => WorkerCount::Ignored {
@@ -1990,7 +1990,7 @@ fn install_heap_profile_hooks() {
 }
 fn version_text(channel_label: &str) -> String {
     format!(
-        "grok {}\n",
+        "friday {}\n",
         xai_grok_version::display_version_with_commit(
             xai_grok_version::full_version(),
             channel_label,
@@ -2071,10 +2071,10 @@ fn main() {
     xai_grok_pager::memory_trace::start(xai_grok_pager::memory_trace::default_dir());
     raise_fd_limit();
     if let Err(e) = xai_grok_config::validate_requirements() {
-        eprintln!("Couldn't start Grok: {e}");
+        eprintln!("Couldn't start Friday X: {e}");
         eprintln!();
         eprintln!(
-            "Update Grok to a version the policy allows, or ask your administrator \
+            "Update Friday X to a version the policy allows, or ask your administrator \
              to fix the managed requirements."
         );
         std::process::exit(2);
@@ -2090,7 +2090,7 @@ fn main() {
     if xai_grok_shell::util::config::load_crash_handler_enabled_sync() {
         let crash_dir = crash_dir_for(&args);
         if let Some(report) = xai_crash_handler::check_previous_crash(&crash_dir) {
-            eprintln!("Grok crashed during your last session.");
+            eprintln!("Friday X crashed during your last session.");
             eprintln!("  Signal:  {}", report.signal_name);
             eprintln!("  Version: {}", report.app_version);
             eprintln!("  Report:  {}", report.report_path.display());
@@ -2530,7 +2530,7 @@ async fn async_main(mut args: PagerArgs) -> Result<()> {
     match result {
         Ok(true) => {
             let adopted = bg_update_wait.lock().await.take();
-            let grok = "grok";
+            let grok = "friday";
             if finish_update_on_exit(adopted, &update_config).await {
                 eprintln!("Update installed. Run `{grok}` to start.");
             } else {
@@ -2594,7 +2594,7 @@ fn build_update_config() -> UpdateConfig {
                 xai_grok_shell::agent::config::EndpointsConfig::default().deployment_key;
         }
     });
-    config.npm_registry = std::env::var(obfstr::obfstr!("GROK_NPM_REGISTRY"))
+    config.npm_registry = std::env::var(obfstr::obfstr!("FRIDAY_NPM_REGISTRY"))
         .ok()
         .or_else(xai_grok_shell::util::config::load_npm_registry_sync);
     if let Ok(root) = xai_grok_shell::config::load_effective_config_disk_only()
@@ -2625,7 +2625,7 @@ fn should_check_for_updates(no_auto_update_flag: bool) -> bool {
 }
 fn is_opted_out_of_updates(no_auto_update_flag: bool) -> bool {
     no_auto_update_flag
-        || std::env::var_os("GROK_DISABLE_AUTOUPDATER")
+        || std::env::var_os("FRIDAY_DISABLE_AUTOUPDATER")
             .is_some_and(|v| env_flag_enabled(&v.to_string_lossy()))
 }
 /// Gate for the stdio agent's background auto-update: only the direct stdio agent, from the managed install.
@@ -2640,7 +2640,7 @@ fn stdio_auto_update_enabled(
 }
 /// True when `exe` is the binary `<grok_home>/bin/grok` resolves to, the install that adopts a staged update on
 /// respawn. Both sides are canonicalized; any failure reports unmanaged and skips the update. The npm shim
-/// hardcodes `~/.grok`, so a custom `GROK_HOME` skips here too.
+/// hardcodes `~/.friday`, so a custom `FRIDAY_HOME` skips here too.
 fn is_managed_install(exe: Option<std::path::PathBuf>, grok_home: &std::path::Path) -> bool {
     if grok_home.as_os_str().is_empty() {
         return false;
@@ -2715,7 +2715,7 @@ async fn run_update_command(
         );
     }
     let telemetry_cfg = xai_grok_shell::config::load_agent_config_disk_only()
-        .map_err(|e| tracing::warn!("grok update: telemetry init skipped (agent config: {e})"))
+        .map_err(|e| tracing::warn!("friday update: telemetry init skipped (agent config: {e})"))
         .ok();
     if let Some(agent_cfg) = telemetry_cfg {
         let auth_manager =
@@ -2742,7 +2742,7 @@ async fn run_update_command(
     result?;
     Ok(())
 }
-/// After a successful `grok update`, ask any running leader on this machine that is older than `installed_version`
+/// After a successful `friday update`, ask any running leader on this machine that is older than `installed_version`
 /// to relaunch onto the new binary. Best-effort and non-fatal: discovery/connect/control failures are logged and
 /// skipped.
 #[tracing::instrument(level = "debug", skip_all)]
@@ -2813,11 +2813,11 @@ mod tests {
     #[test]
     fn embedded_agent_commands_heal_managed_policy_before_sandboxing() {
         for args in [
-            vec!["grok"],
-            vec!["grok", "agent", "stdio"],
-            vec!["grok", "dashboard"],
-            vec!["grok", "models"],
-            vec!["grok", "worktree", "list"],
+            vec!["friday"],
+            vec!["friday", "agent", "stdio"],
+            vec!["friday", "dashboard"],
+            vec!["friday", "models"],
+            vec!["friday", "worktree", "list"],
         ] {
             let args = PagerArgs::try_parse_from(args).unwrap();
             assert!(
@@ -2829,10 +2829,10 @@ mod tests {
     #[test]
     fn utility_commands_skip_managed_policy_heal() {
         for args in [
-            vec!["grok", "inspect"],
-            vec!["grok", "mcp", "list"],
-            vec!["grok", "sessions", "list"],
-            vec!["grok", "version"],
+            vec!["friday", "inspect"],
+            vec!["friday", "mcp", "list"],
+            vec!["friday", "sessions", "list"],
+            vec!["friday", "version"],
         ] {
             let args = PagerArgs::try_parse_from(args).unwrap();
             assert!(
@@ -2905,7 +2905,7 @@ mod tests {
         );
         assert_eq!(
             resolve_worker_override("100000", cores).notice().unwrap(),
-            "grok: clamped GROK_WORKER_THREADS=100000 to 360 (valid range is 1..=360)"
+            "grok: clamped FRIDAY_WORKER_THREADS=100000 to 360 (valid range is 1..=360)"
         );
     }
     #[test]
@@ -2918,7 +2918,7 @@ mod tests {
         }
         assert_eq!(
             resolve_worker_override("abc", cores).notice().unwrap(),
-            "grok: ignoring GROK_WORKER_THREADS=\"abc\" (not a valid integer)"
+            "grok: ignoring FRIDAY_WORKER_THREADS=\"abc\" (not a valid integer)"
         );
     }
     #[test]
@@ -2939,13 +2939,13 @@ mod tests {
     }
     #[test]
     fn version_flags_and_doctor_are_distinct_early_intents() {
-        let version = PagerArgs::try_parse_from(["grok", "--version"]).unwrap();
+        let version = PagerArgs::try_parse_from(["friday", "--version"]).unwrap();
         assert!(version.version);
         assert!(version.command.is_none());
-        let short = PagerArgs::try_parse_from(["grok", "-v"]).unwrap();
+        let short = PagerArgs::try_parse_from(["friday", "-v"]).unwrap();
         assert!(short.version);
         assert!(short.command.is_none());
-        let subcommand = PagerArgs::try_parse_from(["grok", "version"]).unwrap();
+        let subcommand = PagerArgs::try_parse_from(["friday", "version"]).unwrap();
         assert!(!subcommand.version);
         assert!(matches!(
             subcommand.command,
@@ -3101,24 +3101,24 @@ mod tests {
     #[test]
     fn is_managed_install_matches_only_the_bin_grok_target() {
         let home =
-            std::env::temp_dir().join(format!("grok-pager-managed-install-{}", std::process::id()));
+            std::env::temp_dir().join(format!("friday-pager-managed-install-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(home.join("bin")).unwrap();
         std::fs::create_dir_all(home.join("downloads")).unwrap();
         assert!(!is_managed_install(
-            Some(home.join("bin").join("grok")),
+            Some(home.join("bin").join("friday")),
             &home
         ));
         assert!(!is_managed_install(None, &home));
         assert!(!is_managed_install(
-            Some(home.join("bin").join("grok")),
+            Some(home.join("bin").join("friday")),
             std::path::Path::new("")
         ));
         let target = home.join("downloads").join("grok-1.2.3");
         std::fs::write(&target, b"binary").unwrap();
-        std::os::unix::fs::symlink(&target, home.join("bin").join("grok")).unwrap();
+        std::os::unix::fs::symlink(&target, home.join("bin").join("friday")).unwrap();
         assert!(is_managed_install(
-            Some(home.join("bin").join("grok")),
+            Some(home.join("bin").join("friday")),
             &home
         ));
         assert!(is_managed_install(Some(target.clone()), &home));
@@ -3149,12 +3149,12 @@ mod tests {
         );
     }
     use clap::Parser as _;
-    /// `grok dashboard` flags the startup hook without forcing leader mode.
+    /// `friday dashboard` flags the startup hook without forcing leader mode.
     /// The dashboard is independent of leader mode, so the launch keeps whatever leader setting the user (or config) chose.
-    #[serial_test::serial(GROK_AGENT_DASHBOARD)]
+    #[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
     #[test]
     fn dashboard_subcommand_flags_startup_without_forcing_leader() {
-        let mut args = PagerArgs::try_parse_from(["grok", "dashboard"]).unwrap();
+        let mut args = PagerArgs::try_parse_from(["friday", "dashboard"]).unwrap();
         assert!(!args.leader, "fixture: no explicit --leader");
         flag_dashboard_at_startup_if_requested(&mut args).unwrap();
         assert!(!args.leader, "dashboard must NOT force leader mode");
@@ -3163,18 +3163,18 @@ mod tests {
             "soft subcommand must be consumed so the interactive path runs",
         );
         assert_eq!(
-            std::env::var("GROK_OPEN_DASHBOARD_AT_STARTUP").as_deref(),
+            std::env::var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP").as_deref(),
             Ok("1"),
             "startup hook flag must be set",
         );
-        unsafe { std::env::remove_var("GROK_OPEN_DASHBOARD_AT_STARTUP") };
+        unsafe { std::env::remove_var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP") };
     }
-    /// `grok dashboard --no-leader` is allowed.
+    /// `friday dashboard --no-leader` is allowed.
     /// The dashboard does not require a leader, so the combination launches into the dashboard in non-leader mode.
-    #[serial_test::serial(GROK_AGENT_DASHBOARD)]
+    #[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
     #[test]
     fn dashboard_subcommand_allows_no_leader() {
-        let mut args = PagerArgs::try_parse_from(["grok", "--no-leader", "dashboard"]).unwrap();
+        let mut args = PagerArgs::try_parse_from(["friday", "--no-leader", "dashboard"]).unwrap();
         flag_dashboard_at_startup_if_requested(&mut args)
             .expect("--no-leader + dashboard must be allowed");
         assert!(args.no_leader, "--no-leader must be preserved");
@@ -3184,24 +3184,24 @@ mod tests {
             "soft subcommand must be consumed so the interactive path runs",
         );
         assert_eq!(
-            std::env::var("GROK_OPEN_DASHBOARD_AT_STARTUP").as_deref(),
+            std::env::var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP").as_deref(),
             Ok("1"),
             "startup hook flag must be set",
         );
-        unsafe { std::env::remove_var("GROK_OPEN_DASHBOARD_AT_STARTUP") };
+        unsafe { std::env::remove_var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP") };
     }
-    /// `GROK_AGENT_DASHBOARD=0` disables the feature; the subcommand must error visibly before the TUI starts.
-    #[serial_test::serial(GROK_AGENT_DASHBOARD)]
+    /// `FRIDAY_AGENT_DASHBOARD=0` disables the feature; the subcommand must error visibly before the TUI starts.
+    #[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
     #[test]
     fn dashboard_subcommand_errors_when_disabled() {
-        unsafe { std::env::set_var("GROK_AGENT_DASHBOARD", "0") };
-        let mut args = PagerArgs::try_parse_from(["grok", "dashboard"]).unwrap();
+        unsafe { std::env::set_var("FRIDAY_AGENT_DASHBOARD", "0") };
+        let mut args = PagerArgs::try_parse_from(["friday", "dashboard"]).unwrap();
         let result = flag_dashboard_at_startup_if_requested(&mut args);
-        unsafe { std::env::remove_var("GROK_AGENT_DASHBOARD") };
+        unsafe { std::env::remove_var("FRIDAY_AGENT_DASHBOARD") };
         let err = result.expect_err("disabled dashboard must error");
         assert!(err.to_string().contains("disabled"), "got: {err}");
         assert!(
-            std::env::var("GROK_OPEN_DASHBOARD_AT_STARTUP").is_err(),
+            std::env::var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP").is_err(),
             "failure path must not flag the startup hook",
         );
     }
@@ -3239,16 +3239,16 @@ mod tests {
             WorkspaceGate::Disabled
         );
     }
-    #[serial_test::serial(GROK_WORKSPACE_COMMAND)]
+    #[serial_test::serial(FRIDAY_WORKSPACE_COMMAND)]
     #[test]
     fn workspace_command_env_override_parsing() {
-        unsafe { std::env::remove_var("GROK_WORKSPACE_COMMAND") };
+        unsafe { std::env::remove_var("FRIDAY_WORKSPACE_COMMAND") };
         assert_eq!(workspace_command_env_override(), None);
-        unsafe { std::env::set_var("GROK_WORKSPACE_COMMAND", "1") };
+        unsafe { std::env::set_var("FRIDAY_WORKSPACE_COMMAND", "1") };
         assert_eq!(workspace_command_env_override(), Some(true));
-        unsafe { std::env::set_var("GROK_WORKSPACE_COMMAND", "off") };
+        unsafe { std::env::set_var("FRIDAY_WORKSPACE_COMMAND", "off") };
         assert_eq!(workspace_command_env_override(), Some(false));
-        unsafe { std::env::remove_var("GROK_WORKSPACE_COMMAND") };
+        unsafe { std::env::remove_var("FRIDAY_WORKSPACE_COMMAND") };
     }
     fn make_state() -> std::sync::Mutex<StdioReplayState> {
         std::sync::Mutex::new(StdioReplayState::default())

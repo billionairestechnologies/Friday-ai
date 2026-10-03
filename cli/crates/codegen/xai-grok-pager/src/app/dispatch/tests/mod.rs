@@ -166,7 +166,7 @@ fn test_app() -> AppView {
         bootstrap_acp_commands: Vec::new(),
         auth_methods: vec![acp::AuthMethod::Agent(acp::AuthMethodAgent::new(
             acp::AuthMethodId::new("grok.com"),
-            "Grok".to_string(),
+            "Friday X".to_string(),
         ))],
         auth_state: AuthState::Done,
         logout_pending: false,
@@ -587,7 +587,7 @@ pub(super) fn end_turn() -> Action {
         prompt_id: None,
     })
 }
-/// Plant a Build session under the process `grok_home()` (OnceLock-cached; do not rely on setting `GROK_HOME` mid-process).
+/// Plant a Build session under the process `grok_home()` (OnceLock-cached; do not rely on setting `FRIDAY_HOME` mid-process).
 /// Caller must remove `sess_dir`.
 fn plant_local_build_session(cwd: &std::path::Path, session_id: &str) -> std::path::PathBuf {
     let home = xai_grok_shell::util::grok_home::grok_home();

@@ -1,4 +1,4 @@
-//! [`GrokStdioClient`] drives `grok agent stdio`: it owns the child, the [`AgentConnection`] over its pipes,
+//! [`GrokStdioClient`] drives `friday agent stdio`: it owns the child, the [`AgentConnection`] over its pipes,
 //! and runs every request under a scaled budget. A request the test treats as infallible panics, with the
 //! child's stderr, when it times out or the agent refuses it. [`GrokStdioClient::try_initialize`] and
 //! [`GrokStdioClient::try_load_session`] return that failure.
@@ -61,7 +61,7 @@ impl SpawnOptions {
 
     /// Keys removed from the sandbox baseline after the mock URL and `with_extra_env` are applied.
     /// Use this to drop a baseline variable a scenario must run without, such as the mock's
-    /// `XAI_API_KEY`, so a login-only or missing-credential case is exercised faithfully.
+    /// `FRIDAY_X_TOKEN`, so a login-only or missing-credential case is exercised faithfully.
     #[must_use]
     pub fn with_removed_env(
         mut self,

@@ -809,7 +809,7 @@ pub(crate) struct SessionActor {
     pub(crate) compaction_at_tokens:
         std::cell::Cell<Option<xai_grok_sampling_types::CompactionAtTokens>>,
     /// Server-side doom-loop check policy, resolved once at spawn by `Config::resolve_doom_loop_recovery`; `None` means disabled.
-    /// `reconstruct_full_config` threads it into the sampler config, and the sampler itself sends the matching `x-grok-doom-loop-check` header.
+    /// `reconstruct_full_config` threads it into the sampler config, and the sampler itself sends the matching `x-friday-doom-loop-check` header.
     pub(crate) doom_loop_recovery: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
     /// Telemetry-only per-turn detector/recovery tally (deduplicated labels, attempts, budget-spent accept, tightest recovery trigger).
     /// Accumulated by the event drainer and taken at turn end for analytics events.
@@ -983,7 +983,7 @@ pub(crate) struct SessionActor {
     /// The kill-switch is already applied.
     /// Cached at actor construction from remote settings; `Default` (all `InheritCurrent`, empty pool) reproduces today's behavior.
     pub(crate) goal_role_models: GoalRoleModelConfig,
-    /// Kill-switch (`GROK_GOAL_USE_CURRENT_MODEL_ONLY` / `[features] goal_use_current_model_only`) resolved at actor build.
+    /// Kill-switch (`FRIDAY_GOAL_USE_CURRENT_MODEL_ONLY` / `[features] goal_use_current_model_only`) resolved at actor build.
     /// When `true`, every `/goal` role inherits the current model.
     /// The skeptic panel also checks this flag directly so a previously-frozen `skeptic_model_assignment` is overridden too.
     pub(crate) goal_use_current_model_only: bool,
@@ -1071,7 +1071,7 @@ pub(crate) struct SessionActor {
     /// `RefCell` so `load_session` reconnect can replace the set on the live actor (see `SessionCommand::SetClientHooks`).
     pub(crate) client_hooks: std::cell::RefCell<crate::extensions::hooks::ClientHooks>,
     /// Resolved workspace root for hooks: git worktree root if in a git repo, otherwise session cwd.
-    /// Used for hook child process cwd, envelope fields, and GROK_WORKSPACE_ROOT env var.
+    /// Used for hook child process cwd, envelope fields, and FRIDAY_WORKSPACE_ROOT env var.
     pub(crate) hook_resolved_workspace_root: String,
     /// Errors from last hook config load (parse failures, etc.).
     pub(crate) hook_load_errors: std::cell::RefCell<Vec<String>>,
@@ -1392,7 +1392,7 @@ impl SessionActor {
 }
 const PROMPT_CONTEXT_FILENAME: &str = "prompt_context.json";
 /// Persist the structured prompt context to `{session_dir}/prompt_context.json`.
-/// The saved JSON enables deterministic re-rendering and `grok prompt --json` inspection.
+/// The saved JSON enables deterministic re-rendering and `friday prompt --json` inspection.
 fn save_prompt_context(session_info: &SessionInfo, prompt_context: &xai_grok_agent::PromptContext) {
     let dir = match crate::session::persistence::ensure_owner_only_session_dir(session_info) {
         Ok(dir) => dir,

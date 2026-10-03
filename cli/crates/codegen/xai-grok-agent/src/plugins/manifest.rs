@@ -315,7 +315,7 @@ pub fn name_from_dirname(dir: &Path) -> Option<String> {
     Some(trimmed)
 }
 
-/// Replaces `${GROK_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_ROOT}`, `${GROK_PLUGIN_DATA}`, and `${CLAUDE_PLUGIN_DATA}` with the provided values.
+/// Replaces `${FRIDAY_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_ROOT}`, `${FRIDAY_PLUGIN_DATA}`, and `${CLAUDE_PLUGIN_DATA}` with the provided values.
 /// Delegates to [`xai_grok_tools::util::substitute_plugin_tokens`], which plugin skill and command bodies also use.
 pub fn substitute_env_vars(s: &str, plugin_root: &str, plugin_data: &str) -> String {
     xai_grok_tools::util::substitute_plugin_tokens(s, Some(plugin_root), Some(plugin_data))
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn substitute_env_vars_replaces_all() {
-        let input = "${GROK_PLUGIN_ROOT}/bin:${CLAUDE_PLUGIN_ROOT}/lib:${GROK_PLUGIN_DATA}/cache";
+        let input = "${FRIDAY_PLUGIN_ROOT}/bin:${CLAUDE_PLUGIN_ROOT}/lib:${FRIDAY_PLUGIN_DATA}/cache";
         let result = substitute_env_vars(input, "/home/user/plugin", "/home/user/.data/plugin");
         assert_eq!(
             result,

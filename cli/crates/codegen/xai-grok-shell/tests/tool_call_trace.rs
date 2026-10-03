@@ -22,15 +22,15 @@ fn unset_env(key: &str) {
 }
 
 fn install_tracing(traces: &str) {
-    set_env("GROK_INTERNAL_OTLP_TRACES_ENDPOINT", traces);
-    set_env("GROK_INSTRUMENTATION", "server");
-    set_env("GROK_OTEL_FILTER", "info");
+    set_env("FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT", traces);
+    set_env("FRIDAY_INSTRUMENTATION", "server");
+    set_env("FRIDAY_OTEL_FILTER", "info");
     set_env("OTEL_BSP_SCHEDULE_DELAY", "50");
     set_env("OTEL_EXPORTER_OTLP_TIMEOUT", "2000");
     set_env("OTEL_TRACES_EXPORTER", "otlp");
-    set_env("GROK_TELEMETRY_ENABLED", "true");
+    set_env("FRIDAY_TELEMETRY_ENABLED", "true");
     unset_env("DISABLE_TELEMETRY");
-    unset_env("GROK_EXTERNAL_OTEL");
+    unset_env("FRIDAY_EXTERNAL_OTEL");
     let config = xai_grok_shell::agent::init::build_default_otel_layer_config();
     xai_grok_shell::auth::credential_provider::wire_otel_deployment_key("test-key".into());
     let layer = xai_grok_telemetry::otel_layer::build_otel_layer(
@@ -102,7 +102,7 @@ fn product_row<'a>(rows: &'a [Value], invocation: &str) -> Option<&'a Value> {
 async fn span_and_product_row_agree_and_product_gate_is_independent() {
     let home = std::env::temp_dir().join(format!("tool-call-trace-{}", std::process::id()));
     std::fs::create_dir_all(&home).unwrap();
-    set_env("GROK_HOME", home.to_str().unwrap());
+    set_env("FRIDAY_HOME", home.to_str().unwrap());
     let traces = MockOtelServer::start().await.expect("traces");
     let product = MockInferenceServer::start().await.expect("product");
     install_tracing(&format!("{}/v1/traces", traces.origin()));

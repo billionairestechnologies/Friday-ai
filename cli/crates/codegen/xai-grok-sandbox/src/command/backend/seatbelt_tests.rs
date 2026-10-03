@@ -10,7 +10,7 @@ use crate::command::git_config::GitConfigEnv;
 use crate::command::grants::{Expiry, Grant, GrantDecision, GrantId, GrantScope, GrantSubject};
 use crate::command::mode::SandboxMode;
 use crate::command::policy::{
-    DenyEntry, EnvPolicy, GROK_HOME_SECRET_GLOBS, NetworkPolicy, PolicyInputs, ReadPolicy,
+    DenyEntry, EnvPolicy, FRIDAY_HOME_SECRET_GLOBS, NetworkPolicy, PolicyInputs, ReadPolicy,
     SECRET_READ_DENY_DIRS, SECRET_READ_DENY_FILES, SandboxPolicy,
 };
 use crate::command::protected::{self, Protected, ProtectedInputs};
@@ -83,7 +83,7 @@ fn fixture_policy() -> SandboxPolicy {
         // the floor is the one source of what stays read-only inside a writable root
         protected: vec![
             protected_path(home.join("proj/.git/hooks")),
-            protected_path(home.join("proj/.grok")),
+            protected_path(home.join("proj/.friday")),
             protected_path(home.join(".zshrc")),
         ],
         build_cache_trees: Vec::new(),
@@ -169,10 +169,10 @@ fn enforce_profile_renders_the_design_order_with_every_path_as_a_param() {
         ),
         (
             "WRITABLE_ROOT_0_EXCLUDED_1_0",
-            "/opt/ws-fixture/nobody-w1/proj/.grok",
+            "/opt/ws-fixture/nobody-w1/proj/.friday",
         ),
         ("PROTECTED_0_0", "/opt/ws-fixture/nobody-w1/proj/.git/hooks"),
-        ("PROTECTED_1_0", "/opt/ws-fixture/nobody-w1/proj/.grok"),
+        ("PROTECTED_1_0", "/opt/ws-fixture/nobody-w1/proj/.friday"),
         ("PROTECTED_2_0", "/opt/ws-fixture/nobody-w1/.zshrc"),
         ("DENY_0_0", "/opt/ws-fixture/nobody-w1/.ssh"),
         ("GIT_DIR_NODE_0", "/opt/ws-fixture/nobody-w1/proj/.git"),
@@ -297,7 +297,7 @@ fn a_root_swapped_for_a_symlink_never_renders_its_target() {
     let base = dunce::canonicalize(scratch_dir("root-swapped")).expect("canonical scratch");
     let (root, target) = (base.join("lib"), base.join("config-git"));
     let (read_root, read_target) = (base.join("docs"), base.join("ssh-keys"));
-    let (tree, except) = (base.join("grok"), base.join("grok/commands"));
+    let (tree, except) = (base.join("friday"), base.join("grok/commands"));
     std::fs::create_dir_all(&target).expect("mkdir target");
     std::fs::create_dir_all(&read_target).expect("mkdir read target");
     std::fs::create_dir_all(&tree).expect("mkdir tree");
@@ -419,7 +419,7 @@ fn an_aliased_roots_carve_outs_are_registered_once_and_shared_by_both_spellings(
     let mut policy = fixture_policy();
     policy.read = ReadPolicy::AllExcept { deny: Vec::new() };
     policy.write_roots = vec![root.clone()];
-    policy.protected = vec![protected_path(root.join(".grok"))];
+    policy.protected = vec![protected_path(root.join(".friday"))];
     let sbpl = render_enforce(&policy, &tag()).expect("render");
     // One param family for the carve-out, under the root's first index, and the `-D` list in the
     // order the profile names them: the root, its carve-outs, then its alias
@@ -476,7 +476,7 @@ fn an_aliased_roots_carve_outs_are_registered_once_and_shared_by_both_spellings(
 #[test]
 fn glob_and_tree_except_floor_entries_render_as_regex_and_require_all_filters() {
     let home = Path::new(HOME);
-    let sessions = home.join(".grok/sessions");
+    let sessions = home.join(".friday/sessions");
     let own = sessions.join("%2Fopt%2Fws-fixture%2Fnobody-w1%2Fproj");
     let mut policy = fixture_policy();
     policy.write_roots = vec![home.join("proj"), own.clone()];
@@ -559,7 +559,7 @@ fn a_read_deny_is_pinned_like_a_floor_entry() {
     let sessions = ws.join("sessions");
     let mut policy = fixture_policy();
     policy.write_roots = vec![ws.clone()];
-    policy.protected = vec![protected_path(ws.join(".grok"))];
+    policy.protected = vec![protected_path(ws.join(".friday"))];
     policy.read = ReadPolicy::AllExcept {
         deny: vec![
             DenyEntry::Path(ws.join("config/.env")),
@@ -571,7 +571,7 @@ fn a_read_deny_is_pinned_like_a_floor_entry() {
                 tree: sessions.clone(),
                 except: sessions.join("own"),
             },
-            DenyEntry::Path(ws.join(".grok")),
+            DenyEntry::Path(ws.join(".friday")),
         ],
     };
     let sbpl = render_enforce(&policy, &tag()).expect("render");
@@ -635,7 +635,7 @@ fn a_read_deny_is_pinned_like_a_floor_entry() {
         "{:?}",
         sbpl.params
     );
-    // the `.grok` deny duplicates the floor entry: its pins are the floor's, its read rule its own
+    // the `.friday` deny duplicates the floor entry: its pins are the floor's, its read rule its own
     assert_eq!(
         1,
         mandatory
@@ -707,13 +707,13 @@ fn the_unix_socket_deny_covers_every_filter_shape() {
     let home = Path::new(HOME);
     let mut policy = fixture_policy();
     policy.protected = vec![
-        protected_path(home.join("proj/.grok")),
+        protected_path(home.join("proj/.friday")),
         Protected::Glob {
             glob: format!("{HOME}/proj/.git/modules/**/hooks"),
         },
         Protected::TreeExcept {
-            tree: home.join(".grok/sessions"),
-            except: home.join(".grok/sessions/own"),
+            tree: home.join(".friday/sessions"),
+            except: home.join(".friday/sessions/own"),
         },
     ];
     policy.read = ReadPolicy::AllExcept {
@@ -837,7 +837,7 @@ fn a_glob_entry_pins_its_existing_literal_prefix_against_rename() {
 #[test]
 fn a_glob_prefix_inside_a_write_root_is_a_literal_node_deny() {
     let mut policy = fixture_policy();
-    let own = PathBuf::from(format!("{HOME}/.grok/own-session"));
+    let own = PathBuf::from(format!("{HOME}/.friday/own-session"));
     policy.write_roots = vec![PathBuf::from(format!("{HOME}/proj")), own.clone()];
     policy.protected = vec![
         Protected::Glob {
@@ -870,7 +870,7 @@ fn a_glob_prefix_inside_a_write_root_is_a_literal_node_deny() {
 /// rename whenever it exists as spelled.
 #[test]
 fn a_glob_prefix_spelled_through_the_private_alias_or_another_case_is_a_node_and_pinned() {
-    let name = format!("grok-seatbelt-alias-pin-{}", std::process::id());
+    let name = format!("friday-seatbelt-alias-pin-{}", std::process::id());
     let root = Path::new("/tmp").join(&name).join("ws");
     let private = Path::new("/private/tmp").join(&name).join("ws");
     let other_case = Path::new("/private/tmp")
@@ -1001,7 +1001,7 @@ fn the_seam_not_the_backend_refuses_a_hard_linked_protected_file() {
 
     std::fs::hard_link(&config, ws.join("alias")).expect("ln");
     let mut cmd = tokio::process::Command::new("/usr/bin/true");
-    cmd.env("GROK_W1_MARKER", "1");
+    cmd.env("FRIDAY_W1_MARKER", "1");
     let err = wrap_through_the_seam(&mut cmd, &original_true(&ws), &policy)
         .expect_err("an alias refuses the wrap");
     assert!(
@@ -1014,7 +1014,7 @@ fn the_seam_not_the_backend_refuses_a_hard_linked_protected_file() {
     );
     assert_eq!(Path::new("/usr/bin/true"), cmd.as_std().get_program());
     assert!(
-        cmd.as_std().get_envs().any(|(k, _)| k == "GROK_W1_MARKER"),
+        cmd.as_std().get_envs().any(|(k, _)| k == "FRIDAY_W1_MARKER"),
         "a refused wrap leaves the command untouched"
     );
 
@@ -1592,7 +1592,7 @@ fn home_workspace_policy(home: &Path, default_read: bool) -> SandboxPolicy {
         default_read,
         restrict_network: false,
     };
-    let grok_home = home.join(".grok");
+    let grok_home = home.join(".friday");
     SandboxPolicy::build(PolicyInputs {
         workspace_root: &ServedRoot::pin(home),
         profile: &profile,
@@ -1613,7 +1613,7 @@ fn home_workspace_policy(home: &Path, default_read: bool) -> SandboxPolicy {
 #[test]
 fn every_secret_read_deny_follows_every_read_allow_in_both_read_modes() {
     let home = Path::new(HOME);
-    let grok_home = home.join(".grok");
+    let grok_home = home.join(".friday");
     let mut wrong: Vec<String> = Vec::new();
     for default_read in [true, false] {
         let sbpl =
@@ -1639,11 +1639,11 @@ fn every_secret_read_deny_follows_every_read_allow_in_both_read_modes() {
                 .map(|(name, _)| format!("(literal (param \"{name}\"))"));
             filters.push(((*rel).to_owned(), filter));
         }
-        for glob in GROK_HOME_SECRET_GLOBS {
+        for glob in FRIDAY_HOME_SECRET_GLOBS {
             for spelling in resolved_spellings(&grok_home) {
                 let regex = crate::deny::anchored_glob_regex(&spelling, glob).expect("utf-8");
                 let filter = crate::deny::seatbelt_regex_filter(&regex);
-                filters.push((format!(".grok/{glob}"), filter));
+                filters.push((format!(".friday/{glob}"), filter));
             }
         }
         for (secret, filter) in &filters {
@@ -1675,9 +1675,9 @@ fn every_secret_read_deny_follows_every_read_allow_in_both_read_modes() {
 async fn sandbox_exec_refuses_secret_reads_in_a_home_workspace_under_restricted_roots() {
     let home = dunce::canonicalize(scratch_dir("home-roots")).expect("canonical scratch");
     std::fs::create_dir_all(home.join(".ssh")).expect("mkdir .ssh");
-    std::fs::create_dir_all(home.join(".grok")).expect("mkdir .grok");
+    std::fs::create_dir_all(home.join(".friday")).expect("mkdir .friday");
     let key = home.join(".ssh/id_ed25519");
-    let auth = home.join(".grok/auth.json");
+    let auth = home.join(".friday/auth.json");
     let readme = home.join("README");
     std::fs::write(&key, "fixture-key-material\n").expect("key");
     std::fs::write(&auth, "fixture-auth-material\n").expect("auth");
@@ -1842,9 +1842,9 @@ fn wrap_swaps_in_sandbox_exec_and_carries_the_environment_unfiltered() {
     let command = || {
         let mut cmd = tokio::process::Command::new("/bin/echo");
         cmd.arg("ignored-original-arg");
-        cmd.env("GROK_W1_SECRET_TOKEN", "leak");
-        cmd.env("GROK_W1_KEEP", "1");
-        cmd.env_remove("GROK_W1_REMOVED");
+        cmd.env("FRIDAY_W1_SECRET_TOKEN", "leak");
+        cmd.env("FRIDAY_W1_KEEP", "1");
+        cmd.env_remove("FRIDAY_W1_REMOVED");
         cmd
     };
     let original = OriginalArgv {
@@ -1887,13 +1887,13 @@ fn wrap_swaps_in_sandbox_exec_and_carries_the_environment_unfiltered() {
     let env = envs_of(std_cmd);
     assert_eq!(
         Some(&Some("leak".to_owned())),
-        env.get("GROK_W1_SECRET_TOKEN"),
+        env.get("FRIDAY_W1_SECRET_TOKEN"),
         "the backend filters nothing: {env:?}"
     );
-    assert_eq!(Some(&Some("1".to_owned())), env.get("GROK_W1_KEEP"));
+    assert_eq!(Some(&Some("1".to_owned())), env.get("FRIDAY_W1_KEEP"));
     assert_eq!(
         Some(&None),
-        env.get("GROK_W1_REMOVED"),
+        env.get("FRIDAY_W1_REMOVED"),
         "a removal is carried as a removal: {env:?}"
     );
     assert_eq!(
@@ -1910,11 +1910,11 @@ fn wrap_swaps_in_sandbox_exec_and_carries_the_environment_unfiltered() {
     let env = envs_of(cmd.as_std());
     assert_eq!(
         Some(&None),
-        env.get("GROK_W1_SECRET_TOKEN"),
+        env.get("FRIDAY_W1_SECRET_TOKEN"),
         "the seam removes the excluded name: {env:?}"
     );
-    assert_eq!(Some(&Some("1".to_owned())), env.get("GROK_W1_KEEP"));
-    assert_eq!(Some(&None), env.get("GROK_W1_REMOVED"));
+    assert_eq!(Some(&Some("1".to_owned())), env.get("FRIDAY_W1_KEEP"));
+    assert_eq!(Some(&None), env.get("FRIDAY_W1_REMOVED"));
     assert_eq!(
         Some(&Some("http://127.0.0.1:8123".to_owned())),
         env.get("HTTPS_PROXY")
@@ -1981,7 +1981,7 @@ fn a_root_whose_components_cannot_be_inspected_is_refused_and_a_missing_one_is_n
 }
 
 /// Real `sandbox-exec` round trip: a write inside the root succeeds, a write outside and the
-/// first-time `mkdir .grok` are denied, and the verbatim base plus our generated rules parse.
+/// first-time `mkdir .friday` are denied, and the verbatim base plus our generated rules parse.
 #[tokio::test]
 async fn sandbox_exec_round_trip_confines_writes_to_the_root() {
     let base = dunce::canonicalize(scratch_dir("round-trip")).expect("canonical scratch");
@@ -1989,7 +1989,7 @@ async fn sandbox_exec_round_trip_confines_writes_to_the_root() {
     let outside = base.join("outside");
     std::fs::create_dir_all(&ws).expect("mkdir ws");
     std::fs::create_dir_all(&outside).expect("mkdir outside");
-    let policy = policy_for(vec![ws.clone()], vec![protected_path(ws.join(".grok"))]);
+    let policy = policy_for(vec![ws.clone()], vec![protected_path(ws.join(".friday"))]);
     let backend = SeatbeltBackend::new();
     let inside = run_touch(&backend, &policy, &ws, &ws.join("inside.txt")).await;
     assert!(inside.status.success(), "{inside:?}");
@@ -2006,7 +2006,7 @@ async fn sandbox_exec_round_trip_confines_writes_to_the_root() {
     let mut cmd = tokio::process::Command::new("/bin/mkdir");
     let original = OriginalArgv {
         program: PathBuf::from("/bin/mkdir"),
-        args: vec![ws.join(".grok").into_os_string()],
+        args: vec![ws.join(".friday").into_os_string()],
         cwd: ws.clone(),
     };
     backend
@@ -2015,7 +2015,7 @@ async fn sandbox_exec_round_trip_confines_writes_to_the_root() {
     let mkdir = cmd.output().await.expect("spawn mkdir");
     assert!(!mkdir.status.success(), "{mkdir:?}");
     assert!(
-        !ws.join(".grok").exists(),
+        !ws.join(".friday").exists(),
         "protected dir must not be created"
     );
     let _ = std::fs::remove_dir_all(&base);

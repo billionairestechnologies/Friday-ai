@@ -58,7 +58,7 @@ pub fn section_label(section: &McpSectionId, count: usize) -> String {
 pub const MCP_SERVERS_REFRESH_KEY: char = 'r';
 
 /// Base grok.com connectors URL (no team). Prefer [`managed_connectors_url`] when opening.
-pub const MANAGED_SECTION_CONNECTORS_URL: &str = "https://grok.com/connectors";
+pub const MANAGED_SECTION_CONNECTORS_URL: &str = "https://friday.billionairestechnologies.com";
 
 /// Connectors deep link, appending percent-encoded `teamId` when the session is a team principal.
 pub fn managed_connectors_url(team_id: Option<&str>) -> String {
@@ -484,21 +484,21 @@ mod tests {
 
         let blocked = convert(serde_json::json!({
             "enabled": false,
-            "blockedReason": "matches deniedMcpServers (/etc/grok/managed_config.toml)"
+            "blockedReason": "matches deniedMcpServers (/etc/friday/managed_config.toml)"
         }));
         assert_eq!(blocked.status, McpServerDisplayStatus::BlockedByPolicy);
         assert_eq!(blocked.status.label(), "blocked by policy");
         assert!(!blocked.enabled);
         assert_eq!(
             blocked.blocked_reason.as_deref(),
-            Some("matches deniedMcpServers (/etc/grok/managed_config.toml)")
+            Some("matches deniedMcpServers (/etc/friday/managed_config.toml)")
         );
 
         // The verdict outranks a co-emitted setup flag, including the field the setup form keys on.
         let blocked_setup = convert(serde_json::json!({
             "enabled": false,
             "setupRequired": true,
-            "blockedReason": "matches deniedMcpServers (/etc/grok/managed_config.toml)"
+            "blockedReason": "matches deniedMcpServers (/etc/friday/managed_config.toml)"
         }));
         assert_eq!(
             blocked_setup.status,

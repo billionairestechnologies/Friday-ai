@@ -162,7 +162,7 @@ define_methods! {
     BotStatus => "bot.status",
     /// Off-box transcript page. Cold — never wakes the box.
     BotTranscriptOffbox => "bot.transcript.offbox",
-    /// Caller-scoped weekly Grok Bot usage summary. Cold — never wakes the
+    /// Caller-scoped weekly Friday X Bot usage summary. Cold — never wakes the
     /// box.
     BotUsage => "bot.usage",
     /// Subscribe this connection to `bot.event` for the given agents.

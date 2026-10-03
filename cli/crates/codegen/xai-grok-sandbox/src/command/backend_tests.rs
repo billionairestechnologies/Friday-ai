@@ -434,7 +434,7 @@ fn enforce_runs_with_linked_home_files_and_refuses_what_it_cannot_rule_out() {
     policy.write_roots = vec![ws.clone()];
     policy.protected = protected::floor(&ProtectedInputs {
         workspace_root: &ServedRoot::pin(&ws),
-        grok_home: &home.join(".grok"),
+        grok_home: &home.join(".friday"),
         user_home: Some(&home),
         control_socket_dir: &base.join("ctl"),
         git_env: &GitConfigEnv::default(),
@@ -518,7 +518,7 @@ fn enforce_runs_past_symlinks_out_of_the_workspace() {
     policy.write_roots = vec![ws.clone()];
     policy.protected = protected::floor(&ProtectedInputs {
         workspace_root: &ServedRoot::pin(&ws),
-        grok_home: &home.join(".grok"),
+        grok_home: &home.join(".friday"),
         user_home: Some(&home),
         control_socket_dir: &base.join("ctl"),
         git_env: &GitConfigEnv::default(),

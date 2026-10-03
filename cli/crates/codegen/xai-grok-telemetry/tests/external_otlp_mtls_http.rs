@@ -36,7 +36,7 @@ fn external_stream_http_mtls_end_to_end() {
 
     let mut cfg = xai_grok_telemetry::external::ExternalOtelConfig::resolve_with(
         |name| match name {
-            "GROK_EXTERNAL_OTEL" => Some("1".into()),
+            "FRIDAY_EXTERNAL_OTEL" => Some("1".into()),
             "OTEL_LOGS_EXPORTER" | "OTEL_METRICS_EXPORTER" => Some("otlp".into()),
             "OTEL_EXPORTER_OTLP_ENDPOINT" => Some(endpoint.clone()),
             "OTEL_EXPORTER_OTLP_PROTOCOL" => Some("http/protobuf".into()),

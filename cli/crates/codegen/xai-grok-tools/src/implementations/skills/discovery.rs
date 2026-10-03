@@ -21,8 +21,8 @@ pub const MAX_BODY_PEEK_BYTES: usize = 2048;
 pub const MAX_SKILL_WALK_DEPTH: usize = 5;
 
 /// Subdirectory names that contain skill definitions. `skills` is the standard layout
-/// (`.grok/skills/`, `.claude/skills/`, `.cursor/skills/`). The product-specific `skills-cursor/`
-/// layout is no longer scanned — it pulled vendor default skills into Grok Build sessions.
+/// (`.friday/skills/`, `.claude/skills/`, `.cursor/skills/`). The product-specific `skills-cursor/`
+/// layout is no longer scanned — it pulled vendor default skills into Friday X sessions.
 pub const SKILL_SUBDIRS: &[&str] = &["skills"];
 pub const COMMAND_SUBDIR: &str = "commands";
 
@@ -52,7 +52,7 @@ const CURSOR_DEFAULT_SKILLS: &[&str] = &[
 const CLAUDE_DEFAULT_SKILLS: &[&str] = &["pdf", "docx", "xlsx", "pptx", "skill-creator"];
 
 /// Return true if `name` is a vendor-shipped default skill discovered under the matching vendor's config dir (`/.cursor/` or `/.claude/`). The
-/// path check ensures a user's own skill that merely shares a denylisted name (e.g. `~/.grok/skills/shell`) is NOT dropped — only skills
+/// path check ensures a user's own skill that merely shares a denylisted name (e.g. `~/.friday/skills/shell`) is NOT dropped — only skills
 /// physically located under the vendor dir are treated as vendor builtins.
 fn is_vendor_default_skill(path: &str, name: &str) -> bool {
     let in_cursor = path.contains("/.cursor/") || path.contains("\\.cursor\\");
@@ -816,14 +816,14 @@ pub fn parse_skill_files(skill_files: Vec<(PathBuf, SkillScope)>) -> Vec<SkillIn
 
     // Drop vendor-shipped default skills (vendor builtins) found under
     // a `/.cursor/` or `/.claude/` path. Always applied, independent of the
-    // per-vendor toggle, so vendor builtins never leak into Grok Build.
+    // per-vendor toggle, so vendor builtins never leak into Friday X.
     skills.retain(|s| !is_vendor_default_skill(&s.path, &s.name));
 
     skills
 }
 
 /// Walk upward from accessed file paths toward cwd, discovering skill directories not found at startup. Discovery only visits known config
-/// roots (`.grok`, `.agents`, `.claude`, …); those are local harness config (often intentionally gitignored), not tree content. `.cursor/` is
+/// roots (`.friday`, `.agents`, `.claude`, …); those are local harness config (often intentionally gitignored), not tree content. `.cursor/` is
 /// intentionally NOT scanned in this dynamic path — it never was historically, and preserving that keeps default behavior byte-for-byte.
 pub fn discover_skills_for_paths(
     file_paths: &[&Path],
@@ -832,9 +832,9 @@ pub fn discover_skills_for_paths(
     already_checked: &mut HashSet<PathBuf>,
     compat: CompatConfig,
 ) -> Vec<SkillInfo> {
-    // `.grok` and `.agents` are always scanned; `.claude` is gated on the
+    // `.friday` and `.agents` are always scanned; `.claude` is gated on the
     // claude-vendor skills cell. (`.cursor` is excluded here by design — see fn docs.)
-    let mut config_dir_names: Vec<&str> = vec![".grok", ".agents"];
+    let mut config_dir_names: Vec<&str> = vec![".friday", ".agents"];
     if compat.claude.skills {
         config_dir_names.push(".claude");
     }
@@ -1446,9 +1446,9 @@ model: test-model
 
     #[test]
     fn is_vendor_default_skill_spares_user_skill_outside_vendor_dir() {
-        // A user's own "shell" skill in ~/.grok is NOT a vendor builtin.
+        // A user's own "shell" skill in ~/.friday is NOT a vendor builtin.
         assert!(!is_vendor_default_skill(
-            "/home/u/.grok/skills/shell/SKILL.md",
+            "/home/u/.friday/skills/shell/SKILL.md",
             "shell"
         ));
     }
@@ -1481,8 +1481,8 @@ model: test-model
             "---\nname: shell\ndescription: cursor builtin\n---\n",
         )
         .unwrap();
-        // Same name under /.grok/ → kept (user content).
-        let grok_shell = tmp.path().join(".grok").join("skills").join("shell");
+        // Same name under /.friday/ → kept (user content).
+        let grok_shell = tmp.path().join(".friday").join("skills").join("shell");
         std::fs::create_dir_all(&grok_shell).unwrap();
         std::fs::write(
             grok_shell.join("SKILL.md"),
@@ -1495,7 +1495,7 @@ model: test-model
             (grok_shell.join("SKILL.md"), SkillScope::User),
         ]);
         assert_eq!(skills.len(), 1, "cursor builtin must be dropped");
-        assert!(skills.first().is_some_and(|s| s.path.contains("/.grok/")));
+        assert!(skills.first().is_some_and(|s| s.path.contains("/.friday/")));
     }
 
     #[test]
@@ -1530,7 +1530,7 @@ model: test-model
         let sub = repo.join("sub");
         std::fs::create_dir_all(&sub).unwrap();
 
-        // A .claude skill and a .grok skill in an intermediate dir.
+        // A .claude skill and a .friday skill in an intermediate dir.
         let claude_skill = sub.join(".claude").join("skills").join("claude-dyn");
         std::fs::create_dir_all(&claude_skill).unwrap();
         std::fs::write(
@@ -1538,7 +1538,7 @@ model: test-model
             "---\nname: claude-dyn\n---\n",
         )
         .unwrap();
-        let grok_skill = sub.join(".grok").join("skills").join("grok-dyn");
+        let grok_skill = sub.join(".friday").join("skills").join("grok-dyn");
         std::fs::create_dir_all(&grok_skill).unwrap();
         std::fs::write(grok_skill.join("SKILL.md"), "---\nname: grok-dyn\n---\n").unwrap();
 

@@ -1,12 +1,12 @@
 # Hooks
 
-Hooks let you run a script or send an HTTP request at key moments in a Grok session. Use them to automate tasks, enforce safety checks, log activity, send notifications, and integrate your own tools.
+Hooks let you run a script or send an HTTP request at key moments in a Friday X session. Use them to automate tasks, enforce safety checks, log activity, send notifications, and integrate your own tools.
 
 ---
 
 ## What Are Hooks?
 
-A hook is a shell command or HTTP endpoint that Grok calls when a specific lifecycle event occurs. Hooks can:
+A hook is a shell command or HTTP endpoint that Friday X calls when a specific lifecycle event occurs. Hooks can:
 
 - **Block actions**: A `PreToolUse` hook can deny a dangerous command before it runs.
 - **Keep the agent working**: A `Stop` hook can block the agent from finishing its turn until a condition holds (e.g. the test suite passes) and feed the reason back to the model.
@@ -32,10 +32,10 @@ A hook is a shell command or HTTP endpoint that Grok calls when a specific lifec
 1. Create the hooks directory:
 
    ```sh
-   mkdir -p ~/.grok/hooks
+   mkdir -p ~/.friday/hooks
    ```
 
-2. Create a hook file, e.g. `~/.grok/hooks/session-start.json`:
+2. Create a hook file, e.g. `~/.friday/hooks/session-start.json`:
 
    ```json
    {
@@ -43,7 +43,7 @@ A hook is a shell command or HTTP endpoint that Grok calls when a specific lifec
        "SessionStart": [
          {
            "hooks": [
-             { "type": "command", "command": "echo 'Grok session started in '$(pwd)" }
+             { "type": "command", "command": "echo 'Friday X session started in '$(pwd)" }
            ]
          }
        ]
@@ -51,7 +51,7 @@ A hook is a shell command or HTTP endpoint that Grok calls when a specific lifec
    }
    ```
 
-3. Start (or restart) a Grok session. The hook runs automatically on `SessionStart`.
+3. Start (or restart) a Friday X session. The hook runs automatically on `SessionStart`.
 
 4. Press `Ctrl+L` on non–VS Code family terminals (or run `/hooks` anywhere — preferred on VS Code family) and check the Hooks tab to confirm it loaded.
 
@@ -63,22 +63,22 @@ Hooks are discovered from several places (all are merged):
 
 | Scope | Path | Trusted? | Notes |
 |-------|------|----------|-------|
-| Global | `~/.grok/hooks/*.json` | Always | Personal hooks |
+| Global | `~/.friday/hooks/*.json` | Always | Personal hooks |
 | Global | `~/.claude/settings.json` (and `settings.local.json`) | Always | Claude Code compatibility (configurable) |
 | Global | `~/.cursor/hooks.json` | Always | Cursor compatibility (configurable) |
-| Project | `<project>/.grok/hooks/*.json` | Requires trust | Per-repo automation |
+| Project | `<project>/.friday/hooks/*.json` | Requires trust | Per-repo automation |
 | Project | `<project>/.claude/settings.json` (and `settings.local.json`) | Requires trust | Claude compatibility (configurable) |
 | Project | `<project>/.cursor/hooks.json` | Requires trust | Cursor compatibility (configurable) |
-| Config | `~/.grok/config.toml` | Always | Your hooks alongside the rest of your config |
-| Config | `managed_config.toml` (`$GROK_HOME` and `/etc/grok`) | Always | Organization-distributed hooks (server-synced and on-device) |
-| Config | `requirements.toml` (signed cache, and `/etc/grok`) | Always | Organization-enforced hooks; see [Enforced hooks](#enforced-hooks) |
+| Config | `~/.friday/config.toml` | Always | Your hooks alongside the rest of your config |
+| Config | `managed_config.toml` (`$FRIDAY_HOME` and `/etc/friday`) | Always | Organization-distributed hooks (server-synced and on-device) |
+| Config | `requirements.toml` (signed cache, and `/etc/friday`) | Always | Organization-enforced hooks; see [Enforced hooks](#enforced-hooks) |
 | Plugin | Bundled inside installed plugins | Per-plugin | Shared team hooks |
 
-Config-file hooks live in the same TOML your organization already controls; see [Hooks in Config Files](#hooks-in-config-files) for the format. The compatible vendor hook sources are scanned by default. To disable scanning for a specific vendor, set `[compat.<vendor>] hooks = false` in `~/.grok/config.toml` or the corresponding environment variable. See [Configuration](05-configuration.md#harness-compatibility) for details.
+Config-file hooks live in the same TOML your organization already controls; see [Hooks in Config Files](#hooks-in-config-files) for the format. The compatible vendor hook sources are scanned by default. To disable scanning for a specific vendor, set `[compat.<vendor>] hooks = false` in `~/.friday/config.toml` or the corresponding environment variable. See [Configuration](05-configuration.md#harness-compatibility) for details.
 
-**Trusting a project**: The first time you open a project with hooks, you must trust it before its project hooks will run; until then they are silently skipped. Grant trust by running `/hooks-trust` (or launching with `--trust`); the decision is recorded in the unified folder-trust store (`~/.grok/trusted_folders.toml`), the same gate that governs repo-local MCP/LSP servers. Global hooks in `~/.grok/hooks/` are always trusted and need no entry. This prevents untrusted repos from running arbitrary code.
+**Trusting a project**: The first time you open a project with hooks, you must trust it before its project hooks will run; until then they are silently skipped. Grant trust by running `/hooks-trust` (or launching with `--trust`); the decision is recorded in the unified folder-trust store (`~/.friday/trusted_folders.toml`), the same gate that governs repo-local MCP/LSP servers. Global hooks in `~/.friday/hooks/` are always trusted and need no entry. This prevents untrusted repos from running arbitrary code.
 
-Because hooks are unified under folder-trust, a `--trust` / `/hooks-trust` grant trusts the whole folder for **MCP, LSP, hooks, project instructions, and project skills** together, and covers subdirectories of the same repository. A nested git checkout under that folder is a separate workspace and is not covered. Conversely, disabling folder-trust (`GROK_FOLDER_TRUST=0` or `[folder_trust] enabled = false`) ungates those surfaces together.
+Because hooks are unified under folder-trust, a `--trust` / `/hooks-trust` grant trusts the whole folder for **MCP, LSP, hooks, project instructions, and project skills** together, and covers subdirectories of the same repository. A nested git checkout under that folder is a separate workspace and is not covered. Conversely, disabling folder-trust (`FRIDAY_FOLDER_TRUST=0` or `[folder_trust] enabled = false`) ungates those surfaces together.
 
 ---
 
@@ -114,7 +114,7 @@ After a block, prompts already queued behind the blocked one do not auto-run: th
 
 ### Cursor Hook Compatibility
 
-Grok accepts Cursor's camelCase hook event names, so `~/.cursor/hooks.json` loads unchanged:
+Friday X accepts Cursor's camelCase hook event names, so `~/.cursor/hooks.json` loads unchanged:
 
 | Cursor event | Maps to |
 |---|---|
@@ -159,7 +159,7 @@ Each `.json` file can define hooks for multiple events:
 
 ### Key Fields
 
-- **Event name** (top-level key): any event listed in [Hook Events](#hook-events). Grok skips unrecognized event names so a shared Claude or Cursor settings file still loads.
+- **Event name** (top-level key): any event listed in [Hook Events](#hook-events). Friday X skips unrecognized event names so a shared Claude or Cursor settings file still loads.
 - **matcher** (optional): A regular expression that selects which invocations trigger the hook. What it tests depends on the event: the tool name on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionDenied`), the notification type on `Notification`, the subagent type on `SubagentStart`/`SubagentStop` (e.g. `explore`), the start source on `SessionStart` (`startup`, `resume`, …), the end reason on `SessionEnd`, the compaction trigger on `PreCompact`/`PostCompact` (`manual` or `auto`), the error type on `StopFailure` (`rate_limit`, `authentication_failed`, `invalid_request`, `server_error`, `max_output_tokens`, or `unknown`), and the reason on `StopCancelled` (`user_interrupt`, `permission_rejected`, `permission_cancelled`, `max_turns`, `no_progress`, or `unknown`). A matcher on `Stop` or `UserPromptSubmit` is ignored with a warning (those events always fire). An empty or omitted matcher matches everything. A finish-thinking chime should set `matcher` to `idle_prompt` on `Notification` (any turn end, then sustained idle); `permission_prompt` fires only when a permission UI is actually waiting. The matcher tests the real tool name; MCP calls routed through the internal `use_tool` dispatcher appear as the qualified `server__tool` name (e.g. `linear__save_issue`), so match on that, not the dispatcher name.
 - **type**: `"command"` (run a script or shell one-liner) or `"http"` (POST the event to a URL).
 - **command**: Path to executable (relative to the JSON file) or inline shell command.
@@ -167,7 +167,7 @@ Each `.json` file can define hooks for multiple events:
 
 ### Tool Name Aliases
 
-In a `matcher`, Grok maps Claude-style tool names to its own so hooks migrated from Claude fire correctly. Common aliases include:
+In a `matcher`, Friday X maps Claude-style tool names to its own so hooks migrated from Claude fire correctly. Common aliases include:
 
 - `Bash` → `run_terminal_command`
 - `Read` → `read_file`
@@ -183,7 +183,7 @@ A matcher keeps its original name too, so `Bash` matches both `Bash` and `run_te
 
 ## How a Hook Resolves
 
-When an event fires, Grok resolves it in four steps:
+When an event fires, Friday X resolves it in four steps:
 
 1. **Select matching groups.** For that event, each matcher group whose `matcher` matches the event's field runs. The matcher tests the tool name on tool events, the notification type on `Notification`, and so on (see [Key Fields](#key-fields)). An empty or omitted matcher matches everything.
 2. **Run the handlers in order.** Handlers in the selected groups run in config order, each receiving the event as JSON on stdin, until one returns `deny` (which stops the chain). Handlers from different sources (global, project, plugin, config) are merged, and identical handlers are deduplicated. Every handler sees the model's original tool input; a `PreToolUse` `updatedInput` is applied only after all handlers finish, so one handler cannot see another's rewrite (the last rewrite wins).
@@ -194,13 +194,13 @@ When an event fires, Grok resolves it in four steps:
 
 ## Hooks in Config Files
 
-Hooks can also live directly in your Grok config, so a team can distribute them with the rest of their configuration instead of shipping separate JSON files. The same `hooks` object is read from three TOML files:
+Hooks can also live directly in your Friday X config, so a team can distribute them with the rest of their configuration instead of shipping separate JSON files. The same `hooks` object is read from three TOML files:
 
 | File | Tier | Who sets it |
 |------|------|-------------|
-| `~/.grok/config.toml` | User | You |
-| `managed_config.toml` (`$GROK_HOME`, `/etc/grok`) | Managed / system | Your organization |
-| `requirements.toml` (`$GROK_HOME` signed cache, `/etc/grok`) | Requirements | Your organization |
+| `~/.friday/config.toml` | User | You |
+| `managed_config.toml` (`$FRIDAY_HOME`, `/etc/friday`) | Managed / system | Your organization |
+| `requirements.toml` (`$FRIDAY_HOME` signed cache, `/etc/friday`) | Requirements | Your organization |
 
 The TOML is structurally identical to the JSON hook object, so an existing hook transliterates directly:
 
@@ -233,30 +233,30 @@ Prefer the inline form to avoid repeating the `[[hooks.<Event>.hooks]]` header f
 
 ### Enforced hooks
 
-Hooks from the config layers your organization controls are enforced: they carry a `[policy]` badge in `/hooks`, `Space` refuses to disable them, an entry in `~/.grok/disabled-hooks` does not skip them, and their source cannot be removed. Two layers qualify:
+Hooks from the config layers your organization controls are enforced: they carry a `[policy]` badge in `/hooks`, `Space` refuses to disable them, an entry in `~/.friday/disabled-hooks` does not skip them, and their source cannot be removed. Two layers qualify:
 
-- The root-owned system files `/etc/grok/requirements.toml` and `/etc/grok/managed_config.toml` (`requirements/system:` and `system_managed:` names).
-- The `~/.grok/requirements.toml` that the deployment sync writes, while its bytes match the signed policy the server sent (`requirements/signed:` names). If the file is edited or its signature file is missing or unreadable, its hooks load as your own (`requirements/user:` names) and can be disabled again; an unreadable `requirements.toml` contributes no hooks. Organizations that need the file to stay intact set `fail_closed = true` in the same requirements, which refuses to start on an edited copy or a missing signature (an unreadable file is a read error and still starts). See [Configuration](26-config-reference.md#requirementstoml).
+- The root-owned system files `/etc/friday/requirements.toml` and `/etc/friday/managed_config.toml` (`requirements/system:` and `system_managed:` names).
+- The `~/.friday/requirements.toml` that the deployment sync writes, while its bytes match the signed policy the server sent (`requirements/signed:` names). If the file is edited or its signature file is missing or unreadable, its hooks load as your own (`requirements/user:` names) and can be disabled again; an unreadable `requirements.toml` contributes no hooks. Organizations that need the file to stay intact set `fail_closed = true` in the same requirements, which refuses to start on an edited copy or a missing signature (an unreadable file is a read error and still starts). See [Configuration](26-config-reference.md#requirementstoml).
 
-Hooks in `~/.grok/managed_config.toml` and `~/.grok/config.toml` are distribution, not enforcement: you can disable them.
+Hooks in `~/.friday/managed_config.toml` and `~/.friday/config.toml` are distribution, not enforcement: you can disable them.
 
 ### Allow only managed hooks
 
 An organization can restrict a machine to the hooks it enforces:
 
 ```toml
-# /etc/grok/requirements.toml
+# /etc/friday/requirements.toml
 allow_managed_hooks_only = true
 ```
 
 With this set:
 
-- **What runs.** Only [enforced hooks](#enforced-hooks): the ones from the root-owned `/etc/grok/requirements.toml` and `/etc/grok/managed_config.toml`, and the ones in the synced `~/.grok/requirements.toml` while it matches its signature. An edited synced file loads as your own hooks, which the pin skips.
-- **What is skipped.** Every other hook, at dispatch: `~/.grok/hooks`, every `~/.grok/*.toml` file, project hooks, plugin hooks, agent frontmatter hooks, and the Claude and Cursor compatibility files. In `/hooks` they show `[disabled]`, and enabling them is refused ("Hooks outside managed policy are disabled by your organization."); `grok inspect` names the file that set the pin.
+- **What runs.** Only [enforced hooks](#enforced-hooks): the ones from the root-owned `/etc/friday/requirements.toml` and `/etc/friday/managed_config.toml`, and the ones in the synced `~/.friday/requirements.toml` while it matches its signature. An edited synced file loads as your own hooks, which the pin skips.
+- **What is skipped.** Every other hook, at dispatch: `~/.friday/hooks`, every `~/.friday/*.toml` file, project hooks, plugin hooks, agent frontmatter hooks, and the Claude and Cursor compatibility files. In `/hooks` they show `[disabled]`, and enabling them is refused ("Hooks outside managed policy are disabled by your organization."); `friday inspect` names the file that set the pin.
 - **What still runs.** Hooks the embedding client registers over ACP (an IDE or the desktop app), as under Claude Code's `allowManagedHooksOnly`. The pager's `[[ui.notifications.hooks]]` commands are a separate mechanism.
-- **Windows.** There is no root-owned layer (no `/etc/grok`), so only the signed synced `requirements.toml` hooks and ACP client hooks still run.
+- **Windows.** There is no root-owned layer (no `/etc/friday`), so only the signed synced `requirements.toml` hooks and ACP client hooks still run.
 
-The key is a tighten-only policy pin: any native policy layer (`requirements.toml` or `managed_config.toml` in `$GROK_HOME` or `/etc/grok`, or macOS MDM) or Claude's `managed-settings.json` can set it, the camelCase `allowManagedHooksOnly` is accepted everywhere, no layer can release it, and a non-boolean value engages it. Like the other policy pins it is read once at startup, so a pin added mid-session applies at the next start, not on `/hooks` Reload. `grok inspect` lists it under **Enforced by policy** as "Hooks outside managed policy disabled" with the file that set it.
+The key is a tighten-only policy pin: any native policy layer (`requirements.toml` or `managed_config.toml` in `$FRIDAY_HOME` or `/etc/friday`, or macOS MDM) or Claude's `managed-settings.json` can set it, the camelCase `allowManagedHooksOnly` is accepted everywhere, no layer can release it, and a non-boolean value engages it. Like the other policy pins it is read once at startup, so a pin added mid-session applies at the next start, not on `/hooks` Reload. `friday inspect` lists it under **Enforced by policy** as "Hooks outside managed policy disabled" with the file that set it.
 
 ---
 
@@ -307,7 +307,7 @@ The value must be a JSON object; a non-object fails the hook. If the rewritten i
 
 A `deny` discards any `updatedInput`; when several hooks return one, the last wins. Omitting `decision` while returning `updatedInput` allows the call and applies the rewrite.
 
-A `defer` neither blocks the call nor approves it: the call takes the normal permission flow, exactly as if your hook had not answered, and a warning naming the hook goes to the log. It also acts on nothing else you sent — an `updatedInput` or `additionalContext` next to a `defer` is ignored and named in the log. Across hooks `defer` ranks below `ask`, so where one of your hooks defers and another asks, grok prompts.
+A `defer` neither blocks the call nor approves it: the call takes the normal permission flow, exactly as if your hook had not answered, and a warning naming the hook goes to the log. It also acts on nothing else you sent — an `updatedInput` or `additionalContext` next to a `defer` is ignored and named in the log. Across hooks `defer` ranks below `ask`, so where one of your hooks defers and another asks, friday prompts.
 
 `additionalContext` is a note for the model. It arrives after the call has run — never before — with the results of the batch the call belongs to, wrapped in your harness's reminder tag (`<system-reminder>` by default) and naming the hook that wrote it, so the model can tell your text from the user's. Every hook that sends one is delivered, in the order the hooks ran (unlike `updatedInput`, where the last writer wins). A `deny` drops all of it, since the call never runs, and names the drop in the log. Text over 10,000 characters is clipped, the same ceiling `Stop` feedback carries.
 
@@ -449,7 +449,7 @@ What the two scripts have to get right:
   turn correctable. Re-read that record first, so you only clear a turn you recorded yourself.
 - **Keep it to a local write.** Teardown gives the whole queue of turn-end reports half a second,
   and each `SessionEnd` hook is then bounded by its own timeout (default 1.5s; set
-  `GROK_SESSION_END_HOOKS_TIMEOUT_MS`, in milliseconds, to change that default, capped at 60s).
+  `FRIDAY_SESSION_END_HOOKS_TIMEOUT_MS`, in milliseconds, to change that default, capped at 60s).
 
 `Stop` is a gate, so that entry runs on the turn's critical path: keep it fast, give it a `timeout`,
 and exit 0, because exit 2 blocks the stop and keeps the agent working. Leave `Stop` out if you also
@@ -506,7 +506,7 @@ For events like `SessionStart` or `Notification`, stdout is ignored. Just exit 0
 
 ### Environment Variables
 
-Grok sets several environment variables on every hook process. These are useful when writing context-aware or plugin-aware hook scripts.
+Friday X sets several environment variables on every hook process. These are useful when writing context-aware or plugin-aware hook scripts.
 
 #### Runner-injected variables (always available)
 
@@ -514,24 +514,24 @@ These variables are set by the hook runner for **every** hook:
 
 | Variable              | Description |
 |-----------------------|-------------|
-| `GROK_HOOK_EVENT`     | The name of the event that triggered the hook (e.g. `pre_tool_use`, `session_start`, `post_tool_use`, `session_end`, `stop`, `notification`). |
-| `GROK_HOOK_NAME`      | The configured name of this specific hook (includes the plugin prefix for plugin-provided hooks). |
-| `GROK_SESSION_ID`     | The unique identifier of the current Grok session. |
-| `GROK_WORKSPACE_ROOT` | Absolute path to the root of the current workspace. |
-| `CLAUDE_PROJECT_DIR`  | Absolute path to the workspace root. A Claude Code-compatible alias for `GROK_WORKSPACE_ROOT`, set for every hook. |
+| `FRIDAY_HOOK_EVENT`     | The name of the event that triggered the hook (e.g. `pre_tool_use`, `session_start`, `post_tool_use`, `session_end`, `stop`, `notification`). |
+| `FRIDAY_HOOK_NAME`      | The configured name of this specific hook (includes the plugin prefix for plugin-provided hooks). |
+| `FRIDAY_SESSION_ID`     | The unique identifier of the current Friday X session. |
+| `FRIDAY_WORKSPACE_ROOT` | Absolute path to the root of the current workspace. |
+| `CLAUDE_PROJECT_DIR`  | Absolute path to the workspace root. A Claude Code-compatible alias for `FRIDAY_WORKSPACE_ROOT`, set for every hook. |
 
 These variables are **reserved**. Any values you attempt to set for them via the `env` field in your hook JSON are stripped at load time (a warning is logged), and the runner always injects the real values at spawn time.
 
 #### Plugin hook variables
 
-When a hook originates from a plugin, Grok additionally injects the following variables:
+When a hook originates from a plugin, Friday X additionally injects the following variables:
 
 | Variable             | Description |
 |----------------------|-------------|
-| `GROK_PLUGIN_ROOT`   | Absolute path to the plugin's installed directory. |
-| `GROK_PLUGIN_DATA`   | Absolute path to the plugin's writable data directory (for storing plugin state, caches, etc.). |
+| `FRIDAY_PLUGIN_ROOT`   | Absolute path to the plugin's installed directory. |
+| `FRIDAY_PLUGIN_DATA`   | Absolute path to the plugin's writable data directory (for storing plugin state, caches, etc.). |
 
-These values are provided by the plugin system. For the four plugin-related keys (`GROK_PLUGIN_ROOT`, `GROK_PLUGIN_DATA`, and their Claude aliases), the plugin adapter ensures the official plugin values always win over any user-declared values in the hook's `env` map.
+These values are provided by the plugin system. For the four plugin-related keys (`FRIDAY_PLUGIN_ROOT`, `FRIDAY_PLUGIN_DATA`, and their Claude aliases), the plugin adapter ensures the official plugin values always win over any user-declared values in the hook's `env` map.
 
 #### User-defined environment variables
 
@@ -608,7 +608,7 @@ Enable or disable an individual hook at runtime by pressing `Space` in the Hooks
 
 ### Mid-Session Reload
 
-Press `r` in the Hooks tab to reload all hooks from disk. Grok re-reads every hook source, so this picks up changes you made to hook files during the session.
+Press `r` in the Hooks tab to reload all hooks from disk. Friday X re-reads every hook source, so this picks up changes you made to hook files during the session.
 
 ---
 
@@ -618,7 +618,7 @@ Hooks are quiet unless they hold the turn up or change its course:
 
 - While the turn is blocked on a hook batch (a `PreToolUse` gate before a tool, the `UserPromptSubmit` gate, a `Stop` gate), the status row reads `Running pre_tool_use hook…` (or `Running 3 stop hooks…`) once the batch has run for about 300 ms. The timer counts from when the batch started, so a slow hook shows its full wait; a fast one never shows at all.
 - A hook that ran and allowed leaves no trace. Its stdout is not shown.
-- A hook that denies a tool call, blocks a prompt, or stops or continues the agent gets one annotation line with the reason. Hooks from `~/.grok`, project, and plugin files are named; hooks from managed configuration read as "a managed policy hook".
+- A hook that denies a tool call, blocks a prompt, or stops or continues the agent gets one annotation line with the reason. Hooks from `~/.friday`, project, and plugin files are named; hooks from managed configuration read as "a managed policy hook".
 - A hook that fails (non-zero exit, timeout, crash, malformed output) gets one line: `<event> hook (<name>) failed, ignored: <reason>`, where the reason is the exit code with the first stderr line, or the timeout. "Ignored" is literal: failures are fail-open, so the tool call or turn proceeds as if the hook had allowed it.
 
 Deny and failure lines carry the same bullet as the tool rows, so they read as part of the tool call above them.
@@ -666,7 +666,7 @@ echo '{"decision": "allow"}'
 
 ## Security Notes
 
-- Global hooks (`~/.grok/hooks/`) run with your user permissions; treat them like shell scripts.
+- Global hooks (`~/.friday/hooks/`) run with your user permissions; treat them like shell scripts.
 - Project hooks require folder trust (`/hooks-trust` or `--trust`, the same gate as repo-local MCP/LSP) to prevent supply-chain attacks from malicious repos.
 - HTTP hooks send session data; only use trusted endpoints.
 - A `PostToolUse` hook decides what the model reads for that tool call — it can add instructions or replace the output outright — so trust one the way you trust a `PreToolUse` gate. The scrollback and the transcript keep the real output, so a replacement is always visible to you.
@@ -679,7 +679,7 @@ echo '{"decision": "allow"}'
 2. **Use explicit `deny` to block**: hooks fail-open on any error, so a hook that crashes will not block the tool. To enforce policy, your hook must run to completion and emit `{"decision":"deny","reason":"..."}` on stdout. Always handle errors inside your script so it can return an explicit decision.
 3. **Use absolute paths or relative to hook file**: scripts in `bin/` next to the JSON file are portable.
 4. **Test with the modal**: press `Ctrl+L` (non–VS Code family) or run `/hooks` to verify hooks are loaded and matching before relying on them.
-5. **Version control project hooks**: commit `.grok/hooks/` (but never secrets).
+5. **Version control project hooks**: commit `.friday/hooks/` (but never secrets).
 
 ---
 
@@ -688,4 +688,4 @@ echo '{"decision": "allow"}'
 - **Hook not running?** Press `Ctrl+L` on non–VS Code family (or run `/hooks` anywhere) to see if it is loaded and matched.
 - **Project hooks ignored?** The folder may be untrusted. Run `/hooks-trust` (or relaunch with `--trust`).
 - **Script not found?** Check the path is relative to the `.json` file and executable (`chmod +x`).
-- **See errors?** Capture logs by launching with `RUST_LOG=debug GROK_LOG_FILE=/tmp/grok.log grok`, then check `/tmp/grok.log`.
+- **See errors?** Capture logs by launching with `RUST_LOG=debug FRIDAY_LOG_FILE=/tmp/grok.log grok`, then check `/tmp/grok.log`.

@@ -502,7 +502,7 @@ fn init_process(cfg: &AgentConfig, auth_manager: &AuthManager) {
 pub fn update_telemetry_config(config: &AgentConfig, auth_manager: &AuthManager) {
     let user_agent = crate::http::process_user_agent_string();
     if reqwest::header::HeaderValue::from_str(&user_agent).is_err() {
-        tracing::warn!("telemetry init skipped: GROK_CLIENT_NAME yields an invalid user agent");
+        tracing::warn!("telemetry init skipped: FRIDAY_CLIENT_NAME yields an invalid user agent");
         return;
     }
     let grok_auth = auth_manager.current().filter(|a| a.is_xai_auth());
@@ -565,14 +565,14 @@ pub async fn apply_post_login_config(
         }
         xai_grok_cloud_config::managed_config::ManagedConfigSync::Staged => {
             eprintln!(
-                "Managed configuration update verified; it takes effect the next time Grok starts."
+                "Managed configuration update verified; it takes effect the next time Friday X starts."
             );
         }
         _ => {}
     }
     Ok(())
 }
-/// `grok logout` CLI subcommand: clear the cached session and, when one was cleared, drop any orphaned synced files.
+/// `friday logout` CLI subcommand: clear the cached session and, when one was cleared, drop any orphaned synced files.
 /// The orphan cleanup runs here in shell so auth stays out of managed config.
 pub fn run_cli_logout(grok_com_config: &xai_grok_login::GrokComConfig) -> anyhow::Result<()> {
     let grok_home = xai_grok_shell_base::util::grok_home::grok_home();
@@ -590,7 +590,7 @@ pub fn run_cli_logout(grok_com_config: &xai_grok_login::GrokComConfig) -> anyhow
     if !result.was_logged_in {
         eprintln!("No cached session to log out of.");
         if result.api_key_still_set {
-            eprintln!("You are authenticated via XAI_API_KEY (environment variable).");
+            eprintln!("You are authenticated via FRIDAY_X_TOKEN (environment variable).");
         }
         return Ok(());
     }
@@ -600,7 +600,7 @@ pub fn run_cli_logout(grok_com_config: &xai_grok_login::GrokComConfig) -> anyhow
         eprintln!("Logged out");
     }
     if result.api_key_still_set {
-        eprintln!("XAI_API_KEY is still set and will be used for authentication.");
+        eprintln!("FRIDAY_X_TOKEN is still set and will be used for authentication.");
     }
     Ok(())
 }

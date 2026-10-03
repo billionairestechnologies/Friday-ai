@@ -8,10 +8,10 @@ use std::sync::OnceLock;
 use crate::sandbox::TestSandbox;
 
 // First setter wins and later sets are ignored, so parallel tests never race the process-wide choice.
-static GROK_BINARY_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+static FRIDAY_BINARY_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn set_grok_binary_override(path: PathBuf) {
-    let _ = GROK_BINARY_OVERRIDE.set(path);
+    let _ = FRIDAY_BINARY_OVERRIDE.set(path);
 }
 
 pub fn resolved_grok_binary_override() -> Option<PathBuf> {
@@ -73,26 +73,26 @@ impl Drop for EnvGuard {
 pub unsafe fn isolate_grok_env(home: &Path) {
     // SAFETY: forwarded to the caller.
     unsafe {
-        std::env::set_var("GROK_HOME", home);
-        std::env::set_var("GROK_TELEMETRY_ENABLED", "false");
-        std::env::set_var("GROK_TELEMETRY_MIXPANEL_ENABLED", "false");
-        std::env::set_var("GROK_TELEMETRY_MIXPANEL_TOKEN", "");
-        std::env::set_var("GROK_TELEMETRY_EVENTS_URL", "");
-        std::env::set_var("GROK_TELEMETRY_EVENTS_API_KEY", "");
-        std::env::set_var("GROK_FEEDBACK_ENABLED", "false");
-        std::env::set_var("GROK_TRACE_UPLOAD", "false");
+        std::env::set_var("FRIDAY_HOME", home);
+        std::env::set_var("FRIDAY_TELEMETRY_ENABLED", "false");
+        std::env::set_var("FRIDAY_TELEMETRY_MIXPANEL_ENABLED", "false");
+        std::env::set_var("FRIDAY_TELEMETRY_MIXPANEL_TOKEN", "");
+        std::env::set_var("FRIDAY_TELEMETRY_EVENTS_URL", "");
+        std::env::set_var("FRIDAY_TELEMETRY_EVENTS_API_KEY", "");
+        std::env::set_var("FRIDAY_FEEDBACK_ENABLED", "false");
+        std::env::set_var("FRIDAY_TRACE_UPLOAD", "false");
         for var in [
-            "GROK_AUTH",
-            "GROK_AUTH_PATH",
-            "GROK_DEPLOYMENT_KEY",
-            "GROK_MANAGED_CONFIG",
-            "GROK_CONFIG",
-            "GROK_CONFIG_PATH",
-            "GROK_CLI_CHAT_PROXY_BASE_URL",
-            "GROK_MODELS_BASE_URL",
-            "GROK_MODELS_LIST_URL",
-            "XAI_API_KEY",
-            "GROK_API_KEY",
+            "FRIDAY_AUTH",
+            "FRIDAY_AUTH_PATH",
+            "FRIDAY_DEPLOYMENT_KEY",
+            "FRIDAY_MANAGED_CONFIG",
+            "FRIDAY_CONFIG",
+            "FRIDAY_CONFIG_PATH",
+            "FRIDAY_CLI_CHAT_PROXY_BASE_URL",
+            "FRIDAY_MODELS_BASE_URL",
+            "FRIDAY_MODELS_LIST_URL",
+            "FRIDAY_X_TOKEN",
+            "FRIDAY_API_KEY",
             "HTTP_PROXY",
             "HTTPS_PROXY",
             "ALL_PROXY",
@@ -211,22 +211,22 @@ pub fn grok_binary() -> PathBuf {
     if let Some(path) = resolved_override() {
         return path;
     }
-    if let Some(path) = env_binary("GROK_BINARY") {
+    if let Some(path) = env_binary("FRIDAY_BINARY") {
         return path;
     }
 
-    if let Ok(path) = std::env::var("CARGO_BIN_EXE_xai-grok-pager") {
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_friday") {
         let p = PathBuf::from(path);
         if p.exists() {
             return p;
         }
     }
 
-    ensure_cargo_bin("xai-grok-pager-bin", "xai-grok-pager")
+    ensure_cargo_bin("xai-grok-pager-bin", "friday")
 }
 
 fn resolved_override() -> Option<PathBuf> {
-    GROK_BINARY_OVERRIDE.get().cloned()
+    FRIDAY_BINARY_OVERRIDE.get().cloned()
 }
 
 pub fn env_binary(key: &str) -> Option<PathBuf> {
@@ -388,7 +388,7 @@ mod tests {
         std::fs::set_permissions(&cargo, perms).unwrap();
         let got = build_shipped_pager(
             "xai-grok-pager-bin",
-            "xai-grok-pager",
+            "friday",
             &features,
             &out_target,
             &dir,

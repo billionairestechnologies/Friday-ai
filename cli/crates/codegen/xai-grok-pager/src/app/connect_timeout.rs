@@ -6,7 +6,7 @@ use xai_grok_cloud_config::managed_config::LaunchProfile;
 
 macro_rules! connect_ui_timeout_env {
     () => {
-        "GROK_CONNECT_UI_TIMEOUT_SECS"
+        "FRIDAY_CONNECT_UI_TIMEOUT_SECS"
     };
 }
 

@@ -1,11 +1,11 @@
 //! Home-directory resolution generally: USERPROFILE-first `home_dir`, plus
-//! grok-home (`$GROK_HOME` or `<home>/.grok`). Shared by `xai-grok-config`
+//! grok-home (`$FRIDAY_HOME` or `<home>/.friday`). Shared by `xai-grok-config`
 //! and `xai-fast-worktree`.
 //!
 //! Which function to call:
 //! - [`grok_home`]: the usual choice, a cached, created path to build on.
 //! - [`user_grok_home`]: `None` instead of a cwd fallback when no home resolves.
-//! - [`default_grok_home`]: the `<home>/.grok` default, ignoring `$GROK_HOME`, so callers can detect an override.
+//! - [`default_grok_home`]: the `<home>/.friday` default, ignoring `$FRIDAY_HOME`, so callers can detect an override.
 //! - [`resolve_grok_home`]: a fresh, uncached resolve.
 //! - [`resolve_grok_home_with_source`]: [`resolve_grok_home`] plus where the path came from.
 //! - [`home_dir`]: the home directory itself, for sibling dot dirs (`~/.claude`, `~/.agents`, ...).
@@ -24,9 +24,9 @@ use std::sync::OnceLock;
 /// environment at the asking site.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GrokHomeSource {
-    /// A non-empty `$GROK_HOME` override.
+    /// A non-empty `$FRIDAY_HOME` override.
     EnvOverride,
-    /// `<home>/.grok` derived from the home directory.
+    /// `<home>/.friday` derived from the home directory.
     HomeDefault,
 }
 
@@ -38,15 +38,15 @@ pub fn home_dir() -> Option<PathBuf> {
     std::env::home_dir()
 }
 
-/// `<home>/.grok`, canonicalized via `dunce` (not `std::fs::canonicalize`,
+/// `<home>/.friday`, canonicalized via `dunce` (not `std::fs::canonicalize`,
 /// which yields Windows `\\?\` verbatim paths).
 fn grok_home_in(home: &Path) -> PathBuf {
     dunce::canonicalize(home)
         .unwrap_or_else(|_| home.to_path_buf())
-        .join(".grok")
+        .join(".friday")
 }
 
-/// `$GROK_HOME` verbatim when non-empty, else `<home>/.grok`.
+/// `$FRIDAY_HOME` verbatim when non-empty, else `<home>/.friday`.
 /// Used as-is (not canonicalized) so literal prefix checks and symlink guards still see original components.
 fn resolve_grok_home_from(
     grok_home_env: Option<&OsStr>,
@@ -66,21 +66,21 @@ pub fn resolve_grok_home() -> Option<PathBuf> {
 /// [`resolve_grok_home`] plus the [`GrokHomeSource`] the path came from.
 pub fn resolve_grok_home_with_source() -> Option<(PathBuf, GrokHomeSource)> {
     resolve_grok_home_from(
-        std::env::var_os("GROK_HOME").as_deref(),
+        std::env::var_os("FRIDAY_HOME").as_deref(),
         home_dir().as_deref(),
     )
 }
 
-/// The default `<home>/.grok`, used when `$GROK_HOME` is unset.
+/// The default `<home>/.friday`, used when `$FRIDAY_HOME` is unset.
 pub fn default_grok_home() -> PathBuf {
     grok_home_in(&home_dir().unwrap_or_else(|| PathBuf::from(".")))
 }
 
 /// The grok home, created if missing and cached for the process; falls back to
-/// [`default_grok_home`] when neither `$GROK_HOME` nor a home resolves.
+/// [`default_grok_home`] when neither `$FRIDAY_HOME` nor a home resolves.
 pub fn grok_home() -> PathBuf {
-    static GROK_HOME: OnceLock<PathBuf> = OnceLock::new();
-    GROK_HOME
+    static FRIDAY_HOME: OnceLock<PathBuf> = OnceLock::new();
+    FRIDAY_HOME
         .get_or_init(|| {
             let home = resolve_grok_home().unwrap_or_else(default_grok_home);
             if let Err(err) = std::fs::create_dir_all(&home) {
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(
             resolved,
             Some((
-                dunce::canonicalize(tmp.path()).unwrap().join(".grok"),
+                dunce::canonicalize(tmp.path()).unwrap().join(".friday"),
                 GrokHomeSource::HomeDefault
             ))
         );
@@ -144,7 +144,7 @@ mod tests {
         // comparisons. No-op assertion on Unix.
         let home = default_grok_home();
         assert!(!home.to_string_lossy().starts_with(r"\\?\"));
-        assert!(home.ends_with(".grok"));
+        assert!(home.ends_with(".friday"));
     }
 
     #[test]

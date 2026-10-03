@@ -399,8 +399,8 @@ async fn first_catalog_wait_is_bounded() {
 #[tokio::test(start_paused = true)]
 #[serial]
 async fn first_catalog_wait_skips_doomed_signed_out_fetch() {
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy_key = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy_key = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let mgr = cold_manager(config::Config::default(), Arc::new(HangingEndpoint));
     let start = tokio::time::Instant::now();
     mgr.spawn_fetch_inner(None, true);
@@ -1029,8 +1029,8 @@ async fn spawn_background_refresh_never_blocks_on_a_hanging_endpoint() {
 #[serial]
 async fn sign_out_clears_catalog_rebuilds_bundled_without_fetching() {
     use std::sync::atomic::{AtomicUsize, Ordering};
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy_key = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy_key = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let calls = Arc::new(AtomicUsize::new(0));
     let tmp = tempfile::TempDir::new().unwrap();
     let auth_manager = Arc::new(AuthManager::new(tmp.path(), GrokComConfig::default()));
@@ -1524,10 +1524,10 @@ fn models_cache_read_is_scoped_by_alpha_test_key() {
 #[test]
 #[serial]
 fn api_key_scope_identity_differs_per_key() {
-    let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig::default();
     let identity_for = |key: &str| {
-        let _key = EnvGuard::set("XAI_API_KEY", key);
+        let _key = EnvGuard::set("FRIDAY_X_TOKEN", key);
         resolve_models_cache_scope(&endpoints, ModelFetchAuth::ApiKey, None).identity
     };
     assert_eq!(
@@ -1544,10 +1544,10 @@ fn api_key_scope_identity_differs_per_key() {
 #[test]
 #[serial]
 fn custom_endpoint_scope_identity_differs_per_key() {
-    let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig::default();
     let identity_for = |key: &str| {
-        let _key = EnvGuard::set("XAI_API_KEY", key);
+        let _key = EnvGuard::set("FRIDAY_X_TOKEN", key);
         resolve_models_cache_scope(&endpoints, ModelFetchAuth::CustomEndpoint, None).identity
     };
     assert_eq!(
@@ -1564,8 +1564,8 @@ fn custom_endpoint_scope_identity_differs_per_key() {
 #[test]
 #[serial]
 fn custom_endpoint_scope_ignores_session_identity() {
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig::default();
     let auth = GrokAuth {
         user_id: "account-a".to_string(),
@@ -1585,8 +1585,8 @@ fn custom_endpoint_scope_ignores_session_identity() {
 #[test]
 #[serial]
 fn custom_endpoint_scope_keys_on_the_third_party_provider_login() {
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig::default();
     let identity_for = |auth: Option<&GrokAuth>| {
         resolve_models_cache_scope(&endpoints, ModelFetchAuth::CustomEndpoint, auth).identity
@@ -1644,8 +1644,8 @@ fn models_commit_gate_detects_account_switch() {
 #[test]
 #[serial]
 fn resolve_live_keeps_fetch_origin_when_disk_auth_absent() {
-    let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _key = EnvGuard::set("XAI_API_KEY", "boot-window-key");
+    let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "boot-window-key");
     let session_auth = GrokAuth {
         user_id: "session-user".to_string(),
         ..GrokAuth::test_default()
@@ -1782,7 +1782,7 @@ use xai_grok_test_support::EnvGuard;
 #[test]
 #[serial]
 fn resolve_custom_endpoint_always_wins() {
-    let _key = EnvGuard::set("XAI_API_KEY", "test-key");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "test-key");
     let endpoints = config::EndpointsConfig {
         models_base_url: Some("https://custom.example.com".to_owned()),
         ..config::EndpointsConfig::default()
@@ -1799,7 +1799,7 @@ fn resolve_custom_endpoint_always_wins() {
 #[test]
 #[serial]
 fn resolve_cached_session_wins_over_api_key() {
-    let _key = EnvGuard::set("XAI_API_KEY", "test-key");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "test-key");
     let endpoints = config::EndpointsConfig::default();
     assert_eq!(
         ModelFetchAuth::resolve(&endpoints, true),
@@ -1810,7 +1810,7 @@ fn resolve_cached_session_wins_over_api_key() {
 #[test]
 #[serial]
 fn resolve_api_key_used_when_no_session() {
-    let _key = EnvGuard::set("XAI_API_KEY", "test-key");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "test-key");
     let endpoints = config::EndpointsConfig::default();
     assert_eq!(
         ModelFetchAuth::resolve(&endpoints, false),
@@ -1821,8 +1821,8 @@ fn resolve_api_key_used_when_no_session() {
 #[test]
 #[serial]
 fn resolve_falls_back_to_session_when_nothing_set() {
-    let _unset = EnvGuard::unset("XAI_API_KEY");
-    let _unset_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _unset = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _unset_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig::default();
     assert_eq!(
         ModelFetchAuth::resolve(&endpoints, false),
@@ -1833,8 +1833,8 @@ fn resolve_falls_back_to_session_when_nothing_set() {
 #[test]
 #[serial]
 fn resolve_deployment_key_when_no_session_or_api_key() {
-    let _unset = EnvGuard::unset("XAI_API_KEY");
-    let _unset_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _unset = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _unset_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig {
         deployment_key: Some("deploy-key".to_owned()),
         ..config::EndpointsConfig::default()
@@ -1847,7 +1847,7 @@ fn resolve_deployment_key_when_no_session_or_api_key() {
 #[test]
 #[serial]
 fn resolve_deployment_key_outranks_ambient_api_key() {
-    let _key = EnvGuard::set("XAI_API_KEY", "stray-env-key");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "stray-env-key");
     let endpoints = config::EndpointsConfig {
         deployment_key: Some("deploy-key".to_owned()),
         ..config::EndpointsConfig::default()
@@ -1855,7 +1855,7 @@ fn resolve_deployment_key_outranks_ambient_api_key() {
     assert_eq!(
         ModelFetchAuth::resolve(&endpoints, false),
         ModelFetchAuth::Deployment,
-        "managed deployment_key should outrank an ambient XAI_API_KEY",
+        "managed deployment_key should outrank an ambient FRIDAY_X_TOKEN",
     );
     assert_eq!(
         ModelFetchAuth::resolve(&endpoints, true),
@@ -1866,7 +1866,7 @@ fn resolve_deployment_key_outranks_ambient_api_key() {
 #[test]
 #[serial]
 fn prefetch_env_none_when_remote_fetch_disabled_despite_credentials() {
-    let _key = EnvGuard::set("XAI_API_KEY", "stray-env-key");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "stray-env-key");
     let endpoints = config::EndpointsConfig {
         deployment_key: Some("deploy-key".to_owned()),
         models_base_url: Some("https://custom.example.com".to_owned()),
@@ -1889,8 +1889,8 @@ fn prefetch_env_none_when_remote_fetch_disabled_despite_credentials() {
 #[test]
 #[serial]
 fn prefetch_env_resolves_when_remote_fetch_enabled() {
-    let _unset = EnvGuard::unset("XAI_API_KEY");
-    let _unset_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _unset = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _unset_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig {
         deployment_key: Some("deploy-key".to_owned()),
         ..config::EndpointsConfig::default()
@@ -1911,9 +1911,9 @@ fn external_provider_login_fetches_models_with_remote_fetch_off() {
         "[features]\nremote_fetch = false\n",
     )
     .expect("write config.toml");
-    let _home = EnvGuard::set("GROK_HOME", home.path().to_str().expect("utf-8 temp path"));
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy_key = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _home = EnvGuard::set("FRIDAY_HOME", home.path().to_str().expect("utf-8 temp path"));
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy_key = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let endpoints = config::EndpointsConfig {
         models_base_url: Some("https://proxy.example.com/v1".to_owned()),
         ..config::EndpointsConfig::default()
@@ -1996,11 +1996,11 @@ fn make_entry_config_with_id(
 fn build_prefetched_map_distinct_ids_same_slug() {
     let entries = vec![
         make_entry_config_with_id(Some("auto"), "grok-build", Some("Auto")),
-        make_entry_config_with_id(Some("grok-build"), "grok-build", Some("Grok Build")),
+        make_entry_config_with_id(Some("grok-build"), "grok-build", Some("Friday X")),
         make_entry_config_with_id(
             Some("experimental-fast"),
             "experimental-fast",
-            Some("Grok Fast"),
+            Some("Friday X Fast"),
         ),
     ];
     let map = build_prefetched_map(entries, None);
@@ -2341,8 +2341,8 @@ fn fallback_model_id_ignores_a_remote_settings_default_under_external_auth() {
 #[serial]
 async fn empty_models_reply_is_a_failed_refresh_that_keeps_the_last_list() {
     use xai_grok_test_support::MockInferenceServer;
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy_key = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy_key = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let server = MockInferenceServer::start_with_models(vec![])
         .await
         .expect("mock models endpoint starts");
@@ -2578,7 +2578,7 @@ async fn failed_models_endpoint_fetch_blocks_prompts_with_the_endpoint_url() {
     );
     assert_eq!(
         Some(
-            "No models are available: `[features] remote_fetch = false` stops Grok from reading \
+            "No models are available: `[features] remote_fetch = false` stops Friday X from reading \
              https://proxy.example.com/v1/models. Add a `[model.<id>]` table that names an endpoint id, \
              or turn remote_fetch on."
         ),
@@ -2606,8 +2606,8 @@ async fn failed_models_endpoint_refresh_keeps_the_listed_models_and_prompts_unbl
 async fn picker_lists_exactly_the_mocked_models_endpoint_under_external_auth() {
     use crate::remote::ModelSource;
     use xai_grok_test_support::{MockInferenceServer, MockModelEntry};
-    let _no_key = EnvGuard::unset("XAI_API_KEY");
-    let _no_legacy_key = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _no_legacy_key = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let server = MockInferenceServer::start_with_models(vec![
         MockModelEntry::new("proxy-a"),
         MockModelEntry::new("proxy-b"),

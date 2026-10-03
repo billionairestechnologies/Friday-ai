@@ -58,7 +58,7 @@ pub fn inference_request_count(content: &ContentController) -> usize {
     inference_requests(content).len()
 }
 
-/// `XAI_API_KEY` never enters the auth manager. Scope is `<issuer>::<client_id>`, oidc, far-future expiry so no refresh.
+/// `FRIDAY_X_TOKEN` never enters the auth manager. Scope is `<issuer>::<client_id>`, oidc, far-future expiry so no refresh.
 /// Opt-out must be false or collection e2es never enqueue; a missing field deserializes as opted-out.
 pub fn seed_fake_oauth(content: &ContentController, user: &str) {
     seed_fake_oauth_with_opt_out(content, user, false);
@@ -145,8 +145,8 @@ fn seed_fake_oauth_raw(
     opted_out: bool,
     team_fields: &str,
 ) {
-    let grok_home = content.home().join(".grok");
-    std::fs::create_dir_all(&grok_home).expect("create temp .grok");
+    let grok_home = content.home().join(".friday");
+    std::fs::create_dir_all(&grok_home).expect("create temp .friday");
     std::fs::write(
         grok_home.join("auth.json"),
         format!(
@@ -173,9 +173,9 @@ fn seed_fake_oauth_raw(
 /// The `auth.json` entry written by [`seed_fake_oauth`] then determines the advertised auth method.
 pub fn oauth_credential_ops() -> [crate::EnvOp<'static>; 3] {
     [
-        crate::EnvOp::remove("XAI_API_KEY"),
-        crate::EnvOp::remove("GROK_MODELS_BASE_URL"),
-        crate::EnvOp::remove("GROK_MODELS_LIST_URL"),
+        crate::EnvOp::remove("FRIDAY_X_TOKEN"),
+        crate::EnvOp::remove("FRIDAY_MODELS_BASE_URL"),
+        crate::EnvOp::remove("FRIDAY_MODELS_LIST_URL"),
     ]
 }
 

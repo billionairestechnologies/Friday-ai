@@ -1,4 +1,4 @@
-//! Wire names of the hub-synthesized Grok Bot harness tools.
+//! Wire names of the hub-synthesized Friday X Bot harness tools.
 //!
 //! Single source of truth shared by the hub that registers the tools and
 //! by the clients that gate the tools per agent config.
@@ -6,7 +6,7 @@
 /// Handwritten harness tool ids: every id a hub may register or Plane may
 /// allowlist. A hub registers a prefix of this list, so an id can be
 /// declared (validated, offered, reserved) before any hub implements it.
-pub const GROK_BOT_TOOL_IDS: &[&str] = &[
+pub const FRIDAY_BOT_TOOL_IDS: &[&str] = &[
     "bot_create_agent",
     "bot_list_agents",
     "bot_send_prompt",
@@ -21,15 +21,15 @@ pub const GROK_BOT_TOOL_IDS: &[&str] = &[
     "bot_voice_call_tool",
 ];
 
-/// Whether `name` is a hub-synthesized Grok Bot harness tool.
+/// Whether `name` is a hub-synthesized Friday X Bot harness tool.
 pub fn is_grok_bot_tool(name: &str) -> bool {
-    GROK_BOT_TOOL_IDS.contains(&name)
+    FRIDAY_BOT_TOOL_IDS.contains(&name)
 }
 
 /// Bot tools a toolbox receives when `grok_bot_allowed_tools` is empty.
 /// A new id is added here only once a hub implements it; until then it
 /// needs explicit per-toolbox opt-in.
-pub const GROK_BOT_DEFAULT_TOOL_IDS: &[&str] = &[
+pub const FRIDAY_BOT_DEFAULT_TOOL_IDS: &[&str] = &[
     "bot_create_agent",
     "bot_list_agents",
     "bot_send_prompt",
@@ -44,29 +44,29 @@ pub const GROK_BOT_DEFAULT_TOOL_IDS: &[&str] = &[
 
 /// Whether `name` is in the empty-allowlist default set.
 pub fn is_grok_bot_default_tool(name: &str) -> bool {
-    GROK_BOT_DEFAULT_TOOL_IDS.contains(&name)
+    FRIDAY_BOT_DEFAULT_TOOL_IDS.contains(&name)
 }
 
-/// Model-facing descriptions, one per [`GROK_BOT_TOOL_IDS`] entry (same
+/// Model-facing descriptions, one per [`FRIDAY_BOT_TOOL_IDS`] entry (same
 /// order). The hub registers its tools with these strings, and clients
 /// use them to advertise opted-in bot tools before the hub connection is
 /// live, so both surfaces render the same text.
-pub const GROK_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
+pub const FRIDAY_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
     (
         "bot_create_agent",
-        "Create a Grok Bot agent. It greets the user itself; send no first \
+        "Create a Friday X Bot agent. It greets the user itself; send no first \
          prompt, never quote its id. Cannot be deleted; check bot_list_agents \
          first. Only when the user asks for a new agent; to reach an existing \
          one use bot_list_agents then bot_send_prompt. One agent per call.",
     ),
     (
         "bot_list_agents",
-        "List all Grok Bot agents on the user's box with id, name, description, \
+        "List all Friday X Bot agents on the user's box with id, name, description, \
          and status. Wakes the box. Its ids are the only valid agent_id values.",
     ),
     (
         "bot_send_prompt",
-        "Send a prompt to a Grok Bot agent. Returns once accepted unless mode \
+        "Send a prompt to a Friday X Bot agent. Returns once accepted unless mode \
          waits for the reply. on_busy is supersede (default), reject, or queue. \
          After a timeout or a missing notification, resume with bot_await_turn \
          and the returned handle; never re-send. Empty reply with \
@@ -106,13 +106,13 @@ pub const GROK_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
     ),
     (
         "bot_search_agents",
-        "Find Grok Bot agents by name or description when you know what you \
+        "Find Friday X Bot agents by name or description when you know what you \
          want. Returns the best matches only; bot_list_agents shows every bot. \
          Wakes the box.",
     ),
     (
         "bot_voice_call_plan",
-        "Plan a voice call with a Grok Bot agent: its spoken instructions, \
+        "Plan a voice call with a Friday X Bot agent: its spoken instructions, \
          voice-side tools, greeting, and task receipt. For a voice backend at \
          dial time; sends nothing to the agent.",
     ),
@@ -123,9 +123,9 @@ pub const GROK_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
     ),
 ];
 
-/// The model-facing description for a Grok Bot tool id, if known.
+/// The model-facing description for a Friday X Bot tool id, if known.
 pub fn grok_bot_tool_description(name: &str) -> Option<&'static str> {
-    GROK_BOT_TOOL_DESCRIPTIONS
+    FRIDAY_BOT_TOOL_DESCRIPTIONS
         .iter()
         .find(|(id, _)| *id == name)
         .map(|(_, desc)| *desc)
@@ -138,7 +138,7 @@ const SEND_AGENT_ID_DESCRIPTION: &str = "Opaque id copied exactly from \
      bot_list_agents or bot_search_agents; never a name, never typed from \
      memory or shortened.";
 
-/// Flattened JSON Schema for a Grok Bot tool's arguments.
+/// Flattened JSON Schema for a Friday X Bot tool's arguments.
 ///
 /// Same shape the hub advertises via `schema_for_kind`. Pre-bind synthesis
 /// uses this so constrained decoding can emit required fields (`agent_id`,
@@ -395,13 +395,13 @@ mod tests {
 
     #[test]
     fn descriptions_cover_every_id_in_order() {
-        let desc_ids: Vec<&str> = GROK_BOT_TOOL_DESCRIPTIONS
+        let desc_ids: Vec<&str> = FRIDAY_BOT_TOOL_DESCRIPTIONS
             .iter()
             .map(|(id, _)| *id)
             .collect();
-        assert_eq!(desc_ids, GROK_BOT_TOOL_IDS);
+        assert_eq!(desc_ids, FRIDAY_BOT_TOOL_IDS);
         assert!(
-            GROK_BOT_TOOL_DESCRIPTIONS
+            FRIDAY_BOT_TOOL_DESCRIPTIONS
                 .iter()
                 .all(|(_, desc)| !desc.trim().is_empty())
         );
@@ -438,7 +438,7 @@ mod tests {
 
     #[test]
     fn arguments_schema_covers_every_id() {
-        for id in GROK_BOT_TOOL_IDS {
+        for id in FRIDAY_BOT_TOOL_IDS {
             let schema = grok_bot_tool_arguments_schema(id)
                 .unwrap_or_else(|| panic!("{id} must have an arguments schema"));
             assert_eq!(schema["type"], "object", "{id}");
@@ -448,17 +448,17 @@ mod tests {
 
     #[test]
     fn default_tool_ids_are_a_prefix_of_shared_ids() {
-        for id in GROK_BOT_DEFAULT_TOOL_IDS {
-            assert!(is_grok_bot_tool(id), "{id} is not in GROK_BOT_TOOL_IDS");
+        for id in FRIDAY_BOT_DEFAULT_TOOL_IDS {
+            assert!(is_grok_bot_tool(id), "{id} is not in FRIDAY_BOT_TOOL_IDS");
         }
         assert_eq!(
-            GROK_BOT_DEFAULT_TOOL_IDS.len(),
+            FRIDAY_BOT_DEFAULT_TOOL_IDS.len(),
             10,
             "default set size changed; check the surface budget and every other copy of this list"
         );
         assert_eq!(
-            GROK_BOT_DEFAULT_TOOL_IDS,
-            &GROK_BOT_TOOL_IDS[..GROK_BOT_DEFAULT_TOOL_IDS.len()],
+            FRIDAY_BOT_DEFAULT_TOOL_IDS,
+            &FRIDAY_BOT_TOOL_IDS[..FRIDAY_BOT_DEFAULT_TOOL_IDS.len()],
             "new ids go after the default set"
         );
     }
@@ -523,7 +523,7 @@ mod tests {
     fn surface_fits_budget() {
         const DEFAULT_SET_BUDGET: usize = 6_000;
         const OPT_IN_TOOL_BUDGET: usize = 700;
-        let default_total: usize = GROK_BOT_DEFAULT_TOOL_IDS
+        let default_total: usize = FRIDAY_BOT_DEFAULT_TOOL_IDS
             .iter()
             .map(|id| surface_bytes(id))
             .sum();
@@ -531,7 +531,7 @@ mod tests {
             default_total <= DEFAULT_SET_BUDGET,
             "default bot tool surface is {default_total} bytes (budget {DEFAULT_SET_BUDGET}); trim before raising the budget"
         );
-        for id in &GROK_BOT_TOOL_IDS[GROK_BOT_DEFAULT_TOOL_IDS.len()..] {
+        for id in &FRIDAY_BOT_TOOL_IDS[FRIDAY_BOT_DEFAULT_TOOL_IDS.len()..] {
             let bytes = surface_bytes(id);
             assert!(
                 bytes <= OPT_IN_TOOL_BUDGET,

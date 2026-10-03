@@ -5004,8 +5004,8 @@ mod tests {
             .run_until(async {
                 for path in [
                     "/etc/hosts",
-                    "/home/user/.grok/hooks/evil.json",
-                    "/home/user/.grok/sandbox.toml",
+                    "/home/user/.friday/hooks/evil.json",
+                    "/home/user/.friday/sandbox.toml",
                 ] {
                     let mut auto = crate::permission::types::PermissionConfig::new(vec![]);
                     auto.prompt_policy = PromptPolicy::Auto;
@@ -5054,12 +5054,12 @@ mod tests {
         local
             .run_until(async {
                 let grant = std::path::PathBuf::from("/home/user")
-                    .join(".grok")
+                    .join(".friday")
                     .join("sessions")
                     .join("ws")
                     .join("permission_grok-pager.toml");
                 let grant_dir = std::path::PathBuf::from("/home/user")
-                    .join(".grok")
+                    .join(".friday")
                     .join("sessions")
                     .join("ws");
                 let cmds = [

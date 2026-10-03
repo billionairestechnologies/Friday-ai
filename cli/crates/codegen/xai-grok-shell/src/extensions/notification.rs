@@ -936,7 +936,7 @@ pub enum SessionUpdate {
     /// The model that answered the current turn when the backend routed it to one other than the requested model.
     /// Display only: the session's selection is unchanged and the next prompt still names the model the user chose.
     ServedModel {
-        /// The served model's display name as the backend reports it (e.g. "Grok 4.7 Fast"), which may match no catalog row.
+        /// The served model's display name as the backend reports it (e.g. "Friday X 4.7 Fast"), which may match no catalog row.
         display_name: String,
     },
     /// Streaming chunk of a tool call's arguments. Behaves like `acp::SessionUpdate::AgentMessageChunk` / `AgentThoughtChunk`. It flows through the replay buffer and merges with adjacent chunks for the same `tool_call_id`.
@@ -1222,7 +1222,7 @@ pub enum MemoryDisabledReason {
     SessionToggle,
     /// `[memory] enabled = false` in the effective TOML; `/memory on` enables it for this session only.
     ConfigOptOut,
-    /// `--no-memory` or `GROK_MEMORY=0` turned memory off for the whole process; it cannot be enabled until a new session.
+    /// `--no-memory` or `FRIDAY_MEMORY=0` turned memory off for the whole process; it cannot be enabled until a new session.
     ProcessDisabled,
     /// The session's pinned rollout controls disable memory; it cannot be enabled until a new session.
     RolloutRestricted,
@@ -1325,7 +1325,7 @@ pub enum RetryState {
 }
 
 /// Whether a terminal retry failure is a recoverable authentication error (expired/invalid credentials, 401). The user can fix those by signing in again; this drives the actionable re-auth banner.
-/// `legacy_auth` is excluded: its message carries its own migration guidance (`grok update` / `grok logout` / `grok login`), shown verbatim.
+/// `legacy_auth` is excluded: its message carries its own migration guidance (`friday update` / `friday logout` / `friday login`), shown verbatim.
 /// `auth_transient` is excluded for the opposite reason: it is emitted only when the failure self-heals (`AuthManager::requires_manual_reauth`). Its message already says it recovers on its own, so no `/login` banner is shown.
 pub fn is_reauthable_failure(error_type: Option<&str>, message: &str) -> bool {
     if matches!(error_type, Some("legacy_auth") | Some("auth_transient")) {
@@ -1987,7 +1987,7 @@ mod tests {
     fn memory_flush_completed_with_path_roundtrips() {
         let update = SessionUpdate::MemoryFlushCompleted {
             result: "written".into(),
-            path: Some("/home/user/.grok/memory/ws/sessions/log.md".into()),
+            path: Some("/home/user/.friday/memory/ws/sessions/log.md".into()),
         };
         let json_str = serde_json::to_string(&update).unwrap();
         let parsed: SessionUpdate = serde_json::from_str(&json_str).unwrap();
@@ -2038,7 +2038,7 @@ mod tests {
             memories: vec![MemoryCaptureDebugEntry {
                 statement: "Run focused tests before committing.".into(),
                 body: Some("This repository has expensive whole-workspace tests.".into()),
-                path: "/home/user/.grok/memory/ws/observations/test.md".into(),
+                path: "/home/user/.friday/memory/ws/observations/test.md".into(),
             }],
         };
         let json = serde_json::to_string(&update).unwrap();
@@ -2053,7 +2053,7 @@ mod tests {
     fn memory_dream_completed_roundtrips() {
         let update = SessionUpdate::MemoryDreamCompleted {
             result: "written (500 chars)".into(),
-            path: Some("/home/user/.grok/memory/ws/MEMORY.md".into()),
+            path: Some("/home/user/.friday/memory/ws/MEMORY.md".into()),
         };
         let json_str = serde_json::to_string(&update).unwrap();
         let parsed: SessionUpdate = serde_json::from_str(&json_str).unwrap();
@@ -2063,7 +2063,7 @@ mod tests {
     #[test]
     fn memory_session_saved_roundtrips() {
         let update = SessionUpdate::MemorySessionSaved {
-            path: "/home/user/.grok/memory/ws/sessions/2026-01-15-fix-auth-abc12345.md".into(),
+            path: "/home/user/.friday/memory/ws/sessions/2026-01-15-fix-auth-abc12345.md".into(),
         };
         let json_str = serde_json::to_string(&update).unwrap();
         let parsed: SessionUpdate = serde_json::from_str(&json_str).unwrap();
@@ -2091,7 +2091,7 @@ mod tests {
         let update = SessionUpdate::MemoryFiles {
             files: vec![
                 MemoryFileInfo {
-                    path: "/home/user/.grok/memory/MEMORY.md".into(),
+                    path: "/home/user/.friday/memory/MEMORY.md".into(),
                     source: "global".into(),
                     size_bytes: 1024,
                     modified_epoch_secs: Some(1_700_000_000),
@@ -2099,7 +2099,7 @@ mod tests {
                     title: None,
                 },
                 MemoryFileInfo {
-                    path: "/project/.grok/memory/MEMORY.md".into(),
+                    path: "/project/.friday/memory/MEMORY.md".into(),
                     source: "workspace".into(),
                     size_bytes: 512,
                     modified_epoch_secs: None,

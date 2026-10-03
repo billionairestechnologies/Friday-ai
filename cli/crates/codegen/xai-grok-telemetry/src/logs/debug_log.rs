@@ -1,11 +1,11 @@
 //! Reusable non-blocking file-logging tracing layers for the `--debug` firehose.
 //!
 //! Two install modes, chosen by env precedence (see `resolve_debug_target_inner`):
-//! - PerSession (`GROK_DEBUG_LOG=1`): a routing layer fans each session's
-//!   firehose to `~/.grok/debug/<session_id>.txt` (one file per session), with a
+//! - PerSession (`FRIDAY_DEBUG_LOG=1`): a routing layer fans each session's
+//!   firehose to `~/.friday/debug/<session_id>.txt` (one file per session), with a
 //!   `<role>-<pid>.txt` catch-all for events fired outside any session span, and
 //!   a `latest.txt` symlink pointing at the most-recently-opened session file.
-//! - SingleFile (explicit path via `GROK_LOG_FILE` or `GROK_DEBUG_LOG=<path>`): one flat `fmt` file, routing bypassed.
+//! - SingleFile (explicit path via `FRIDAY_LOG_FILE` or `FRIDAY_DEBUG_LOG=<path>`): one flat `fmt` file, routing bypassed.
 //!   Disk IO stays off the tracing hot path via `tracing_appender`'s non-blocking writer in both modes.
 
 use std::collections::HashMap;
@@ -34,8 +34,8 @@ pub(crate) enum DebugSource {
 impl DebugSource {
     fn label(self) -> &'static str {
         match self {
-            Self::GrokLogFile => "GROK_LOG_FILE",
-            Self::GrokDebugLog => "GROK_DEBUG_LOG",
+            Self::GrokLogFile => "FRIDAY_LOG_FILE",
+            Self::GrokDebugLog => "FRIDAY_DEBUG_LOG",
         }
     }
 }
@@ -54,7 +54,7 @@ pub const ACP_UPDATE_PAYLOAD_TARGET: &str = "acp_update_payload";
 /// Re-check on rmcp bump.
 pub const RMCP_SSE_NOISE_TARGET: &str = "rmcp::transport::common::client_side_sse";
 
-// Broad firehose filter for the routing and GROK_DEBUG_LOG sources
+// Broad firehose filter for the routing and FRIDAY_DEBUG_LOG sources
 // Capture our crates at debug regardless of a narrowing RUST_LOG, with deps at info so they don't flood
 // Curated first-party allowlist: new grok crates default to `info` until added here
 const FIREHOSE_BASE_DIRECTIVES: &str = "info,xai_grok_pager=debug,xai_grok_shell=debug,xai_grok_gateway=debug,xai_grok_config=debug,xai_grok_cloud_config=debug,xai_grok_agent_config=debug,xai_grok_external_agent_migration=debug,xai_grok_login=debug,xai_grok_tools=debug,xai_grok_telemetry=debug,xai_grok_agent=debug,xai_grok_mcp=debug,xai_grok_session_search=debug,xai_acp_lib=debug,sampling_log=off";
@@ -64,13 +64,13 @@ fn firehose_directives() -> String {
     format!("{FIREHOSE_BASE_DIRECTIVES},{ACP_UPDATE_TARGET}=debug")
 }
 
-// The broad firehose filter, used by both the routing layer and the GROK_DEBUG_LOG single-file source (mirrors `default_file_filter`)
+// The broad firehose filter, used by both the routing layer and the FRIDAY_DEBUG_LOG single-file source (mirrors `default_file_filter`)
 fn firehose_filter() -> EnvFilter {
     EnvFilter::new(firehose_directives())
 }
 
-// RUST_LOG-respecting filter for the GROK_LOG_FILE source: DEBUG default, honor RUST_LOG, silence sampling_log
-// This preserves GROK_LOG_FILE back-compat
+// RUST_LOG-respecting filter for the FRIDAY_LOG_FILE source: DEBUG default, honor RUST_LOG, silence sampling_log
+// This preserves FRIDAY_LOG_FILE back-compat
 fn default_file_filter() -> EnvFilter {
     EnvFilter::builder()
         .with_default_directive(LevelFilter::DEBUG.into())
@@ -372,18 +372,18 @@ pub fn flush() {
 /// Where the firehose should go, if anywhere.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum DebugTarget {
-    /// `GROK_DEBUG_LOG=1` → route per session into `<dir>` (`~/.grok/debug`).
+    /// `FRIDAY_DEBUG_LOG=1` → route per session into `<dir>` (`~/.friday/debug`).
     PerSession { dir: PathBuf },
     /// An explicit path writes one flat `fmt` file, routing bypassed.
     SingleFile { path: PathBuf, src: DebugSource },
 }
 
-/// Resolve the debug target, honoring precedence: explicit GROK_LOG_FILE wins (single file, RUST_LOG filter); else
-/// GROK_DEBUG_LOG — a truthy bool routes per session into `~/.grok/debug`, an explicit path writes a single file. Read
+/// Resolve the debug target, honoring precedence: explicit FRIDAY_LOG_FILE wins (single file, RUST_LOG filter); else
+/// FRIDAY_DEBUG_LOG — a truthy bool routes per session into `~/.friday/debug`, an explicit path writes a single file. Read
 /// via `var_os` (not `var`) so a non-UTF-8 path isn't silently dropped.
 pub(crate) fn resolve_debug_target() -> Option<DebugTarget> {
-    let grok_log_file = std::env::var_os("GROK_LOG_FILE");
-    let grok_debug_log = std::env::var_os("GROK_DEBUG_LOG");
+    let grok_log_file = std::env::var_os("FRIDAY_LOG_FILE");
+    let grok_debug_log = std::env::var_os("FRIDAY_DEBUG_LOG");
     resolve_debug_target_inner(
         grok_log_file.as_deref(),
         grok_debug_log.as_deref(),
@@ -439,7 +439,7 @@ fn resolve_debug_target_inner(
 const LOG_RETENTION: std::time::Duration = std::time::Duration::from_secs(7 * 24 * 60 * 60);
 
 /// Prune `*.txt` firehose files (and orphaned `latest.txt` swap temps) under
-/// `~/.grok/debug` older than [`LOG_RETENTION`] so the dir doesn't grow
+/// `~/.friday/debug` older than [`LOG_RETENTION`] so the dir doesn't grow
 /// unbounded. Age-based (not count-based) so a still-open log from a concurrent process is never unlinked mid-write; best-effort, ignore errors.
 pub(crate) fn sweep_old_logs() {
     prune_old_logs(&grok_home().join("debug"), LOG_RETENTION);
@@ -541,7 +541,7 @@ mod tests {
             assert!(
                 resolve_debug_target_inner(None, Some(OsStr::new(v)), Path::new("/debug"))
                     .is_none(),
-                "expected None for GROK_DEBUG_LOG={v:?}"
+                "expected None for FRIDAY_DEBUG_LOG={v:?}"
             );
         }
     }
@@ -556,7 +556,7 @@ mod tests {
                 DebugTarget::PerSession {
                     dir: PathBuf::from("/debug")
                 },
-                "expected PerSession for GROK_DEBUG_LOG={v:?}"
+                "expected PerSession for FRIDAY_DEBUG_LOG={v:?}"
             );
         }
     }
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn resolve_target_empty_log_file_falls_through_to_debug_log() {
-        // Empty or whitespace GROK_LOG_FILE is treated as unset (mirrors GROK_DEBUG_LOG)
+        // Empty or whitespace FRIDAY_LOG_FILE is treated as unset (mirrors FRIDAY_DEBUG_LOG)
         for blank in ["", "   "] {
             let target = resolve_debug_target_inner(
                 Some(OsStr::new(blank)),
@@ -622,7 +622,7 @@ mod tests {
     fn resolve_target_non_utf8_debug_log_path_is_single_file() {
         use std::os::unix::ffi::OsStrExt;
 
-        // A non-UTF-8 GROK_DEBUG_LOG value is a path, not a bool keyword, and its bytes must round-trip (not be silently dropped)
+        // A non-UTF-8 FRIDAY_DEBUG_LOG value is a path, not a bool keyword, and its bytes must round-trip (not be silently dropped)
         let raw = OsStr::from_bytes(b"/tmp/\xff/fire.txt");
         let target = resolve_debug_target_inner(None, Some(raw), Path::new("/debug")).unwrap();
         match target {

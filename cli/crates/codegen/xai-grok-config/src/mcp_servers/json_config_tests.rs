@@ -119,7 +119,7 @@ fn mcp_json_expands_an_unset_variable_to_its_default() {
     let path = dir.path().join(".mcp.json");
     std::fs::write(
         &path,
-        r#"{"mcpServers": {"api": {"url": "${GROK_TEST_MCP_UNSET_VAR_12345:-https://fallback.example.com}/mcp"}}}"#,
+        r#"{"mcpServers": {"api": {"url": "${FRIDAY_TEST_MCP_UNSET_VAR_12345:-https://fallback.example.com}/mcp"}}}"#,
     )
     .unwrap();
 

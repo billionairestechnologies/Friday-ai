@@ -10,7 +10,7 @@ const MCP_NAME_SEPARATOR: &str = "__";
 const USE_TOOL_NAME: &str = "use_tool";
 /// The subagent spawn tool's name in each toolset: GrokBuild spells it `spawn_subagent`, the
 /// daemon worker spells it `Task`. Single-sourced so the two spellings cannot drift.
-pub const GROK_BUILD_SPAWN_TOOL: &str = "spawn_subagent";
+pub const FRIDAY_BUILD_SPAWN_TOOL: &str = "spawn_subagent";
 pub const DAEMON_SPAWN_TOOL: &str = "Task";
 /// The task id a task call gets when the case names none.
 pub(crate) const FIRST_TASK_ID: &str = "1";
@@ -213,7 +213,7 @@ impl Tool {
             Tool::List => GrokBuildRow::new("list_dir"),
             Tool::MemorySearch => GrokBuildRow::new("memory_search"),
             Tool::MemoryGet => GrokBuildRow::new("memory_get"),
-            Tool::Task => GrokBuildRow::new(GROK_BUILD_SPAWN_TOOL).with_fills(&[FieldFill {
+            Tool::Task => GrokBuildRow::new(FRIDAY_BUILD_SPAWN_TOOL).with_fills(&[FieldFill {
                 field: "description",
                 source: "prompt",
             }]),

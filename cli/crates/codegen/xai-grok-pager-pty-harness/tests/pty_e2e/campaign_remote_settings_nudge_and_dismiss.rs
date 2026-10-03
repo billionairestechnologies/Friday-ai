@@ -28,15 +28,15 @@ async fn campaign_remote_settings_nudge_and_dismiss() {
     }));
 
     // Seed config.toml with the user's own default model.
-    let grok_home = content.home().join(".grok");
-    std::fs::create_dir_all(&grok_home).expect("create GROK_HOME");
+    let grok_home = content.home().join(".friday");
+    std::fs::create_dir_all(&grok_home).expect("create FRIDAY_HOME");
     std::fs::write(
         grok_home.join("config.toml"),
         format!("[models]\ndefault = \"{CONFIG_MODEL}\"\n"),
     )
     .expect("write config.toml");
 
-    // Use session (OAuth) auth, not the harness's default XAI_API_KEY: the settings fetch requires `auth_manager.auth()`
+    // Use session (OAuth) auth, not the harness's default FRIDAY_X_TOKEN: the settings fetch requires `auth_manager.auth()`
     // In ApiKey/BYOK mode the pager never requests `/v1/settings`, so a remote campaign could never arrive (see `spawn_polling_session`'s doc)
     seed_fake_oauth(&content, "pty-campaign-remote");
     let binary = pager_binary().expect("resolve pager binary");

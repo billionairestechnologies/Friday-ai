@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn non_reasoning_model_errors() {
         let mut state = ModelState::default();
-        let (id, info) = plain_model("grok-4.5", "Grok 4.5");
+        let (id, info) = plain_model("grok-4.5", "Friday X 4.5");
         state.available.insert(id.clone(), info);
         state.current = Some(id);
         let mut ctx = dummy_exec_ctx(&state);
@@ -317,7 +317,7 @@ mod tests {
         assert!(cmd.suggest_args(&ctx, "").is_none());
 
         let mut plain = ModelState::default();
-        let (id, info) = plain_model("grok-4.5", "Grok 4.5");
+        let (id, info) = plain_model("grok-4.5", "Friday X 4.5");
         plain.available.insert(id.clone(), info);
         plain.current = Some(id);
         let ctx = AppCtx {
@@ -376,7 +376,7 @@ mod tests {
         let id = acp_fixtures::model_id("grok-4.7");
         let info = acp_fixtures::model_info_with_meta(
             "grok-4.7",
-            "Grok 4.7",
+            "Friday X 4.7",
             serde_json::json!({
                 "supportsReasoningEffort": true,
                 "reasoningEfforts": [
@@ -404,11 +404,11 @@ mod tests {
         );
         assert_eq!(top(&mut ctrl, "/effort high").as_deref(), Some("High"));
         assert_eq!(
-            top(&mut ctrl, "/model Grok 4.7 extra").as_deref(),
+            top(&mut ctrl, "/model Friday X 4.7 extra").as_deref(),
             Some("Extra High")
         );
         assert_eq!(
-            top(&mut ctrl, "/model Grok 4.7 high").as_deref(),
+            top(&mut ctrl, "/model Friday X 4.7 high").as_deref(),
             Some("High")
         );
 
@@ -422,7 +422,7 @@ mod tests {
             }
             other => panic!("expected SwitchModel, got {other:?}"),
         }
-        match crate::slash::commands::model::ModelCommand.run(&mut ctx, "Grok 4.7 Extra High") {
+        match crate::slash::commands::model::ModelCommand.run(&mut ctx, "Friday X 4.7 Extra High") {
             CommandResult::Action(Action::SwitchModel(ModelChoice {
                 model_id, effort, ..
             })) => {

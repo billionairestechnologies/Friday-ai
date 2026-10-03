@@ -2326,7 +2326,7 @@ mod tests {
             "got: {message}"
         );
         assert!(
-            !message.contains("/etc/grok/"),
+            !message.contains("/etc/friday/"),
             "user-facing refusal must name the policy file only, got: {message}"
         );
 
@@ -2347,7 +2347,7 @@ mod tests {
             vec![AllowedMcpServer::Http {
                 url_pattern: "https://evil.corp/*".into(),
             }],
-            Some(std::path::PathBuf::from("/etc/grok/managed_config.toml")),
+            Some(std::path::PathBuf::from("/etc/friday/managed_config.toml")),
         ));
         ms
     }
@@ -2415,7 +2415,7 @@ mod tests {
         let blocked = McpServerWithPolicy {
             server: server(),
             disabled_reason: Some(McpBlockReason::Deny {
-                source: std::path::PathBuf::from("/etc/grok/managed_config.toml"),
+                source: std::path::PathBuf::from("/etc/friday/managed_config.toml"),
             }),
         };
         let err = confirm_enabled_or_rollback("corp", Some(blocked), rollback)
@@ -2427,7 +2427,7 @@ mod tests {
         assert!(
             message.contains("organization policy")
                 && message.contains("managed_config.toml")
-                && !message.contains("/etc/grok/"),
+                && !message.contains("/etc/friday/"),
             "got: {message}"
         );
         assert!(rolled_back.get(), "refusal must roll back the enable write");
@@ -2574,18 +2574,18 @@ mod tests {
                 .collect::<std::collections::HashSet<_>>()
         };
         let pin = || PolicyPin::Disabled {
-            source: std::path::PathBuf::from("/etc/grok/managed_config.toml"),
+            source: std::path::PathBuf::from("/etc/friday/managed_config.toml"),
             ownership: PolicyLayerOwnership::Admin,
         };
         let mut ms = ManagedSettings::default();
-        // The /etc/grok grant is admin-owned like the pin, so it may carve the exception.
+        // The /etc/friday grant is admin-owned like the pin, so it may carve the exception.
         ms.mcp_allowlist = McpServerPolicy::single(
             McpServerAllowlist::new(
                 vec![AllowedMcpServer::Http {
                     url_pattern: "https://allowed.example.com/*".into(),
                 }],
                 vec![],
-                Some(std::path::PathBuf::from("/etc/grok/managed_config.toml")),
+                Some(std::path::PathBuf::from("/etc/friday/managed_config.toml")),
             )
             .with_ownership(PolicyLayerOwnership::Admin),
         );
@@ -2598,7 +2598,7 @@ mod tests {
         assert!(
             reason.contains("enableAllProjectMcpServers = false")
                 && reason.contains("managed_config.toml")
-                && !reason.contains("/etc/grok/"),
+                && !reason.contains("/etc/friday/"),
             "got: {reason}"
         );
         assert!(
@@ -2617,7 +2617,7 @@ mod tests {
             vec![AllowedMcpServer::Http {
                 url_pattern: "https://proj.example.com/*".into(),
             }],
-            Some(std::path::PathBuf::from("/etc/grok/managed_config.toml")),
+            Some(std::path::PathBuf::from("/etc/friday/managed_config.toml")),
         ));
         deny_ms.project_mcp = pin();
         let definition = http("projsrv", "https://proj.example.com/mcp");
@@ -2643,13 +2643,13 @@ mod tests {
     fn org_policy_message_clamps_unbounded_server_names() {
         let name = format!("拒否-Sërver-🚫-{}", "a".repeat(120));
         let reason = xai_grok_workspace::permission::resolution::McpBlockReason::Deny {
-            source: std::path::PathBuf::from("/etc/grok/managed_config.toml"),
+            source: std::path::PathBuf::from("/etc/friday/managed_config.toml"),
         };
         let message = org_policy_message(&name, &reason);
         assert!(
             message.contains("is blocked by an organization policy")
                 && message.contains("managed_config.toml")
-                && !message.contains("/etc/grok/"),
+                && !message.contains("/etc/friday/"),
             "got: {message}"
         );
         assert!(
@@ -2686,7 +2686,7 @@ mod tests {
 
         let mut ms = ManagedSettings::default();
         ms.project_mcp = PolicyPin::Disabled {
-            source: std::path::PathBuf::from("/etc/grok/requirements.toml"),
+            source: std::path::PathBuf::from("/etc/friday/requirements.toml"),
             ownership: PolicyLayerOwnership::Admin,
         };
         let server = |name: &str| {
@@ -2824,7 +2824,7 @@ mod tests {
                         url: "https://mcp.linear.app".to_string(),
                         scope: Some("team".to_string()),
                         scope_id: Some("team-uuid-123".to_string()),
-                        scope_name: Some("Grok CLI".to_string()),
+                        scope_name: Some("Friday X CLI".to_string()),
                     },
                     source_label: None,
                     setup: None,
@@ -2887,7 +2887,7 @@ mod tests {
         );
         assert_eq!(
             json.pointer("/servers/0/scopeName"),
-            Some(&serde_json::json!("Grok CLI"))
+            Some(&serde_json::json!("Friday X CLI"))
         );
         assert!(json.pointer("/servers/0/session").is_none());
         // Managed gateway connectors are not serialized as local transports.

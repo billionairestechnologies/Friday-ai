@@ -1756,7 +1756,7 @@ async fn refresh_chain_demotes_when_attributed_tried_rt_differs_from_disk() {
     assert!(
         mgr.permanent_failure().is_none(),
         "demotion must not record a sticky verdict that locks out every \
-         sibling process until the user re-runs `grok login`",
+         sibling process until the user re-runs `friday login`",
     );
 }
 /// The demotion must *not* fire when disk still holds the very RT that was just rejected.
@@ -3110,9 +3110,9 @@ fn apply_user_info_enrichment_overwrites_can_administer_team() {
 async fn current_api_key_async_drives_refresh_chain() {
     use xai_grok_test_support::EnvGuard;
     use xai_grok_tools::types::ApiKeyProvider;
-    let _xai = EnvGuard::unset("XAI_API_KEY");
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _auth_path = EnvGuard::unset("GROK_AUTH_PATH");
+    let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _auth_path = EnvGuard::unset("FRIDAY_AUTH_PATH");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     mgr.hot_swap(GrokAuth {
@@ -3880,17 +3880,17 @@ async fn shared_api_key_provider_static_fallthrough() {
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     let provider = crate::shared_api_key_provider(mgr.clone());
     {
-        let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-        let _key = EnvGuard::set("XAI_API_KEY", "env-only-key");
+        let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+        let _key = EnvGuard::set("FRIDAY_X_TOKEN", "env-only-key");
         assert_eq!(
             provider.current_api_key_async().await.as_deref(),
             Some("env-only-key")
         );
     }
     {
-        let _xai = EnvGuard::unset("XAI_API_KEY");
-        let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-        let _auth_path = EnvGuard::unset("GROK_AUTH_PATH");
+        let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+        let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+        let _auth_path = EnvGuard::unset("FRIDAY_AUTH_PATH");
         crate::store_api_key(dir.path(), "disk-api-key").unwrap();
         assert_eq!(
             provider.current_api_key_async().await.as_deref(),
@@ -3898,7 +3898,7 @@ async fn shared_api_key_provider_static_fallthrough() {
         );
     }
     {
-        let _key = EnvGuard::set("XAI_API_KEY", "env-should-lose");
+        let _key = EnvGuard::set("FRIDAY_X_TOKEN", "env-should-lose");
         mgr.hot_swap(GrokAuth {
             key: "session-bearer".into(),
             expires_at: Some(Utc::now() + Duration::hours(1)),
@@ -3915,7 +3915,7 @@ async fn shared_api_key_provider_static_fallthrough() {
 #[serial_test::serial]
 async fn shared_api_key_provider_kill_switch_blocks_static() {
     use xai_grok_test_support::EnvGuard;
-    let _key = EnvGuard::set("XAI_API_KEY", "blocked");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "blocked");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(
         dir.path(),
@@ -3935,7 +3935,7 @@ async fn shared_api_key_provider_kill_switch_blocks_static() {
 #[serial_test::serial]
 async fn shared_api_key_provider_oidc_preferred_blocks_static() {
     use xai_grok_test_support::EnvGuard;
-    let _key = EnvGuard::set("XAI_API_KEY", "should-not-use");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "should-not-use");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(
         dir.path(),
@@ -3956,8 +3956,8 @@ async fn shared_api_key_provider_oidc_preferred_blocks_static() {
 #[serial_test::serial]
 async fn shared_api_key_provider_api_key_preferred_skips_session() {
     use xai_grok_test_support::EnvGuard;
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _key = EnvGuard::set("XAI_API_KEY", "static-preferred");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "static-preferred");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(
         dir.path(),
@@ -3985,8 +3985,8 @@ async fn shared_api_key_provider_api_key_preferred_skips_session() {
 #[serial_test::serial]
 async fn shared_api_key_provider_sync_falls_through_when_session_expired() {
     use xai_grok_test_support::EnvGuard;
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _key = EnvGuard::set("XAI_API_KEY", "static-after-expiry");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "static-after-expiry");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     mgr.hot_swap(GrokAuth {
@@ -4013,8 +4013,8 @@ async fn shared_api_key_provider_sync_falls_through_when_session_expired() {
 async fn shared_api_key_provider_sync_buffered_session_beats_static() {
     use xai_grok_test_support::EnvGuard;
     use xai_grok_tools::types::ApiKeyProvider;
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _key = EnvGuard::set("XAI_API_KEY", "leftover-static");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _key = EnvGuard::set("FRIDAY_X_TOKEN", "leftover-static");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     mgr.hot_swap(GrokAuth {
@@ -4032,9 +4032,9 @@ async fn shared_api_key_provider_sync_buffered_session_beats_static() {
 #[serial_test::serial]
 async fn shared_api_key_provider_disk_memo_follows_rewrites() {
     use xai_grok_test_support::EnvGuard;
-    let _xai = EnvGuard::unset("XAI_API_KEY");
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _auth_path = EnvGuard::unset("GROK_AUTH_PATH");
+    let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _auth_path = EnvGuard::unset("FRIDAY_AUTH_PATH");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     let provider = crate::shared_api_key_provider(mgr);
@@ -4050,9 +4050,9 @@ async fn shared_api_key_provider_disk_memo_follows_rewrites() {
 #[serial_test::serial]
 async fn process_key_precedence() {
     use xai_grok_test_support::EnvGuard;
-    let _xai = EnvGuard::unset("XAI_API_KEY");
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _auth_path = EnvGuard::unset("GROK_AUTH_PATH");
+    let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _auth_path = EnvGuard::unset("FRIDAY_AUTH_PATH");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     let provider = crate::shared_api_key_provider(mgr.clone());
@@ -4068,7 +4068,7 @@ async fn process_key_precedence() {
         Some("process")
     );
     {
-        let _key = EnvGuard::set("XAI_API_KEY", "env");
+        let _key = EnvGuard::set("FRIDAY_X_TOKEN", "env");
         assert_eq!(
             provider.current_api_key_async().await.as_deref(),
             Some("env")
@@ -4353,7 +4353,7 @@ fn dark_wake_defer_budget_survives_powered_on_during_dark_wake() {
 #[test]
 #[serial_test::serial(force_dark_wake_env)]
 fn is_dark_wake_false_when_power_listener_not_started() {
-    let _unset = xai_grok_test_support::EnvGuard::unset("GROK_AUTH_FORCE_DARK_WAKE");
+    let _unset = xai_grok_test_support::EnvGuard::unset("FRIDAY_AUTH_FORCE_DARK_WAKE");
     let dir = tempfile::tempdir().unwrap();
     let mgr = AuthManager::new(dir.path(), GrokComConfig::default());
     assert!(
@@ -4361,7 +4361,7 @@ fn is_dark_wake_false_when_power_listener_not_started() {
         "is_dark_wake must be false when the power listener was never started"
     );
 }
-/// `GROK_AUTH_FORCE_DARK_WAKE` forces the dark-wake answer for manual and integration testing.
+/// `FRIDAY_AUTH_FORCE_DARK_WAKE` forces the dark-wake answer for manual and integration testing.
 /// It is read BEFORE the `power_listener_started` check: a headless run never starts the listener.
 /// The override exists precisely so such a run can drive the dark-wake paths against a real binary.
 #[test]
@@ -4371,18 +4371,18 @@ fn is_dark_wake_env_override_forces_both_states() {
     let dir = tempfile::tempdir().unwrap();
     let mgr = AuthManager::new(dir.path(), GrokComConfig::default());
     {
-        let _g = EnvGuard::set("GROK_AUTH_FORCE_DARK_WAKE", "1");
+        let _g = EnvGuard::set("FRIDAY_AUTH_FORCE_DARK_WAKE", "1");
         assert!(
             mgr.is_dark_wake(),
             "=1 must force dark wake even without a power listener"
         );
     }
     {
-        let _g = EnvGuard::set("GROK_AUTH_FORCE_DARK_WAKE", "0");
+        let _g = EnvGuard::set("FRIDAY_AUTH_FORCE_DARK_WAKE", "0");
         assert!(!mgr.is_dark_wake(), "=0 must force full wake");
     }
     {
-        let _g = EnvGuard::set("GROK_AUTH_FORCE_DARK_WAKE", "yes");
+        let _g = EnvGuard::set("FRIDAY_AUTH_FORCE_DARK_WAKE", "yes");
         assert!(!mgr.is_dark_wake(), "non-1/0 values must not force a state");
     }
 }

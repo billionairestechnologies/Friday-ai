@@ -1,4 +1,4 @@
-//! `grok mcp`: manage MCP server configurations from the command line.
+//! `friday mcp`: manage MCP server configurations from the command line.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -12,19 +12,19 @@ use crate::util::display_user_grok_path;
 const ADD_AFTER_HELP: &str = "\
 Examples:
   # Add a stdio server (everything after -- is the server command)
-  grok mcp add xcode -- xcrun mcpbridge
+  friday mcp add xcode -- xcrun mcpbridge
 
   # Add a stdio server with environment variables
-  grok mcp add postgres -e DATABASE_URL=postgres://localhost/mydb -- npx -y @modelcontextprotocol/server-postgres
+  friday mcp add postgres -e DATABASE_URL=postgres://localhost/mydb -- npx -y @modelcontextprotocol/server-postgres
 
   # Add a remote HTTP server
-  grok mcp add --transport http sentry https://mcp.sentry.dev/mcp
+  friday mcp add --transport http sentry https://mcp.sentry.dev/mcp
 
   # Add a remote server with an authentication header
-  grok mcp add --transport http api https://mcp.example.com/mcp --header \"Authorization: Bearer YOUR_TOKEN\"
+  friday mcp add --transport http api https://mcp.example.com/mcp --header \"Authorization: Bearer YOUR_TOKEN\"
 
-  # Add to the project config (./.grok/config.toml) instead of ~/.grok/config.toml
-  grok mcp add --scope project github -- npx -y @modelcontextprotocol/server-github";
+  # Add to the project config (./.friday/config.toml) instead of ~/.friday/config.toml
+  friday mcp add --scope project github -- npx -y @modelcontextprotocol/server-github";
 
 #[derive(Debug, clap::Args, Clone)]
 pub struct McpArgs {
@@ -46,9 +46,9 @@ pub enum McpTransport {
 /// Which config file an MCP server definition is written to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum McpScope {
-    /// `~/.grok/config.toml`, available in all your projects
+    /// `~/.friday/config.toml`, available in all your projects
     User,
-    /// `./.grok/config.toml`, shared with everyone working in this directory
+    /// `./.friday/config.toml`, shared with everyone working in this directory
     Project,
 }
 
@@ -120,7 +120,7 @@ pub struct AddArgs {
     #[arg(short = 't', long, value_enum)]
     transport: Option<McpTransport>,
 
-    /// Config to write to: user (~/.grok/config.toml) or project (./.grok/config.toml)
+    /// Config to write to: user (~/.friday/config.toml) or project (./.friday/config.toml)
     #[arg(short = 's', long, value_enum, default_value = "user")]
     scope: McpScope,
 
@@ -190,7 +190,7 @@ fn run_list(json: bool) -> Result<()> {
             .collect();
         println!("{}", serde_json::to_string_pretty(&payload)?);
     } else if servers.is_empty() {
-        println!("No MCP servers configured. Run `grok mcp add --help` to get started.");
+        println!("No MCP servers configured. Run `friday mcp add --help` to get started.");
     } else {
         for (name, (config, scope)) in &servers {
             let transport = match &config.transport {
@@ -349,7 +349,7 @@ fn resolve_add(args: &AddArgs) -> Result<ResolvedAdd> {
         McpTransport::Stdio => {
             let Some(command) = source else {
                 bail!(
-                    "A command is required for stdio servers. Usage: grok mcp add <name> -- <command> [args...]"
+                    "A command is required for stdio servers. Usage: friday mcp add <name> -- <command> [args...]"
                 );
             };
             if !args.header.is_empty() {
@@ -381,7 +381,7 @@ fn resolve_add(args: &AddArgs) -> Result<ResolvedAdd> {
                         format!("http://{command}")
                     };
                 warnings.push(format!(
-                    "Warning: '{command}' looks like a URL, but it is being added as a stdio command because --transport was not specified.\nFor a remote server, use: grok mcp add --transport http {} {suggested_url}",
+                    "Warning: '{command}' looks like a URL, but it is being added as a stdio command because --transport was not specified.\nFor a remote server, use: friday mcp add --transport http {} {suggested_url}",
                     args.name
                 ));
             }
@@ -405,7 +405,7 @@ fn resolve_add(args: &AddArgs) -> Result<ResolvedAdd> {
             };
             let Some(url) = source else {
                 bail!(
-                    "A URL is required for {label} servers. Usage: grok mcp add --transport {label} <name> <url>"
+                    "A URL is required for {label} servers. Usage: friday mcp add --transport {label} <name> <url>"
                 );
             };
             if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -632,7 +632,7 @@ async fn run_set_enabled(name: &str, enabled: bool) -> Result<()> {
         if !available.is_empty() {
             eprintln!("Available servers: {}", available.join(", "));
         } else {
-            eprintln!("No MCP servers configured. Run `grok mcp add --help` to get started.");
+            eprintln!("No MCP servers configured. Run `friday mcp add --help` to get started.");
         }
         std::process::exit(1);
     }
@@ -726,7 +726,7 @@ async fn run_remove(name: &str, requested_scope: Option<McpScope>) -> Result<()>
                 display_user_grok_path(xai_grok_config::USER_CONFIG_FILENAME)
             );
             eprintln!("  project: {}", project_path.display());
-            eprintln!("Specify which one to remove, e.g.: grok mcp remove {name} --scope project");
+            eprintln!("Specify which one to remove, e.g.: friday mcp remove {name} --scope project");
             std::process::exit(1);
         }
     };
@@ -741,7 +741,7 @@ async fn run_remove(name: &str, requested_scope: Option<McpScope>) -> Result<()>
     println!("Removed MCP server '{name}' from {} config", scope.label());
     println!("File modified: {}", scope_display(scope, &path));
 
-    // A scoped delete can leave the name defined in the other scope or an ancestor .grok/config.toml, where it still resolves for sessions
+    // A scoped delete can leave the name defined in the other scope or an ancestor .friday/config.toml, where it still resolves for sessions
     let still_user_defined = mcp_server_defined_at(&user_config_path(), name);
     if let Some((survivor_scope, remaining)) =
         surviving_definition(still_user_defined, find_project_site())
@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn add_hyphen_flag_without_double_dash_is_rejected() {
-        let err = PagerArgs::try_parse_from(["grok", "mcp", "add", "fs", "npx", "-y"])
+        let err = PagerArgs::try_parse_from(["friday", "mcp", "add", "fs", "npx", "-y"])
             .expect_err("hyphen args must be escaped with --");
         assert_eq!(err.kind(), clap::error::ErrorKind::UnknownArgument);
     }
@@ -968,7 +968,7 @@ mod tests {
     #[test]
     fn add_infers_http_for_bare_positional_url() {
         for url in ["https://mcp.example.com/mcp", "http://mcp.example.com/mcp"] {
-            let add = parse_add(&["grok", "mcp", "add", "api", url]);
+            let add = parse_add(&["friday", "mcp", "add", "api", url]);
             let resolved = resolve_add(&add).expect("bare http(s) URL infers http");
             assert_eq!(resolved.kind, McpTransport::Http);
             match resolved.transport {
@@ -1019,7 +1019,7 @@ mod tests {
     #[test]
     fn add_default_transport_warns_on_url_looking_command() {
         // Scheme-less URL-looking commands are not inferred; they get http:// prepended so the suggested command passes URL validation
-        let add = parse_add(&["grok", "mcp", "add", "local", "localhost:3000"]);
+        let add = parse_add(&["friday", "mcp", "add", "local", "localhost:3000"]);
         let resolved = resolve_add(&add).expect("localhost command warns");
         assert!(matches!(
             resolved.transport,
@@ -1210,7 +1210,7 @@ mod tests {
 
     #[test]
     fn add_validates_name_env_and_headers() {
-        let add = parse_add(&["grok", "mcp", "add", "fs", "-e", "NOT_A_PAIR", "--", "npx"]);
+        let add = parse_add(&["friday", "mcp", "add", "fs", "-e", "NOT_A_PAIR", "--", "npx"]);
         let err = resolve_add(&add).expect_err("malformed env must fail");
         assert!(
             err.to_string()
@@ -1235,14 +1235,14 @@ mod tests {
             "got: {err}"
         );
 
-        let add = parse_add(&["grok", "mcp", "add", "bad name!", "--", "npx"]);
+        let add = parse_add(&["friday", "mcp", "add", "bad name!", "--", "npx"]);
         let err = resolve_add(&add).expect_err("invalid name must fail");
         assert!(err.to_string().contains("Invalid name"), "got: {err}");
     }
 
     #[test]
     fn add_rejects_mismatched_options_per_transport() {
-        let add = parse_add(&["grok", "mcp", "add", "fs", "-H", "X: y", "--", "npx"]);
+        let add = parse_add(&["friday", "mcp", "add", "fs", "-H", "X: y", "--", "npx"]);
         let err = resolve_add(&add).expect_err("--header is remote-only");
         assert!(err.to_string().contains("--header"), "got: {err}");
 
@@ -1280,21 +1280,21 @@ mod tests {
 
     #[test]
     fn add_requires_a_source_for_each_transport() {
-        let add = parse_add(&["grok", "mcp", "add", "fs"]);
+        let add = parse_add(&["friday", "mcp", "add", "fs"]);
         let err = resolve_add(&add).expect_err("stdio without a command must fail");
         assert!(
             err.to_string().contains("command is required"),
             "got: {err}"
         );
 
-        let add = parse_add(&["grok", "mcp", "add", "--transport", "http", "api"]);
+        let add = parse_add(&["friday", "mcp", "add", "--transport", "http", "api"]);
         let err = resolve_add(&add).expect_err("http without a URL must fail");
         assert!(err.to_string().contains("URL is required"), "got: {err}");
     }
 
     #[test]
     fn remove_accepts_optional_scope() {
-        let args = PagerArgs::try_parse_from(["grok", "mcp", "remove", "fs", "-s", "project"])
+        let args = PagerArgs::try_parse_from(["friday", "mcp", "remove", "fs", "-s", "project"])
             .expect("remove with scope parses");
         match args.command {
             Some(Command::Mcp(McpArgs {
@@ -1317,7 +1317,7 @@ mod tests {
 
     #[test]
     fn grok_com_known_only_with_toml_definition() {
-        // Unique name: `grok_home()` is process-wide OnceLock, so GROK_HOME. `grok_com_*` in the real ~/.grok disabled
+        // Unique name: `grok_home()` is process-wide OnceLock, so FRIDAY_HOME. `grok_com_*` in the real ~/.friday disabled
         // list would fail an orphan assertion on a well-known name.
         let name = format!("grok_com_orphan_{}", uuid::Uuid::new_v4().as_simple());
 
@@ -1329,11 +1329,11 @@ mod tests {
         );
 
         let defined = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(defined.path().join(".grok")).unwrap();
+        std::fs::create_dir_all(defined.path().join(".friday")).unwrap();
         std::fs::write(
             defined
                 .path()
-                .join(".grok")
+                .join(".friday")
                 .join(xai_grok_config::USER_CONFIG_FILENAME),
             format!(
                 r#"
@@ -1370,7 +1370,7 @@ url = "https://mcp.example.test/sse"
 
     #[test]
     fn enable_and_disable_parse_name() {
-        let args = PagerArgs::try_parse_from(["grok", "mcp", "enable", "user-grafana"])
+        let args = PagerArgs::try_parse_from(["friday", "mcp", "enable", "user-grafana"])
             .expect("enable should parse");
         match args.command {
             Some(Command::Mcp(McpArgs {
@@ -1379,7 +1379,7 @@ url = "https://mcp.example.test/sse"
             other => panic!("expected mcp enable, got {other:?}"),
         }
 
-        let args = PagerArgs::try_parse_from(["grok", "mcp", "disable", "user-slack"])
+        let args = PagerArgs::try_parse_from(["friday", "mcp", "disable", "user-slack"])
             .expect("disable should parse");
         match args.command {
             Some(Command::Mcp(McpArgs {
@@ -1391,11 +1391,11 @@ url = "https://mcp.example.test/sse"
 
     #[test]
     fn enable_disable_require_name() {
-        let err = PagerArgs::try_parse_from(["grok", "mcp", "enable"])
+        let err = PagerArgs::try_parse_from(["friday", "mcp", "enable"])
             .expect_err("enable without name must fail");
         assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
 
-        let err = PagerArgs::try_parse_from(["grok", "mcp", "disable"])
+        let err = PagerArgs::try_parse_from(["friday", "mcp", "disable"])
             .expect_err("disable without name must fail");
         assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
@@ -1403,7 +1403,7 @@ url = "https://mcp.example.test/sse"
     #[test]
     fn select_remove_site_covers_scope_presence_matrix() {
         let user = xai_grok_shell::util::config::user_config_path();
-        let project = PathBuf::from("/repo/.grok/config.toml");
+        let project = PathBuf::from("/repo/.friday/config.toml");
 
         // No scope: a single hit resolves, both scopes is ambiguous, neither is NotFound
         assert_eq!(
@@ -1447,7 +1447,7 @@ url = "https://mcp.example.test/sse"
     #[test]
     fn surviving_definition_prefers_project_then_user() {
         let user = xai_grok_shell::util::config::user_config_path();
-        let project = PathBuf::from("/repo/.grok/config.toml");
+        let project = PathBuf::from("/repo/.friday/config.toml");
 
         // The mirror of the remove note: a user-scope delete with a project survivor (and vice versa) must still report the remaining site
         assert_eq!(

@@ -57,7 +57,7 @@ pub(crate) fn build_static_headers(
 ) -> std::collections::HashMap<String, String> {
     let mut static_headers = std::collections::HashMap::new();
     static_headers.insert(
-        "x-grok-client-version".to_string(),
+        "x-friday-client-version".to_string(),
         client_version.to_string(),
     );
     let _ = (alpha_test_key, traces_url);
@@ -86,7 +86,7 @@ pub(crate) fn build_export_headers(
     }
     headers.insert("Authorization".to_string(), format!("Bearer {token}"));
     if let Some(value) = token_auth_header {
-        headers.insert("X-XAI-Token-Auth".to_string(), value.to_string());
+        headers.insert("X-Friday-Token-Auth".to_string(), value.to_string());
     }
     for (k, v) in extra_headers {
         headers.insert(k.clone(), v.clone());

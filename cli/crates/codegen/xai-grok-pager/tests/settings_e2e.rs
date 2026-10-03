@@ -3686,7 +3686,7 @@ fn reset_overlay_dims_all_rows_except_target() {
     }
 }
 
-/// The settings modal renders a 1-line "Ask Grok" tip footer at the bottom of the content area. It shows in Browse,
+/// The settings modal renders a 1-line "Ask Friday X" tip footer at the bottom of the content area. It shows in Browse,
 /// FilterFocused, and PickingEnum modes (always-on tip). The footer is suppressed in `EditingValue` because the
 /// editor needs every line for input and validation.
 #[test]
@@ -3720,8 +3720,8 @@ fn docs_footer_renders_for_browse_and_picker() {
             all_text.push('\n');
         }
         assert!(
-            all_text.contains("Ask Grok"),
-            "[{fixture_label}] docs footer (`Ask Grok`) must appear in the rendered modal:\n\
+            all_text.contains("Ask Friday X"),
+            "[{fixture_label}] docs footer (`Ask Friday X`) must appear in the rendered modal:\n\
              {all_text}"
         );
         assert!(
@@ -4093,11 +4093,11 @@ fn pr14_default_model_picker_commits_resolved_model_id() {
     let snapshot = PagerLocalSnapshot {
         available_models: vec![
             (
-                "Grok 4.5".to_string(),
+                "Friday X 4.5".to_string(),
                 agent_client_protocol::ModelId::new(std::sync::Arc::from("grok-4.5")),
             ),
             (
-                "Grok 3".to_string(),
+                "Friday X 3".to_string(),
                 agent_client_protocol::ModelId::new(std::sync::Arc::from("grok-3")),
             ),
         ],
@@ -4119,7 +4119,7 @@ fn pr14_default_model_picker_commits_resolved_model_id() {
         "Enter must transition to PickingEnum for default_model"
     );
 
-    // Walk down past row 0 ("(no override)") to row 1 ("Grok 4.5").
+    // Walk down past row 0 ("(no override)") to row 1 ("Friday X 4.5").
     let outcome = handle_settings_key(&mut s, &press(KeyCode::Down));
     assert!(
         matches!(outcome, SettingsKeyOutcome::Changed),
@@ -4149,7 +4149,7 @@ fn pr14_default_model_picker_commits_resolved_model_id() {
 fn pr14_default_model_picker_row_zero_commits_clear_action() {
     let snapshot = PagerLocalSnapshot {
         available_models: vec![(
-            "Grok 3".to_string(),
+            "Friday X 3".to_string(),
             agent_client_protocol::ModelId::new(std::sync::Arc::from("grok-3")),
         )],
         ..PagerLocalSnapshot::default()
@@ -4185,7 +4185,7 @@ fn pr14_default_model_picker_row_zero_commits_clear_action() {
 fn pr14_mouse_click_on_dynamic_enum_row_opens_picker() {
     let snapshot = PagerLocalSnapshot {
         available_models: vec![(
-            "Grok 3".to_string(),
+            "Friday X 3".to_string(),
             agent_client_protocol::ModelId::new(std::sync::Arc::from("grok-3")),
         )],
         ..PagerLocalSnapshot::default()

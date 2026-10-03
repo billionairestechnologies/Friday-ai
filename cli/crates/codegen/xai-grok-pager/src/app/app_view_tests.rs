@@ -796,7 +796,7 @@ fn tick_demand_welcome_is_slow_unless_loading() {
     assert_eq!(app.tick_demand(), TickDemand::Fast);
 }
 /// An open modal session picker that is still fetching keeps fast ticks alive on an otherwise-idle agent (its loading spinner must animate).
-/// That holds even after the fast foreign scan lands rows the default Grok filter hides; once the native list settles the demand parks again.
+/// That holds even after the fast foreign scan lands rows the default Friday X filter hides; once the native list settles the demand parks again.
 #[test]
 fn tick_demand_fast_while_modal_session_picker_loads() {
     let mut app = test_app_with_agent();
@@ -851,7 +851,7 @@ fn tick_demand_fast_while_modal_session_picker_loads() {
     assert_eq!(
         app.tick_demand(),
         TickDemand::Fast,
-        "foreign rows hidden by the Grok filter must not end the loading spinner"
+        "foreign rows hidden by the Friday X filter must not end the loading spinner"
     );
     if let Some(crate::views::modal::ActiveModal::SessionPicker { loading, .. }) =
         app.agents.get_mut(&id).unwrap().active_modal.as_mut()
@@ -2295,7 +2295,7 @@ fn is_voice_tier_restricted_tracks_tier() {
 fn apply_auth_meta_clears_gate_on_subscription() {
     let mut app = test_app();
     app.gate = Some(xai_grok_login::GateInfo {
-        message: "Subscribe to use Grok Build".into(),
+        message: "Subscribe to use Friday X".into(),
         url: Some("https://grok.com/supergrok?referrer=grok-build".into()),
         label: None,
     });

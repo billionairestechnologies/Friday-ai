@@ -696,9 +696,9 @@ async fn the_protected_target_floor_prompts_whatever_the_grants_say() {
     settle_at_cwd(&session, "search_replace", "c3", &edit, Some(&allow_edits))
         .await
         .expect("edits approved for the session");
-    let lsp = session.cwd().join(".grok/lsp.json");
+    let lsp = session.cwd().join(".friday/lsp.json");
     let grant_store = Path::new("/home/user")
-        .join(".grok")
+        .join(".friday")
         .join("sessions")
         .join("ws")
         .join("permission.toml");
@@ -706,7 +706,7 @@ async fn the_protected_target_floor_prompts_whatever_the_grants_say() {
         hook.as_str(),
         "/home/user/.zshrc",
         grant_store.to_str().expect("utf-8 path"),
-        "/home/user/.grok/mcp.json",
+        "/home/user/.friday/mcp.json",
         lsp.to_str().expect("utf-8 tempdir"),
     ] {
         let edit = json!({"file_path": path, "old_string": "a", "new_string": "b"});
@@ -878,7 +878,7 @@ async fn an_always_answer_is_persisted_for_the_folder_and_skips_the_next_prompt(
         err.detail
     );
 }
-/// Grok Desktop binds each conversation to its own scratch directory under the folder it serves.
+/// Friday X Desktop binds each conversation to its own scratch directory under the folder it serves.
 /// An "always" answer given in one of them is keyed on the served folder, so a sibling conversation
 /// inherits it; a subdirectory that is a repository of its own keeps its own store, as the CLI's
 /// per-project grants always have.

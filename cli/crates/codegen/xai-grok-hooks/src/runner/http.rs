@@ -156,10 +156,10 @@ pub async fn run_http_hook(
 
     let mut url_env = spec.extra_env.clone();
     for (k, v) in [
-        ("GROK_HOOK_EVENT", envelope.hook_event_name.to_string()),
-        ("GROK_HOOK_NAME", spec.name.clone()),
-        ("GROK_SESSION_ID", ctx.session_id.to_string()),
-        ("GROK_WORKSPACE_ROOT", ctx.workspace_root.to_string()),
+        ("FRIDAY_HOOK_EVENT", envelope.hook_event_name.to_string()),
+        ("FRIDAY_HOOK_NAME", spec.name.clone()),
+        ("FRIDAY_SESSION_ID", ctx.session_id.to_string()),
+        ("FRIDAY_WORKSPACE_ROOT", ctx.workspace_root.to_string()),
         ("CLAUDE_PROJECT_DIR", ctx.workspace_root.to_string()),
     ] {
         url_env.insert(k.to_string(), v);
@@ -1146,7 +1146,7 @@ mod tests {
 
     #[tokio::test]
     async fn url_unresolved_var_fails_validation() {
-        let key = "GROK_HOOKS_HTTP_TEST_UNRESOLVED";
+        let key = "FRIDAY_HOOKS_HTTP_TEST_UNRESOLVED";
         let expanded = with_env_var(key, None, || {
             let extra = std::collections::HashMap::new();
             crate::env_expand::expand_env_vars_with_extra(

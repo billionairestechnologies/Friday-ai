@@ -10,11 +10,11 @@ use std::sync::RwLock;
 /// Env var that, when set, advertises `xai.api_key` as a viable auth method.
 ///
 /// Kept as a constant so test code and the production check stay in sync.
-pub const XAI_API_KEY_ENV_VAR: &str = "XAI_API_KEY";
+pub const XAI_API_KEY_ENV_VAR: &str = "FRIDAY_X_TOKEN";
 
 /// Legacy env var name.
-/// Checked as a fallback when `XAI_API_KEY` is not set, so existing deployments that use the old name keep working.
-pub const LEGACY_XAI_API_KEY_ENV_VAR: &str = "GROK_CODE_XAI_API_KEY";
+/// Checked as a fallback when `FRIDAY_X_TOKEN` is not set, so existing deployments that use the old name keep working.
+pub const LEGACY_XAI_API_KEY_ENV_VAR: &str = "FRIDAY_X_LEGACY_TOKEN";
 
 /// Runtime-loaded keys live here instead of the process env: `set_var` races C `getenv` on other threads (DNS, libgit2).
 static RUNTIME_API_KEY: RwLock<Option<String>> = RwLock::new(None);
@@ -32,7 +32,7 @@ pub fn clear_runtime_xai_api_key() {
         .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
 }
 
-/// `std::env::var` that also sees the runtime key when `name` is `XAI_API_KEY`.
+/// `std::env::var` that also sees the runtime key when `name` is `FRIDAY_X_TOKEN`.
 pub fn read_env_var(name: &str) -> Result<String, std::env::VarError> {
     if name == XAI_API_KEY_ENV_VAR
         && let Some(key) = RUNTIME_API_KEY
@@ -47,12 +47,12 @@ pub fn read_env_var(name: &str) -> Result<String, std::env::VarError> {
 
 /// Read the API key from the runtime override or the environment.
 ///
-/// Checks `XAI_API_KEY` first, then falls back to the legacy `GROK_CODE_XAI_API_KEY` for backward compatibility.
+/// Checks `FRIDAY_X_TOKEN` first, then falls back to the legacy `FRIDAY_X_LEGACY_TOKEN` for backward compatibility.
 pub fn read_xai_api_key_env() -> Result<String, std::env::VarError> {
     read_env_var(XAI_API_KEY_ENV_VAR).or_else(|_| std::env::var(LEGACY_XAI_API_KEY_ENV_VAR))
 }
 
-/// Returns `true` if either `XAI_API_KEY` or `GROK_CODE_XAI_API_KEY` is set.
+/// Returns `true` if either `FRIDAY_X_TOKEN` or `FRIDAY_X_LEGACY_TOKEN` is set.
 pub fn has_xai_api_key_env() -> bool {
     read_xai_api_key_env().is_ok()
 }

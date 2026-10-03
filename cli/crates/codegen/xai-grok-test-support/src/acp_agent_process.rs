@@ -1,4 +1,4 @@
-//! The `grok agent stdio` child that `GrokStdioClient` and `AcpTestClient` drive: the sandbox it runs in, what
+//! The `friday agent stdio` child that `GrokStdioClient` and `AcpTestClient` drive: the sandbox it runs in, what
 //! is applied on top of the sandbox's hermetic baseline, and the spawn that hands the sandbox back together
 //! with the child.
 
@@ -13,7 +13,7 @@ pub(crate) struct AgentProcessOptions {
     sandbox: TestSandbox,
     pub(crate) extra_env: Vec<(String, String)>,
     /// Keys removed from the sandbox baseline after the mock URL and `extra_env` are applied, so a
-    /// scenario can drop a variable the baseline sets (e.g. the mock's `XAI_API_KEY`).
+    /// scenario can drop a variable the baseline sets (e.g. the mock's `FRIDAY_X_TOKEN`).
     pub(crate) removed_env: Vec<String>,
     pub(crate) leading_args: Vec<String>,
     pub(crate) agent_args: Vec<String>,
@@ -69,13 +69,13 @@ impl AgentProcessOptions {
             cmd,
             &sandbox,
             TestProcessConfig::new()
-                .label("grok agent stdio")
+                .label("friday agent stdio")
                 .stdin(TestStdin::Piped)
                 .stdout(TestOutput::Piped),
         )
         .unwrap_or_else(|error| {
             panic!(
-                "failed to spawn grok agent stdio at {}: {error}\n{}",
+                "failed to spawn friday agent stdio at {}: {error}\n{}",
                 binary.display(),
                 sandbox.diagnostic_summary(),
             )

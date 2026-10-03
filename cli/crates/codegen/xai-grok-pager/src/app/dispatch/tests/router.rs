@@ -607,15 +607,15 @@ fn shown_banner_id(app: &AppView) -> Option<String> {
     .and_then(|a| a.id.clone())
 }
 /// `AnnouncementsOpenCta(surface)` re-resolves through the slot gate and opens the promo url from every surface.
-/// The opens are observed through the file named by `GROK_TEST_OPEN_URL_FILE`.
+/// The opens are observed through the file named by `FRIDAY_TEST_OPEN_URL_FILE`.
 /// A critical owning the slot, or no usable cta, makes it a silent no-op, so a stale prior-frame click cannot open the promo url.
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn announcements_open_cta_opens_promo_and_noops_under_critical() {
     use xai_grok_telemetry::events::AnnouncementCtaSurface;
-    let url_file = std::env::temp_dir().join(format!("grok-cta-open-{}.txt", std::process::id()));
+    let url_file = std::env::temp_dir().join(format!("friday-cta-open-{}.txt", std::process::id()));
     let _ = std::fs::remove_file(&url_file);
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &url_file) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &url_file) };
     let opened = || std::fs::read_to_string(&url_file).unwrap_or_default();
     let mut app = test_app_with_agent();
     app.active_announcements = vec![promo_announcement("promo-open")];
@@ -656,7 +656,7 @@ fn announcements_open_cta_opens_promo_and_noops_under_critical() {
         &mut app,
     );
     assert!(opened().trim().is_empty(), "no cta → no open");
-    unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+    unsafe { std::env::remove_var("FRIDAY_TEST_OPEN_URL_FILE") };
     let _ = std::fs::remove_file(&url_file);
 }
 /// `AnnouncementCtaShown` latches once per (announcement, surface) pair.
@@ -1050,7 +1050,7 @@ fn a_redundant_window_pick_is_refused_while_a_model_switch_is_pending() {
         scrollback_before + 1
     );
 }
-/// Grok 4.7 (current) and 4.8 list 256k and 500k, and Grok 4.5 lists 128k and 256k. All default to 256k.
+/// Friday X 4.7 (current) and 4.8 list 256k and 500k, and Friday X 4.5 lists 128k and 256k. All default to 256k.
 fn test_app_with_catalog(selection: Option<u64>) -> AppView {
     let mut app = test_app_with_agent();
     let models = &mut test_agent_mut(&mut app, AgentId(0)).session.models;
@@ -1505,7 +1505,7 @@ fn tick_propagates_available_commands_to_bootstrap() {
     app.active_view = crate::app::app_view::ActiveView::Agent(id);
     let skill_meta = serde_json::json!({
         "scope": "user",
-        "path": "/home/user/.grok/skills/pick-best/SKILL.md",
+        "path": "/home/user/.friday/skills/pick-best/SKILL.md",
     });
     app.agents.get_mut(&id).unwrap().session.available_commands = vec![
         acp::AvailableCommand::new("compact".to_string(), "Builtin".to_string()),
@@ -2476,7 +2476,7 @@ fn build_rows_fallback_anchor_is_frozen_when_last_active_at_is_none() {
 /// While the turn is IDLE the scrollback scan gives the peek header label the TYPE of the most recent agent block (Response / Edit / Thought / …).
 /// The most recent block wins; a fresh user prompt is a turn boundary with no agent response after it yet, so the label is "Idle".
 /// (The RUNNING case follows live turn activity; see the `extract_response_type_*` tests.)
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn peek_label_reflects_last_response_type() {
     use crate::scrollback::block::RenderBlock;
@@ -2549,7 +2549,7 @@ fn mouse_event(
     }
 }
 /// A single left-click on a row selects it and attaches the conversation immediately.
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn mouse_left_click_attaches_immediately() {
     use crossterm::event::{Event, MouseButton, MouseEventKind};
@@ -2577,7 +2577,7 @@ fn mouse_left_click_attaches_immediately() {
 /// Every left-click attaches, including rapid repeated clicks.
 /// The previous design used a 500ms window to distinguish single (select) from double (attach) click.
 /// Now every click attaches, so the user's mental model "click = open" always holds.
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn mouse_repeated_click_keeps_attaching() {
     use crossterm::event::{Event, MouseButton, MouseEventKind};
@@ -2611,7 +2611,7 @@ fn mouse_repeated_click_keeps_attaching() {
 }
 /// Clicks after the previous 500ms double-click window also attach.
 /// (The previous test asserted single-click behaviour for clicks more than 500ms apart; now every click attaches.)
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn mouse_click_after_long_pause_still_attaches() {
     use crossterm::event::{Event, MouseButton, MouseEventKind};
@@ -2642,7 +2642,7 @@ fn mouse_click_after_long_pause_still_attaches() {
     }
 }
 /// Click on the peek close-button rect closes the peek.
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn mouse_click_on_peek_close_rect_clears_peek() {
     use crossterm::event::{Event, MouseButton, MouseEventKind};
@@ -2882,7 +2882,7 @@ fn welcome_expand_skips_conversation_and_routes_build_card_detail() {
     assert_eq!(
         welcome_card_detail(&app),
         None,
-        "Headless must not resurrect a cleared Grok row from card detail"
+        "Headless must not resurrect a cleared Friday X row from card detail"
     );
 }
 fn system_texts(app: &AppView, id: AgentId) -> Vec<String> {
@@ -2950,7 +2950,7 @@ fn toggle_scroll_log_flips_recorder_and_reports_path() {
         "disable must be confirmed, got {texts:?}"
     );
 }
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn open_managed_connectors_starts_wait_when_modal_open() {
     use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab};
@@ -2959,7 +2959,7 @@ fn open_managed_connectors_starts_wait_when_modal_open() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&url_file);
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &url_file) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &url_file) };
     let mut app = test_app_with_agent();
     let id = AgentId(0);
     app.agents.get_mut(&id).unwrap().extensions_modal =
@@ -2979,7 +2979,7 @@ fn open_managed_connectors_starts_wait_when_modal_open() {
             .any(|line| line == crate::views::mcps_modal::managed_connectors_url(None)),
         "opener seam must record the connectors URL; got {recorded:?}"
     );
-    unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+    unsafe { std::env::remove_var("FRIDAY_TEST_OPEN_URL_FILE") };
     let _ = std::fs::remove_file(&url_file);
 }
 #[test]

@@ -10,7 +10,7 @@ fn git_stdout(args: &[&str]) -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 fn main() {
-    println!("cargo:rerun-if-env-changed=GROK_VERSION");
+    println!("cargo:rerun-if-env-changed=FRIDAY_VERSION");
     let mut watch_paths = Vec::new();
     watch_paths.extend(git_stdout(&["rev-parse", "--git-path", "HEAD"]));
     watch_paths.extend(git_stdout(&["rev-parse", "--git-path", "logs/HEAD"]));
@@ -24,7 +24,7 @@ fn main() {
         .map(|s| s.chars().take(12).collect::<String>())
         .filter(|s| s.len() == 12)
         .unwrap_or_else(|| "unknown".to_string());
-    let version = std::env::var("GROK_VERSION")
+    let version = std::env::var("FRIDAY_VERSION")
         .or_else(|_| std::env::var("CARGO_PKG_VERSION"))
         .unwrap_or_else(|_| "0.0.0".to_string());
     println!("cargo:rustc-env=VERSION_WITH_COMMIT={version} ({commit})");

@@ -20,7 +20,7 @@ use prod_mc_cli_chat_proxy_types::feedback_types::{
 };
 
 /// Client version header sent on every request to cli-chat-proxy for version gating.
-const CLIENT_VERSION_HEADER: &str = "x-grok-client-version";
+const CLIENT_VERSION_HEADER: &str = "x-friday-client-version";
 
 /// HTTP error from the feedback/signals API with a preserved status code.
 ///
@@ -229,7 +229,7 @@ impl FeedbackClient {
         // User-token auth requires the companion marker header for proxy routing
         // Deployment keys do not need it
         if self.credentials.deployment_key.is_none() {
-            builder.header("X-XAI-Token-Auth", "xai-grok-cli")
+            builder.header("X-Friday-Token-Auth", "friday-x-cli")
         } else {
             builder
         }
@@ -240,6 +240,11 @@ impl FeedbackClient {
         request: RequestBuilder,
         context: &'static str,
     ) -> Result<T> {
+        // Friday X never sends feedback, session signals or per-turn analytics: this client is the only way those
+        // reached a server, so it refuses before any network I/O (feedback is also switched off in config).
+        let _ = request;
+        anyhow::bail!("{context}: not available in Friday X");
+        #[allow(unreachable_code)]
         let request = xai_grok_otel::inject_trace_context_into_request(request);
         let req = request.build().context(context)?;
         let (response, stamp) = xai_grok_auth::execute_with_stamp(&self.client, req)

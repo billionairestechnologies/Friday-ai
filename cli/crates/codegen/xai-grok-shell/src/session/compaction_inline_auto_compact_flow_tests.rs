@@ -1877,11 +1877,11 @@ fn classify_suppress_reason_maps_error_text() {
         SuppressReason::CreditBlock
     );
     assert_eq!(
-        classify("API error (status 402 Payment Required): Grok Build usage balance exhausted"),
+        classify("API error (status 402 Payment Required): Friday X usage balance exhausted"),
         SuppressReason::CreditBlock
     );
     assert_eq!(
-        classify("Grok Build usage limit reached"),
+        classify("Friday X usage limit reached"),
         SuppressReason::CreditBlock
     );
     assert_eq!(

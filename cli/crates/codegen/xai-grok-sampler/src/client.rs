@@ -44,14 +44,14 @@ use xai_grok_auth::bearer_suffix;
 
 pub use xai_grok_sampling_types::ApiBackend;
 
-/// Process-level fallback for the `x-grok-client-identifier` header.
+/// Process-level fallback for the `x-friday-client-identifier` header.
 const DEFAULT_CLIENT_IDENTIFIER: &str = "grok-shell";
 
 /// Product identifier baked into User-Agent strings.
 const AGENT_PRODUCT: &str = "grok-shell";
 const ANTHROPIC_DEFAULT_MAX_TOKENS: u32 = 128_000;
 
-/// Per-request `x-grok-*` headers. Optional fields are skipped when empty/`None`.
+/// Per-request `x-friday-*` headers. Optional fields are skipped when empty/`None`.
 struct GrokRequestHeaders<'a> {
     conv_id: &'a str,
     req_id: &'a str,
@@ -68,22 +68,22 @@ struct GrokRequestHeaders<'a> {
 impl GrokRequestHeaders<'_> {
     fn apply(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         let mut b = builder
-            .header("x-grok-conv-id", self.conv_id)
-            .header("x-grok-req-id", self.req_id)
-            .header("x-grok-model-override", self.model_id)
-            .header("x-grok-session-id", self.session_id)
-            .header("x-grok-agent-id", self.agent_id);
+            .header("x-friday-conv-id", self.conv_id)
+            .header("x-friday-req-id", self.req_id)
+            .header("x-friday-model-override", self.model_id)
+            .header("x-friday-session-id", self.session_id)
+            .header("x-friday-agent-id", self.agent_id);
         if let Some(idx) = self.turn_idx {
-            b = b.header("x-grok-turn-idx", idx);
+            b = b.header("x-friday-turn-idx", idx);
         }
         if let Some(attempt) = self.transient_retry {
-            b = b.header("x-grok-transient-retry", attempt);
+            b = b.header("x-friday-transient-retry", attempt);
         }
         if let Some(id) = self.deployment_id.filter(|s| !s.is_empty()) {
-            b = b.header("x-grok-deployment-id", id);
+            b = b.header("x-friday-deployment-id", id);
         }
         if let Some(id) = self.user_id.filter(|s| !s.is_empty()) {
-            b = b.header("x-grok-user-id", id);
+            b = b.header("x-friday-user-id", id);
         }
         b
     }
@@ -210,12 +210,12 @@ fn extract_should_retry(headers: &reqwest::header::HeaderMap) -> Option<bool> {
 
 fn extract_model_metadata(headers: &reqwest::header::HeaderMap) -> Option<ResponseModelMetadata> {
     let context_window = headers
-        .get("x-grok-context-window")
+        .get("x-friday-context-window")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok());
 
     let max_completion_tokens = headers
-        .get("x-grok-max-completion-tokens")
+        .get("x-friday-max-completion-tokens")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u32>().ok());
 
@@ -557,12 +557,12 @@ impl SamplingClient {
             &mut headers,
         );
 
-        // Add x-grok-client-version header for version gating at the proxy.
+        // Add x-friday-client-version header for version gating at the proxy.
         if let Some(client_version) = config.client_version.as_ref()
             && let Ok(header_value) = HeaderValue::from_str(client_version)
         {
             headers.insert(
-                HeaderName::from_static("x-grok-client-version"),
+                HeaderName::from_static("x-friday-client-version"),
                 header_value,
             );
         }
@@ -571,7 +571,7 @@ impl SamplingClient {
             && let Ok(header_value) = HeaderValue::from_str(deployment_id)
         {
             headers.insert(
-                HeaderName::from_static("x-grok-deployment-id"),
+                HeaderName::from_static("x-friday-deployment-id"),
                 header_value,
             );
         }
@@ -579,14 +579,14 @@ impl SamplingClient {
         if let Some(user_id) = config.user_id.as_ref()
             && let Ok(header_value) = HeaderValue::from_str(user_id)
         {
-            headers.insert(HeaderName::from_static("x-grok-user-id"), header_value);
+            headers.insert(HeaderName::from_static("x-friday-user-id"), header_value);
         }
 
         if let Some(conversation_group_id) = config.conversation_group_id.as_ref()
             && let Ok(header_value) = HeaderValue::from_str(conversation_group_id.as_ref())
         {
             headers.insert(
-                HeaderName::from_static("x-grok-conv-group-id"),
+                HeaderName::from_static("x-friday-conv-group-id"),
                 header_value,
             );
         }
@@ -598,7 +598,7 @@ impl SamplingClient {
                 .unwrap_or_else(|| DEFAULT_CLIENT_IDENTIFIER.to_string());
             if let Ok(header_value) = HeaderValue::from_str(&client_id) {
                 headers.insert(
-                    HeaderName::from_static("x-grok-client-identifier"),
+                    HeaderName::from_static("x-friday-client-identifier"),
                     header_value,
                 );
             }
@@ -2621,7 +2621,7 @@ mod tests {
                 );
                 // cli-chat-proxy rejects a zstd body it cannot attribute from headers.
                 assert!(
-                    header(&headers, HeaderName::from_static("x-grok-model-override"))
+                    header(&headers, HeaderName::from_static("x-friday-model-override"))
                         .is_some_and(|model| !model.is_empty()),
                     "{route}: a compressed body must carry the model override"
                 );

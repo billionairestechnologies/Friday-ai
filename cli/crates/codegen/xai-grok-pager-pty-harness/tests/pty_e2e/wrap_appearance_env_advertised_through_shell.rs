@@ -4,7 +4,7 @@ use super::common::*;
 
 /// A single argv containing whitespace routes through `$SHELL -i -c`, the same hop OSC 52 takes.
 const PRINT_APPEARANCE: &str =
-    "printf 'grok=%s lc=%s\\n' \"$GROK_APPEARANCE\" \"$LC_GROK_APPEARANCE\"";
+    "printf 'grok=%s lc=%s\\n' \"$FRIDAY_APPEARANCE\" \"$LC_GROK_APPEARANCE\"";
 
 fn parse_printed_appearance(raw: &str) -> Option<(String, String)> {
     let line = raw.lines().find(|l| l.starts_with("grok="))?;
@@ -24,7 +24,7 @@ fn wrap_appearance_env_advertised_through_shell() {
         &[
             ("SHELL", "/bin/sh"),
             ("COLORFGBG", "15;0"),
-            ("GROK_APPEARANCE", ""),
+            ("FRIDAY_APPEARANCE", ""),
             ("LC_GROK_APPEARANCE", ""),
         ],
     );
@@ -44,7 +44,7 @@ fn wrap_appearance_env_advertised_through_shell() {
     );
 }
 
-/// The parent sets `GROK_APPEARANCE=light` and pins LC empty.
+/// The parent sets `FRIDAY_APPEARANCE=light` and pins LC empty.
 /// A desktop probe that answers overrides both names to the same polarity; one that answers `None` inherits GROK and must not invent LC.
 /// The test itself never probes the desktop; a second live probe could disagree.
 #[test]
@@ -55,7 +55,7 @@ fn wrap_appearance_env_desktop_none_does_not_restamp_parent_grok() {
         &[PRINT_APPEARANCE],
         &[
             ("SHELL", "/bin/sh"),
-            ("GROK_APPEARANCE", "light"),
+            ("FRIDAY_APPEARANCE", "light"),
             ("LC_GROK_APPEARANCE", ""),
         ],
     );

@@ -7,14 +7,14 @@ use xai_grok_login::backend::{ActiveAuthBackend, AuthBackend};
 use xai_grok_login::{GrokAuth, GrokComConfig};
 use xai_grok_sampling_types::{MODEL_NOTICE_META_KEY, ModelNotice};
 
-const GROK_CODE_BACKEND_URL: &str = "https://code.grok.com";
+const FRIDAY_CODE_BACKEND_URL: &str = "https://friday.billionairestechnologies.com";
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
-const GROK_CODE_WEB_URL: &str = "https://grok.com";
+const FRIDAY_CODE_WEB_URL: &str = "https://friday.billionairestechnologies.com";
 
 pub fn share_url(permission_id: &str) -> String {
     let web_url =
-        std::env::var("GROK_CODE_WEB_URL").unwrap_or_else(|_| GROK_CODE_WEB_URL.to_string());
+        std::env::var("FRIDAY_CODE_WEB_URL").unwrap_or_else(|_| FRIDAY_CODE_WEB_URL.to_string());
     format!("{}/build/share/{}", web_url, permission_id)
 }
 
@@ -46,7 +46,7 @@ async fn add_bundle_fetch_headers(
 
     let mut builder = credentials
         .apply(builder, url)
-        .header("x-grok-client-version", xai_grok_version::VERSION);
+        .header("x-friday-client-version", xai_grok_version::VERSION);
 
     if deployment_key.is_none()
         && let Some(auth) = &resolved_auth
@@ -59,7 +59,7 @@ async fn add_bundle_fetch_headers(
 
     builder = builder
         .header(
-            "x-grok-client-identifier",
+            "x-friday-client-identifier",
             crate::http::process_client_identifier(),
         )
         .header(
@@ -160,7 +160,7 @@ async fn fetch_bundle_inner(
     let mut request = client
         .get(&archive_url)
         .timeout(std::time::Duration::from_secs(30))
-        .header("x-grok-client-version", xai_grok_version::VERSION)
+        .header("x-friday-client-version", xai_grok_version::VERSION)
         .header(
             crate::http::CLIENT_MODE_HEADER,
             crate::http::process_client_mode(),
@@ -322,8 +322,8 @@ impl BackendClient {
         Self {
             client: reqwest_middleware::ClientBuilder::new(reqwest_client.clone()).build(),
             reqwest_client,
-            base_url: std::env::var("GROK_CODE_BACKEND_URL")
-                .unwrap_or_else(|_| GROK_CODE_BACKEND_URL.to_string()),
+            base_url: std::env::var("FRIDAY_CODE_BACKEND_URL")
+                .unwrap_or_else(|_| FRIDAY_CODE_BACKEND_URL.to_string()),
             auth_manager: None,
         }
     }
@@ -405,7 +405,7 @@ impl BackendClient {
         Ok(share_url(&share_response.permission_id))
     }
 
-    /// Must include X-XAI-Token-Auth so nginx auth subrequest routes to OAuth.
+    /// Must include X-Friday-Token-Auth so nginx auth subrequest routes to OAuth.
     /// See: crates/codegen/xai-grok-shell/src/agent/app.rs:run_headless
     // Returns a HeaderMap; reqwest .header() appends, so we must not touch a builder that already has Content-Type from .json()
     async fn auth_header_map(&self) -> Result<reqwest::header::HeaderMap, BackendError> {
@@ -421,8 +421,8 @@ impl BackendClient {
         };
 
         headers.insert(
-            "X-XAI-Token-Auth",
-            required(&GrokComConfig::default().token_header, "X-XAI-Token-Auth")?,
+            "X-Friday-Token-Auth",
+            required(&GrokComConfig::default().token_header, "X-Friday-Token-Auth")?,
         );
         headers.insert("x-userid", required(&auth.user_id, "x-userid")?);
         if let Some(email) = &auth.email
@@ -431,14 +431,14 @@ impl BackendClient {
             headers.insert("x-email", v);
         }
         if let Ok(v) = HeaderValue::from_str(&crate::http::process_client_identifier()) {
-            headers.insert("x-grok-client-identifier", v);
+            headers.insert("x-friday-client-identifier", v);
         }
         headers.insert(
             crate::http::CLIENT_MODE_HEADER,
             HeaderValue::from_static(crate::http::process_client_mode()),
         );
         headers.insert(
-            "x-grok-client-version",
+            "x-friday-client-version",
             HeaderValue::from_static(xai_grok_version::VERSION),
         );
         Ok(headers)

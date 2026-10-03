@@ -19,7 +19,7 @@ fn install_releases_registry_lock_before_post_install_config_write() {
     // acp_harness::run_agent_test).
     let grok_home = tempfile::tempdir().expect("grok home");
     // SAFETY: no other threads are running yet.
-    unsafe { std::env::set_var("GROK_HOME", grok_home.path()) };
+    unsafe { std::env::set_var("FRIDAY_HOME", grok_home.path()) };
 
     let src = tempfile::tempdir().expect("plugin source");
     std::fs::write(

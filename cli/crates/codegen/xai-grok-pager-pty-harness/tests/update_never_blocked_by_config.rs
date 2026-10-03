@@ -1,4 +1,4 @@
-//! `grok update` is a recovery command: a config failure must not block it, and a WinGet install hands off to WinGet.
+//! `friday update` is a recovery command: a config failure must not block it, and a WinGet install hands off to WinGet.
 //!
 //! A local server serves the channel pointer and records each request path.
 //! The config test serves the binary's own version, so a healthy run exits 0 ("already up to date").
@@ -67,9 +67,9 @@ fn grok_command(exe: &Path, home: &Path, base: &str) -> Command {
     command
         .env_clear()
         .env("HOME", home)
-        .env("GROK_HOME", home)
+        .env("FRIDAY_HOME", home)
         .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("GROK_CLI_BASE_URL", base);
+        .env("FRIDAY_CLI_BASE_URL", base);
     xai_tty_utils::detach_std_command(&mut command);
     command
 }
@@ -88,7 +88,7 @@ fn output(mut command: Command) -> Output {
     child.wait_with_output().expect("wait for grok")
 }
 
-/// Run `grok update` in a fresh isolated home against the local pointer base.
+/// Run `friday update` in a fresh isolated home against the local pointer base.
 fn run_update(base: &str, config_toml: &str, extra_args: &[&str]) -> Output {
     let home = tempfile::tempdir().unwrap();
     std::fs::write(home.path().join("config.toml"), config_toml).unwrap();
@@ -140,7 +140,7 @@ fn corrupt_config_never_changes_update_outcome() {
     let valid = run_update(&base, "[cli]\n", &[]);
     assert!(
         valid.status.success(),
-        "healthy grok update against the local base must exit 0\nstdout:\n{}\nstderr:\n{}",
+        "healthy friday update against the local base must exit 0\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&valid.stdout),
         String::from_utf8_lossy(&valid.stderr)
     );
@@ -148,7 +148,7 @@ fn corrupt_config_never_changes_update_outcome() {
     let corrupt = run_update(&base, "this is not toml {{{[[[", &[]);
     assert!(
         corrupt.status.success(),
-        "a corrupt config.toml must not block grok update\nstdout:\n{}\nstderr:\n{}",
+        "a corrupt config.toml must not block friday update\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&corrupt.stdout),
         String::from_utf8_lossy(&corrupt.stderr)
     );
@@ -177,12 +177,12 @@ fn winget_install_update_hands_off_without_update_writes() {
         let stderr = String::from_utf8_lossy(&update.stderr);
         assert!(
             update.status.success(),
-            "grok update on a WinGet install must exit 0 (env {envs:?})\nstderr:\n{stderr}"
+            "friday update on a WinGet install must exit 0 (env {envs:?})\nstderr:\n{stderr}"
         );
         assert!(
             stderr.contains("winget upgrade --id xAI.GrokBuild -e")
                 && stderr.contains("WinGet ships only the stable channel"),
-            "grok update must hand off to WinGet and flag the ignored alpha channel (env {envs:?})\nstderr:\n{stderr}"
+            "friday update must hand off to WinGet and flag the ignored alpha channel (env {envs:?})\nstderr:\n{stderr}"
         );
         let logged = requests.lock().unwrap_or_else(|e| e.into_inner()).clone();
         assert_eq!(Vec::<String>::new(), logged);
@@ -196,7 +196,7 @@ fn winget_install_update_hands_off_without_update_writes() {
     let mut pinned = grok_command(&exe, home.path(), &base);
     pinned
         .args(["update", "--version", "0.0.1"])
-        .env("GROK_REQUIRED_MINIMUM_VERSION", "0.0.2");
+        .env("FRIDAY_REQUIRED_MINIMUM_VERSION", "0.0.2");
     let pinned = output(pinned);
     let stderr = String::from_utf8_lossy(&pinned.stderr);
     assert!(
@@ -216,8 +216,8 @@ fn winget_install_update_hands_off_without_update_writes() {
     let capped_cases = [
         CappedCase {
             envs: &[
-                ("GROK_MAXIMUM_VERSION", "5.0.0"),
-                ("GROK_TEST_VERSION", "1.0.0"),
+                ("FRIDAY_MAXIMUM_VERSION", "5.0.0"),
+                ("FRIDAY_TEST_VERSION", "1.0.0"),
             ],
             succeeds: true,
             expected: install_5,
@@ -225,8 +225,8 @@ fn winget_install_update_hands_off_without_update_writes() {
         },
         CappedCase {
             envs: &[
-                ("GROK_REQUIRED_MAXIMUM_VERSION", "5.0.0"),
-                ("GROK_TEST_VERSION", "6.0.0"),
+                ("FRIDAY_REQUIRED_MAXIMUM_VERSION", "5.0.0"),
+                ("FRIDAY_TEST_VERSION", "6.0.0"),
             ],
             succeeds: true,
             expected: install_5,
@@ -234,8 +234,8 @@ fn winget_install_update_hands_off_without_update_writes() {
         },
         CappedCase {
             envs: &[
-                ("GROK_MAXIMUM_VERSION", "5.0.0"),
-                ("GROK_TEST_VERSION", "5.0.0"),
+                ("FRIDAY_MAXIMUM_VERSION", "5.0.0"),
+                ("FRIDAY_TEST_VERSION", "5.0.0"),
             ],
             succeeds: true,
             expected: "Already up to date (5.0.0).",
@@ -243,8 +243,8 @@ fn winget_install_update_hands_off_without_update_writes() {
         },
         CappedCase {
             envs: &[
-                ("GROK_MAXIMUM_VERSION", "5.0.0"),
-                ("GROK_TEST_VERSION", "6.0.0"),
+                ("FRIDAY_MAXIMUM_VERSION", "5.0.0"),
+                ("FRIDAY_TEST_VERSION", "6.0.0"),
             ],
             succeeds: true,
             expected: "Already up to date (6.0.0).",
@@ -252,8 +252,8 @@ fn winget_install_update_hands_off_without_update_writes() {
         },
         CappedCase {
             envs: &[
-                ("GROK_MAXIMUM_VERSION", "5.0.0"),
-                ("GROK_MINIMUM_VERSION", "6.0.0"),
+                ("FRIDAY_MAXIMUM_VERSION", "5.0.0"),
+                ("FRIDAY_MINIMUM_VERSION", "6.0.0"),
             ],
             succeeds: true,
             expected: "is not an allowed update",
@@ -261,8 +261,8 @@ fn winget_install_update_hands_off_without_update_writes() {
         },
         CappedCase {
             envs: &[
-                ("GROK_MAXIMUM_VERSION", "2000.0.0"),
-                ("GROK_REQUIRED_MINIMUM_VERSION", "1000.0.0"),
+                ("FRIDAY_MAXIMUM_VERSION", "2000.0.0"),
+                ("FRIDAY_REQUIRED_MINIMUM_VERSION", "1000.0.0"),
             ],
             succeeds: false,
             expected: "newer than the latest available release (999.0.0)",
@@ -313,7 +313,7 @@ fn winget_install_update_hands_off_without_update_writes() {
     let mut explicit = grok_command(&exe, home.path(), &base);
     explicit
         .args(["update", "--check", "--json"])
-        .env("GROK_INSTALLER", "internal");
+        .env("FRIDAY_INSTALLER", "internal");
     let status: Value = serde_json::from_slice(&output(explicit).stdout)
         .unwrap_or_else(|e| panic!("update --check --json must emit JSON: {e}"));
     assert_eq!(

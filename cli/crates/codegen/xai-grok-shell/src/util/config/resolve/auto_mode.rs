@@ -1,13 +1,13 @@
 use crate::util::config::RemoteSettings;
 use toml::Value as TomlValue;
 
-pub(crate) const ENV_AUTO_PERMISSION_MODE: &str = "GROK_AUTO_PERMISSION_MODE";
+pub(crate) const ENV_AUTO_PERMISSION_MODE: &str = "FRIDAY_AUTO_PERMISSION_MODE";
 
 const AUTO_MODE_CLASSIFY_TIMEOUT_MIN_MS: u64 = 1_000;
 const AUTO_MODE_CLASSIFY_TIMEOUT_DEFAULT_MS: u64 = 30_000;
 const AUTO_MODE_CLASSIFY_TIMEOUT_MAX_MS: u64 = 120_000;
 
-/// Crate-wide serialization lock for tests that mutate `GROK_AUTO_PERMISSION_MODE`.
+/// Crate-wide serialization lock for tests that mutate `FRIDAY_AUTO_PERMISSION_MODE`.
 /// Every test reading the gate locks this so a concurrent setter can't make them flaky.
 /// That includes the tests in `permissions.rs`, which compile into the same test binary.
 #[cfg(test)]
@@ -58,7 +58,7 @@ fn resolve_auto_permission_mode_layers(
 
 /// Resolve whether the **auto** permission mode feature (`PermissionMode::Auto`, the LLM/heuristic classifier) is enabled.
 /// Full chain mirroring [`resolve_zdr_access_enabled`](super::resolve_zdr_access_enabled):
-/// requirements > env (`GROK_AUTO_PERMISSION_MODE`) > `[auto_mode] enabled` > managed > remote `auto_mode.enabled` > default (`true`).
+/// requirements > env (`FRIDAY_AUTO_PERMISSION_MODE`) > `[auto_mode] enabled` > managed > remote `auto_mode.enabled` > default (`true`).
 pub fn resolve_auto_permission_mode_enabled(
     requirements: Option<&TomlValue>,
     user: Option<&TomlValue>,
@@ -233,7 +233,7 @@ mod auto_permission_mode_gate_tests {
     use super::*;
     use crate::agent::config::ConfigSource;
 
-    // `GROK_AUTO_PERMISSION_MODE` is process-global; serialize every test that reads it (all of them, via `BoolFlag::env`)
+    // `FRIDAY_AUTO_PERMISSION_MODE` is process-global; serialize every test that reads it (all of them, via `BoolFlag::env`)
     // Force it unset at the top of each so a developer's shell value can't make these flaky
     fn guard() -> std::sync::MutexGuard<'static, ()> {
         let g = super::AUTO_PERMISSION_MODE_ENV_LOCK

@@ -497,7 +497,7 @@ fn upsell_non_max_unified_shows_buy_credits() {
     assert_eq!(option_at(q, 1).label, "Buy more credits");
     assert_eq!(
         option_at(q, 1).description,
-        "Purchase credits to keep using Grok Build"
+        "Purchase credits to keep using Friday X"
     );
     assert_eq!(option_at(q, 2).label, "Try Again");
 }
@@ -566,7 +566,7 @@ fn is_credit_limit_error_matches_legacy_403_and_pool_402() {
     assert!(is_credit_limit_error(Some(402), "anything"));
     assert!(is_credit_limit_error(
         None,
-        "API error (status 402 Payment Required): Grok Build usage balance exhausted"
+        "API error (status 402 Payment Required): Friday X usage balance exhausted"
     ));
     assert!(is_credit_limit_error(
         None,
@@ -809,13 +809,13 @@ fn team_auth_disables_agent_billing_surface() {
     assert!(!app.agents.get(&AgentId(0)).unwrap().billing_surface_visible);
 }
 
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn manage_billing_gates_on_consumer_billing_surface() {
-    let out = std::env::temp_dir().join(format!("grok-manage-billing-{}.txt", std::process::id()));
+    let out = std::env::temp_dir().join(format!("friday-manage-billing-{}.txt", std::process::id()));
     let _ = std::fs::remove_file(&out);
     // SAFETY: serialized via `serial_test` so no other test races the env var.
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &out) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &out) };
     let mut app = test_app_with_agent();
     dispatch(Action::ManageBilling, &mut app);
     let opened = std::fs::read_to_string(&out).unwrap_or_default();
@@ -1300,7 +1300,7 @@ fn free_usage_upsell_shows_three_options_with_exact_labels() {
         ),
         (
             "Upgrade to SuperGrok Heavy",
-            "Get the most out of Grok Build. Highest usage limits.",
+            "Get the most out of Friday X. Highest usage limits.",
             Some(UPSELL_URL_UPGRADE),
         ),
     ];
@@ -1526,18 +1526,18 @@ fn unknown_non_restricted_command_still_passes_through() {
 }
 
 /// `Action::OpenUrl` for a billing CTA must push a scrollback system message that includes the full URL when the OS browser opener cannot run.
-/// The opener failure is simulated via a broken `GROK_TEST_OPEN_URL_FILE` path.
+/// The opener failure is simulated via a broken `FRIDAY_TEST_OPEN_URL_FILE` path.
 /// On a headless VM the opener always fails, so without this message the Upgrade and Buy-more-credits buttons do nothing visible.
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn open_url_shows_manual_url_when_browser_unavailable() {
-    // Point `GROK_TEST_OPEN_URL_FILE` at a path whose parent dir does not exist so the write fails and `open_url` returns false (BrowserUnavailable)
+    // Point `FRIDAY_TEST_OPEN_URL_FILE` at a path whose parent dir does not exist so the write fails and `open_url` returns false (BrowserUnavailable)
     let bad = std::env::temp_dir().join(format!(
         "grok-open-url-missing-{}/out.txt",
         std::process::id()
     ));
     // SAFETY: serialized via `serial_test` so no other test races the env var.
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &bad) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &bad) };
 
     let mut app = test_app_with_agent();
     let before = agent_scrollback_len(&app);
@@ -1562,18 +1562,18 @@ fn open_url_shows_manual_url_when_browser_unavailable() {
     assert_eq!(toast, Some("Browser unavailable - URL shown above"));
 
     // SAFETY: serialized via `serial_test`; restore the env for other tests.
-    unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+    unsafe { std::env::remove_var("FRIDAY_TEST_OPEN_URL_FILE") };
 }
 
-/// A successful open (the `GROK_TEST_OPEN_URL_FILE` write succeeds) must not spam a fallback system message.
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+/// A successful open (the `FRIDAY_TEST_OPEN_URL_FILE` write succeeds) must not spam a fallback system message.
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn open_url_does_not_show_fallback_when_opener_succeeds() {
     let url_file =
-        std::env::temp_dir().join(format!("grok-open-url-ok-{}.txt", std::process::id()));
+        std::env::temp_dir().join(format!("friday-open-url-ok-{}.txt", std::process::id()));
     let _ = std::fs::remove_file(&url_file);
     // SAFETY: serialized via `serial_test`.
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &url_file) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &url_file) };
 
     let mut app = test_app_with_agent();
     let before = agent_scrollback_len(&app);
@@ -1592,13 +1592,13 @@ fn open_url_does_not_show_fallback_when_opener_succeeds() {
     );
 
     // SAFETY: serialized via `serial_test`.
-    unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+    unsafe { std::env::remove_var("FRIDAY_TEST_OPEN_URL_FILE") };
     let _ = std::fs::remove_file(&url_file);
 }
 
 /// Welcome has no scrollback: browser-unavailable OpenUrl must put up a single-line toast that includes the full URL.
 /// No `\n`; the welcome painter is one row. Privacy-banner Terms/Policy clicks hit this path.
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn open_url_welcome_toasts_single_line_url_when_browser_unavailable() {
     let bad = std::env::temp_dir().join(format!(
@@ -1606,7 +1606,7 @@ fn open_url_welcome_toasts_single_line_url_when_browser_unavailable() {
         std::process::id()
     ));
     // SAFETY: serialized via `serial_test` so no other test races the env var.
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &bad) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &bad) };
 
     let mut app = test_app();
     assert!(
@@ -1649,11 +1649,11 @@ fn open_url_welcome_toasts_single_line_url_when_browser_unavailable() {
     );
 
     // SAFETY: serialized via `serial_test`; restore the env for other tests.
-    unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+    unsafe { std::env::remove_var("FRIDAY_TEST_OPEN_URL_FILE") };
 }
 
 /// Credit-limit upsell Q&A submit routes through OpenUrl; when the browser is unavailable the full option URL must land in scrollback.
-#[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
+#[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
 fn credit_limit_upsell_submit_shows_url_when_browser_unavailable() {
     use crate::app::agent_view::translate_local_submit_for_test;
@@ -1665,7 +1665,7 @@ fn credit_limit_upsell_submit_shows_url_when_browser_unavailable() {
         std::process::id()
     ));
     // SAFETY: serialized via `serial_test`.
-    unsafe { std::env::set_var("GROK_TEST_OPEN_URL_FILE", &bad) };
+    unsafe { std::env::set_var("FRIDAY_TEST_OPEN_URL_FILE", &bad) };
 
     let mut app = test_app_with_agent();
     open_upsell_qa(&mut app, CreditLimitUpsellMode::UnifiedCredits);
@@ -1702,7 +1702,7 @@ fn credit_limit_upsell_submit_shows_url_when_browser_unavailable() {
     );
 
     // SAFETY: serialized via `serial_test`.
-    unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+    unsafe { std::env::remove_var("FRIDAY_TEST_OPEN_URL_FILE") };
 }
 
 #[test]

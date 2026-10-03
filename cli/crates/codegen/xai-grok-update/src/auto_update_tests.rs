@@ -4,8 +4,8 @@ use super::*;
 fn test_tmp_download_path_is_unique_per_version_and_per_attempt() {
     // The old `with_extension("tmp")` collapsed every 0.1.x versioned name onto a single `grok-0.1.tmp`
     // The helper must keep distinct versions distinct AND make repeated attempts (same process, e.g. concurrent tokio tasks) unique.
-    let dest_181 = std::path::Path::new("/home/u/.grok/downloads/grok-0.1.181-linux-x86_64");
-    let dest_182 = std::path::Path::new("/home/u/.grok/downloads/grok-0.1.182-linux-x86_64");
+    let dest_181 = std::path::Path::new("/home/u/.friday/downloads/grok-0.1.181-linux-x86_64");
+    let dest_182 = std::path::Path::new("/home/u/.friday/downloads/grok-0.1.182-linux-x86_64");
 
     let a = tmp_download_path(dest_181);
     let b = tmp_download_path(dest_182);
@@ -28,7 +28,7 @@ fn test_tmp_download_path_is_unique_per_version_and_per_attempt() {
     );
     assert_eq!(
         a.parent(),
-        std::path::Path::new("/home/u/.grok/downloads").into(),
+        std::path::Path::new("/home/u/.friday/downloads").into(),
         "temp file must stay in the destination directory for atomic rename"
     );
 }
@@ -77,7 +77,7 @@ async fn test_atomic_symlink_swap_creates_new_symlink() {
     let target = dir.path().join("binary-v1");
     std::fs::write(&target, "v1").unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     // No existing symlink, so the swap should create one
     atomic_symlink_swap(&target, &link).await.unwrap();
 
@@ -96,7 +96,7 @@ async fn test_atomic_symlink_swap_replaces_existing() {
     let target_v2 = dir.path().join("binary-v2");
     std::fs::write(&target_v2, "v2").unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     // Set up initial symlink to v1.
     std::os::unix::fs::symlink(&target_v1, &link).unwrap();
     assert_eq!(std::fs::read_to_string(&link).unwrap(), "v1");
@@ -118,7 +118,7 @@ async fn test_atomic_symlink_swap_preserves_old_target() {
     let target_v2 = dir.path().join("binary-v2");
     std::fs::write(&target_v2, "v2-content").unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     std::os::unix::fs::symlink(&target_v1, &link).unwrap();
 
     atomic_symlink_swap(&target_v2, &link).await.unwrap();
@@ -141,7 +141,7 @@ async fn test_atomic_symlink_swap_no_intermediate_missing_state() {
     let target_v2 = dir.path().join("binary-v2");
     std::fs::write(&target_v2, "v2").unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     std::os::unix::fs::symlink(&target_v1, &link).unwrap();
     assert!(link.exists(), "link should exist before swap");
 
@@ -161,7 +161,7 @@ async fn test_atomic_symlink_swap_replaces_regular_file() {
     let target = dir.path().join("binary-v2");
     std::fs::write(&target, "v2").unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     // Simulate an old installation where grok is a regular file.
     std::fs::write(&link, "old-binary").unwrap();
 
@@ -182,7 +182,7 @@ async fn test_atomic_symlink_swap_succeeds_despite_leftover_tmp_link() {
     let target_v2 = dir.path().join("binary-v2");
     std::fs::write(&target_v2, "v2").unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     std::os::unix::fs::symlink(&target_v1, &link).unwrap();
     std::os::unix::fs::symlink(&target_v1, link.with_extension("tmp-link")).unwrap();
 
@@ -216,7 +216,7 @@ async fn test_reconcile_agent_repoints_diverged_agent() {
     std::fs::write(downloads.join("grok-0.2.101-macos-aarch64"), "new").unwrap();
     std::fs::write(downloads.join("grok-0.1.199-macos-aarch64"), "old").unwrap();
 
-    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("grok"))
+    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("friday"))
         .unwrap();
     std::os::unix::fs::symlink("../downloads/grok-0.1.199-macos-aarch64", bin.join("agent"))
         .unwrap();
@@ -238,7 +238,7 @@ async fn test_reconcile_agent_heals_legacy_unversioned_agent() {
     std::fs::write(downloads.join("grok-0.2.101-macos-aarch64"), "new").unwrap();
     std::fs::write(downloads.join("grok-macos-aarch64"), "legacy").unwrap();
 
-    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("grok"))
+    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("friday"))
         .unwrap();
     std::os::unix::fs::symlink("../downloads/grok-macos-aarch64", bin.join("agent")).unwrap();
 
@@ -256,7 +256,7 @@ async fn test_reconcile_agent_heals_legacy_unversioned_agent() {
 async fn test_reconcile_agent_creates_missing_agent() {
     let (_dir, bin, downloads) = managed_layout();
     std::fs::write(downloads.join("grok-0.2.101-macos-aarch64"), "new").unwrap();
-    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("grok"))
+    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("friday"))
         .unwrap();
 
     reconcile_agent_to_grok(&bin).await;
@@ -271,7 +271,7 @@ async fn test_reconcile_agent_noop_when_consistent() {
     let (_dir, bin, downloads) = managed_layout();
     std::fs::write(downloads.join("grok-0.2.101-macos-aarch64"), "new").unwrap();
     let target = "../downloads/grok-0.2.101-macos-aarch64";
-    std::os::unix::fs::symlink(target, bin.join("grok")).unwrap();
+    std::os::unix::fs::symlink(target, bin.join("friday")).unwrap();
     std::os::unix::fs::symlink(target, bin.join("agent")).unwrap();
 
     reconcile_agent_to_grok(&bin).await;
@@ -292,7 +292,7 @@ async fn test_reconcile_agent_noop_when_consistent() {
 #[tokio::test]
 async fn test_reconcile_agent_skips_when_grok_dangling() {
     let (_dir, bin, downloads) = managed_layout();
-    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("grok"))
+    std::os::unix::fs::symlink("../downloads/grok-0.2.101-macos-aarch64", bin.join("friday"))
         .unwrap();
     std::fs::write(downloads.join("grok-0.1.199-macos-aarch64"), "old").unwrap();
     std::os::unix::fs::symlink("../downloads/grok-0.1.199-macos-aarch64", bin.join("agent"))
@@ -310,7 +310,7 @@ async fn test_reconcile_agent_skips_when_grok_dangling() {
 #[tokio::test]
 async fn test_reconcile_agent_skips_when_grok_not_symlink() {
     let (_dir, bin, downloads) = managed_layout();
-    std::fs::write(bin.join("grok"), "copy-binary").unwrap();
+    std::fs::write(bin.join("friday"), "copy-binary").unwrap();
     std::fs::write(downloads.join("grok-0.1.199-macos-aarch64"), "old").unwrap();
     std::os::unix::fs::symlink("../downloads/grok-0.1.199-macos-aarch64", bin.join("agent"))
         .unwrap();
@@ -329,7 +329,7 @@ async fn test_sweep_stale_tmp_links_removes_stale_keeps_fresh_and_active() {
     let dir = tempfile::tempdir().unwrap();
     let target = dir.path().join("binary-v1");
     std::fs::write(&target, "v1").unwrap();
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     std::os::unix::fs::symlink(&target, &link).unwrap();
 
     // Old- and new-style leftover temp links.
@@ -338,7 +338,7 @@ async fn test_sweep_stale_tmp_links_removes_stale_keeps_fresh_and_active() {
     std::os::unix::fs::symlink(&target, &leftover_old).unwrap();
     std::os::unix::fs::symlink(&target, &leftover_new).unwrap();
 
-    // max_age = ZERO: every leftover is stale and removed; the active `grok` link (no `.tmp-link` suffix) is untouched
+    // max_age = ZERO: every leftover is stale and removed; the active `friday` link (no `.tmp-link` suffix) is untouched
     sweep_stale_tmp_links(&link, Duration::ZERO).await;
     assert!(!leftover_old.exists() && !leftover_new.exists());
     assert!(link.is_symlink(), "active link must be preserved");
@@ -355,7 +355,7 @@ async fn test_sweep_stale_tmp_links_removes_stale_keeps_fresh_and_active() {
 async fn test_atomic_symlink_swap_multiple_sequential_swaps() {
     // Simulate four sequential swaps, v1 through v4
     let dir = tempfile::tempdir().unwrap();
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
 
     for i in 1..=4 {
         let target = dir.path().join(format!("binary-v{}", i));
@@ -391,7 +391,7 @@ async fn test_atomic_symlink_swap_with_relative_target() {
     std::fs::write(downloads.join("grok-0.1.203"), "v203").unwrap();
 
     let rel_target = std::path::Path::new("../downloads/grok-0.1.203");
-    let link = bin.join("grok");
+    let link = bin.join("friday");
     atomic_symlink_swap(rel_target, &link).await.unwrap();
 
     assert!(link.is_symlink());
@@ -406,8 +406,8 @@ async fn test_atomic_symlink_swap_with_relative_target() {
 #[test]
 fn test_relative_symlink_target_sibling_dirs() {
     // bin/grok -> ../downloads/grok-0.1.203
-    let target = std::path::Path::new("/home/alice/.grok/downloads/grok-0.1.203");
-    let link = std::path::Path::new("/home/alice/.grok/bin/grok");
+    let target = std::path::Path::new("/home/alice/.friday/downloads/grok-0.1.203");
+    let link = std::path::Path::new("/home/alice/.friday/bin/grok");
     let result = relative_symlink_target(target, link);
     assert_eq!(
         result,
@@ -419,8 +419,8 @@ fn test_relative_symlink_target_sibling_dirs() {
 #[test]
 fn test_relative_symlink_target_same_dir() {
     // downloads/grok-latest -> grok-0.1.203 (same directory)
-    let target = std::path::Path::new("/home/alice/.grok/downloads/grok-0.1.203");
-    let link = std::path::Path::new("/home/alice/.grok/downloads/grok-latest");
+    let target = std::path::Path::new("/home/alice/.friday/downloads/grok-0.1.203");
+    let link = std::path::Path::new("/home/alice/.friday/downloads/grok-latest");
     let result = relative_symlink_target(target, link);
     assert_eq!(result, std::path::PathBuf::from("grok-0.1.203"));
 }
@@ -428,26 +428,26 @@ fn test_relative_symlink_target_same_dir() {
 #[cfg(unix)]
 #[test]
 fn test_relative_symlink_target_cross_tree_stays_absolute() {
-    // /usr/local/bin/grok -> /home/alice/.grok/downloads/grok-0.1.203
+    // /usr/local/bin/grok -> /home/alice/.friday/downloads/grok-0.1.203
     // Different grandparents, so the target should stay absolute
-    let target = std::path::Path::new("/home/alice/.grok/downloads/grok-0.1.203");
+    let target = std::path::Path::new("/home/alice/.friday/downloads/grok-0.1.203");
     let link = std::path::Path::new("/usr/local/bin/grok");
     let result = relative_symlink_target(target, link);
     assert_eq!(
         result,
-        std::path::PathBuf::from("/home/alice/.grok/downloads/grok-0.1.203")
+        std::path::PathBuf::from("/home/alice/.friday/downloads/grok-0.1.203")
     );
 }
 
 #[cfg(unix)]
 #[tokio::test]
 async fn test_relative_symlink_survives_directory_move() {
-    // Simulates Docker bind-mount: create ~/.grok/ layout at path A,
+    // Simulates Docker bind-mount: create ~/.friday/ layout at path A,
     // then move it to path B and verify the symlink still resolves.
     let dir = tempfile::tempdir().unwrap();
 
     // Create alice's layout
-    let alice = dir.path().join("alice").join(".grok");
+    let alice = dir.path().join("alice").join(".friday");
     let alice_downloads = alice.join("downloads");
     let alice_bin = alice.join("bin");
     std::fs::create_dir_all(&alice_downloads).unwrap();
@@ -456,16 +456,16 @@ async fn test_relative_symlink_survives_directory_move() {
 
     // Create a relative symlink (what relative_symlink_target produces)
     let rel_target = std::path::Path::new("../downloads/grok-0.1.203");
-    let link = alice_bin.join("grok");
+    let link = alice_bin.join("friday");
     atomic_symlink_swap(rel_target, &link).await.unwrap();
 
     // Verify it works at the original location
     assert_eq!(std::fs::read_to_string(&link).unwrap(), "binary-content");
 
-    // "Bind-mount" to bob: copy the entire .grok tree
+    // "Bind-mount" to bob: copy the entire .friday tree
     let bob_home = dir.path().join("bob");
     std::fs::create_dir_all(&bob_home).unwrap();
-    let bob = bob_home.join(".grok");
+    let bob = bob_home.join(".friday");
     let copy_status = std::process::Command::new("cp")
         .args(["-a", alice.to_str().unwrap(), bob.to_str().unwrap()])
         .status()
@@ -473,7 +473,7 @@ async fn test_relative_symlink_survives_directory_move() {
     assert!(copy_status.success());
 
     // Verify the symlink resolves at bob's path too
-    let bob_link = bob.join("bin").join("grok");
+    let bob_link = bob.join("bin").join("friday");
     assert!(bob_link.is_symlink());
     assert_eq!(
         std::fs::read_link(&bob_link).unwrap(),
@@ -493,7 +493,7 @@ async fn test_atomic_symlink_swap_broken_symlink_target() {
     // If the current symlink is broken (target deleted externally), the swap should still succeed
     let dir = tempfile::tempdir().unwrap();
 
-    let link = dir.path().join("grok");
+    let link = dir.path().join("friday");
     // Create a broken symlink that points to a file that doesn't exist
     std::os::unix::fs::symlink(dir.path().join("deleted-binary"), &link).unwrap();
     assert!(link.is_symlink());
@@ -600,13 +600,13 @@ async fn test_cleanup_old_downloads_keeps_current_plus_one() {
 
     // Simulate 5 old grok binaries in downloads dir.
     for v in ["0.1.140", "0.1.141", "0.1.142", "0.1.143", "0.1.144"] {
-        std::fs::write(d.join(format!("grok-{}-macos-aarch64", v)), v).unwrap();
+        std::fs::write(d.join(format!("friday-{}-macos-aarch64", v)), v).unwrap();
     }
     std::fs::write(d.join("grok-0.1.145-macos-aarch64"), "current").unwrap();
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.145").await;
+    cleanup_old_downloads(d, "friday", "0.1.145").await;
 
     // Current must survive.
     assert!(d.join("grok-0.1.145-macos-aarch64").exists(), "current");
@@ -645,7 +645,7 @@ async fn test_cleanup_old_downloads_does_not_touch_other_binaries() {
     // Cleanup only grok; pager files must be untouched
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(d.join("grok-0.1.141-macos-aarch64").exists());
     assert!(d.join("grok-0.1.140-macos-aarch64").exists()); // only old, kept as N-1
@@ -691,7 +691,7 @@ async fn test_cleanup_old_downloads_removes_stale_tmp_keeps_fresh_tmp() {
     std::fs::write(d.join("grok-0.1.142-macos-aarch64.77-0.tmp"), "inflight").unwrap();
     std::fs::write(d.join("grok-0.1.141-macos-aarch64"), "current").unwrap();
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(
         !d.join("grok-0.1.140-macos-aarch64.tmp").exists(),
@@ -716,14 +716,14 @@ async fn test_cleanup_old_downloads_keeps_fresh_versioned_binary() {
 
     // Three old versions and the current: policy would delete .138 and .139
     for v in ["0.1.138", "0.1.139", "0.1.140"] {
-        std::fs::write(d.join(format!("grok-{v}-macos-aarch64")), v).unwrap();
+        std::fs::write(d.join(format!("friday-{v}-macos-aarch64")), v).unwrap();
     }
     std::fs::write(d.join("grok-0.1.141-macos-aarch64"), "current").unwrap();
     make_all_stale(d);
     // .138 is re-written NOW, simulating a racer that just renamed its download into place (e.g. a rollback install racing an upgrade).
     std::fs::write(d.join("grok-0.1.138-macos-aarch64"), "in-flight").unwrap();
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(d.join("grok-0.1.141-macos-aarch64").exists(), "current");
     assert!(d.join("grok-0.1.140-macos-aarch64").exists(), "N-1 kept");
@@ -750,7 +750,7 @@ async fn test_cleanup_old_downloads_skips_symlinks() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(
         d.join("grok-latest").exists(),
@@ -771,7 +771,7 @@ async fn test_cleanup_old_downloads_version_prefix_collision() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.14").await;
+    cleanup_old_downloads(d, "friday", "0.1.14").await;
 
     // Current must survive.
     assert!(
@@ -799,7 +799,7 @@ async fn test_cleanup_old_downloads_pager_multi_version() {
     let d = dir.path();
 
     for v in ["0.1.148", "0.1.149", "0.1.150"] {
-        std::fs::write(d.join(format!("grok-pager-{}-linux-x64", v)), v).unwrap();
+        std::fs::write(d.join(format!("friday-pager-{}-linux-x64", v)), v).unwrap();
     }
     std::fs::write(d.join("grok-pager-0.1.151-linux-x64"), "current").unwrap();
 
@@ -826,13 +826,13 @@ async fn test_cleanup_old_downloads_npm_layout() {
     let d = dir.path();
 
     for v in ["0.1.138", "0.1.139", "0.1.140"] {
-        std::fs::write(d.join(format!("grok-{}", v)), v).unwrap();
+        std::fs::write(d.join(format!("friday-{}", v)), v).unwrap();
     }
     std::fs::write(d.join("grok-0.1.141"), "current").unwrap();
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(d.join("grok-0.1.141").exists(), "current");
     assert!(d.join("grok-0.1.140").exists(), "N-1 kept");
@@ -855,7 +855,7 @@ async fn test_cleanup_old_downloads_alpha_versions() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.150-alpha.1").await;
+    cleanup_old_downloads(d, "friday", "0.1.150-alpha.1").await;
 
     // Current must survive.
     assert!(
@@ -892,7 +892,7 @@ async fn test_cleanup_old_downloads_mixed_stable_and_alpha() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.150").await;
+    cleanup_old_downloads(d, "friday", "0.1.150").await;
 
     // Current must survive.
     assert!(d.join("grok-0.1.150-macos-aarch64").exists(), "current");
@@ -949,7 +949,7 @@ fn test_reinstall_hint_internal_mentions_platform_installer() {
             "should reference install.ps1: {hint}"
         );
         assert!(
-            !hint.contains("GROK_CHANNEL"),
+            !hint.contains("FRIDAY_CHANNEL"),
             "stable must not set channel: {hint}"
         );
     } else {
@@ -959,7 +959,7 @@ fn test_reinstall_hint_internal_mentions_platform_installer() {
             "should reference install.sh: {hint}"
         );
         assert!(
-            !hint.contains("GROK_CHANNEL"),
+            !hint.contains("FRIDAY_CHANNEL"),
             "stable must not set channel: {hint}"
         );
     }
@@ -970,13 +970,13 @@ fn test_reinstall_hint_internal_alpha_sets_channel() {
     let hint = reinstall_hint("internal", "alpha");
     if cfg!(windows) {
         assert!(
-            hint.contains("$env:GROK_CHANNEL='alpha'"),
-            "alpha should set GROK_CHANNEL: {hint}"
+            hint.contains("$env:FRIDAY_CHANNEL='alpha'"),
+            "alpha should set FRIDAY_CHANNEL: {hint}"
         );
     } else {
         assert!(
-            hint.contains("| GROK_CHANNEL='alpha' bash"),
-            "alpha must set GROK_CHANNEL on bash (the process running \
+            hint.contains("| FRIDAY_CHANNEL='alpha' bash"),
+            "alpha must set FRIDAY_CHANNEL on bash (the process running \
              install.sh), not curl: {hint}"
         );
     }
@@ -984,14 +984,14 @@ fn test_reinstall_hint_internal_alpha_sets_channel() {
 
 #[test]
 fn test_reinstall_hint_enterprise_uses_enterprise_script() {
-    // Enterprise ships via its own bootstrap script (channel hardcoded there), never install.sh with GROK_CHANNEL
+    // Enterprise ships via its own bootstrap script (channel hardcoded there), never install.sh with FRIDAY_CHANNEL
     let hint = reinstall_hint("internal", "enterprise");
     assert!(
         hint.contains("/enterprise-install."),
         "enterprise must use the published enterprise-install script: {hint}"
     );
     assert!(
-        !hint.contains("GROK_CHANNEL"),
+        !hint.contains("FRIDAY_CHANNEL"),
         "enterprise script needs no channel env: {hint}"
     );
 }
@@ -1002,7 +1002,7 @@ fn test_reinstall_hint_malformed_channel_falls_back_to_stable() {
     for bad in ["al pha", "x'; rm -rf ~;'", "a\"b", ""] {
         let hint = reinstall_hint("internal", bad);
         assert!(
-            !hint.contains("GROK_CHANNEL"),
+            !hint.contains("FRIDAY_CHANNEL"),
             "malformed channel {bad:?} must fall back to stable: {hint}"
         );
     }
@@ -1465,7 +1465,7 @@ async fn test_cleanup_old_downloads_invalid_current_version_is_no_op() {
     // An invalid version string makes cleanup early-return without deleting
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "not-a-version").await;
+    cleanup_old_downloads(d, "friday", "not-a-version").await;
     assert!(d.join("grok-0.1.140-macos-aarch64").exists());
     assert!(d.join("grok-0.1.141-macos-aarch64").exists());
 }
@@ -1481,7 +1481,7 @@ async fn test_cleanup_old_downloads_files_with_non_digit_suffix_skipped() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     // grok-latest and grok-pager-* must be untouched.
     assert!(d.join("grok-latest").exists());
@@ -1498,7 +1498,7 @@ async fn test_cleanup_old_downloads_unparseable_version_skipped() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(
         d.join("grok-9garbage-macos-aarch64").exists(),
@@ -1515,7 +1515,7 @@ async fn test_cleanup_old_downloads_only_current_present_no_op() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(d.join("grok-0.1.141-macos-aarch64").exists());
 }
@@ -1529,7 +1529,7 @@ async fn test_cleanup_old_downloads_only_one_old_keeps_it() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     // Only one old version, so it is kept as N-1
     assert!(d.join("grok-0.1.140-macos-aarch64").exists(), "N-1 kept");
@@ -1549,7 +1549,7 @@ async fn test_cleanup_old_downloads_unrelated_files_untouched() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(d.join("README.md").exists());
     assert!(d.join("config.toml").exists());
@@ -1569,7 +1569,7 @@ async fn test_cleanup_old_downloads_multiplatform_in_same_dir() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     // Both platform variants of current must survive.
     assert!(d.join("grok-0.1.141-macos-aarch64").exists());
@@ -1592,7 +1592,7 @@ async fn test_cleanup_old_downloads_tmp_files_deleted_even_when_unparseable() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(!d.join("grok-junk.tmp").exists(), "junk tmp deleted");
     assert!(
@@ -1611,7 +1611,7 @@ async fn test_cleanup_old_downloads_darwin_platform_recognized() {
 
     make_all_stale(d);
 
-    cleanup_old_downloads(d, "grok", "0.1.141").await;
+    cleanup_old_downloads(d, "friday", "0.1.141").await;
 
     assert!(d.join("grok-0.1.141-darwin-arm64").exists(), "current");
     assert!(d.join("grok-0.1.140-darwin-arm64").exists(), "N-1");
@@ -1630,12 +1630,12 @@ fn test_user_facing_constants_are_stable() {
     );
     assert_eq!(
         MSG_RUN_UPDATE_MANUAL,
-        "Run `grok update` to get the latest version."
+        "Run `friday update` to get the latest version."
     );
 }
 
 // ────────────────────────────────────────────────────────────────────── env_installer — env-var based, must run
-// serially. GROK_INSTALLER (npm | internal | gh-release | gh); GROK_MANAGED_BY_NPM → npm; GROK_MANAGED_BY_INTERNAL →
+// serially. FRIDAY_INSTALLER (npm | internal | gh-release | gh); FRIDAY_MANAGED_BY_NPM → npm; FRIDAY_MANAGED_BY_INTERNAL →
 // internal. ──────────────────────────────────────────────────────────────────────
 
 /// Snapshot every installer-related env var so the test can clear them at start and restore them at end.
@@ -1647,9 +1647,9 @@ struct InstallerEnvGuard {
 impl InstallerEnvGuard {
     fn isolate() -> Self {
         const VARS: &[&str] = &[
-            "GROK_INSTALLER",
-            "GROK_MANAGED_BY_NPM",
-            "GROK_MANAGED_BY_INTERNAL",
+            "FRIDAY_INSTALLER",
+            "FRIDAY_MANAGED_BY_NPM",
+            "FRIDAY_MANAGED_BY_INTERNAL",
             "npm_config_user_agent",
             "NPM_TOKEN",
         ];
@@ -1687,7 +1687,7 @@ fn test_env_installer_no_vars_returns_none() {
 #[serial_test::serial]
 fn test_env_installer_explicit_npm() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "npm") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "npm") };
     assert_eq!(env_installer(), Some("npm"));
 }
 
@@ -1695,7 +1695,7 @@ fn test_env_installer_explicit_npm() {
 #[serial_test::serial]
 fn test_env_installer_explicit_internal() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "internal") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "internal") };
     assert_eq!(env_installer(), Some("internal"));
 }
 
@@ -1703,7 +1703,7 @@ fn test_env_installer_explicit_internal() {
 #[serial_test::serial]
 fn test_env_installer_explicit_gh_release() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "gh-release") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "gh-release") };
     assert_eq!(env_installer(), Some("gh-release"));
 }
 
@@ -1712,7 +1712,7 @@ fn test_env_installer_explicit_gh_release() {
 fn test_env_installer_explicit_gh_alias() {
     // `gh` is shorthand for `gh-release`.
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "gh") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "gh") };
     assert_eq!(env_installer(), Some("gh-release"));
 }
 
@@ -1720,10 +1720,10 @@ fn test_env_installer_explicit_gh_alias() {
 #[serial_test::serial]
 fn test_env_installer_explicit_uppercase_normalized() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "NPM") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "NPM") };
     assert_eq!(env_installer(), Some("npm"));
 
-    unsafe { std::env::set_var("GROK_INSTALLER", "Gh-Release") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "Gh-Release") };
     assert_eq!(env_installer(), Some("gh-release"));
 }
 
@@ -1732,15 +1732,15 @@ fn test_env_installer_explicit_uppercase_normalized() {
 fn test_env_installer_explicit_unknown_value_returns_none() {
     // CRITICAL: when the explicit env var is set to something we don't recognize, we early-return None
     // This means we do NOT fall through to the other env vars or to config
-    // So `GROK_INSTALLER=brew` disables the env-installer detection entirely
+    // So `FRIDAY_INSTALLER=brew` disables the env-installer detection entirely
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "brew") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "brew") };
     // Even if MANAGED_BY_NPM is also set, the explicit var wins (and rejects).
-    unsafe { std::env::set_var("GROK_MANAGED_BY_NPM", "1") };
+    unsafe { std::env::set_var("FRIDAY_MANAGED_BY_NPM", "1") };
     assert_eq!(
         env_installer(),
         None,
-        "explicit GROK_INSTALLER=brew must early-return None, not fall through"
+        "explicit FRIDAY_INSTALLER=brew must early-return None, not fall through"
     );
 }
 
@@ -1748,7 +1748,7 @@ fn test_env_installer_explicit_unknown_value_returns_none() {
 #[serial_test::serial]
 fn test_env_installer_explicit_empty_returns_none() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_INSTALLER", "") };
+    unsafe { std::env::set_var("FRIDAY_INSTALLER", "") };
     assert_eq!(env_installer(), None);
 }
 
@@ -1756,7 +1756,7 @@ fn test_env_installer_explicit_empty_returns_none() {
 #[serial_test::serial]
 fn test_env_installer_managed_by_npm() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_MANAGED_BY_NPM", "1") };
+    unsafe { std::env::set_var("FRIDAY_MANAGED_BY_NPM", "1") };
     assert_eq!(env_installer(), Some("npm"));
 }
 
@@ -1765,7 +1765,7 @@ fn test_env_installer_managed_by_npm() {
 fn test_env_installer_managed_by_npm_any_value() {
     // The check is `is_some`, so any value (including empty) wins
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_MANAGED_BY_NPM", "") };
+    unsafe { std::env::set_var("FRIDAY_MANAGED_BY_NPM", "") };
     assert_eq!(env_installer(), Some("npm"));
 }
 
@@ -1773,7 +1773,7 @@ fn test_env_installer_managed_by_npm_any_value() {
 #[serial_test::serial]
 fn test_env_installer_managed_by_internal() {
     let _g = InstallerEnvGuard::isolate();
-    unsafe { std::env::set_var("GROK_MANAGED_BY_INTERNAL", "1") };
+    unsafe { std::env::set_var("FRIDAY_MANAGED_BY_INTERNAL", "1") };
     assert_eq!(env_installer(), Some("internal"));
 }
 
@@ -1794,11 +1794,11 @@ fn test_env_installer_npm_config_user_agent_implies_npm() {
 #[test]
 #[serial_test::serial]
 fn test_env_installer_explicit_internal_wins_over_npm_managed() {
-    // GROK_INSTALLER=internal must override an inherited MANAGED_BY_NPM.
+    // FRIDAY_INSTALLER=internal must override an inherited MANAGED_BY_NPM.
     let _g = InstallerEnvGuard::isolate();
     unsafe {
-        std::env::set_var("GROK_INSTALLER", "internal");
-        std::env::set_var("GROK_MANAGED_BY_NPM", "1");
+        std::env::set_var("FRIDAY_INSTALLER", "internal");
+        std::env::set_var("FRIDAY_MANAGED_BY_NPM", "1");
     }
     assert_eq!(env_installer(), Some("internal"));
 }
@@ -1971,7 +1971,7 @@ async fn test_windows_replace_exe_creates_dest_when_missing() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new-binary.exe");
     std::fs::write(&src, "new content").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
 
     windows_replace_exe(&src, &dest).await.unwrap();
 
@@ -1985,7 +1985,7 @@ async fn test_windows_replace_exe_overwrites_unlocked_dest() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new-binary.exe");
     std::fs::write(&src, "new content").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "old content").unwrap();
 
     windows_replace_exe(&src, &dest).await.unwrap();
@@ -2000,7 +2000,7 @@ async fn test_windows_replace_exe_preserves_binary_bytes() {
     let body: Vec<u8> = (0u8..=255).cycle().take(4096).collect();
     let src = dir.path().join("binary.exe");
     std::fs::write(&src, &body).unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
 
     windows_replace_exe(&src, &dest).await.unwrap();
 
@@ -2013,9 +2013,9 @@ async fn test_windows_replace_exe_cleans_stale_old_backup() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new.exe");
     std::fs::write(&src, "new").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "current").unwrap();
-    let old = dir.path().join("grok.exe.old");
+    let old = dir.path().join("friday.exe.old");
     std::fs::write(&old, "stale-from-prior-update").unwrap();
 
     windows_replace_exe(&src, &dest).await.unwrap();
@@ -2047,7 +2047,7 @@ async fn test_windows_replace_exe_locked_file_renames_aside() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new.exe");
     std::fs::write(&src, "updated binary").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "running binary").unwrap();
 
     let _lock = std::fs::OpenOptions::new()
@@ -2060,7 +2060,7 @@ async fn test_windows_replace_exe_locked_file_renames_aside() {
 
     assert_eq!(std::fs::read_to_string(&dest).unwrap(), "updated binary");
 
-    let old = dir.path().join("grok.exe.old");
+    let old = dir.path().join("friday.exe.old");
     assert!(old.exists(), ".old must exist after rename fallback");
     drop(_lock);
     assert_eq!(std::fs::read_to_string(&old).unwrap(), "running binary");
@@ -2077,7 +2077,7 @@ async fn test_windows_replace_exe_rollback_on_copy_failure() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new.exe");
     std::fs::write(&src, "updated binary").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "original").unwrap();
 
     // Dest locked like a running exe: blocks writes but allows rename.
@@ -2103,7 +2103,7 @@ async fn test_windows_replace_exe_rollback_on_copy_failure() {
         "original",
         "rollback must restore the original binary"
     );
-    let old = dir.path().join("grok.exe.old");
+    let old = dir.path().join("friday.exe.old");
     assert!(!old.exists(), "rollback must consume the .old aside");
 }
 
@@ -2113,7 +2113,7 @@ async fn test_windows_replace_exe_idempotent_same_content() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("binary.exe");
     std::fs::write(&src, "same content").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "same content").unwrap();
 
     windows_replace_exe(&src, &dest).await.unwrap();
@@ -2127,7 +2127,7 @@ async fn test_windows_replace_exe_empty_binary() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("empty.exe");
     std::fs::write(&src, b"").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "non-empty").unwrap();
 
     windows_replace_exe(&src, &dest).await.unwrap();
@@ -2147,9 +2147,9 @@ async fn test_windows_replace_exe_locked_stale_old_does_not_block_update() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new.exe");
     std::fs::write(&src, "updated binary").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "running binary").unwrap();
-    let old = dir.path().join("grok.exe.old");
+    let old = dir.path().join("friday.exe.old");
     std::fs::write(&old, "previous binary").unwrap();
 
     // No FILE_SHARE_DELETE: .old cannot be deleted or rename-replaced.
@@ -2210,9 +2210,9 @@ async fn test_windows_replace_exe_rollback_restores_from_diverted_aside() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new.exe");
     std::fs::write(&src, "updated binary").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "running binary").unwrap();
-    let old = dir.path().join("grok.exe.old");
+    let old = dir.path().join("friday.exe.old");
     std::fs::write(&old, "previous binary").unwrap();
 
     // No FILE_SHARE_DELETE: .old survives the sweep and forces a divert.
@@ -2263,9 +2263,9 @@ async fn test_windows_replace_exe_sweeps_accumulated_asides() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("new.exe");
     std::fs::write(&src, "new").unwrap();
-    let dest = dir.path().join("grok.exe");
+    let dest = dir.path().join("friday.exe");
     std::fs::write(&dest, "current").unwrap();
-    let old = dir.path().join("grok.exe.old");
+    let old = dir.path().join("friday.exe.old");
     std::fs::write(&old, "stale").unwrap();
     let aside_a = dir.path().join("grok.exe.old.1234-0.old");
     let aside_b = dir.path().join("grok.exe.old.1234-1.old");

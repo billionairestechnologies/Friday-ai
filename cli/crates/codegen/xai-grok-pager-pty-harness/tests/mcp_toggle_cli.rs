@@ -1,4 +1,4 @@
-//! CLI-seam tests for `grok mcp enable`/`disable`/`add`/`list` against the real pager binary: no-op
+//! CLI-seam tests for `friday mcp enable`/`disable`/`add`/`list` against the real pager binary: no-op
 //! toggles leave config.toml alone, policy refusals fire before any write, list reports verdicts.
 
 use std::process::{Command, Stdio};
@@ -22,7 +22,7 @@ fn toggle_env(user_config: &str) -> ToggleEnv {
     let grok_home = root.join("grok-home");
     let cwd = root.join("project");
     std::fs::create_dir_all(&home).expect("create HOME");
-    std::fs::create_dir_all(&grok_home).expect("create GROK_HOME");
+    std::fs::create_dir_all(&grok_home).expect("create FRIDAY_HOME");
     std::fs::create_dir_all(&cwd).expect("create cwd");
     // Bound the project-config walk to the temp dir.
     git2::Repository::init(&cwd).expect("git init");
@@ -57,7 +57,7 @@ fn run_mcp(env: &ToggleEnv, args: &[&str]) -> std::process::Output {
     command
         .env_clear()
         .env("HOME", &env.home)
-        .env("GROK_HOME", &env.grok_home)
+        .env("FRIDAY_HOME", &env.grok_home)
         .env("SHELL", "/bin/sh")
         .env("PATH", std::env::var_os("PATH").unwrap_or_default())
         .env("TERM", "xterm-256color")
@@ -232,7 +232,7 @@ fn enable_refuses_denied_server_from_project_path_plugin() {
     // Under $HOME so the config-path plugin is auto-trusted (folder trust is inert in dev builds).
     let project = env.home.join("project");
     let plugin = project.join("tools").join("plugin");
-    std::fs::create_dir_all(project.join(".grok")).expect("create project .grok");
+    std::fs::create_dir_all(project.join(".friday")).expect("create project .friday");
     std::fs::create_dir_all(&plugin).expect("create plugin dir");
     git2::Repository::init(&project).expect("git init");
     std::fs::write(plugin.join("plugin.json"), r#"{"name": "corp-plugin"}"#).expect("manifest");
@@ -242,7 +242,7 @@ fn enable_refuses_denied_server_from_project_path_plugin() {
     )
     .expect("plugin .mcp.json");
     std::fs::write(
-        project.join(".grok").join("config.toml"),
+        project.join(".friday").join("config.toml"),
         format!("[plugins]\npaths = [\"{}\"]\n", plugin.display()),
     )
     .expect("project config.toml");
@@ -264,9 +264,9 @@ fn enable_refuses_denied_project_server_in_untrusted_folder() {
         ("", "enabled = false\n"),
     ] {
         let mut env = blocked_env(user_config);
-        env.extra_env.push(("GROK_TEST_VERSION", "1.0.0"));
-        let project_config = env.cwd.join(".grok").join("config.toml");
-        std::fs::create_dir_all(env.cwd.join(".grok")).expect("create project .grok");
+        env.extra_env.push(("FRIDAY_TEST_VERSION", "1.0.0"));
+        let project_config = env.cwd.join(".friday").join("config.toml");
+        std::fs::create_dir_all(env.cwd.join(".friday")).expect("create project .friday");
         std::fs::write(
             &project_config,
             format!("[mcp_servers.corp]\nurl = \"{BLOCKED_URL}\"\n{project_extra}"),
@@ -293,15 +293,15 @@ fn enable_refuses_denied_project_server_in_untrusted_folder() {
     }
 }
 
-/// `grok mcp disable` writes the personal (user-tier) disable, so "already disabled" is judged
+/// `friday mcp disable` writes the personal (user-tier) disable, so "already disabled" is judged
 /// against that tier: a project-tier `enabled = false` must not swallow the write.
 #[test]
 #[ignore = "spawns the real pager binary; CI/Bazel provides PAGER_BINARY"]
 fn disable_persists_personal_disable_over_project_tier_disable() {
     let env = toggle_env("");
-    std::fs::create_dir_all(env.cwd.join(".grok")).expect("create project .grok");
+    std::fs::create_dir_all(env.cwd.join(".friday")).expect("create project .friday");
     std::fs::write(
-        env.cwd.join(".grok").join("config.toml"),
+        env.cwd.join(".friday").join("config.toml"),
         "[mcp_servers.x]\nurl = \"https://x.example.test/sse\"\nenabled = false\n",
     )
     .expect("project config.toml");
@@ -316,7 +316,7 @@ fn disable_persists_personal_disable_over_project_tier_disable() {
     );
     assert!(
         stdout.contains("Disabled MCP server 'x'.")
-            && stdout.contains("File modified: $GROK_HOME/config.toml"),
+            && stdout.contains("File modified: $FRIDAY_HOME/config.toml"),
         "stdout: {stdout}"
     );
     let parsed: toml::Value =
@@ -340,7 +340,7 @@ fn disable_persists_personal_disable_over_project_tier_disable() {
     );
 }
 
-/// `grok mcp list` co-reports the policy verdict with the personal disable, in the text note and
+/// `friday mcp list` co-reports the policy verdict with the personal disable, in the text note and
 /// as the additive `blocked_reason` JSON key.
 #[test]
 #[ignore = "spawns the real pager binary; CI/Bazel provides PAGER_BINARY"]
@@ -381,7 +381,7 @@ fn list_reports_policy_block_in_text_and_json() {
     );
 }
 
-/// `grok mcp add` gates on policy before persisting: a URL deny refuses a user-scope add and the
+/// `friday mcp add` gates on policy before persisting: a URL deny refuses a user-scope add and the
 /// project-MCP pin refuses a fresh `--scope project` add, with no config file written either way.
 #[test]
 #[ignore = "spawns the real pager binary; CI/Bazel provides PAGER_BINARY"]
@@ -399,7 +399,7 @@ fn add_refuses_denied_server_before_any_write() {
     let output = run_mcp(&env, &["add", "--transport", "http", "svc", BLOCKED_URL]);
     assert_refused_without_write(&env, &output, &env.config, &before);
 
-    let project_config = env.cwd.join(".grok").join("config.toml");
+    let project_config = env.cwd.join(".friday").join("config.toml");
     let output = run_mcp(
         &env,
         &[
@@ -444,7 +444,7 @@ fn real_toggle_writes_config_and_reports_file_modified() {
         "stdout: {stdout}"
     );
     assert!(
-        stdout.contains("File modified: $GROK_HOME/config.toml"),
+        stdout.contains("File modified: $FRIDAY_HOME/config.toml"),
         "stdout: {stdout}"
     );
     let enabled_body = std::fs::read(&env.config).expect("re-read config");
@@ -469,7 +469,7 @@ fn real_toggle_writes_config_and_reports_file_modified() {
         "stdout: {stdout}"
     );
     assert!(
-        stdout.contains("File modified: $GROK_HOME/config.toml"),
+        stdout.contains("File modified: $FRIDAY_HOME/config.toml"),
         "stdout: {stdout}"
     );
     let disabled_body = std::fs::read(&env.config).expect("re-read config");

@@ -336,7 +336,7 @@ pub struct AnimationConfig {
     /// Lower is a faster wave; higher is slower and smoother. Default: 32.
     pub wave_rows: u16,
     /// Show an FPS counter overlay in the top-right corner (debug/dev builds only).
-    /// Also enabled by the `GROK_FPS=1` env var. Default: false.
+    /// Also enabled by the `FRIDAY_FPS=1` env var. Default: false.
     pub show_fps: bool,
 }
 
@@ -926,7 +926,7 @@ pub struct RawAnimationConfig {
     /// Lower = faster wave, higher = slower/smoother wave. Default: 32.
     pub wave_rows: u16,
     /// Show an FPS counter overlay in the top-right corner.
-    /// Requires a debug build. Also enabled by GROK_FPS=1 env var. Default: false.
+    /// Requires a debug build. Also enabled by FRIDAY_FPS=1 env var. Default: false.
     pub show_fps: bool,
 }
 
@@ -1859,13 +1859,13 @@ fn annotate_table<T: DocumentedFields>(table: &mut toml_edit::Table) {
 mod tests {
     use super::*;
 
-    /// The `/settings` toggle on a dotfile-managed `~/.grok/pager.toml` must reach the dotfile, not replace the link.
+    /// The `/settings` toggle on a dotfile-managed `~/.friday/pager.toml` must reach the dotfile, not replace the link.
     #[cfg(unix)]
     #[test]
     #[serial_test::serial]
     fn persist_respect_manual_folds_writes_through_symlink() {
         let dir = tempfile::tempdir().unwrap();
-        let _home = xai_grok_env::EnvVarGuard::set("GROK_HOME", dir.path().to_str().unwrap());
+        let _home = xai_grok_env::EnvVarGuard::set("FRIDAY_HOME", dir.path().to_str().unwrap());
         let target = dir.path().join("dotfiles").join("pager.toml");
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
         std::fs::write(&target, "[scrollback.scroll]\nanchor_on_fold = false\n").unwrap();

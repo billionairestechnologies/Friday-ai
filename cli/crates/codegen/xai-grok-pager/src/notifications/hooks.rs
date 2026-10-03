@@ -15,13 +15,13 @@ fn execute_hook(
     let mut cmd = Command::new("sh");
     cmd.arg("-c")
         .arg(command)
-        .env("GROK_EVENT", event_str)
-        .env("GROK_MESSAGE", message)
+        .env("FRIDAY_EVENT", event_str)
+        .env("FRIDAY_MESSAGE", message)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     if let Some(sid) = session_id {
-        cmd.env("GROK_SESSION_ID", sid);
+        cmd.env("FRIDAY_SESSION_ID", sid);
     }
 
     xai_tty_utils::detach_std_command(&mut cmd);
@@ -123,7 +123,7 @@ mod tests {
     fn test_event() -> NotificationEvent {
         NotificationEvent {
             kind: NotificationEventKind::TurnComplete,
-            title: "Grok".into(),
+            title: "Friday X".into(),
             body: "test body payload".into(),
             session_id: Some("test-session-123".into()),
         }
@@ -134,8 +134,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("env.txt");
         let command = format!(
-            "printf 'GROK_EVENT=%s\\nGROK_MESSAGE=%s\\nGROK_SESSION_ID=%s\\n' \
-             \"$GROK_EVENT\" \"$GROK_MESSAGE\" \"$GROK_SESSION_ID\" > {}",
+            "printf 'FRIDAY_EVENT=%s\\nGROK_MESSAGE=%s\\nGROK_SESSION_ID=%s\\n' \
+             \"$FRIDAY_EVENT\" \"$FRIDAY_MESSAGE\" \"$FRIDAY_SESSION_ID\" > {}",
             out.display()
         );
 
@@ -149,16 +149,16 @@ mod tests {
 
         let content = std::fs::read_to_string(&out).unwrap();
         assert!(
-            content.contains("GROK_EVENT=Turn complete"),
-            "missing GROK_EVENT: {content}"
+            content.contains("FRIDAY_EVENT=Turn complete"),
+            "missing FRIDAY_EVENT: {content}"
         );
         assert!(
-            content.contains("GROK_MESSAGE=hello world"),
-            "missing GROK_MESSAGE: {content}"
+            content.contains("FRIDAY_MESSAGE=hello world"),
+            "missing FRIDAY_MESSAGE: {content}"
         );
         assert!(
-            content.contains("GROK_SESSION_ID=sess-42"),
-            "missing GROK_SESSION_ID: {content}"
+            content.contains("FRIDAY_SESSION_ID=sess-42"),
+            "missing FRIDAY_SESSION_ID: {content}"
         );
     }
 
@@ -178,8 +178,8 @@ mod tests {
 
         let content = std::fs::read_to_string(&out).unwrap();
         assert!(
-            !content.contains("GROK_SESSION_ID"),
-            "GROK_SESSION_ID should not be set: {content}"
+            !content.contains("FRIDAY_SESSION_ID"),
+            "FRIDAY_SESSION_ID should not be set: {content}"
         );
     }
 
@@ -285,8 +285,8 @@ mod tests {
         let out = dir.path().join("env.txt");
         let hook = NotificationHook {
             command: format!(
-                "printf 'GROK_EVENT=%s\\nGROK_MESSAGE=%s\\nGROK_SESSION_ID=%s\\n' \
-                 \"$GROK_EVENT\" \"$GROK_MESSAGE\" \"$GROK_SESSION_ID\" > {}",
+                "printf 'FRIDAY_EVENT=%s\\nGROK_MESSAGE=%s\\nGROK_SESSION_ID=%s\\n' \
+                 \"$FRIDAY_EVENT\" \"$FRIDAY_MESSAGE\" \"$FRIDAY_SESSION_ID\" > {}",
                 out.display()
             ),
             events: vec![],
@@ -308,8 +308,8 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(50));
         };
-        assert!(content.contains("GROK_EVENT=Turn complete"));
-        assert!(content.contains("GROK_MESSAGE=test body payload"));
-        assert!(content.contains("GROK_SESSION_ID=test-session-123"));
+        assert!(content.contains("FRIDAY_EVENT=Turn complete"));
+        assert!(content.contains("FRIDAY_MESSAGE=test body payload"));
+        assert!(content.contains("FRIDAY_SESSION_ID=test-session-123"));
     }
 }

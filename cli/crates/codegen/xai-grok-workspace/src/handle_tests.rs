@@ -2266,7 +2266,7 @@ fn spawn_test_queue(home: &std::path::Path) -> Arc<xai_file_utils::queue::Upload
     ))
 }
 /// `WorkspaceHandle::new` (the test/default path, not `connect_local_workspace`) must use an ephemeral temp `workspace_home`.
-/// It must never use the real `$GROK_WORKSPACE_HOME` and must NOT configure an upload queue. This pins the flag-off defaults so uploads never start implicitly and `new` stays runtime-light (no queue worker spawned).
+/// It must never use the real `$FRIDAY_WORKSPACE_HOME` and must NOT configure an upload queue. This pins the flag-off defaults so uploads never start implicitly and `new` stays runtime-light (no queue worker spawned).
 #[tokio::test]
 async fn new_defaults_to_ephemeral_home_and_inert_legacy_upload() {
     let handle = make_handle();
@@ -2280,7 +2280,7 @@ async fn new_defaults_to_ephemeral_home_and_inert_legacy_upload() {
     assert_ne!(
         home,
         resolve_workspace_home(),
-        "default construction must NOT use the real $GROK_WORKSPACE_HOME"
+        "default construction must NOT use the real $FRIDAY_WORKSPACE_HOME"
     );
     assert!(
         shared.upload_queue().is_none(),
@@ -2317,7 +2317,7 @@ async fn tool_state_upload_is_noop_when_flag_off() {
     let _env = crate::session::tool_config::TOOL_STATE_ENV_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    unsafe { std::env::remove_var("GROK_WORKSPACE_TOOL_STATE_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_WORKSPACE_TOOL_STATE_ENABLED") };
     let factory = Arc::new(TestSessionContextFactory::new());
     let cwd = factory.temp.path().to_path_buf();
     let queue_home = tempfile::TempDir::new().unwrap();
@@ -2355,7 +2355,7 @@ async fn tool_state_upload_is_noop_when_data_collection_disabled() {
     let _env = crate::session::tool_config::TOOL_STATE_ENV_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    unsafe { std::env::set_var("GROK_WORKSPACE_TOOL_STATE_ENABLED", "true") };
+    unsafe { std::env::set_var("FRIDAY_WORKSPACE_TOOL_STATE_ENABLED", "true") };
     let factory = Arc::new(TestSessionContextFactory::new());
     let cwd = factory.temp.path().to_path_buf();
     let queue_home = tempfile::TempDir::new().unwrap();
@@ -2375,7 +2375,7 @@ async fn tool_state_upload_is_noop_when_data_collection_disabled() {
         .enqueued
         .load(std::sync::atomic::Ordering::Relaxed);
     handle.spawn_tool_state_upload("main", 1);
-    unsafe { std::env::remove_var("GROK_WORKSPACE_TOOL_STATE_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_WORKSPACE_TOOL_STATE_ENABLED") };
     drop(_env);
     tokio::task::yield_now().await;
     assert_eq!(
@@ -4093,7 +4093,7 @@ async fn bind_mcp_post(
     axum::Json(request): axum::Json<serde_json::Value>,
 ) -> axum::response::Response {
     if let Some(session_id) = headers
-        .get(xai_grok_mcp::servers::GROK_AGENT_ID_HEADER)
+        .get(xai_grok_mcp::servers::FRIDAY_AGENT_ID_HEADER)
         .and_then(|value| value.to_str().ok())
     {
         state.session_ids.lock().push(session_id.to_owned());
@@ -4331,7 +4331,7 @@ async fn bind_advertises_configured_mcp_per_session() {
 }
 /// Stopping a server drops the session's client and its hub registrations while the publish keeps
 /// naming it. A reload's convergence (`IfChanged`) leaves it stopped, so the daemon can stop the
-/// computer-use helper the moment Grok Desktop quits and push the app-endpoint drop right after
+/// computer-use helper the moment Friday X Desktop quits and push the app-endpoint drop right after
 /// without the push starting the helper again; the next bind's convergence (`Always`, like every
 /// bind) starts a fresh client.
 #[tokio::test]
@@ -4419,7 +4419,7 @@ async fn a_stopped_server_stays_configured_and_returns_at_the_next_bind() {
     );
     server_task.abort();
 }
-/// Grok Desktop can quit while a bind's convergence is still starting the helper: the stop then
+/// Friday X Desktop can quit while a bind's convergence is still starting the helper: the stop then
 /// finds nothing running and only marks the server stopped, without waiting for the convergence
 /// (which may hold the session's `update_lock` for the whole discovery window). The start that
 /// completes afterwards must not commit — the client the convergence opened ends, the way a stop
@@ -4891,7 +4891,7 @@ async fn stop_mcp_server_ends_the_client_without_a_hub() {
     server_task.abort();
 }
 /// [`crate::mcp::HubToolRegistry`] whose unregisters are never acknowledged, like the hub once
-/// Grok Desktop's session is gone: the daemon's config push then waits out its whole budget.
+/// Friday X Desktop's session is gone: the daemon's config push then waits out its whole budget.
 struct HubThatNeverAcksUnregisters {
     inner: FakeHubRegistry,
 }
@@ -4914,7 +4914,7 @@ impl crate::mcp::HubToolRegistry for HubThatNeverAcksUnregisters {
         std::future::pending().await
     }
 }
-/// When Grok Desktop quits, the daemon stops the helper and, right behind it, pushes the config
+/// When Friday X Desktop quits, the daemon stops the helper and, right behind it, pushes the config
 /// without the app's server; that push's convergence holds the session's `update_lock` and waits
 /// on a hub that never acknowledges the app's unregisters. The stop shares no lock with it across
 /// a hub round trip, so the helper's client is gone within a second while the push is still waiting.
@@ -6900,7 +6900,7 @@ async fn the_configure_path_caps_advertised_tools() {
     );
     server_task.abort();
 }
-/// The legacy client-driven path (`workspace.configure_mcp`, used when `bind_mcp` is None: sandbox, standalone, Grok Build) across the full lifecycle: configure → hub unbind teardown → REBIND (which must re-open the `Closed` binding even without a machine-owned config) → configure again succeeds.
+/// The legacy client-driven path (`workspace.configure_mcp`, used when `bind_mcp` is None: sandbox, standalone, Friday X) across the full lifecycle: configure → hub unbind teardown → REBIND (which must re-open the `Closed` binding even without a machine-owned config) → configure again succeeds.
 /// Without the re-open, the drive fails closed on `Closed` forever and the session can never attach servers again.
 #[tokio::test]
 async fn a_rebind_reopens_for_the_client_driven_configure_path() {
@@ -8409,7 +8409,7 @@ fn bundled_allowlist_unreadable_dir_fails_closed() {
     let got = bundled_allowlist_ignore_dirs("/nonexistent/bundled-skills", Some("pdf"));
     assert_eq!(got, vec!["/nonexistent/bundled-skills".to_string()]);
 }
-/// Unique skill names: discovery also reads the dev machine's `~/.grok`.
+/// Unique skill names: discovery also reads the dev machine's `~/.friday`.
 #[tokio::test]
 async fn bundled_allowlist_filters_discovery() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -8768,11 +8768,11 @@ async fn tool_state_upload_registers_producer() {
     let _env = crate::session::tool_config::TOOL_STATE_ENV_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    unsafe { std::env::set_var("GROK_WORKSPACE_TOOL_STATE_ENABLED", "true") };
+    unsafe { std::env::set_var("FRIDAY_WORKSPACE_TOOL_STATE_ENABLED", "true") };
     let (handle, _queue, _home) = make_handle_with_queue(false);
     assert_eq!(handle.shared.producer_tasks.len(), 0);
     handle.spawn_tool_state_upload("main", 1);
-    unsafe { std::env::remove_var("GROK_WORKSPACE_TOOL_STATE_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_WORKSPACE_TOOL_STATE_ENABLED") };
     drop(_env);
     assert_eq!(
         handle.shared.producer_tasks.len(),

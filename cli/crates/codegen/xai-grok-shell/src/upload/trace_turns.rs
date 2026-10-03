@@ -1,4 +1,4 @@
-//! Request, report and skip reasons for the `grok trace` per-turn gap-fill, plus the entry point
+//! Request, report and skip reasons for the `friday trace` per-turn gap-fill, plus the entry point
 //! that resolves to the real upload or to a stub that reports the feature as unavailable.
 use crate::session::repo_changes::TraceExportConfig;
 use serde::Serialize;

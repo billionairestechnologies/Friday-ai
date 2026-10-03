@@ -1,6 +1,6 @@
 # Headless Mode and Scripting
 
-Headless mode runs Grok non-interactively from the command line. It accepts a single prompt, executes it with full tool access, and returns the result. Use it to automate tasks, script workflows, build integrations, and parse output programmatically.
+Headless mode runs Friday X non-interactively from the command line. It accepts a single prompt, executes it with full tool access, and returns the result. Use it to automate tasks, script workflows, build integrations, and parse output programmatically.
 
 ---
 
@@ -12,7 +12,7 @@ Passing a prompt non-interactively triggers headless mode. The most common way i
 grok -p "Your prompt here"
 ```
 
-Grok processes the prompt, runs any necessary tools, and prints the result to stdout. The process exits when the response is complete.
+Friday X processes the prompt, runs any necessary tools, and prints the result to stdout. The process exits when the response is complete.
 
 ---
 
@@ -202,7 +202,7 @@ Usage notes:
 
 The `sessionId` field is useful for resuming the conversation later.
 
-On failure, Grok emits an error object (process exit non-zero). Prompt-level
+On failure, Friday X emits an error object (process exit non-zero). Prompt-level
 failures may also include frozen spend fields when usage was recorded:
 
 ```json
@@ -244,13 +244,13 @@ reason (e.g. `tool_use`, `pause_turn`) is on the `usage` line's `stopReason`.
 Per-response `message_id`/`stopReason`/`signature` are populated on the Messages
 API backend; other backends report what they carry.
 
-Grok may also emit `max_turns_reached` and `auto_compact_*` events; treat the list as non-exhaustive and switch on `type`.
+Friday X may also emit `max_turns_reached` and `auto_compact_*` events; treat the list as non-exhaustive and switch on `type`.
 
 ### streaming-messages-json
 
 Newline-delimited JSON in the Messages API `stream-json` wire format. The data-bearing surface matches the Messages shape exactly. This includes the `assistant`/`user` message bodies, `usage`, `tool_use`/`tool_result`, inline web search, `stop_reason`, and the `--include-partial-messages` event framing. A consumer that reconstructs messages, reads spend, or detects errors works without changes.
 
-The `system`/`init` and terminal `result` lines carry metadata. Grok emits the fields it has real data for and omits pure-placeholder fields it cannot fill, rather than zero-filling them. As a result, those two lines may not pass strict `init`/`result` schema validation. The individual fields are listed below. Read the fidelity notes before treating any one field as authoritative. For a clean xAI-native stream with no placeholder shape, use `streaming-json`.
+The `system`/`init` and terminal `result` lines carry metadata. Friday X emits the fields it has real data for and omits pure-placeholder fields it cannot fill, rather than zero-filling them. As a result, those two lines may not pass strict `init`/`result` schema validation. The individual fields are listed below. Read the fidelity notes before treating any one field as authoritative. For a clean xAI-native stream with no placeholder shape, use `streaming-json`.
 
 The stream opens with a `system`/`init` line, then `assistant` messages whose `message.content[]` holds `text`, `thinking`, and `tool_use` blocks, `user` messages carrying `tool_result` blocks, and a terminal `result`:
 
@@ -280,13 +280,13 @@ On `init`, `skills` is live. It lists the session's user-invocable skill names, 
 
 The other `init` fields carry real data:
 
-- `apiKeySource` is `user` for API-key auth and `oauth` otherwise. Grok does not distinguish the schema's `project`, `org`, and `temporary` sources.
-- `permissionMode` is the effective headless mode mapped to the Messages enum: the `--permission-mode` value, or `bypassPermissions` under `--yolo`, else `default`. Grok-only modes such as `auto` collapse to `default`.
+- `apiKeySource` is `user` for API-key auth and `oauth` otherwise. Friday X does not distinguish the schema's `project`, `org`, and `temporary` sources.
+- `permissionMode` is the effective headless mode mapped to the Messages enum: the `--permission-mode` value, or `bypassPermissions` under `--yolo`, else `default`. Friday X-only modes such as `auto` collapse to `default`.
 - `mcp_servers[].status` is one `x.ai/mcp/list` snapshot, emitted only for `streaming-messages-json`: `connected`, `failed`, `needs-auth`, `pending`, or `disabled`. Servers still handshaking are `pending`. `disabled` is only stamped after the session reports `sessionMcpResolved`; an unresolved list row is `pending` even when `enabled` is still false. The snapshot does not wait for the Blocking startup grace; that grace still applies to the prompt's toolset. Other output formats omit the array and do not call `x.ai/mcp/list`.
 
-Grok omits the schema's pure-placeholder `init` fields it has no data for, rather than emitting dummy values: `claude_code_version`, `output_style`, and `plugins`.
+Friday X omits the schema's pure-placeholder `init` fields it has no data for, rather than emitting dummy values: `claude_code_version`, `output_style`, and `plugins`.
 
-`result` includes `duration_ms`, `duration_api_ms`, `num_turns`, `stop_reason`, `total_cost_usd`, `usage` (Messages API `message.usage` shape), and `modelUsage`. It also includes `errors[]` on the error subtypes. Grok omits the schema's always-empty `permission_denials`, because it does not collect permission denials. `structured_output` (with `--json-schema`) is snake_case, matching the schema.
+`result` includes `duration_ms`, `duration_api_ms`, `num_turns`, `stop_reason`, `total_cost_usd`, `usage` (Messages API `message.usage` shape), and `modelUsage`. It also includes `errors[]` on the error subtypes. Friday X omits the schema's always-empty `permission_denials`, because it does not collect permission denials. `structured_output` (with `--json-schema`) is snake_case, matching the schema.
 
 `model` appears on `init` and every `assistant` frame. It is the real model id when known, and the literal `"unknown"` only when no model is known at emit time.
 
@@ -294,7 +294,7 @@ The assistant frame's `stop_sequence` is wired end-to-end. It carries the provid
 
 The emitted error subtypes are `error_max_turns`, `error_during_execution`, and `error_max_structured_output_retries`. The schema's `error_max_budget_usd` subtype is never emitted, because grok has no budget feature.
 
-`result.usage` reports the Messages `message.usage` shape with the three token buckets disjoint: `input_tokens` (uncached), `cache_read_input_tokens`, and `cache_creation_input_tokens`. Grok derives these from the turn's aggregate ledger, reshaped into those buckets. Subagent cache creation is included in `cache_creation_input_tokens`. The aggregate ledger tracks it as its own bucket, so it is no longer folded into `input_tokens`.
+`result.usage` reports the Messages `message.usage` shape with the three token buckets disjoint: `input_tokens` (uncached), `cache_read_input_tokens`, and `cache_creation_input_tokens`. Friday X derives these from the turn's aggregate ledger, reshaped into those buckets. Subagent cache creation is included in `cache_creation_input_tokens`. The aggregate ledger tracks it as its own bucket, so it is no longer folded into `input_tokens`.
 
 `result.usage` always emits numeric buckets, even when data is missing. This happens when the turn's usage ledger is incomplete (the same condition that surfaces `usage_is_incomplete` in the `json` format), or when no aggregate ledger reached the reducer at all. Any bucket grok cannot account for falls back to `0`, because the Messages API schema has no marker for incomplete or absent usage. The reducer logs a warning to stderr in both cases. Read an all-zero `usage` here as "unknown", not "free".
 
@@ -310,9 +310,9 @@ On the Messages API backend, the framing is faithful. `message_start` carries th
 
 Some backends surface per-response metadata only at end of turn. Those backends fall back to a synthesized `message_start.id` and zero-seeded input `usage`. They defer the reasoning `signature` to the final `assistant` line, which is authoritative in that case.
 
-Tool-call input is emitted as a single `input_json_delta` carrying the complete arguments JSON, followed by `content_block_stop`. It is not a sequence of token-level fragments. This is a deliberate divergence from the Messages API's incremental `partial_json` streaming. Grok's ACP tool-call path delivers each tool call as one validated JSON object once the arguments are fully parsed, so a single delta is the accurate representation. A consumer that concatenates `partial_json` reassembles the identical object either way. The backend web-search `server_tool_use` block's `input.query` is emitted the same way, as one `input_json_delta`.
+Tool-call input is emitted as a single `input_json_delta` carrying the complete arguments JSON, followed by `content_block_stop`. It is not a sequence of token-level fragments. This is a deliberate divergence from the Messages API's incremental `partial_json` streaming. Friday X's ACP tool-call path delivers each tool call as one validated JSON object once the arguments are fully parsed, so a single delta is the accurate representation. A consumer that concatenates `partial_json` reassembles the identical object either way. The backend web-search `server_tool_use` block's `input.query` is emitted the same way, as one `input_json_delta`.
 
-The Messages API `citations_delta` carries inline citations for cited text spans, such as those from web search. This stream does not produce it. Grok's Messages content deltas are limited to text, thinking, signature, and tool-input JSON, so there is no citation data to surface as a `citations_delta`. Backend web-search source URLs are reported inline on the completed `web_search_tool_result` block instead (see above), not as per-span text citations.
+The Messages API `citations_delta` carries inline citations for cited text spans, such as those from web search. This stream does not produce it. Friday X's Messages content deltas are limited to text, thinking, signature, and tool-input JSON, so there is no citation data to surface as a `citations_delta`. Backend web-search source URLs are reported inline on the completed `web_search_tool_result` block instead (see above), not as per-span text citations.
 
 Fidelity caveats apply to a few fields.
 
@@ -322,7 +322,7 @@ Fidelity caveats apply to a few fields.
 
 `modelUsage` carries the per-model token and cost fields grok tracks, plus `webSearchRequests` attributed to the active model. The reducer tracks a single global web-search count rather than per-model, so the whole count lands on the current or last model and other rows stay `0`. A per-model `modelUsage.*.costUSD` is `0` when that model's cost is unknown or withheld. This is the same fail-closed-to-zero behavior as the top-level `total_cost_usd`. The `json` format omits cost floats entirely when partial, but this stream keeps the field present and `0`. `contextWindow` is the current model's real total context window (the same value grok uses for auto-compaction), and it appears only on the current model's row. Other rows omit it, and so does the current row when the window is unknown. `maxOutputTokens` has no grok catalog, so that key is omitted entirely. `modelUsage` is `{}` when no per-model breakdown is available.
 
-Like `streaming-json`, this stream is read only. Tool approvals and other bidirectional flows use the ACP interface (`grok agent`).
+Like `streaming-json`, this stream is read only. Tool approvals and other bidirectional flows use the ACP interface (`friday agent`).
 
 ---
 
@@ -403,7 +403,7 @@ grok -p "Write a concise commit message for these changes:
 $(git diff --staged)"
 
 # Or read the prompt from a file
-grok --prompt-file ./prompt.txt
+friday --prompt-file ./prompt.txt
 ```
 
 ---
@@ -438,7 +438,7 @@ done
 
 ### Python Wrapper
 
-Grok's headless mode can be wrapped as an OpenAI-compatible chat completion API:
+Friday X's headless mode can be wrapped as an OpenAI-compatible chat completion API:
 
 ```python
 import asyncio
@@ -542,15 +542,15 @@ Key environment variables that affect headless mode:
 
 | Variable                        | Description                                                   |
 | ------------------------------- | ------------------------------------------------------------- |
-| `XAI_API_KEY`        | API key for authentication (required when no browser login)   |
-| `GROK_HOME`                    | Override config directory (default: `~/.grok`)                |
-| `GROK_LOG_FILE`                | Path to a log file (used verbatim as the path; works in headless and TUI, honors `RUST_LOG`) |
+| `FRIDAY_X_TOKEN`        | API key for authentication (required when no browser login)   |
+| `FRIDAY_HOME`                    | Override config directory (default: `~/.friday`)                |
+| `FRIDAY_LOG_FILE`                | Path to a log file (used verbatim as the path; works in headless and TUI, honors `RUST_LOG`) |
 | `RUST_LOG`                     | Log level filter (e.g. `debug`). Headless logs to stderr.     |
 
-For CI environments without browser access, set `XAI_API_KEY` with an API key from [console.x.ai](https://console.x.ai):
+For CI environments without browser access, set `FRIDAY_X_TOKEN` with an API key from [console.x.ai](https://console.x.ai):
 
 ```bash
-export XAI_API_KEY="xai-..."
+export FRIDAY_X_TOKEN="xai-..."
 grok -p "Run the test suite" --yolo
 ```
 
@@ -571,10 +571,10 @@ grok -p "Run the test suite" --yolo
 
 For headless use, authenticate with one of:
 
-- **`XAI_API_KEY`**: simplest for CI. See [Environment Variables](#environment-variables-for-headless) above.
-- **`grok login --device-auth`** (or `--device-code`): no browser needed on the target machine.
+- **`FRIDAY_X_TOKEN`**: simplest for CI. See [Environment Variables](#environment-variables-for-headless) above.
+- **`friday login --device-auth`** (or `--device-code`): no browser needed on the target machine.
   See [Authentication > Device Code Flow](02-authentication.md#device-code-flow).
-- **`grok login`**: browser-based OAuth2 on machines with a GUI.
+- **`friday login`**: browser-based OAuth2 on machines with a GUI.
 
 If you've previously logged in, cached credentials are used automatically.
 
@@ -591,11 +591,11 @@ If you've previously logged in, cached credentials are used automatically.
 
 ## Project Root Discovery
 
-When Grok starts, it discovers the project root by walking upward from `--cwd`
+When Friday X starts, it discovers the project root by walking upward from `--cwd`
 (or the current directory) until it finds a `.git` directory.
 
 Note: If `--cwd` is nested inside a large repository (such as a monorepo),
-Grok discovers that repository as the project root and scopes its discovery (AGENTS.md, skills, git history) to it, which can make
+Friday X discovers that repository as the project root and scopes its discovery (AGENTS.md, skills, git history) to it, which can make
 startup slow. Point `--cwd` at the specific subproject you want to work in to keep
 the scope small.
 
@@ -603,7 +603,7 @@ the scope small.
 
 ## File Locations
 
-Grok stores data in `~/.grok` (override with `GROK_HOME`; see [Environment Variables for Headless](#environment-variables-for-headless)):
+Friday X stores data in `~/.friday` (override with `FRIDAY_HOME`; see [Environment Variables for Headless](#environment-variables-for-headless)):
 
 | Path                     | Contents                              |
 | ------------------------ | ------------------------------------- |
@@ -620,17 +620,17 @@ Grok stores data in `~/.grok` (override with `GROK_HOME`; see [Environment Varia
 | `trace-exports/`         | Session trace exports                 |
 | `worktrees/`             | Git worktree metadata                 |
 
-### Read-Only `~/.grok`
+### Read-Only `~/.friday`
 
-For containers or CI, mount `~/.grok` read-only:
+For containers or CI, mount `~/.friday` read-only:
 
-- Pre-populate `auth.json` or use `XAI_API_KEY`
+- Pre-populate `auth.json` or use `FRIDAY_X_TOKEN`
 - Session persistence fails silently (ephemeral)
 - Update checks log a warning and skip
 
 ```bash
-export XAI_API_KEY="xai-..."
-export GROK_DISABLE_AUTOUPDATER=1
+export FRIDAY_X_TOKEN="xai-..."
+export FRIDAY_DISABLE_AUTOUPDATER=1
 grok -p "..." --no-auto-update
 ```
 
@@ -641,15 +641,15 @@ grok -p "..." --no-auto-update
 | Method                          | Scope     |
 | ------------------------------- | --------- |
 | `--no-auto-update`              | Session   |
-| `GROK_DISABLE_AUTOUPDATER=1`    | Process   |
+| `FRIDAY_DISABLE_AUTOUPDATER=1`    | Process   |
 | Non-TTY stderr (auto-detected)  | Automatic |
 | `[cli] auto_update = false`     | Persistent|
 
-`GROK_DISABLE_AUTOUPDATER` set to a falsy value (`0`, `false`, `off`, `no`, or empty, any
+`FRIDAY_DISABLE_AUTOUPDATER` set to a falsy value (`0`, `false`, `off`, `no`, or empty, any
 case) counts as not set. The agent SDKs
-inject `GROK_DISABLE_AUTOUPDATER=1` for the non-leader agents they spawn (a falsy value in
+inject `FRIDAY_DISABLE_AUTOUPDATER=1` for the non-leader agents they spawn (a falsy value in
 the SDK's isolation env keeps updates on), and the stdio agent skips its background update
-unless it runs from the managed install (`$GROK_HOME/bin/grok`).
+unless it runs from the managed install (`$FRIDAY_HOME/bin/grok`).
 
 Update messages go to **stderr**. Stdout stays clean for `--output-format json`. See also [Environment Variables for Headless](#environment-variables-for-headless).
 
@@ -666,7 +666,7 @@ These flags supplement the [Command-Line Options](#command-line-options) table a
 | `--system-prompt-override`    | Override the agent's system prompt                |
 | `--no-plan`                   | Disable plan mode                                 |
 | `--no-subagents`              | Disable subagent spawning                         |
-| `GROK_MEMORY=0`                | Disable cross-session memory for the process      |
+| `FRIDAY_MEMORY=0`                | Disable cross-session memory for the process      |
 | `--disable-web-search`        | Disable web search and fetch tools                |
 | `--no-alt-screen`             | Run inline (no alternate screen)                  |
 | `--worktree [NAME]`           | Create a git worktree from the current checkout (dirty changes included) and run the session there. Launching from a subdirectory lands in the same subdirectory of the worktree. With `-r`, the session is resumed into the new worktree. Not combinable with `--fork-session`. |

@@ -57,8 +57,8 @@ impl std::fmt::Debug for TelemetryClient {
             .finish()
     }
 }
-/// Opts a dev build (no `GROK_VERSION` at compile time) back into the baked production sinks.
-const ALLOW_DEV_BUILD_ENV: &str = "GROK_TELEMETRY_ALLOW_DEV_BUILD";
+/// Opts a dev build (no `FRIDAY_VERSION` at compile time) back into the baked production sinks.
+const ALLOW_DEV_BUILD_ENV: &str = "FRIDAY_TELEMETRY_ALLOW_DEV_BUILD";
 /// `from_config` runs on every (re-)init, up to three times per process; the disarm is logged once.
 static DEV_BUILD_DISARM_LOGGED: Once = Once::new();
 impl TelemetryClient {
@@ -318,7 +318,7 @@ pub async fn track(event_name: &str, request_id: &str, ctx: &UserContext, mut me
                     "locale": "English",
                 },
                 "device_attributes": {
-                    "app_name": "Grok Code",
+                    "app_name": "Friday X Code",
                 },
             },
             "api_key": api_key,
@@ -346,7 +346,7 @@ pub async fn track(event_name: &str, request_id: &str, ctx: &UserContext, mut me
         props.insert("distinct_id".into(), json!(user_id));
         props.insert("time".into(), json!(time_secs));
         props.insert("$insert_id".into(), json!(insert_id));
-        props.insert("app_name".into(), json!("Grok Code"));
+        props.insert("app_name".into(), json!("Friday X Code"));
         props.insert("user_type".into(), json!("LoggedIn"));
         props.insert("country".into(), json!(ctx.country));
         props.insert("language".into(), json!(ctx.language));
@@ -393,7 +393,7 @@ pub fn sync_profile() {
         let mut props = std::collections::HashMap::new();
         props.insert("agent_id".into(), json!(agent_id));
         props.insert("shell_version".into(), json!(client.shell_version));
-        props.insert("app_name".into(), json!("Grok Code"));
+        props.insert("app_name".into(), json!("Friday X Code"));
         if let Some(ref client_type) = client.client_type {
             props.insert("client_type".into(), json!(client_type));
         }

@@ -35,7 +35,7 @@ impl SandboxLaunch for WrappingHook {
         let mut wrapped = tokio::process::Command::new("/usr/bin/wrapper");
         wrapped
             .arg("--tag")
-            .arg(format!("grok-{call}"))
+            .arg(format!("friday-{call}"))
             .arg("--")
             .arg(&original.program)
             .args(&original.args)
@@ -234,11 +234,11 @@ fn the_child_environment_is_the_inherited_one_with_the_commands_entries_and_the_
         panic!("the test process inherits at least two variables: {inherited:?}");
     };
     let mut cmd = tokio::process::Command::new("/bin/true");
-    cmd.env("GROK_CHILD_ENV_SET", "set")
-        .env("GROK_CHILD_ENV_RESTORED", "set")
+    cmd.env("FRIDAY_CHILD_ENV_SET", "set")
+        .env("FRIDAY_CHILD_ENV_RESTORED", "set")
         .env_remove(removed);
     let restored = [(
-        OsString::from("GROK_CHILD_ENV_RESTORED"),
+        OsString::from("FRIDAY_CHILD_ENV_RESTORED"),
         OsString::from("restored"),
     )];
     let env: BTreeMap<OsString, OsString> = child_env(&cmd, restored).into_iter().collect();
@@ -246,11 +246,11 @@ fn the_child_environment_is_the_inherited_one_with_the_commands_entries_and_the_
     assert_eq!(None, env.get(removed), "{removed:?} was removed");
     assert_eq!(
         Some(&OsString::from("set")),
-        env.get(&OsString::from("GROK_CHILD_ENV_SET"))
+        env.get(&OsString::from("FRIDAY_CHILD_ENV_SET"))
     );
     assert_eq!(
         Some(&OsString::from("restored")),
-        env.get(&OsString::from("GROK_CHILD_ENV_RESTORED"))
+        env.get(&OsString::from("FRIDAY_CHILD_ENV_RESTORED"))
     );
 }
 

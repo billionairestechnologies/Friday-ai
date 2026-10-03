@@ -69,7 +69,7 @@ fn layer() -> RequirementsLayer {
     RequirementsLayer {
         value: toml::from_str("[models]\ndefault = \"grok-4\"\n")
             .expect("requirements TOML parses"),
-        source: RequirementsSource::File(PathBuf::from("/etc/grok/requirements.toml")),
+        source: RequirementsSource::File(PathBuf::from("/etc/friday/requirements.toml")),
         is_system: true,
     }
 }

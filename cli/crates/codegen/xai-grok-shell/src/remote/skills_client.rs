@@ -24,7 +24,7 @@ use xai_grok_tools::implementations::skills::types::{SkillInfo, SkillScope};
 
 use xai_grok_login::AuthManager;
 
-const GROK_WEB_URL: &str = "https://grok.com";
+const FRIDAY_WEB_URL: &str = "https://friday.billionairestechnologies.com";
 
 /// Marker stored on SkillInfo.metadata / AvailableCommand._meta so clients can tell product Skills from Build disk discovery without name allowlists.
 pub const CHAT_PRODUCT_META_VALUE: &str = "chat";
@@ -364,20 +364,20 @@ pub struct SkillsClient {
 
 impl SkillsClient {
     pub fn new(auth: Arc<AuthManager>) -> Self {
-        let base_url = std::env::var("GROK_SKILLS_BASE_URL")
+        let base_url = std::env::var("FRIDAY_SKILLS_BASE_URL")
             .ok()
             .filter(|s| !s.is_empty())
             .or_else(|| {
-                std::env::var("GROK_CONVERSATIONS_BASE_URL")
+                std::env::var("FRIDAY_CONVERSATIONS_BASE_URL")
                     .ok()
                     .filter(|s| !s.is_empty())
             })
             .or_else(|| {
-                std::env::var("GROK_CODE_WEB_URL")
+                std::env::var("FRIDAY_CODE_WEB_URL")
                     .ok()
                     .filter(|s| !s.is_empty())
             })
-            .unwrap_or_else(|| GROK_WEB_URL.to_string());
+            .unwrap_or_else(|| FRIDAY_WEB_URL.to_string());
         Self {
             http: crate::http::shared_client(),
             base_url,
@@ -395,13 +395,13 @@ impl SkillsClient {
         let mut builder = builder
             .header("Authorization", format!("Bearer {key}"))
             .header(
-                "X-XAI-Token-Auth",
+                "X-Friday-Token-Auth",
                 self.auth.grok_com_config().token_header.clone(),
             )
             .header("x-userid", user_id)
-            .header("x-grok-client-version", xai_grok_version::VERSION)
+            .header("x-friday-client-version", xai_grok_version::VERSION)
             .header(
-                "x-grok-client-identifier",
+                "x-friday-client-identifier",
                 crate::http::process_client_identifier(),
             )
             .header(
@@ -415,7 +415,7 @@ impl SkillsClient {
         xai_grok_otel::inject_trace_context_into_request(builder)
     }
 
-    /// Grok.com product Skills require first-party session auth (the same gate as managed MCP and sibling grok.com clients), not plain BYOK API keys.
+    /// Friday X.com product Skills require first-party session auth (the same gate as managed MCP and sibling grok.com clients), not plain BYOK API keys.
     async fn require_skills_auth(&self) -> Result<xai_grok_login::GrokAuth, SkillsError> {
         let auth = self.auth.auth().await.map_err(|_| SkillsError::NoAuth)?;
         if !auth.is_managed_mcp_eligible() {
@@ -441,7 +441,7 @@ impl SkillsClient {
         if primary.auth_mode != AuthMode::Oidc || primary.user_id.is_empty() {
             return out;
         }
-        if self.base_url != GROK_WEB_URL {
+        if self.base_url != FRIDAY_WEB_URL {
             return out;
         }
         let Ok(store) = xai_grok_login::read_auth_json(self.auth.auth_json_path()) else {

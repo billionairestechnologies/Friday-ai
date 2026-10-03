@@ -1,6 +1,6 @@
 //! Changelog fetching from CDN with local disk cache.
 //!
-//! Both markdown (`*.external.md`) and JSON (`*.external.json`) changelogs are published per-version to the CDN at `x.ai/cli/changelogs/`.
+//! Both markdown (`*.external.md`) and JSON (`*.external.json`) changelogs are published per-version at `<friday origin>/x/changelogs/`.
 //!
 //! `ChangelogManager::fetch()` retrieves both formats in parallel and returns a `Changelog` with optional markdown and structured entries.
 //! Consumers pick the format they need:
@@ -10,7 +10,9 @@
 use std::path::PathBuf;
 
 /// CDN base for all changelogs (proxies to GCS, cache-friendly).
-const CHANGELOG_BASE: &str = "https://x.ai/cli/changelogs";
+fn changelog_base() -> String {
+    format!("{}/x/changelogs", xai_grok_env::friday_origin())
+}
 const FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// A single structured changelog entry from the published JSON changelog. Shape must match the output of `render_external_json` in `changelog.sh`: `{category, description, breaking_change}`
@@ -53,15 +55,15 @@ impl Default for ChangelogManager {
 
 impl ChangelogManager {
     pub fn new() -> Self {
-        // Prefer the live `$GROK_HOME` over the `grok_home()` OnceLock
+        // Prefer the live `$FRIDAY_HOME` over the `grok_home()` OnceLock
         // A home injected by the PTY e2e harness must beat a path some earlier init cached in the same process
         Self::from_env_home()
     }
 
     /// Resolve cache paths from the live process environment (not the `grok_home()` OnceLock).
-    /// A seeded `$GROK_HOME` set on the pager process is always honoured even if some earlier init path cached a different home.
+    /// A seeded `$FRIDAY_HOME` set on the pager process is always honoured even if some earlier init path cached a different home.
     fn from_env_home() -> Self {
-        let home = std::env::var_os("GROK_HOME")
+        let home = std::env::var_os("FRIDAY_HOME")
             .map(std::path::PathBuf::from)
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or_else(crate::util::grok_home::grok_home);
@@ -72,15 +74,15 @@ impl ChangelogManager {
     }
 
     /// Fetch both markdown and JSON changelogs for the current version. Each format is fetched independently (CDN, 3 s timeout) and cached to disk, falling back to the cached copy on failure.
-    /// Either field may be `None` if offline with no cache. When `GROK_CHANGELOG_OFFLINE` is set (PTY / integration tests), the CDN is skipped and only the disk cache is read.
+    /// Either field may be `None` if offline with no cache. When `FRIDAY_CHANGELOG_OFFLINE` is set (PTY / integration tests), the CDN is skipped and only the disk cache is read.
     /// JSON is cached only after a successful parse; the markdown cache is write-through since it's consumed as raw text.
     pub fn fetch(&self) -> Changelog {
         // Always re-resolve from env so a caller holding an older manager (or a stale OnceLock) still reads the live harness home
-        Self::from_env_home().fetch_with(changelog_offline(), CHANGELOG_BASE)
+        Self::from_env_home().fetch_with(changelog_offline(), &changelog_base())
     }
 
     /// Fetch using this manager's already-resolved cache paths, an explicit offline flag, and an explicit CDN base. Split out of [`fetch`] so unit tests can drive it against a temp home without touching process-global env.
-    /// Mutating `GROK_HOME` / `GROK_CHANGELOG_OFFLINE` races across the parallel test harness. Passing an unreachable `base` forces a deterministic CDN miss instead of depending on whether the sandbox happens to block network.
+    /// Mutating `FRIDAY_HOME` / `FRIDAY_CHANGELOG_OFFLINE` races across the parallel test harness. Passing an unreachable `base` forces a deterministic CDN miss instead of depending on whether the sandbox happens to block network.
     /// Production callers always go through [`fetch`].
     fn fetch_with(&self, offline: bool, base: &str) -> Changelog {
         if offline {
@@ -103,7 +105,7 @@ impl ChangelogManager {
             entries = json_handle.join().ok().flatten();
         });
 
-        // If the CDN is unreachable (CI sandboxes, airplane mode), fall back to any on-disk seed under `$GROK_HOME`
+        // If the CDN is unreachable (CI sandboxes, airplane mode), fall back to any on-disk seed under `$FRIDAY_HOME`
         // This applies even when offline mode was not requested, keeping PTY/integration tests deterministic
         if markdown.is_none() {
             markdown = read_cache(&self.md_cache);
@@ -167,7 +169,7 @@ impl ChangelogManager {
 /// When set, `ChangelogManager::fetch` skips the CDN and only reads disk cache.
 /// Used by PTY harness tests that seed `CHANGELOG.{md,json}` under a temp home.
 fn changelog_offline() -> bool {
-    std::env::var_os("GROK_CHANGELOG_OFFLINE").is_some_and(|v| !v.is_empty() && v != "0")
+    std::env::var_os("FRIDAY_CHANGELOG_OFFLINE").is_some_and(|v| !v.is_empty() && v != "0")
 }
 
 fn read_cache(path: &std::path::Path) -> Option<String> {
@@ -209,7 +211,7 @@ fn fetch_blocking(url: &str) -> anyhow::Result<String> {
 mod tests {
     use super::*;
 
-    /// Build a manager pointing at `home` directly, bypassing the global `$GROK_HOME` env so tests never race the parallel harness.
+    /// Build a manager pointing at `home` directly, bypassing the global `$FRIDAY_HOME` env so tests never race the parallel harness.
     fn manager_for(home: &std::path::Path) -> ChangelogManager {
         ChangelogManager {
             md_cache: home.join("CHANGELOG.md"),
@@ -230,7 +232,7 @@ mod tests {
         .unwrap();
 
         // Offline path: read only the seeded disk cache, no network.
-        let changelog = manager_for(&home).fetch_with(true, CHANGELOG_BASE);
+        let changelog = manager_for(&home).fetch_with(true, &changelog_base());
         assert_eq!(
             changelog.markdown.as_deref(),
             Some("# seeded offline md\n"),

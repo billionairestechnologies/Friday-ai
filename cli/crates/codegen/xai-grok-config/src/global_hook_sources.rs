@@ -1,5 +1,5 @@
-//! Grok-owned direct global hook paths shared by shell discovery and sandbox write-deny.
-//! These are `$GROK_HOME/hooks`, `hooks-paths`, and absolute registry targets.
+//! Friday X-owned direct global hook paths shared by shell discovery and sandbox write-deny.
+//! These are `$FRIDAY_HOME/hooks`, `hooks-paths`, and absolute registry targets.
 //! Relative registry lines, project hooks, and vendor compat are out of scope.
 
 use std::io;
@@ -12,13 +12,13 @@ use crate::loader::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlobalHookSourceKind {
-    /// `$GROK_HOME/hooks/` (discovered and protected).
+    /// `$FRIDAY_HOME/hooks/` (discovered and protected).
     HookDirectory,
-    /// `$GROK_HOME/hooks-paths` (protected; never loaded as hook JSON).
+    /// `$FRIDAY_HOME/hooks-paths` (protected; never loaded as hook JSON).
     RegistryFile,
     /// Absolute registry target (must exist before sandbox apply).
     ConfiguredSource,
-    /// `$GROK_HOME` trust-boundary file (protected; never hook JSON or a discovery source).
+    /// `$FRIDAY_HOME` trust-boundary file (protected; never hook JSON or a discovery source).
     TrustBoundaryFile,
 }
 
@@ -60,7 +60,7 @@ pub enum GlobalHookSourceError {
         #[source]
         source: io::Error,
     },
-    #[error("symlinked GROK_HOME is not allowed under sandbox write-deny: {path}")]
+    #[error("symlinked FRIDAY_HOME is not allowed under sandbox write-deny: {path}")]
     SymlinkedGrokHome { path: PathBuf },
     #[error("hook source path contains a symlink component (retargetable): {path}")]
     SymlinkedSource { path: PathBuf },
@@ -68,17 +68,17 @@ pub enum GlobalHookSourceError {
     HardLinkedHookFile { path: PathBuf, nlink: u64 },
     #[error("hook JSON path is not a regular file: {path}")]
     InvalidHookJsonFile { path: PathBuf },
-    #[error("Grok hooks directory has wrong type (expected real directory): {path}")]
+    #[error("Friday X hooks directory has wrong type (expected real directory): {path}")]
     InvalidHooksDir { path: PathBuf },
-    #[error("Grok hooks-paths registry has wrong type (expected real file): {path}")]
+    #[error("Friday X hooks-paths registry has wrong type (expected real file): {path}")]
     InvalidRegistryFile { path: PathBuf },
-    #[error("cannot create Grok hooks directory {path}: {source}")]
+    #[error("cannot create Friday X hooks directory {path}: {source}")]
     CreateHooksDir {
         path: PathBuf,
         #[source]
         source: io::Error,
     },
-    #[error("cannot create Grok hooks-paths registry {path}: {source}")]
+    #[error("cannot create Friday X hooks-paths registry {path}: {source}")]
     CreateRegistryFile {
         path: PathBuf,
         #[source]
@@ -303,7 +303,7 @@ fn ensure_real_file_slot(path: &Path) -> Result<(), GlobalHookSourceError> {
     Ok(())
 }
 
-/// Ensure real `$GROK_HOME/hooks` dir and `hooks-paths` file (create if missing).
+/// Ensure real `$FRIDAY_HOME/hooks` dir and `hooks-paths` file (create if missing).
 /// The create is race-resistant (`create_dir` / `create_new` with `O_NOFOLLOW`) and never truncates an existing registry.
 /// Symlinks and wrong types are rejected.
 pub fn ensure_grok_hook_slots(grok_home: &Path) -> Result<(), GlobalHookSourceError> {
@@ -372,7 +372,7 @@ pub fn ensure_grok_hook_slots(grok_home: &Path) -> Result<(), GlobalHookSourceEr
     Ok(())
 }
 
-/// `$GROK_HOME` files that are always-trusted or trust-granting if writable.
+/// `$FRIDAY_HOME` files that are always-trusted or trust-granting if writable.
 pub const TRUST_BOUNDARY_FILENAMES: &[&str] = &[
     USER_CONFIG_FILENAME,
     TRUSTED_FOLDERS_FILENAME,
@@ -397,7 +397,7 @@ pub(crate) fn ensure_grok_trust_boundary_slots(
     Ok(())
 }
 
-/// Resolve `$GROK_HOME` trust-boundary files (symlink-rejected for sandbox).
+/// Resolve `$FRIDAY_HOME` trust-boundary files (symlink-rejected for sandbox).
 pub fn resolve_trust_boundary_sources(
     grok_home: &Path,
 ) -> Result<Vec<GlobalHookSource>, GlobalHookSourceError> {
@@ -451,7 +451,7 @@ fn open_registry_create_new(path: &Path) -> io::Result<std::fs::File> {
     }
 }
 
-/// Resolve Grok-owned direct global hook sources (`reject_symlinks` for sandbox).
+/// Resolve Friday X-owned direct global hook sources (`reject_symlinks` for sandbox).
 pub fn resolve_global_hook_sources(
     grok_home: Option<&Path>,
     reject_symlinks: bool,

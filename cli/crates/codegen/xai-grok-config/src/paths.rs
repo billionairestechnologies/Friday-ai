@@ -8,21 +8,21 @@ const CLAUDE_MANAGED_SETTINGS_PATH: &str =
 #[cfg(target_os = "linux")]
 const CLAUDE_MANAGED_SETTINGS_PATH: &str = "/etc/claude-code/managed-settings.json";
 
-/// Canonical grok application path: `$GROK_HOME/bin/grok` (Unix) or `grok.exe` (Windows).
+/// Canonical grok application path: `$FRIDAY_HOME/bin/grok` (Unix) or `grok.exe` (Windows).
 pub fn grok_application() -> PathBuf {
     grok_application_in(&grok_home())
 }
 
-/// [`grok_application`] under an explicit home instead of `$GROK_HOME`.
+/// [`grok_application`] under an explicit home instead of `$FRIDAY_HOME`.
 pub fn grok_application_in(home: &std::path::Path) -> PathBuf {
-    let name = if cfg!(windows) { "grok.exe" } else { "grok" };
+    let name = if cfg!(windows) { "friday.exe" } else { "grok" };
     home.join("bin").join(name)
 }
 
-/// System-wide config directory: `/etc/grok/` on Unix, `None` on Windows.
+/// System-wide config directory: `/etc/friday/` on Unix, `None` on Windows.
 pub fn system_config_dir() -> Option<PathBuf> {
     if cfg!(unix) {
-        Some(PathBuf::from("/etc/grok"))
+        Some(PathBuf::from("/etc/friday"))
     } else {
         None
     }

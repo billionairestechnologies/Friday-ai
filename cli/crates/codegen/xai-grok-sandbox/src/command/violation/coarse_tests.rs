@@ -83,7 +83,7 @@ const MACOS_CASES: &[Case] = &[
     (
         "mkdir-ws-grok",
         include_str!("../../../tests/fixtures/violations/macos/mkdir-ws-grok.txt"),
-        Some(|| write("/opt/ws-fixture/homedir/w1-scratch/ws/.grok")),
+        Some(|| write("/opt/ws-fixture/homedir/w1-scratch/ws/.friday")),
     ),
     // `rename A to B`: the kernel refused unlinking the source
     (
@@ -368,7 +368,7 @@ fn quoted_and_spaced_paths_are_read_whole() {
         );
     }
     // Unquoted, with the spaced directory on disk: bash's `<path>: Operation not permitted`
-    let dir = std::env::temp_dir().join(format!("grok-sandbox-spaced-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-sandbox-spaced-{}", std::process::id()));
     let support = dir.join("Library").join("Application Support");
     std::fs::create_dir_all(&support).unwrap();
     let target = support.join("MyTool").join("state.json");
@@ -594,10 +594,10 @@ fn dot_directory_relative_paths_join_the_cwd_but_bare_names_do_not() {
     let policy = workspace_policy(Path::new(CWD));
     assert_eq!(
         Some(write(
-            "/opt/ws-fixture/homedir/w1-scratch/ws/.grok/config.toml"
+            "/opt/ws-fixture/homedir/w1-scratch/ws/.friday/config.toml"
         )),
         decode_coarse(
-            "sh: 1: cannot create .grok/config.toml: Operation not permitted\n",
+            "sh: 1: cannot create .friday/config.toml: Operation not permitted\n",
             Path::new(CWD),
             &policy
         )
@@ -642,7 +642,7 @@ fn ambiguous_marker_falls_back_to_what_the_policy_refuses() {
 
 #[test]
 fn proposal_climbs_to_the_nearest_existing_directory() {
-    let dir = std::env::temp_dir().join(format!("grok-sandbox-coarse-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-sandbox-coarse-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("existing.txt");
     std::fs::write(&file, "x").unwrap();

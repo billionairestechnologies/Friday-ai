@@ -198,7 +198,7 @@ mod linux {
         /// configure memory limits.
         pub(crate) async fn create(config: &CgroupMemoryConfig) -> std::io::Result<Self> {
             let self_cgroup = read_self_cgroup()?;
-            let name = format!("grok-tools-{}", uuid::Uuid::now_v7());
+            let name = format!("friday-tools-{}", uuid::Uuid::now_v7());
             let fs_path = PathBuf::from(format!("/sys/fs/cgroup{}/{}", self_cgroup, name));
 
             tokio::fs::create_dir_all(&fs_path).await?;

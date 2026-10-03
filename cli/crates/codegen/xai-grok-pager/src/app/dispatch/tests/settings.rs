@@ -135,7 +135,7 @@ fn toggle_vim_mode_propagates_to_open_subagent_views() {
 /// `/vim-mode` must toggle vim from the DASHBOARD too, not just an agent view.
 /// It used to early-return unless an agent was active, a silent no-op that left the overview's j/k off.
 /// Turning vim ON also focuses the overview so j/k navigate immediately; turning it OFF returns focus to the input.
-#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
 fn toggle_vim_mode_works_on_dashboard_and_focuses_overview() {
     crate::appearance::cache::set_vim_mode(false);
@@ -279,9 +279,9 @@ fn slash_model_valid_dispatches_set_default_model_with_switch_and_persist() {
         .available
         .insert(
             model_id.clone(),
-            acp::ModelInfo::new(model_id.clone(), "Grok 4.5".to_string()),
+            acp::ModelInfo::new(model_id.clone(), "Friday X 4.5".to_string()),
         );
-    let effects = dispatch(Action::SendPrompt("/model Grok 4.5".into()), &mut app);
+    let effects = dispatch(Action::SendPrompt("/model Friday X 4.5".into()), &mut app);
     assert_eq!(
         effects.len(),
         2,
@@ -1307,7 +1307,7 @@ fn clear_default_model_persists_but_keeps_live_current() {
     use std::sync::Arc;
     let mut app = test_app_with_agent();
     let id = acp::ModelId::new(Arc::from("grok-test"));
-    let info = acp::ModelInfo::new(id.clone(), "Grok Test".to_string());
+    let info = acp::ModelInfo::new(id.clone(), "Friday X Test".to_string());
     let agent_id = AgentId(0);
     app.agents
         .get_mut(&agent_id)
@@ -1350,7 +1350,7 @@ fn set_default_model_resolves_known_name() {
     use std::sync::Arc;
     let mut app = test_app_with_agent();
     let id = acp::ModelId::new(Arc::from("grok-4.5"));
-    let info = acp::ModelInfo::new(id.clone(), "Grok 4.5".to_string());
+    let info = acp::ModelInfo::new(id.clone(), "Friday X 4.5".to_string());
     let agent_id = AgentId(0);
     app.agents
         .get_mut(&agent_id)
@@ -1380,7 +1380,7 @@ fn set_default_model_idempotent_when_already_current() {
     use std::sync::Arc;
     let mut app = test_app_with_agent();
     let id = acp::ModelId::new(Arc::from("grok-already"));
-    let info = acp::ModelInfo::new(id.clone(), "Grok Already".to_string());
+    let info = acp::ModelInfo::new(id.clone(), "Friday X Already".to_string());
     let agent_id = AgentId(0);
     app.agents
         .get_mut(&agent_id)
@@ -3467,8 +3467,8 @@ fn set_theme_toast_format_uses_display_name() {
             "toast must contain label, got: {toast:?}",
         );
         assert!(
-            toast.contains("Grok Day"),
-            "toast must use display name `Grok Day`, not canonical `grokday`, got: {toast:?}",
+            toast.contains("Friday X Day"),
+            "toast must use display name `Friday X Day`, not canonical `grokday`, got: {toast:?}",
         );
         assert!(toast.contains('\u{2713}'), "toast must contain the ✓ glyph");
     });
@@ -3480,7 +3480,7 @@ fn set_auto_dark_theme_toast_format_uses_display_name() {
         let _ = dispatch(Action::SetAutoDarkTheme("grokday".into()), &mut app);
         let toast = read_toast(&app);
         assert!(toast.contains("Auto dark theme"));
-        assert!(toast.contains("Grok Day"));
+        assert!(toast.contains("Friday X Day"));
         assert!(toast.contains('\u{2713}'));
     });
 }
@@ -3491,7 +3491,7 @@ fn set_auto_light_theme_toast_format_uses_display_name() {
         let _ = dispatch(Action::SetAutoLightTheme("groknight".into()), &mut app);
         let toast = read_toast(&app);
         assert!(toast.contains("Auto light theme"));
-        assert!(toast.contains("Grok Night"));
+        assert!(toast.contains("Friday X Night"));
     });
 }
 /// `apply_setting_rollback` for theme keys: a failed persist reverts `app.current_ui.theme` AND the live cache.

@@ -16,7 +16,7 @@ fn user_config_writers_write_through_a_symlink() {
     // One #[test] per binary: the env is process-global and `grok_home()` is cached.
     let grok_home = tempfile::tempdir().expect("grok home");
     // SAFETY: no other threads are running yet.
-    unsafe { std::env::set_var("GROK_HOME", grok_home.path()) };
+    unsafe { std::env::set_var("FRIDAY_HOME", grok_home.path()) };
 
     let dotfiles = tempfile::tempdir().expect("dotfiles");
     let target = dotfiles.path().join("config.toml");
@@ -87,12 +87,12 @@ fn user_config_writers_write_through_a_symlink() {
                 "the link target must carry the import marker"
             );
 
-            // A link a repository committed at `.grok/config.toml` is replaced at the link name, never followed.
+            // A link a repository committed at `.friday/config.toml` is replaced at the link name, never followed.
             let repo = tempfile::tempdir().expect("repo");
             let outside = repo.path().join("outside.toml");
             let defined = "[mcp_servers.planted]\ncommand = \"/bin/echo\"\n";
             std::fs::write(&outside, defined).unwrap();
-            let project_link = repo.path().join(".grok").join("config.toml");
+            let project_link = repo.path().join(".friday").join("config.toml");
             std::fs::create_dir_all(project_link.parent().unwrap()).unwrap();
             std::os::unix::fs::symlink(&outside, &project_link).unwrap();
             assert!(

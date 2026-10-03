@@ -22,8 +22,8 @@ use super::{
     Engaged, WorkspaceSandbox, WorkspaceSandboxError, assert_control_socket_protected, metrics,
 };
 
-/// The process-wide profile for the folder (`~/.grok/sandbox.toml` + `.grok/sandbox.toml`,
-/// `GROK_SANDBOX_PROFILE` ignored: the per-command policy always starts from `workspace`). A
+/// The process-wide profile for the folder (`~/.friday/sandbox.toml` + `.friday/sandbox.toml`,
+/// `FRIDAY_SANDBOX_PROFILE` ignored: the per-command policy always starts from `workspace`). A
 /// profile that does not resolve is logged and replaced by the bare workspace-writable one.
 pub(super) fn resolve_profile(workspace_root: &Path) -> SandboxProfile {
     let config = load_sandbox_config(workspace_root);

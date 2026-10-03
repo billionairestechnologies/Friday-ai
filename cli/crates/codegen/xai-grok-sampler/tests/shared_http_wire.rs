@@ -68,7 +68,7 @@ fn pin_env() {
         let fixture = &*TLS_FIXTURE;
         // SAFETY: Every test in this process calls `pin_env` before building a client.
         // `PIN` serializes the one mutation while concurrent tests wait.
-        unsafe { std::env::set_var("GROK_EXTRA_CA_BUNDLE", &fixture.ca_path) };
+        unsafe { std::env::set_var("FRIDAY_EXTRA_CA_BUNDLE", &fixture.ca_path) };
     });
 }
 

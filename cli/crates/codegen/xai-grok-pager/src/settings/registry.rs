@@ -72,7 +72,7 @@ impl SettingCategory {
 pub struct EnumChoice {
     /// Canonical persisted value (e.g. `"groknight"`).
     pub canonical: &'static str,
-    /// Display label shown in the chooser (e.g. `"Grok Night"`).
+    /// Display label shown in the chooser (e.g. `"Friday X Night"`).
     pub display: &'static str,
     /// Sub-text shown in the chooser sheet (e.g. `"Dark + magenta accent"`).
     pub description: &'static str,
@@ -416,7 +416,7 @@ pub fn canonical_voice_capture_mode(value: Option<&str>) -> &'static str {
 
 /// Canonicalize a raw voice STT language to a settings choice. Delegates to
 /// [`xai_grok_voice::canonicalize_stt_language`] so the pager and the STT client share one catalog. The catalog is
-/// the official Grok STT languages plus the client-only `auto`.
+/// the official Friday X STT languages plus the client-only `auto`.
 pub fn canonical_voice_stt_language(value: Option<&str>) -> &'static str {
     xai_grok_voice::canonicalize_stt_language(value)
 }
@@ -645,7 +645,7 @@ pub fn current_value_for(
         "collapsed_edit_blocks" => Some(SettingValue::Bool(
             crate::appearance::cache::load_collapsed_edit_blocks(),
         )),
-        // Live cache; `GROK_PROMPT_SUGGESTIONS` env overrides at the gate.
+        // Live cache; `FRIDAY_PROMPT_SUGGESTIONS` env overrides at the gate.
         "prompt_suggestions" => Some(SettingValue::Bool(
             crate::appearance::cache::load_prompt_suggestions(),
         )),
@@ -1557,7 +1557,7 @@ mod tests {
         );
         let pager = PagerLocalSnapshot {
             available_models: vec![(
-                "Grok 4.5 Fast".to_string(),
+                "Friday X 4.5 Fast".to_string(),
                 acp::ModelId::new(std::sync::Arc::from(slug)),
             )],
             ..Default::default()
@@ -1568,7 +1568,7 @@ mod tests {
         };
         assert_eq!(
             current_value_for("fork_secondary_model", &ui, &pager),
-            Some(SettingValue::String("Grok 4.5 Fast".to_string())),
+            Some(SettingValue::String("Friday X 4.5 Fast".to_string())),
         );
 
         // The baseline folds to the empty "no override" sentinel

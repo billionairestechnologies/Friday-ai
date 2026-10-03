@@ -1,6 +1,6 @@
-/// Crate-wide lock serializing every test that mutates the process-global environment (`GROK_HOME`, `HOME`, …).
+/// Crate-wide lock serializing every test that mutates the process-global environment (`FRIDAY_HOME`, `HOME`, …).
 /// nextest isolates each test in its own process, but `cargo test --lib` shares ONE process across threads.
-/// A per-module lock can't stop a peer test in another module clobbering `GROK_HOME` mid-test, so every env-mutating test module uses this one.
+/// A per-module lock can't stop a peer test in another module clobbering `FRIDAY_HOME` mid-test, so every env-mutating test module uses this one.
 pub(crate) static ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Crate-shared RAII guard for a single process env var in tests: sets (or unsets) it on construction and restores the prior value on drop.

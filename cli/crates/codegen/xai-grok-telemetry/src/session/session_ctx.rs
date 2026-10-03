@@ -456,7 +456,7 @@ mod tests {
         );
     }
 
-    /// What a command exiting right after emitting (`grok login`) relies on.
+    /// What a command exiting right after emitting (`friday login`) relies on.
     /// Asserts on the wait, not on the gauge: it is process-global and other tests in this binary emit concurrently.
     #[tokio::test]
     async fn drain_pending_waits_for_in_flight_posts() {
@@ -497,13 +497,13 @@ mod tests {
         assert_eq!(EmitterOrigin::Workspace.event_prefix(), "grok-workspace-");
     }
 
-    /// The `Shell` reroute must reproduce the historical `format!("grok-shell-{suffix}")` event name byte-for-byte.
+    /// The `Shell` reroute must reproduce the historical `format!("friday-shell-{suffix}")` event name byte-for-byte.
     /// Every existing `log_session_event` / `log_event` / `emit_event` call funnels through `EmitterOrigin::Shell`.
     #[test]
     fn shell_origin_event_name_matches_legacy_format() {
         let suffix = "trace_upload_attempted";
         let rerouted = format!("{}{}", EmitterOrigin::Shell.event_prefix(), suffix);
-        let legacy = format!("grok-shell-{suffix}");
+        let legacy = format!("friday-shell-{suffix}");
         assert_eq!(rerouted, legacy);
     }
 

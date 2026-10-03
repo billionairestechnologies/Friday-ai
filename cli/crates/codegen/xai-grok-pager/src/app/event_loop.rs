@@ -1175,14 +1175,14 @@ pub(crate) async fn run(
         .and_then(|s| s.show_resolved_model)
         .unwrap_or(true);
     app.sharing_enabled = false;
-    app.privacy_notice_rollout = xai_grok_config::env_bool("GROK_PRIVACY_NOTICE_ROLLOUT")
+    app.privacy_notice_rollout = xai_grok_config::env_bool("FRIDAY_PRIVACY_NOTICE_ROLLOUT")
         .or_else(|| {
             remote_settings
                 .as_ref()
                 .and_then(|s| s.privacy_notice_rollout)
         })
         .unwrap_or(false);
-    app.privacy_banner_reshow_days = std::env::var("GROK_PRIVACY_BANNER_RESHOW_DAYS")
+    app.privacy_banner_reshow_days = std::env::var("FRIDAY_PRIVACY_BANNER_RESHOW_DAYS")
         .ok()
         .and_then(|v| v.trim().parse().ok())
         .or_else(|| {
@@ -1197,20 +1197,20 @@ pub(crate) async fn run(
                 .privacy
                 .privacy_banner_acked
         });
-    app.plugin_cta_enabled = xai_grok_config::env_bool("GROK_PLUGIN_CTA")
+    app.plugin_cta_enabled = xai_grok_config::env_bool("FRIDAY_PLUGIN_CTA")
         .or_else(|| remote_settings.as_ref().and_then(|s| s.plugin_cta))
         .unwrap_or(false);
     app.plugin_cta_marketplace = launch_effective_config
         .as_ref()
         .and_then(plugin_cta_marketplace_from);
-    app.workspace_dashboard_enabled = xai_grok_config::env_bool("GROK_WORKSPACE_DASHBOARD")
+    app.workspace_dashboard_enabled = xai_grok_config::env_bool("FRIDAY_WORKSPACE_DASHBOARD")
         .or_else(|| {
             remote_settings
                 .as_ref()
                 .and_then(|s| s.workspace_dashboard_enabled)
         })
         .unwrap_or(false);
-    app.session_picker_grouped = std::env::var("GROK_SESSION_PICKER_GROUPED")
+    app.session_picker_grouped = std::env::var("FRIDAY_SESSION_PICKER_GROUPED")
         .ok()
         .and_then(|v| match v.as_str() {
             "1" | "true" => Some(true),
@@ -1811,8 +1811,8 @@ pub(crate) async fn run(
             app.finish_startup(xai_grok_telemetry::startup::StartupOutcome::Ok);
         }
     }
-    if std::env::var("GROK_OPEN_DASHBOARD_AT_STARTUP").as_deref() == Ok("1") {
-        unsafe { std::env::remove_var("GROK_OPEN_DASHBOARD_AT_STARTUP") };
+    if std::env::var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP").as_deref() == Ok("1") {
+        unsafe { std::env::remove_var("FRIDAY_OPEN_DASHBOARD_AT_STARTUP") };
         if app.session_startup_allowed() {
             let effs = dispatch::dispatch(Action::OpenDashboard, &mut app);
             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
@@ -1964,7 +1964,7 @@ pub(crate) async fn run(
             } else if app.voice_cmd_tx.is_none() {
                 app.voice_reset();
                 app.voice_ui_active = false;
-                app.show_toast("Voice could not start. Restart Grok.");
+                app.show_toast("Voice could not start. Restart Friday X.");
             } else {
                 app.voice_reset();
             }

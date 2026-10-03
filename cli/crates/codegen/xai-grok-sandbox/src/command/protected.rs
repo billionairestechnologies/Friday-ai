@@ -1,6 +1,6 @@
 //! The protected floor: paths no command may write and no grant may open, rendered after every
 //! allow by every backend. One table, pinned by a test, so the desktop copy
-//! ("Grok can never write to …"), the grant store's load-time filter and the backends agree on
+//! ("Friday X can never write to …"), the grant store's load-time filter and the backends agree on
 //! the same set. Every entry is spelled canonically ([`canonical_path`]) and every question asked
 //! of the floor canonicalises its path first, so `..`, a firmlink, a symlinked prefix or an APFS
 //! case or normalisation variant never makes one path look like two.
@@ -162,7 +162,7 @@ pub fn is_ungrantable(root: &Path, floor: &[Protected]) -> bool {
 /// editors' and agents' own config trees. The git entries are derived from the repository's
 /// layout by [`git_config::git_entries_in`].
 pub const WORKSPACE_PROTECTED_SUBPATHS: &[&str] =
-    &[".grok", ".cursor", ".claude", ".vscode", ".idea"];
+    &[".friday", ".cursor", ".claude", ".vscode", ".idea"];
 
 /// The entries of a git directory that run or reconfigure code on the user's next git action:
 /// `hooks/`, `config` and `config.worktree` (`core.hooksPath`, `core.fsmonitor`, filters; the
@@ -179,7 +179,7 @@ pub const GIT_DIR_NAME: &str = ".git";
 /// that could write it would switch the sandbox off for every command after it.
 pub const DAEMON_SETTINGS_FILENAME: &str = "workspaced.toml";
 
-/// Grok-home entries beyond [`TRUST_BOUNDARY_FILENAMES`]: hook sources, the global grant file and
+/// Friday X-home entries beyond [`TRUST_BOUNDARY_FILENAMES`]: hook sources, the global grant file and
 /// its lock sidecar, the daemon's settings file, and everything grok runs, starts or loads into a
 /// prompt from its home: the installed binary (`bin/grok`, a link into `downloads`), the vendored
 /// search tools, plugins (installed, their data and the marketplace clones they install from),
@@ -187,7 +187,7 @@ pub const DAEMON_SETTINGS_FILENAME: &str = "workspaced.toml";
 /// guide the model reads, the MCP and LSP server configs the daemon starts what they name from,
 /// extensions, and the CLI's own settings. The whole grok home is a floor tree too; a workspace
 /// served from inside it (a grok-managed worktree) is the one thing there a command may write.
-pub const GROK_HOME_PROTECTED_NAMES: &[&str] = &[
+pub const FRIDAY_HOME_PROTECTED_NAMES: &[&str] = &[
     "hooks",
     "hooks-paths",
     GLOBAL_GRANTS_FILENAME,
@@ -356,8 +356,8 @@ pub const SECRET_READ_DENY_FILES: &[&str] = &[
     ".git-credentials",
 ];
 
-/// Grok-home glob prefixes denied for read: the auth material.
-pub const GROK_HOME_SECRET_GLOBS: &[&str] = &["auth*", "credentials*"];
+/// Friday X-home glob prefixes denied for read: the auth material.
+pub const FRIDAY_HOME_SECRET_GLOBS: &[&str] = &["auth*", "credentials*"];
 
 /// The temporary directories a command may write by default: `$TMPDIR` (or the platform default)
 /// plus the platform's shared temp roots. Every entry is absolute; a relative `$TMPDIR` is ignored.
@@ -1039,7 +1039,7 @@ pub fn floor_with_unread(inputs: &ProtectedInputs<'_>) -> Floor {
     out.extend(
         TRUST_BOUNDARY_FILENAMES
             .iter()
-            .chain(GROK_HOME_PROTECTED_NAMES)
+            .chain(FRIDAY_HOME_PROTECTED_NAMES)
             .map(|name| path(grok_home.join(name))),
     );
     if let Some(home) = &home {

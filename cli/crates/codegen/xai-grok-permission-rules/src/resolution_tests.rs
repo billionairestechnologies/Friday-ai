@@ -1,7 +1,7 @@
 use super::*;
 
 // Crate-shared lock serializing tests that mutate the global process environment so concurrent test threads can't race on shared env state
-// Shared so `GROK_HOME`/`HOME` mutations here also serialize against the other env-mutating test modules under single-process `cargo test --lib`
+// Shared so `FRIDAY_HOME`/`HOME` mutations here also serialize against the other env-mutating test modules under single-process `cargo test --lib`
 use crate::ENV_TEST_LOCK as ENV_LOCK;
 
 // The crate-shared generic env-var guard, defined once in `lib.rs`
@@ -578,7 +578,7 @@ fn load_settings_no_env_field() {
 
 #[test]
 fn load_claude_env_merges_with_precedence() {
-    // Isolate GROK_HOME (claude-import marker) and HOME (global `~/.claude`); an imported dev machine would otherwise early-return an empty map
+    // Isolate FRIDAY_HOME (claude-import marker) and HOME (global `~/.claude`); an imported dev machine would otherwise early-return an empty map
     let _home = isolated_home();
     let tmp = tempfile::tempdir().unwrap();
     let claude_dir = tmp.path().join(".claude");
@@ -606,7 +606,7 @@ fn load_claude_env_merges_with_precedence() {
 
 #[test]
 fn load_claude_env_empty_when_no_settings() {
-    // Isolate GROK_HOME (claude-import marker) and HOME (global `~/.claude`)
+    // Isolate FRIDAY_HOME (claude-import marker) and HOME (global `~/.claude`)
     // Neither a dev machine's import marker nor its real `~/.claude` env can then trip the empty-map assertion
     let _home = isolated_home();
     let tmp = tempfile::tempdir().unwrap();
@@ -617,7 +617,7 @@ fn load_claude_env_empty_when_no_settings() {
 #[test]
 fn load_claude_env_with_project_drops_repo_env_when_untrusted() {
     // Repo-tree `.claude` env is injected into every subprocess, so an untrusted folder must drop it
-    // Isolate `GROK_HOME` and `HOME` so the import marker is clean and the unique key stays independent of the host `~/.claude`
+    // Isolate `FRIDAY_HOME` and `HOME` so the import marker is clean and the unique key stays independent of the host `~/.claude`
     let _home = isolated_home();
     let tmp = tempfile::tempdir().unwrap();
     let claude_dir = tmp.path().join(".claude");
@@ -1216,16 +1216,16 @@ fn untrusted_project_claude_permissions_are_not_honored() {
     );
 }
 
-/// Untrusted clone must not contribute project `.grok/config.toml` `[permission]`.
+/// Untrusted clone must not contribute project `.friday/config.toml` `[permission]`.
 /// Sync `block_on` so `ENV_LOCK` is not held across `.await`. Global counts are not exact: `grok_home()` is a process-wide `OnceLock`.
 #[test]
 fn untrusted_project_config_toml_permissions_are_not_honored() {
     let home = isolated_home();
 
-    // Global allow (survives untrusted project when GROK_HOME resolves here).
-    std::fs::create_dir_all(home.path().join(".grok")).unwrap();
+    // Global allow (survives untrusted project when FRIDAY_HOME resolves here).
+    std::fs::create_dir_all(home.path().join(".friday")).unwrap();
     std::fs::write(
-        home.path().join(".grok/config.toml"),
+        home.path().join(".friday/config.toml"),
         r#"[permission]
 allow = ["Bash(git status)"]
 "#,
@@ -1235,7 +1235,7 @@ allow = ["Bash(git status)"]
     let tmp = tempfile::tempdir().unwrap();
     // Bound project discovery to this temp dir (canonical walker uses git root).
     git2::Repository::init(tmp.path()).expect("git init");
-    let grok = tmp.path().join(".grok");
+    let grok = tmp.path().join(".friday");
     std::fs::create_dir_all(&grok).unwrap();
     std::fs::write(
         grok.join("config.toml"),
@@ -1245,7 +1245,7 @@ allow = ["Bash(evil *)"]
     )
     .unwrap();
 
-    // Untrusted may be None when no global rules load (GROK_HOME OnceLock already pinned by another test); empty after dropping project is OK
+    // Untrusted may be None when no global rules load (FRIDAY_HOME OnceLock already pinned by another test); empty after dropping project is OK
     let untrusted = block_on(resolve_permissions_with_provenance_inner(
         tmp.path(),
         inputs_trusted(None, false),
@@ -1278,7 +1278,7 @@ allow = ["Bash(evil *)"]
     let global_live = xai_grok_config::user_grok_home()
         .is_some_and(|g| g == home.path() || g.starts_with(home.path()));
     if global_live {
-        let untrusted = untrusted.expect("global rules present when GROK_HOME is live");
+        let untrusted = untrusted.expect("global rules present when FRIDAY_HOME is live");
         assert!(
             untrusted
                 .config
@@ -1450,7 +1450,7 @@ fn inputs_with_managed<'a>(
     }
 }
 
-/// Holds `ENV_LOCK` and points `HOME`, `USERPROFILE`, and `GROK_HOME` at an empty temp home with the import-marker override unset
+/// Holds `ENV_LOCK` and points `HOME`, `USERPROFILE`, and `FRIDAY_HOME` at an empty temp home with the import-marker override unset
 #[must_use]
 pub(crate) struct IsolatedHome {
     _env: [EnvVarGuard; 4],
@@ -1470,7 +1470,7 @@ pub(crate) fn isolated_home() -> IsolatedHome {
     let env = [
         EnvVarGuard::set("HOME", home.path()),
         EnvVarGuard::set("USERPROFILE", home.path()),
-        EnvVarGuard::set("GROK_HOME", &home.path().join(".grok")),
+        EnvVarGuard::set("FRIDAY_HOME", &home.path().join(".friday")),
         EnvVarGuard::unset("_GROK_CLAUDE_MARKER_OVERRIDE"),
     ];
     IsolatedHome {
@@ -1738,7 +1738,7 @@ fn non_bool_lock_key_warns_and_does_not_lock() {
         }
     }
 
-    let p = Path::new("/etc/grok/requirements.toml");
+    let p = Path::new("/etc/friday/requirements.toml");
     let bad = layer("[ui]\ndisable_bypass_permissions_mode = \"true\"\n");
 
     let writer = CapturingWriter::default();
@@ -1764,7 +1764,7 @@ fn non_bool_lock_key_warns_and_does_not_lock() {
         "missing non-bool warning in: {out}"
     );
     assert!(
-        out.contains("/etc/grok/requirements.toml"),
+        out.contains("/etc/friday/requirements.toml"),
         "non-bool warning must name the layer in: {out}"
     );
 }
@@ -1868,19 +1868,19 @@ fn catchall_allow_covers_freeform_dimensions() {
 #[test]
 fn admin_source_trusts_only_root_owned_tiers() {
     // Only managed-settings and the system-dir requirements layer are admin;
-    // the user-writable `~/.grok/requirements.toml` is not, despite its path.
+    // the user-writable `~/.friday/requirements.toml` is not, despite its path.
     let p = std::path::PathBuf::from("x");
     assert!(is_admin_source(&RequirementSource::ManagedSettings {
         path: p.clone()
     }));
     assert!(is_admin_source(&RequirementSource::SystemRequirements {
-        path: "/etc/grok/requirements.toml".into(),
+        path: "/etc/friday/requirements.toml".into(),
     }));
     assert!(!is_admin_source(&RequirementSource::Requirements {
-        path: "/home/u/.grok/requirements.toml".into(),
+        path: "/home/u/.friday/requirements.toml".into(),
     }));
     assert!(!is_admin_source(&RequirementSource::ManagedConfig {
-        path: "/etc/grok/managed_config.toml".into(),
+        path: "/etc/friday/managed_config.toml".into(),
     }));
     assert!(!is_admin_source(&RequirementSource::Config {
         path: p.clone()
@@ -1910,14 +1910,14 @@ fn drop_untrusted_catchall_allows_is_source_aware() {
         sourced(
             allow_any(Some("**/*")),
             RequirementSource::Requirements {
-                path: "/home/u/.grok/requirements.toml".into(),
+                path: "/home/u/.friday/requirements.toml".into(),
             },
         ),
-        // Managed config: defaults tier, untrusted even from /etc/grok.
+        // Managed config: defaults tier, untrusted even from /etc/friday.
         sourced(
             allow_any(Some("*")),
             RequirementSource::ManagedConfig {
-                path: "/etc/grok/managed_config.toml".into(),
+                path: "/etc/friday/managed_config.toml".into(),
             },
         ),
         // Scoped Allow(Any) from an untrusted source: not a catch-all, kept
@@ -1929,7 +1929,7 @@ fn drop_untrusted_catchall_allows_is_source_aware() {
         sourced(
             allow_any(Some("*")),
             RequirementSource::SystemRequirements {
-                path: "/etc/grok/requirements.toml".into(),
+                path: "/etc/friday/requirements.toml".into(),
             },
         ),
         sourced(
@@ -1986,10 +1986,10 @@ fn drop_untrusted_catchall_allows_is_source_aware() {
 fn drop_untrusted_freeform_catchalls_respects_source_and_scope() {
     let sourced = |value, source| Sourced { value, source };
     let untrusted = || RequirementSource::Requirements {
-        path: "/home/u/.grok/requirements.toml".into(),
+        path: "/home/u/.friday/requirements.toml".into(),
     };
     let admin = || RequirementSource::SystemRequirements {
-        path: "/etc/grok/requirements.toml".into(),
+        path: "/etc/friday/requirements.toml".into(),
     };
     let rules = vec![
         // Bare `allow = ["Bash"]` from an untrusted source: dropped
@@ -2370,7 +2370,7 @@ fn unrecognized_project_mode_claims_scope_over_global_accept_edits() {
         skipped
             .iter()
             .any(|s| s.rule.contains("dontask") || s.rule.contains("defaultMode=")),
-        "typo should be recorded for grok inspect"
+        "typo should be recorded for friday inspect"
     );
 }
 
@@ -2968,7 +2968,7 @@ fn explicit_default_mode_blocks_permission_mode_hint() {
         std::fs::create_dir_all(&claude_dir).unwrap();
         std::fs::write(claude_dir.join("settings.json"), settings).unwrap();
         let _home = EnvVarGuard::set("HOME", tmp.path());
-        let _grok_home = EnvVarGuard::set("GROK_HOME", &tmp.path().join(".grok"));
+        let _grok_home = EnvVarGuard::set("FRIDAY_HOME", &tmp.path().join(".friday"));
         let _marker = EnvVarGuard::unset("_GROK_CLAUDE_MARKER_OVERRIDE");
 
         let resolved = rt

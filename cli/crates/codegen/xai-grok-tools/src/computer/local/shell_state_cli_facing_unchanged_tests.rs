@@ -66,7 +66,7 @@ async fn cli_facing_persistent_state_capture_unchanged_without_hook() {
     let shell = ShellKind::detect();
     let policy = ShellEnvironmentPolicy {
         exclude: vec![EnvironmentVariablePattern::new_case_insensitive(
-            "GROK_PIN_SECRET*",
+            "FRIDAY_PIN_SECRET*",
         )],
         ..Default::default()
     };

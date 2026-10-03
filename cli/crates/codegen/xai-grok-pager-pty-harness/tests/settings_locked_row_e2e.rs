@@ -8,7 +8,7 @@
 //! - Team member with an unknown capability (`canAdministerTeam: null`): the row stays editable (`Opt out` with the chevron).
 //!   An absent key reads the same `None` (unit-tested), so only `null` runs here.
 //!
-//! All three accounts suppress the welcome privacy banner even with `GROK_PRIVACY_NOTICE_ROLLOUT=1`.
+//! All three accounts suppress the welcome privacy banner even with `FRIDAY_PRIVACY_NOTICE_ROLLOUT=1`.
 //! That is asserted on the authenticated welcome screen before opening settings.
 //! Team name and role are seeded on every account so the lock cannot be keying on them.
 //! Row/input details are unit-tested in `xai-grok-pager` (`views/settings_modal/tests.rs`, `locked_coding_*`).
@@ -30,7 +30,7 @@ use xai_grok_pager_pty_harness::{
 
 const ROWS: u16 = 50;
 const COLS: u16 = 120;
-const BANNER_TITLE: &str = "Help improve Grok";
+const BANNER_TITLE: &str = "Help improve Friday X";
 /// Head of the row's label (`Coding data, retention, and training`).
 /// The modal truncates long labels, so match the stable prefix.
 const ROW_LABEL: &str = "Coding data";
@@ -68,9 +68,9 @@ async fn team_member_with_unknown_capability_sees_no_banner_and_editable_row() {
 /// The seeded team principal would otherwise start a managed-config fetch the mock does not serve.
 fn locked_row_env_ops() -> Vec<EnvOp<'static>> {
     let mut ops = vec![
-        EnvOp::set("GROK_PRIVACY_NOTICE_ROLLOUT", "1"),
-        EnvOp::set("GROK_ZDR_ACCESS_ENABLED", "1"),
-        EnvOp::set("GROK_MANAGED_CONFIG", "0"),
+        EnvOp::set("FRIDAY_PRIVACY_NOTICE_ROLLOUT", "1"),
+        EnvOp::set("FRIDAY_ZDR_ACCESS_ENABLED", "1"),
+        EnvOp::set("FRIDAY_MANAGED_CONFIG", "0"),
     ];
     ops.extend(oauth_credential_ops());
     ops

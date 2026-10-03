@@ -80,7 +80,7 @@ mod network_tests;
 
 /// The model-visible refusal under `enforce` on a host with no backend.
 pub const ENFORCE_UNAVAILABLE_TEXT: &str = "the command sandbox is set to enforce but this host has no per-command sandbox backend; \
-     no shell command can run; ask the folder's owner to set `[sandbox] mode = \"observe\"` (or GROK_SANDBOX_MODE=observe) to run commands unsandboxed.";
+     no shell command can run; ask the folder's owner to set `[sandbox] mode = \"observe\"` (or FRIDAY_SANDBOX_MODE=observe) to run commands unsandboxed.";
 
 /// The model-visible refusal under `enforce` while the folder's session directory is not safe;
 /// the reason follows in parentheses.
@@ -744,7 +744,7 @@ impl WorkspaceSandbox {
         self.backend().is_some_and(|b| b.capabilities().reduced)
     }
 
-    /// The mode as the layers resolve it (`GROK_SANDBOX_MODE`, the managed file's rollout switch,
+    /// The mode as the layers resolve it (`FRIDAY_SANDBOX_MODE`, the managed file's rollout switch,
     /// the user file, the workspace's file, default `off`), kept until one of its inputs moves or
     /// `sandbox.mode.set` invalidates it. A call reads it once, at [`WorkspaceSandbox::pin_mode`]
     /// or its first `prepare`, and runs under that mode to its end.
@@ -876,14 +876,14 @@ impl WorkspaceSandbox {
         }
     }
 
-    /// `sandbox.mode.set`: write `mode` into the folder's `.grok/workspaced.toml` and answer with
+    /// `sandbox.mode.set`: write `mode` into the folder's `.friday/workspaced.toml` and answer with
     /// the mode the layers resolve to *now* and its source, which the workspace layer (tighten
     /// only) may not have set. The caller then runs [`WorkspaceSandbox::sync_network`], which
     /// engages the folder when the mode is not `off`. A command already running keeps its mode
     /// ([`WorkspaceSandbox::running_under_another_mode`]).
     ///
     /// # Errors
-    /// [`set_workspace_mode_in`]'s: a root that is not a directory, an unwritable `.grok/`, a file
+    /// [`set_workspace_mode_in`]'s: a root that is not a directory, an unwritable `.friday/`, a file
     /// that is not TOML.
     pub fn set_workspace_mode(
         &self,

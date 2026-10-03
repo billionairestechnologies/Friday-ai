@@ -1,13 +1,13 @@
-//! Release-safe FPS readout: `/debug fps`, and `GROK_FPS` on release builds.
+//! Release-safe FPS readout: `/debug fps`, and `FRIDAY_FPS` on release builds.
 //!
-//! The frame profiler (`render::frame_metrics`, `GROK_FPS`) threads per-phase timings through `draw_frame`, so it exists only in debug/dev builds.
+//! The frame profiler (`render::frame_metrics`, `FRIDAY_FPS`) threads per-phase timings through `draw_frame`, so it exists only in debug/dev builds.
 //! This HUD measures the one thing that needs no pipeline change: the wall-clock cost of the whole `draw_frame` call (render, flush, writer handoff).
 //! It therefore compiles into release builds behind a runtime toggle (the scroll-debug HUD precedent).
 //! It measures the production render path itself, with no debug-only approximation.
 //!
-//! `GROK_FPS` ownership: in debug/dev builds the env feeds `FrameMetrics` and this HUD stays toggle-only (no double overlay).
+//! `FRIDAY_FPS` ownership: in debug/dev builds the env feeds `FrameMetrics` and this HUD stays toggle-only (no double overlay).
 //! On release binaries, where that overlay does not exist, the same env enables this HUD from startup.
-//! `GROK_FPS=1` is therefore never a silent no-op ([`HONORS_GROK_FPS_ENV`]).
+//! `FRIDAY_FPS=1` is therefore never a silent no-op ([`HONORS_GROK_FPS_ENV`]).
 //!
 //! "fps" here is render throughput (1 / mean frame cost), not paint frequency: the pager draws on demand.
 //! The second stats line reports measured paints and ticks per second over a sliding window; it refreshes on paint, so an idle screen keeps its last pre-idle rates.
@@ -26,11 +26,11 @@ const REFRESH: Duration = Duration::from_millis(250);
 const RATE_WINDOW: Duration = Duration::from_secs(2);
 /// Panel width in cells; each line is padded/truncated to this.
 const PANEL_WIDTH: u16 = 32;
-/// Whether this HUD owns the `GROK_FPS` env gate: only where the dev `FrameMetrics` overlay is compiled out.
+/// Whether this HUD owns the `FRIDAY_FPS` env gate: only where the dev `FrameMetrics` overlay is compiled out.
 /// In debug/dev builds the env keeps feeding that overlay alone.
 const HONORS_GROK_FPS_ENV: bool = true;
 /// Runtime state for the FPS HUD.
-/// `GROK_FPS` enables it at startup on release binaries ([`HONORS_GROK_FPS_ENV`]); `/debug fps` toggles it live everywhere.
+/// `FRIDAY_FPS` enables it at startup on release binaries ([`HONORS_GROK_FPS_ENV`]); `/debug fps` toggles it live everywhere.
 /// Deliberately NOT a settings-registry entry: it is a diagnostic, not a preference to persist.
 pub struct FpsHud {
     samples: VecDeque<Duration>,
@@ -53,9 +53,9 @@ impl Default for FpsHud {
 }
 impl FpsHud {
     pub fn new() -> Self {
-        Self::with_env(std::env::var("GROK_FPS").ok())
+        Self::with_env(std::env::var("FRIDAY_FPS").ok())
     }
-    /// `env` is the raw `GROK_FPS` value; the truthiness rule (nonempty and not `"0"`) matches `FrameMetrics` and `GROK_SCROLL_DEBUG`.
+    /// `env` is the raw `FRIDAY_FPS` value; the truthiness rule (nonempty and not `"0"`) matches `FrameMetrics` and `FRIDAY_SCROLL_DEBUG`.
     fn with_env(env: Option<String>) -> Self {
         let env_on = HONORS_GROK_FPS_ENV && env.is_some_and(|v| !v.is_empty() && v != "0");
         Self {
@@ -199,7 +199,7 @@ fn percentile(sorted: &[f64], pct: f64) -> f64 {
 pub struct FpsOverlay {
     body: String,
     rates: String,
-    /// Rows left free for overlays above (the dev `GROK_FPS` line).
+    /// Rows left free for overlays above (the dev `FRIDAY_FPS` line).
     pub top_offset: u16,
 }
 impl FpsOverlay {
@@ -244,7 +244,7 @@ mod tests {
             assert_eq!(
                 FpsHud::with_env(Some(truthy.into())).enabled(),
                 HONORS_GROK_FPS_ENV,
-                "GROK_FPS={truthy:?} must track the env-gate owner"
+                "FRIDAY_FPS={truthy:?} must track the env-gate owner"
             );
         }
         for falsy in [None, Some(String::new()), Some("0".into())] {

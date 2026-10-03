@@ -98,10 +98,10 @@ impl Default for PruningConfig {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthType {
-    /// From AuthManager (grok login, OIDC, external binary). Refreshable.
+    /// From AuthManager (friday login, OIDC, external binary). Refreshable.
     #[default]
     SessionToken,
-    /// From user config ([model.*] api_key, env_key, XAI_API_KEY). Not refreshable.
+    /// From user config ([model.*] api_key, env_key, FRIDAY_X_TOKEN). Not refreshable.
     ApiKey,
 }
 

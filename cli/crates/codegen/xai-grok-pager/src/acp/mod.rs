@@ -128,7 +128,7 @@ pub struct AcpConnection {
 /// CLI flags that affect agent configuration, threaded from PagerArgs.
 #[derive(Debug, Clone, Default)]
 pub struct ConnectFlags {
-    /// `--no-subagents`. Only an explicit flag reaches the CLI tier of the resolver; otherwise env, config.toml, and the default decide, exactly as in `grok agent stdio`.
+    /// `--no-subagents`. Only an explicit flag reaches the CLI tier of the resolver; otherwise env, config.toml, and the default decide, exactly as in `friday agent stdio`.
     pub no_subagents: bool,
     /// CLI memory override set by a legacy compatibility flag.
     pub memory_enabled_override: Option<bool>,
@@ -902,9 +902,9 @@ mod tests {
     /// on a meaningful new code path.
     #[test]
     fn startup_auth_xai_api_key_not_first_still_requires_login() {
-        use xai_grok_shell::agent::auth_method::{GROK_COM_METHOD_ID, XAI_API_KEY_METHOD_ID};
+        use xai_grok_shell::agent::auth_method::{FRIDAY_COM_METHOD_ID, XAI_API_KEY_METHOD_ID};
         let methods = vec![
-            make_auth_method(GROK_COM_METHOD_ID, "Grok", None),
+            make_auth_method(FRIDAY_COM_METHOD_ID, "Friday X", None),
             make_auth_method(XAI_API_KEY_METHOD_ID, "xai.api_key", None),
         ];
         let (needs, _, _, _) = startup_auth_metadata(&methods);

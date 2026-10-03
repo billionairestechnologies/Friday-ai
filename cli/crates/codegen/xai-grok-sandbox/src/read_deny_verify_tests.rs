@@ -8,8 +8,8 @@ fn temp_workspace(tag: &str, toml_body: &str) -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let ws = std::env::temp_dir().join(format!("grok-rdv-{tag}-{}-{nanos}", std::process::id()));
-    let grok = ws.join(".grok");
+    let ws = std::env::temp_dir().join(format!("friday-rdv-{tag}-{}-{nanos}", std::process::id()));
+    let grok = ws.join(".friday");
     std::fs::create_dir_all(&grok).unwrap();
     std::fs::write(
         grok.join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
@@ -37,7 +37,7 @@ fn mode_000_path_status_stays_a_deny() {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("grok-mode000-{}-{nanos}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-mode000-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("key");
     std::fs::write(&path, b"x").unwrap();

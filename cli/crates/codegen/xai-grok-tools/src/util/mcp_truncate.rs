@@ -38,8 +38,8 @@ pub const MCP_MAX_OUTPUT_BYTES: usize = 20_000;
 /// truncation is byte-oriented (`truncate_str`).
 pub const ENV_MAX_MCP_OUTPUT_BYTES: &str = "MAX_MCP_OUTPUT_BYTES";
 
-/// Grok-native env override for the MCP inline output cap (bytes).
-pub const ENV_GROK_MAX_MCP_OUTPUT_BYTES: &str = "GROK_MAX_MCP_OUTPUT_BYTES";
+/// Friday X-native env override for the MCP inline output cap (bytes).
+pub const ENV_GROK_MAX_MCP_OUTPUT_BYTES: &str = "FRIDAY_MAX_MCP_OUTPUT_BYTES";
 
 /// Process-wide effective limit. `0` = host has not seeded; fall through to
 /// env / default. The shell writes the *fully resolved* stack here so free-
@@ -60,7 +60,7 @@ fn parse_positive_bytes_env(name: &str) -> Option<usize> {
     usize::try_from(n).ok().filter(|n| *n > 0)
 }
 
-/// Env tier: `GROK_MAX_MCP_OUTPUT_BYTES` then `MAX_MCP_OUTPUT_BYTES`. Grok-native wins when both
+/// Env tier: `FRIDAY_MAX_MCP_OUTPUT_BYTES` then `MAX_MCP_OUTPUT_BYTES`. Friday X-native wins when both
 /// are set. Positive integers only. Used by the shell resolver and as the standalone fallback when
 /// the host has not called [`set_mcp_max_output_bytes`].
 pub fn mcp_max_output_bytes_from_env() -> Option<usize> {
@@ -360,7 +360,7 @@ mod tests {
             unsafe { std::env::set_var(ENV_MAX_MCP_OUTPUT_BYTES, "12345") };
             assert_eq!(mcp_max_output_bytes_from_env(), Some(12_345));
 
-            // GROK_* wins over MAX_* when both set.
+            // FRIDAY_* wins over MAX_* when both set.
             unsafe { std::env::set_var(ENV_GROK_MAX_MCP_OUTPUT_BYTES, "99999") };
             assert_eq!(mcp_max_output_bytes_from_env(), Some(99_999));
 

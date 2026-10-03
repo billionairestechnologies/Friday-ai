@@ -885,7 +885,7 @@ pub fn load_cli_plugin_registry(cwd: &std::path::Path) -> xai_grok_agent::plugin
 }
 
 fn config_path() -> PathBuf {
-    // Live `$GROK_HOME` first: `grok_home()` is OnceLock and misses EnvGuard/tests.
+    // Live `$FRIDAY_HOME` first: `grok_home()` is OnceLock and misses EnvGuard/tests.
     xai_dirs::resolve_grok_home()
         .unwrap_or_else(crate::util::grok_home::grok_home)
         .join("config.toml")
@@ -896,7 +896,7 @@ pub fn user_config_path() -> PathBuf {
 }
 
 pub fn project_config_path(dir: &std::path::Path) -> PathBuf {
-    dir.join(".grok").join("config.toml")
+    dir.join(".friday").join("config.toml")
 }
 
 /// Checks raw key presence rather than deserializing, so malformed entries (the ones users most need `mcp remove` for) are still reported.
@@ -960,8 +960,8 @@ pub(crate) fn session_registry_from_toml_opt(root: &TomlValue) -> Option<bool> {
     }
 }
 
-/// Overrides `[cli] session_registry`; usable before `~/.grok/config.toml` exists.
-pub const SESSION_REGISTRY_ENV_VAR: &str = "GROK_SESSION_REGISTRY";
+/// Overrides `[cli] session_registry`; usable before `~/.friday/config.toml` exists.
+pub const SESSION_REGISTRY_ENV_VAR: &str = "FRIDAY_SESSION_REGISTRY";
 
 pub(crate) fn session_registry_from_env_opt() -> Option<bool> {
     xai_grok_config::env_bool(SESSION_REGISTRY_ENV_VAR)
@@ -1033,7 +1033,7 @@ mod tests {
     #[serial_test::serial]
     fn load_cli_plugin_registry_includes_project_config_path_plugins() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
 
         let repo = tempfile::tempdir().unwrap();
         git2::Repository::init(repo.path()).unwrap();
@@ -1052,7 +1052,7 @@ mod tests {
         )
         .unwrap();
 
-        let grok = repo.path().join(".grok");
+        let grok = repo.path().join(".friday");
         std::fs::create_dir_all(&grok).unwrap();
         std::fs::write(
             grok.join("config.toml"),
@@ -1189,8 +1189,8 @@ default = "grok-code-fast-1"
         let root = toml::from_str::<TomlValue>(
             r#"
 [skills]
-paths = ["~/.grok/skills", "~/.grok/skills/special/SKILL.md"]
-ignore = ["~/.grok/skills/noisy/SKILL.md"]
+paths = ["~/.friday/skills", "~/.friday/skills/special/SKILL.md"]
+ignore = ["~/.friday/skills/noisy/SKILL.md"]
 "#,
         )
         .unwrap();
@@ -1203,9 +1203,9 @@ ignore = ["~/.grok/skills/noisy/SKILL.md"]
             .unwrap_or_default();
         assert_eq!(
             cfg.paths,
-            vec!["~/.grok/skills", "~/.grok/skills/special/SKILL.md"]
+            vec!["~/.friday/skills", "~/.friday/skills/special/SKILL.md"]
         );
-        assert_eq!(cfg.ignore, vec!["~/.grok/skills/noisy/SKILL.md"]);
+        assert_eq!(cfg.ignore, vec!["~/.friday/skills/noisy/SKILL.md"]);
     }
 
     #[test]
@@ -1397,8 +1397,8 @@ enabled = false
         let tmp = tempfile::tempdir().unwrap();
         git2::Repository::init(tmp.path()).unwrap();
         let nested = tmp.path().join("pkg");
-        std::fs::create_dir_all(nested.join(".grok")).unwrap();
-        std::fs::create_dir_all(tmp.path().join(".grok")).unwrap();
+        std::fs::create_dir_all(nested.join(".friday")).unwrap();
+        std::fs::create_dir_all(tmp.path().join(".friday")).unwrap();
 
         let sticky = r#"
 # keep me
@@ -1406,8 +1406,8 @@ enabled = false
 command = "npx"
 enabled = false
 "#;
-        let ancestor = tmp.path().join(".grok").join("config.toml");
-        let nearer = nested.join(".grok").join("config.toml");
+        let ancestor = tmp.path().join(".friday").join("config.toml");
+        let nearer = nested.join(".friday").join("config.toml");
         std::fs::write(&ancestor, sticky).unwrap();
         std::fs::write(&nearer, sticky).unwrap();
 
@@ -1486,7 +1486,7 @@ enabled = false
     async fn project_enable_replaces_config_symlink_not_referent() {
         let tmp = tempfile::tempdir().unwrap();
         git2::Repository::init(tmp.path()).unwrap();
-        let grok = tmp.path().join(".grok");
+        let grok = tmp.path().join(".friday");
         std::fs::create_dir_all(&grok).unwrap();
         let outside = tmp.path().join("outside.toml");
         std::fs::write(
@@ -1528,7 +1528,7 @@ enabled = false
     #[serial_test::serial]
     async fn persist_mcp_toml_follows_user_config_symlink() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let outside = home.path().join("dotfiles").join("config.toml");
         std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
         std::fs::write(&outside, "[mcp_servers.keep]\ncommand = \"true\"\n").unwrap();
@@ -1565,7 +1565,7 @@ enabled = false
     #[serial_test::serial]
     async fn save_mcp_server_config_at_refuses_unparseable() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let slot = home.path().join("config.toml");
         std::fs::write(&slot, "not = [valid\n").unwrap();
         let err = save_mcp_server_config_at(&config_path(), "svc", &test_stdio_server())
@@ -1587,7 +1587,7 @@ enabled = false
     #[serial_test::serial]
     async fn save_mcp_server_config_at_follows_user_symlink() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let outside = home.path().join("dotfiles").join("config.toml");
         std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
         std::fs::write(&outside, "[mcp_servers.keep]\ncommand = \"true\"\n").unwrap();
@@ -1614,7 +1614,7 @@ enabled = false
     #[serial_test::serial]
     async fn save_mcp_disabled_tools_follows_user_symlink() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let outside = home.path().join("dotfiles").join("config.toml");
         std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
         std::fs::write(&outside, "[mcp_servers.keep]\ncommand = \"true\"\n").unwrap();
@@ -1642,7 +1642,7 @@ enabled = false
     #[serial_test::serial]
     async fn save_mcp_disabled_tools_refuses_unparseable() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let slot = home.path().join("config.toml");
         std::fs::write(&slot, "not = [valid\n").unwrap();
         let err = save_mcp_disabled_tools("svc", &["tool_a".to_string()])
@@ -1660,7 +1660,7 @@ enabled = false
     #[serial_test::serial]
     async fn delete_mcp_server_config_at_follows_user_symlink() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let outside = home.path().join("dotfiles").join("config.toml");
         std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
         std::fs::write(
@@ -1693,7 +1693,7 @@ enabled = false
     #[serial_test::serial]
     async fn delete_mcp_server_config_at_refuses_unparseable() {
         let home = tempfile::tempdir().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let slot = home.path().join("config.toml");
         std::fs::write(&slot, "not = [valid\n").unwrap();
         let err = delete_mcp_server_config_at(&config_path(), "svc")

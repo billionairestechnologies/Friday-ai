@@ -1,14 +1,14 @@
 //! The `[sandbox]` table of the workspace daemon's own settings file, `workspaced.toml`
-//! (`<grok_home>/workspaced.toml` for the user layer, `<workspace>/.grok/workspaced.toml` for the
+//! (`<grok_home>/workspaced.toml` for the user layer, `<workspace>/.friday/workspaced.toml` for the
 //! folder's own, tighten-only layer). The daemon owns this file outright: nothing here is read
 //! from or written to `config.toml`, whose `[sandbox]` table (`profile`, `auto_allow_bash`) stays
-//! the `grok` CLI's.
+//! the `friday` CLI's.
 
 use serde::{Deserialize, Serialize};
 pub use xai_grok_config::sandbox_mode::optional_sandbox_mode;
 use xai_grok_sandbox::command::SandboxMode;
 
-/// The daemon's settings file name, under the grok home and under a folder's `.grok/`: the one
+/// The daemon's settings file name, under the grok home and under a folder's `.friday/`: the one
 /// name the loader reads and the floor protects.
 pub use xai_grok_sandbox::command::protected::DAEMON_SETTINGS_FILENAME as WORKSPACED_CONFIG_FILENAME;
 
@@ -83,7 +83,7 @@ mod tests {
         );
     }
 
-    /// The file accepts what `GROK_SANDBOX_MODE` accepts: any case, surrounding whitespace.
+    /// The file accepts what `FRIDAY_SANDBOX_MODE` accepts: any case, surrounding whitespace.
     #[test]
     fn mode_is_read_in_any_case() {
         for (text, mode) in [
@@ -107,7 +107,7 @@ mod tests {
         for text in [
             "[sandbox]\nmode = 3\n",
             "[sandbox]\nmode = \"enforcee\"\n",
-            "[sandbox]\nmode = \"${GROK_SANDBOX_MODE_UNSET_VAR:-enforce}\"\n",
+            "[sandbox]\nmode = \"${FRIDAY_SANDBOX_MODE_UNSET_VAR:-enforce}\"\n",
             "[sandbox]\nmode = [\"enforce\"]\n",
         ] {
             let root: toml::Value = toml::from_str(text).unwrap();

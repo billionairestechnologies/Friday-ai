@@ -7,14 +7,16 @@ description = "Auth dependency-inversion seam: HttpAuth + AuthCredentialProvider
 authors = ["xAI"]
 
 [features]
-middleware = ["dep:reqwest-middleware", "dep:http"]
+middleware = ["dep:reqwest-middleware", "dep:http", "dep:xai-grok-env", "dep:anyhow"]
 
 [dependencies]
+anyhow = { workspace = true, optional = true }
 async-trait = { workspace = true }
 http = { workspace = true, optional = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true, optional = true }
 tracing = { workspace = true }
+xai-grok-env = { workspace = true, optional = true }
 
 [dev-dependencies]
 mockito = { workspace = true }

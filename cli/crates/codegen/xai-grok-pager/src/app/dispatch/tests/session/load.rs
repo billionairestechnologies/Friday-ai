@@ -386,7 +386,7 @@ fn load_session_marks_standalone_worktree_cwd() {
     );
     assert!(
         expect_agent(&app, AgentId(0)).session.is_worktree,
-        "resume into a standalone grok worktree must set session.is_worktree"
+        "resume into a standalone friday worktree must set session.is_worktree"
     );
     assert_eq!(expect_agent(&app, AgentId(0)).session.cwd, clone.path);
 }
@@ -2411,7 +2411,7 @@ fn welcome_esc_drops_in_flight_fetch_response() {
     );
 }
 /// Build-mode sibling of the chat Esc test, pinning Esc during load.
-/// The fast foreign fetch has landed (its rows hidden behind the Grok-default CTA) while the native fetch is still in flight.
+/// The fast foreign fetch has landed (its rows hidden behind the Friday X-default CTA) while the native fetch is still in flight.
 /// Esc must really dismiss the picker: drop the loading flag and invalidate the fetch so its late response cannot resurrect the picker.
 #[test]
 fn build_welcome_esc_during_load_dismisses_without_resurrection() {

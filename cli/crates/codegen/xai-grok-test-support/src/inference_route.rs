@@ -55,7 +55,7 @@ struct FallbackSettings {
     /// Script `.hold()` leaves tool calls unparked so a job can start; this holds the turn's first
     /// answer itself.
     park_foreground: bool,
-    /// One-shot hold consumed only by an auxiliary whose `x-grok-req-id` starts with this prefix.
+    /// One-shot hold consumed only by an auxiliary whose `x-friday-req-id` starts with this prefix.
     park_request_prefix: Option<String>,
 }
 

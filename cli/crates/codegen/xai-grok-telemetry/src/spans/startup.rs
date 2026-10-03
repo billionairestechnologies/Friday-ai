@@ -28,9 +28,9 @@ pub const STARTUP_TIMING_MSG: &str = "startup timing";
 pub const STARTUP_SLOW_PHASE_MSG: &str = "startup phase running long";
 pub const STARTUP_OVER_BUDGET_MSG: &str = "startup phase over budget";
 /// A launcher stamps the wall-clock spawn time, capturing the gap before our own clock starts.
-pub const SPAWN_TIMESTAMP_ENV: &str = "GROK_SPAWN_TIMESTAMP_MS";
+pub const SPAWN_TIMESTAMP_ENV: &str = "FRIDAY_SPAWN_TIMESTAMP_MS";
 /// Benchmarks set this to stop right after the first confirmed frame.
-pub const EXIT_AFTER_FIRST_RENDER_ENV: &str = "GROK_EXIT_AFTER_FIRST_RENDER";
+pub const EXIT_AFTER_FIRST_RENDER_ENV: &str = "FRIDAY_EXIT_AFTER_FIRST_RENDER";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::AsRefStr, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum StartupPhase {

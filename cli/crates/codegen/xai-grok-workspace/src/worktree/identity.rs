@@ -24,7 +24,7 @@ pub fn worktree_identity_for_cwd(cwd: &str) -> Option<WorktreeIdentity> {
 /// Returns `None` when `cwd` is not inside a worktree.
 pub fn worktree_identity_in(worktrees_dir: &Path, cwd: &str) -> Option<WorktreeIdentity> {
     // Session cwd is usually `current_dir()` (symlink-resolved)
-    // GROK_HOME (and so `worktrees_dir`) is often the unresolved env spelling
+    // FRIDAY_HOME (and so `worktrees_dir`) is often the unresolved env spelling
     // A raw strip_prefix then misses a real worktree and summaries never get a kind or label
     let cwd_path = Path::new(cwd);
     let cwd_canon = canonical(cwd_path);

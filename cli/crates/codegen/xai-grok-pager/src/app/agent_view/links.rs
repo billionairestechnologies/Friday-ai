@@ -738,7 +738,7 @@ mod link_click_tests {
                     .collect::<String>()
             })
             .collect();
-        assert!(text.contains("Help improve Grok"), "banner copy painted");
+        assert!(text.contains("Help improve Friday X"), "banner copy painted");
         assert!(
             !text.contains("ZZCRIT"),
             "critical announcement yields the slot to the privacy banner"

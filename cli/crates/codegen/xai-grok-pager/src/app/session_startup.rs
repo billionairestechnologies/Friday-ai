@@ -40,7 +40,7 @@ pub enum DeferredSessionStartup {
         parent_cwd: Option<PathBuf>,
         new_session_id: Option<String>,
     },
-    /// Fresh plain Grok session whose first prompt resumes a foreign tool session.
+    /// Fresh plain Friday X session whose first prompt resumes a foreign tool session.
     ForeignResume {
         tool: xai_grok_foreign_sessions::ForeignSessionTool,
         native_id: String,
@@ -340,42 +340,42 @@ pub fn chat_mode_flag_conflict(
     None
 }
 /// Env: enable local workspace without CLI flags (`1`).
-/// Mode defaults to `own` unless `GROK_CHAT_LOCAL_WORKSPACE_MODE` or an attach server id is set.
+/// Mode defaults to `own` unless `FRIDAY_CHAT_LOCAL_WORKSPACE_MODE` or an attach server id is set.
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE";
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_CWD_ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE_CWD";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_CWD_ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE_CWD";
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_MODE_ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE_MODE";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_MODE_ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE_MODE";
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID";
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME";
 /// Skip interactive first-run confirm (still prints the banner).
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_ACK_ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE_ACK";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_ACK_ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE_ACK";
 /// Startup banner and first-run copy.
 #[cfg(feature = "local-workspace")]
 pub const LOCAL_WORKSPACE_BANNER: &str =
     "Local workspace runs tools on this machine (FS confined to <cwd>).";
 #[cfg(feature = "local-workspace")]
 pub const LOCAL_WORKSPACE_ATTACH_NEEDS_SERVER_ID: &str = "local-workspace attach requires --local-workspace-attach=<server_id> \
-     (or GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID)";
+     (or FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID)";
 #[cfg(feature = "local-workspace")]
 pub const LOCAL_WORKSPACE_REQUIRES_CHAT: &str = "local-workspace flags/env require --chat";
 #[cfg(feature = "local-workspace")]
 pub const LOCAL_WORKSPACE_HOME_DENIED: &str =
-    "local-workspace cwd may not be / or $HOME unless GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME=1";
+    "local-workspace cwd may not be / or $HOME unless FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME=1";
 #[cfg(feature = "local-workspace")]
 pub const LOCAL_WORKSPACE_HITL_HINT: &str = "Permission prompts for local workspace tools apply to your machine. \
      Local workspace replaces the chat sandbox.";
 #[cfg(feature = "local-workspace")]
 pub const LOCAL_WORKSPACE_ACK_REQUIRED: &str =
-    "local-workspace requires interactive confirm, GROK_CHAT_LOCAL_WORKSPACE_ACK=1, or an ack file";
+    "local-workspace requires interactive confirm, FRIDAY_CHAT_LOCAL_WORKSPACE_ACK=1, or an ack file";
 /// Declared advertised tool ids for attach FS-only check (comma-separated).
 #[cfg(feature = "local-workspace")]
-pub const GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV: &str =
-    "GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS";
+pub const FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV: &str =
+    "FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS";
 #[cfg(feature = "local-workspace")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LocalWorkspaceMode {
@@ -448,10 +448,10 @@ pub fn resolve_local_workspace_config(
     cli_attach: Option<&str>,
     cli_cwd: Option<&std::path::Path>,
 ) -> anyhow::Result<Option<LocalWorkspaceConfig>> {
-    let env_enable = env_truthy(GROK_CHAT_LOCAL_WORKSPACE_ENV);
-    let env_mode = env_nonempty(GROK_CHAT_LOCAL_WORKSPACE_MODE_ENV);
-    let env_server_id = env_nonempty(GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV);
-    let env_cwd = env_nonempty(GROK_CHAT_LOCAL_WORKSPACE_CWD_ENV).map(std::path::PathBuf::from);
+    let env_enable = env_truthy(FRIDAY_CHAT_LOCAL_WORKSPACE_ENV);
+    let env_mode = env_nonempty(FRIDAY_CHAT_LOCAL_WORKSPACE_MODE_ENV);
+    let env_server_id = env_nonempty(FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV);
+    let env_cwd = env_nonempty(FRIDAY_CHAT_LOCAL_WORKSPACE_CWD_ENV).map(std::path::PathBuf::from);
     let cli_attach = cli_attach.map(str::trim).filter(|s| !s.is_empty());
     let cli_requested = cli_own.is_some() || cli_attach.is_some();
     let env_requested = env_enable || env_mode.is_some() || env_server_id.is_some();
@@ -471,7 +471,7 @@ pub fn resolve_local_workspace_config(
             "own" => LocalWorkspaceMode::Own,
             other => {
                 anyhow::bail!(
-                    "invalid {GROK_CHAT_LOCAL_WORKSPACE_MODE_ENV}={other:?}; expected own|attach"
+                    "invalid {FRIDAY_CHAT_LOCAL_WORKSPACE_MODE_ENV}={other:?}; expected own|attach"
                 )
             }
         }
@@ -542,7 +542,7 @@ pub fn validate_local_workspace_cwd(path: &std::path::Path) -> anyhow::Result<st
             canon.display()
         );
     }
-    if env_truthy(GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV) {
+    if env_truthy(FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV) {
         return Ok(canon);
     }
     if canon == std::path::Path::new("/") {
@@ -557,7 +557,7 @@ pub fn validate_local_workspace_cwd(path: &std::path::Path) -> anyhow::Result<st
     Ok(canon)
 }
 /// Banner and first-run confirm for the local-workspace own and attach modes.
-/// Skip confirm only with `GROK_CHAT_LOCAL_WORKSPACE_ACK=1` or a prior ack file.
+/// Skip confirm only with `FRIDAY_CHAT_LOCAL_WORKSPACE_ACK=1` or a prior ack file.
 /// Non-TTY without ACK refuses (fail closed).
 #[cfg(feature = "local-workspace")]
 pub fn emit_local_workspace_startup_ux(cfg: &LocalWorkspaceConfig) -> anyhow::Result<()> {
@@ -599,7 +599,7 @@ pub fn emit_local_workspace_startup_ux_with(
 /// True when ACK env or ack file already authorizes local workspace.
 #[cfg(feature = "local-workspace")]
 pub fn local_workspace_ack_satisfied() -> bool {
-    if env_truthy(GROK_CHAT_LOCAL_WORKSPACE_ACK_ENV) {
+    if env_truthy(FRIDAY_CHAT_LOCAL_WORKSPACE_ACK_ENV) {
         return true;
     }
     local_workspace_ack_path().is_some_and(|p| p.is_file())
@@ -615,7 +615,7 @@ pub fn write_local_workspace_ack() {
     }
 }
 /// Fail closed unless advertised tools are FS-only.
-/// Until diag exposes a real tool catalog, attach trusts operator attestation via `GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS` (comma-separated ids).
+/// Until diag exposes a real tool catalog, attach trusts operator attestation via `FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS` (comma-separated ids).
 /// Unset or empty means refuse.
 #[cfg(feature = "local-workspace")]
 pub fn ensure_attach_fs_only_toolset(_server_id: &str) -> anyhow::Result<()> {
@@ -629,7 +629,7 @@ pub fn ensure_attach_fs_only_toolset(_server_id: &str) -> anyhow::Result<()> {
 /// Operator-attested advertised tool ids for attach (env only; no fake diag probe).
 #[cfg(feature = "local-workspace")]
 pub fn probe_advertised_tool_ids() -> Option<Vec<String>> {
-    let raw = env_nonempty(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV)?;
+    let raw = env_nonempty(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV)?;
     let ids: Vec<String> = raw
         .split(',')
         .map(|s| s.trim().to_string())
@@ -1418,7 +1418,7 @@ mod tests {
         assert!(git2::Repository::discover(&dir).is_err());
         assert!(parent_session_is_worktree("any-sid", &dir));
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[test]
     fn parent_session_is_worktree_summary_session_kind() {
         let mut fx = crate::test_util::GrokHomeFixture::new();
@@ -1431,7 +1431,7 @@ mod tests {
         );
         assert!(parent_session_is_worktree("sid-kind", &repo.path));
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[test]
     fn parent_session_is_worktree_summary_source_workspace_dir() {
         let mut fx = crate::test_util::GrokHomeFixture::new();
@@ -1450,7 +1450,7 @@ mod tests {
         );
         assert!(!parent_session_is_worktree("sid-src-empty", &repo.path));
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[test]
     fn parent_session_is_worktree_summary_worktree_label() {
         let mut fx = crate::test_util::GrokHomeFixture::new();
@@ -1497,14 +1497,14 @@ mod tests {
     #[test]
     fn intent_default_is_new_auto() {
         assert_eq!(
-            parse(&["grok"]).session_startup_intent().unwrap(),
+            parse(&["friday"]).session_startup_intent().unwrap(),
             SessionStartupIntent::NewAuto
         );
     }
     #[test]
     fn intent_resume_id() {
         assert_eq!(
-            parse(&["grok", "--resume", "abc"])
+            parse(&["friday", "--resume", "abc"])
                 .session_startup_intent()
                 .unwrap(),
             SessionStartupIntent::Resume {
@@ -1516,7 +1516,7 @@ mod tests {
     #[test]
     fn intent_resume_empty_is_most_recent() {
         assert_eq!(
-            parse(&["grok", "--resume"])
+            parse(&["friday", "--resume"])
                 .session_startup_intent()
                 .unwrap(),
             SessionStartupIntent::Resume {
@@ -1528,7 +1528,7 @@ mod tests {
     #[test]
     fn intent_continue() {
         assert_eq!(
-            parse(&["grok", "-c"]).session_startup_intent().unwrap(),
+            parse(&["friday", "-c"]).session_startup_intent().unwrap(),
             SessionStartupIntent::Resume {
                 session_id: None,
                 most_recent_for_cwd: true,
@@ -1538,7 +1538,7 @@ mod tests {
     #[test]
     fn intent_session_id_alone_is_new_with_id() {
         assert_eq!(
-            parse(&["grok", "--session-id", "my-id"])
+            parse(&["friday", "--session-id", "my-id"])
                 .session_startup_intent()
                 .unwrap(),
             SessionStartupIntent::NewWithId {
@@ -1548,7 +1548,7 @@ mod tests {
     }
     #[test]
     fn intent_session_id_with_resume_without_fork_errors() {
-        let err = parse(&["grok", "-r", "a", "-s", "b"])
+        let err = parse(&["friday", "-r", "a", "-s", "b"])
             .session_startup_intent()
             .unwrap_err();
         assert_eq!(err, StartupFlagError::SessionIdRequiresFork);
@@ -1556,7 +1556,7 @@ mod tests {
     #[test]
     fn intent_fork_with_resume() {
         assert_eq!(
-            parse(&["grok", "-r", "old", "--fork-session"])
+            parse(&["friday", "-r", "old", "--fork-session"])
                 .session_startup_intent()
                 .unwrap(),
             SessionStartupIntent::ForkFrom {
@@ -1569,7 +1569,7 @@ mod tests {
     #[test]
     fn intent_fork_with_resume_and_new_id() {
         assert_eq!(
-            parse(&["grok", "-r", "old", "--fork-session", "-s", "new"])
+            parse(&["friday", "-r", "old", "--fork-session", "-s", "new"])
                 .session_startup_intent()
                 .unwrap(),
             SessionStartupIntent::ForkFrom {
@@ -1581,21 +1581,21 @@ mod tests {
     }
     #[test]
     fn intent_fork_alone_errors() {
-        let err = parse(&["grok", "--fork-session"])
+        let err = parse(&["friday", "--fork-session"])
             .session_startup_intent()
             .unwrap_err();
         assert_eq!(err, StartupFlagError::ForkRequiresResumeOrContinue);
     }
     #[test]
     fn intent_fork_with_worktree_errors() {
-        let err = parse(&["grok", "-r", "a", "--fork-session", "-w"])
+        let err = parse(&["friday", "-r", "a", "--fork-session", "-w"])
             .session_startup_intent()
             .unwrap_err();
         assert_eq!(err, StartupFlagError::ForkWithWorktree);
     }
     #[test]
     fn intent_from_flags_matches_pager_args() {
-        let args = parse(&["grok", "-r", "old", "--fork-session", "-s", "new"]);
+        let args = parse(&["friday", "-r", "old", "--fork-session", "-s", "new"]);
         let from_flags = session_startup_intent_from_flags(SessionStartupFlags {
             session_id: Some("new"),
             resume_session_id: Some("old"),
@@ -1749,16 +1749,16 @@ mod tests {
     #[test]
     fn materialize_ctx_recent_selection_follows_surface() {
         assert_eq!(
-            MaterializeCtx::from_pager_args(&parse(&["grok"])).recent_session_selection,
+            MaterializeCtx::from_pager_args(&parse(&["friday"])).recent_session_selection,
             RecentSessionSelection::Interactive,
         );
         assert_eq!(
-            MaterializeCtx::from_pager_args(&parse(&["grok", "-p", "run"]))
+            MaterializeCtx::from_pager_args(&parse(&["friday", "-p", "run"]))
                 .recent_session_selection,
             RecentSessionSelection::Any,
         );
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn continue_skips_empty_worktree_stamped_husk() {
         let mut fx = crate::test_util::GrokHomeFixture::new();
@@ -1785,7 +1785,7 @@ mod tests {
                 "session_summary": "",
             }),
         );
-        let args = parse(&["grok", "-c"]);
+        let args = parse(&["friday", "-c"]);
         let result = materialize_startup_for_cwd(
             MaterializeCtx::from_pager_args(&args),
             args.session_startup_intent().unwrap(),
@@ -1800,7 +1800,7 @@ mod tests {
             other => panic!("expected Resume of the prior session, got {other:?}"),
         }
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn continue_keeps_empty_worktree_fork() {
         let mut fx = crate::test_util::GrokHomeFixture::new();
@@ -1829,7 +1829,7 @@ mod tests {
                 "session_summary": "",
             }),
         );
-        let args = parse(&["grok", "-c"]);
+        let args = parse(&["friday", "-c"]);
         let result = materialize_startup_for_cwd(
             MaterializeCtx::from_pager_args(&args),
             args.session_startup_intent().unwrap(),
@@ -1844,7 +1844,7 @@ mod tests {
             other => panic!("expected Resume of the empty worktree fork, got {other:?}"),
         }
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn most_recent_fork_selection_follows_surface() {
         let mut fx = crate::test_util::GrokHomeFixture::new();
@@ -1866,11 +1866,11 @@ mod tests {
         );
         for (args, expected_parent) in [
             (
-                ["grok", "-c", "--fork-session"].as_slice(),
+                ["friday", "-c", "--fork-session"].as_slice(),
                 interactive_id.as_str(),
             ),
             (
-                ["grok", "-p", "run", "-c", "--fork-session"].as_slice(),
+                ["friday", "-p", "run", "-c", "--fork-session"].as_slice(),
                 headless_id.as_str(),
             ),
         ] {
@@ -1892,28 +1892,28 @@ mod tests {
     }
     #[test]
     fn materialize_ctx_chat_mode_from_args() {
-        assert!(!MaterializeCtx::from_pager_args(&parse(&["grok"])).chat_mode);
+        assert!(!MaterializeCtx::from_pager_args(&parse(&["friday"])).chat_mode);
     }
     #[test]
     fn remote_restore_follows_compiled_restore_stack() {
         assert_eq!(
-            MaterializeCtx::from_pager_args(&parse(&["grok"])).allow_remote_restore,
+            MaterializeCtx::from_pager_args(&parse(&["friday"])).allow_remote_restore,
             false
         );
     }
     #[test]
     fn from_pager_args_does_not_probe_tty_for_progress() {
         assert!(
-            !MaterializeCtx::from_pager_args(&parse(&["grok"])).restore_progress_on_stdout,
+            !MaterializeCtx::from_pager_args(&parse(&["friday"])).restore_progress_on_stdout,
             "stdout vs stderr is decided at the composition root, not from_pager_args"
         );
     }
     #[test]
     fn materialize_ctx_restore_code_follows_cli_flag() {
-        assert!(!MaterializeCtx::from_pager_args(&parse(&["grok"])).restore_code);
-        assert!(!MaterializeCtx::from_pager_args(&parse(&["grok", "-r", "abc"])).restore_code);
+        assert!(!MaterializeCtx::from_pager_args(&parse(&["friday"])).restore_code);
+        assert!(!MaterializeCtx::from_pager_args(&parse(&["friday", "-r", "abc"])).restore_code);
         assert!(
-            MaterializeCtx::from_pager_args(&parse(&["grok", "-r", "abc", "--restore-code"]))
+            MaterializeCtx::from_pager_args(&parse(&["friday", "-r", "abc", "--restore-code"]))
                 .restore_code
         );
         let wt = MaterializeCtx::from_pager_args(&parse(&[
@@ -2068,7 +2068,7 @@ mod tests {
         assert!(WORKTREE_NO_RESTORE_CODE_NOTICE.contains("--restore-code"));
     }
     /// `--restore-code` without `--worktree` must fail before any in-place checkout.
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn remote_miss_restore_code_without_worktree_errors() {
         let _fx = crate::test_util::GrokHomeFixture::new();
@@ -2104,7 +2104,7 @@ mod tests {
         );
     }
     /// `--restore-code --worktree` stays on the existing defer path.
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn remote_miss_restore_code_with_worktree_defers() {
         let _fx = crate::test_util::GrokHomeFixture::new();
@@ -2136,7 +2136,7 @@ mod tests {
             other => panic!("expected Resume, got {other:?}"),
         }
     }
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn remote_miss_worktree_without_restore_code_suppresses_snapshot() {
         let _fx = crate::test_util::GrokHomeFixture::new();
@@ -2283,11 +2283,11 @@ mod tests {
         }
     }
     /// The chat passthrough does not bypass the cwd-collision refusal that `app/mod.rs` runs on the materialized id.
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[tokio::test]
     async fn chat_resume_passthrough_keeps_cwd_collision_refusal() {
         let home = tempfile::tempdir().expect("home tempdir");
-        unsafe { std::env::set_var("GROK_HOME", home.path()) };
+        unsafe { std::env::set_var("FRIDAY_HOME", home.path()) };
         let cwd = tempfile::tempdir().expect("cwd tempdir");
         let cwd_str = cwd.path().to_string_lossy().to_string();
         let id = uuid::Uuid::new_v4().to_string();
@@ -2362,7 +2362,7 @@ mod tests {
         async fn resume(arg: &str, cwd: &str) -> anyhow::Result<MaterializedStartup> {
             resume_with(arg, cwd, RecentSessionSelection::Interactive).await
         }
-        #[serial_test::serial(GROK_HOME)]
+        #[serial_test::serial(FRIDAY_HOME)]
         #[tokio::test]
         async fn title_fallback_ignores_headless_matches() {
             let mut fx = GrokHomeFixture::new();
@@ -2380,7 +2380,7 @@ mod tests {
                 .expect_err("headless title must not resolve interactively");
             assert!(error.to_string().contains("does not exist"));
         }
-        #[serial_test::serial(GROK_HOME)]
+        #[serial_test::serial(FRIDAY_HOME)]
         #[tokio::test]
         async fn headless_title_resume_keeps_headless_matches() {
             let mut fx = GrokHomeFixture::new();
@@ -2405,7 +2405,7 @@ mod tests {
             }
         }
         /// Also covers letter-case insensitivity: the query case differs from the stored title.
-        #[serial_test::serial(GROK_HOME)]
+        #[serial_test::serial(FRIDAY_HOME)]
         #[tokio::test]
         async fn title_fallback_resumes_single_match_case_insensitively() {
             let mut fx = GrokHomeFixture::new();
@@ -2437,7 +2437,7 @@ mod tests {
         }
         /// Id resolution stays authoritative: when the arg is an on-disk session id, the title fallback is never consulted.
         /// That holds even though another session carries that exact title.
-        #[serial_test::serial(GROK_HOME)]
+        #[serial_test::serial(FRIDAY_HOME)]
         #[tokio::test]
         async fn id_hit_beats_title_fallback() {
             let mut fx = GrokHomeFixture::new();
@@ -2464,7 +2464,7 @@ mod tests {
         }
         /// Provenance for the worktree failure hint: only the defer arm (a local id and title miss under `--worktree`) flags the target.
         /// A resolved local id, even a legacy non-UUID one, never does.
-        #[serial_test::serial(GROK_HOME)]
+        #[serial_test::serial(FRIDAY_HOME)]
         #[tokio::test]
         async fn worktree_defer_flags_local_miss_and_local_hit_does_not() {
             let mut fx = GrokHomeFixture::new();
@@ -2536,12 +2536,12 @@ mod tests {
     #[cfg(feature = "local-workspace")]
     fn advertised_tools_env() -> xai_grok_test_support::EnvGuard {
         xai_grok_test_support::EnvGuard::set(
-            GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV,
+            FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV,
             "workspace.fs_list,workspace.fs_read_file,workspace.fs_write_file,workspace.fs_exists,workspace.fs_delete_file,workspace.put_files,workspace.get_files",
         )
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
     #[test]
     fn resolve_local_workspace_attach_from_cli() {
         let _env = advertised_tools_env();
@@ -2555,13 +2555,13 @@ mod tests {
         assert_eq!(cfg.cwd.as_deref(), Some(canon.as_path()));
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID)]
     #[test]
     fn resolve_local_workspace_empty_cli_attach_falls_back_to_env() {
         let _env = advertised_tools_env();
         let _sid = xai_grok_test_support::EnvGuard::set(
-            GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV,
+            FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV,
             "srv-from-env",
         );
         let tmp = tempfile::tempdir().unwrap();
@@ -2572,20 +2572,20 @@ mod tests {
         assert_eq!(cfg.server_id.as_deref(), Some("srv-from-env"));
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_CWD)]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE)]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_MODE)]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_CWD)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_MODE)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID)]
     #[test]
     fn resolve_local_workspace_cwd_only_is_not_a_request() {
         let tmp = tempfile::tempdir().unwrap();
         let _cwd = xai_grok_test_support::EnvGuard::set(
-            GROK_CHAT_LOCAL_WORKSPACE_CWD_ENV,
+            FRIDAY_CHAT_LOCAL_WORKSPACE_CWD_ENV,
             tmp.path().to_str().unwrap(),
         );
-        let _enable = xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_ENV);
-        let _mode = xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_MODE_ENV);
-        let _sid = xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV);
+        let _enable = xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_ENV);
+        let _mode = xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_MODE_ENV);
+        let _sid = xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV);
         let cfg = resolve_local_workspace_config(true, None, None, Some(tmp.path())).unwrap();
         assert!(
             cfg.is_none(),
@@ -2593,7 +2593,7 @@ mod tests {
         );
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
     #[test]
     fn resolve_local_workspace_own_from_cli() {
         let _env = advertised_tools_env();
@@ -2610,16 +2610,16 @@ mod tests {
         assert_eq!(cfg.cwd.as_deref(), Some(canon.as_path()));
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
     #[test]
     fn resolve_local_workspace_own_env_defaults() {
         let _env = advertised_tools_env();
-        let _enable = xai_grok_test_support::EnvGuard::set(GROK_CHAT_LOCAL_WORKSPACE_ENV, "1");
-        let _mode = xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_MODE_ENV);
-        let _sid = xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV);
+        let _enable = xai_grok_test_support::EnvGuard::set(FRIDAY_CHAT_LOCAL_WORKSPACE_ENV, "1");
+        let _mode = xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_MODE_ENV);
+        let _sid = xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_SERVER_ID_ENV);
         let cwd = tempfile::tempdir().unwrap();
         let _cwd = xai_grok_test_support::EnvGuard::set(
-            GROK_CHAT_LOCAL_WORKSPACE_CWD_ENV,
+            FRIDAY_CHAT_LOCAL_WORKSPACE_CWD_ENV,
             cwd.path().to_str().unwrap(),
         );
         let cfg = resolve_local_workspace_config(true, None, None, None)
@@ -2631,7 +2631,7 @@ mod tests {
         assert_eq!(cfg.cwd.as_deref(), Some(canon.as_path()));
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
     #[test]
     fn resolve_local_workspace_requires_chat() {
         let _env = advertised_tools_env();
@@ -2642,18 +2642,18 @@ mod tests {
         );
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME)]
     #[serial_test::serial(HOME)]
     #[serial_test::serial(USERPROFILE)]
     #[test]
     fn resolve_local_workspace_defaults_cwd_and_denies_home() {
         let _tools = xai_grok_test_support::EnvGuard::set(
-            GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV,
+            FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV,
             "workspace.fs_list",
         );
         let _allow =
-            xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV);
+            xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV);
         let home = tempfile::tempdir().unwrap();
         let home_str = home.path().to_str().unwrap();
         let _home = xai_grok_test_support::EnvGuard::set("HOME", home_str);
@@ -2663,11 +2663,11 @@ mod tests {
         assert!(err.to_string().contains("ALLOW_HOME"), "unexpected: {err}");
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
     #[test]
     fn resolve_local_workspace_refuses_uncheckable_toolset() {
         let _tools =
-            xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV);
+            xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV);
         let tmp = tempfile::tempdir().unwrap();
         let err =
             resolve_local_workspace_config(true, None, Some("srv"), Some(tmp.path())).unwrap_err();
@@ -2677,11 +2677,11 @@ mod tests {
         );
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS)]
     #[test]
     fn resolve_local_workspace_refuses_non_fs_toolset() {
         let _tools = xai_grok_test_support::EnvGuard::set(
-            GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV,
+            FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS_ENV,
             "workspace.fs_list,workspace.bash",
         );
         let tmp = tempfile::tempdir().unwrap();
@@ -2701,14 +2701,14 @@ mod tests {
         assert!(LOCAL_WORKSPACE_HITL_HINT.contains("replaces the chat sandbox"));
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ACK)]
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ACK)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[test]
     fn local_workspace_non_tty_requires_ack() {
-        let _ack = xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_ACK_ENV);
+        let _ack = xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_ACK_ENV);
         let home = tempfile::tempdir().unwrap();
         let _home =
-            xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path().to_str().unwrap());
+            xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path().to_str().unwrap());
         let cfg = LocalWorkspaceConfig {
             mode: LocalWorkspaceMode::Attach,
             cwd: Some(std::path::PathBuf::from("/tmp/repo")),
@@ -2721,11 +2721,11 @@ mod tests {
         );
     }
     #[cfg(feature = "local-workspace")]
-    #[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME)]
+    #[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME)]
     #[test]
     fn validate_local_workspace_cwd_denies_root() {
         let _allow =
-            xai_grok_test_support::EnvGuard::unset(GROK_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV);
+            xai_grok_test_support::EnvGuard::unset(FRIDAY_CHAT_LOCAL_WORKSPACE_ALLOW_HOME_ENV);
         let err = validate_local_workspace_cwd(std::path::Path::new("/")).unwrap_err();
         assert!(err.to_string().contains("ALLOW_HOME"), "{err}");
     }

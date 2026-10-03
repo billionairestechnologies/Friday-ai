@@ -63,7 +63,7 @@ pub async fn run_external_refresh(command: &str) -> Result<GrokAuth, ExternalRef
     tracing::info!(cmd = %command, timeout_secs = EXTERNAL_AUTH_REFRESH_TIMEOUT.as_secs(), "auth: running external auth provider (headless refresh)");
 
     let mut cmd = shell_c(command);
-    cmd.env("GROK_AUTH_EXPIRED", "1");
+    cmd.env("FRIDAY_AUTH_EXPIRED", "1");
     // Route through the group-killing runner so a provider that spawns helpers is torn down as a unit on timeout
     let output = match run_detached_with_timeout(
         cmd,
@@ -204,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn sets_grok_auth_expired_env_on_refresh() {
-        let auth = run_external_refresh("echo $GROK_AUTH_EXPIRED")
+        let auth = run_external_refresh("echo $FRIDAY_AUTH_EXPIRED")
             .await
             .unwrap();
         assert_eq!(auth.key, "1");

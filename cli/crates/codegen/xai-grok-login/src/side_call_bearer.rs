@@ -11,7 +11,7 @@
 //! Invariants:
 //! - A session whose issuer is a foreign login authority is never returned.
 //! - A missing bearer is an error, never a cue to fall back to a different credential.
-//! - A configured static key (`XAI_API_KEY`, the process model key, or `xai::api_key` on disk)
+//! - A configured static key (`FRIDAY_X_TOKEN`, the process model key, or `xai::api_key` on disk)
 //!   still applies, under the same kill-switch and `preferred_method` rules as chat.
 //! - Every other credential goes to the server as before, and the server decides, as it does
 //!   today for enterprise IdP sessions and bare external-provider tokens.

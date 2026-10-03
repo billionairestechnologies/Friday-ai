@@ -1,7 +1,7 @@
 use reqwest::RequestBuilder;
 use std::sync::Arc;
 /// Deployment key (enterprise) sends bare `Bearer`, routed to management key auth.
-/// User token (xAI users) sends `Bearer` and `X-XAI-Token-Auth: xai-grok-cli`.
+/// User token (xAI users) sends `Bearer` and `X-Friday-Token-Auth: friday-x-cli`.
 /// Deployment key takes precedence when both are present.
 #[derive(Clone)]
 pub struct GrokAuthCredentials {
@@ -54,9 +54,9 @@ impl GrokAuthCredentials {
     /// Error hint for 401 responses.
     pub fn auth_error_hint(&self) -> &'static str {
         if self.deployment_key.is_some() {
-            "Your GROK_DEPLOYMENT_KEY is invalid or expired. Please contact a team admin."
+            "Your FRIDAY_DEPLOYMENT_KEY is invalid or expired. Please contact a team admin."
         } else if self.user_token.is_some() {
-            "Your auth token is invalid or expired. Run `grok login` to re-authenticate."
+            "Your auth token is invalid or expired. Run `friday login` to re-authenticate."
         } else {
             "Not authenticated."
         }
@@ -100,8 +100,8 @@ impl GrokAuthCredentials {
             builder
                 .header("Authorization", format!("Bearer {}", token))
                 .header(
-                    obfstr::obfstr!("X-XAI-Token-Auth"),
-                    obfstr::obfstr!("xai-grok-cli"),
+                    obfstr::obfstr!("X-Friday-Token-Auth"),
+                    obfstr::obfstr!("friday-x-cli"),
                 )
         } else {
             builder

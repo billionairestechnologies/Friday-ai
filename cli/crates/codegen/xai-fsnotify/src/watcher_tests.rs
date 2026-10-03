@@ -1633,7 +1633,7 @@ mod helper_tests {
     #[test]
     fn external_ancestor_sl_arms_in_recursive_root_mode() {
         // Subdir cwd whose `.sl` lives in an ancestor *outside* watch_path
-        // (e.g. `grok` run in `crates/codegen`): the production guard must
+        // (e.g. `friday` run in `crates/codegen`): the production guard must
         // still attach the watch under a recursive root (fanout=false).
         let temp = TempDir::new().unwrap();
         let repo = dunce::canonicalize(temp.path()).unwrap();
@@ -1653,18 +1653,18 @@ mod helper_tests {
         impl Drop for Restore {
             fn drop(&mut self) {
                 // Safety: serialized test; no concurrent env access.
-                unsafe { std::env::remove_var("GROK_FSNOTIFY_SAPLING") };
+                unsafe { std::env::remove_var("FRIDAY_FSNOTIFY_SAPLING") };
             }
         }
         let _restore = Restore;
 
-        unsafe { std::env::remove_var("GROK_FSNOTIFY_SAPLING") };
+        unsafe { std::env::remove_var("FRIDAY_FSNOTIFY_SAPLING") };
         assert!(sapling_enabled(), "default (unset) is enabled");
         for off in ["0", "false"] {
-            unsafe { std::env::set_var("GROK_FSNOTIFY_SAPLING", off) };
+            unsafe { std::env::set_var("FRIDAY_FSNOTIFY_SAPLING", off) };
             assert!(!sapling_enabled(), "{off:?} must disable Sapling");
         }
-        unsafe { std::env::set_var("GROK_FSNOTIFY_SAPLING", "1") };
+        unsafe { std::env::set_var("FRIDAY_FSNOTIFY_SAPLING", "1") };
         assert!(sapling_enabled(), "any other value stays enabled");
     }
 

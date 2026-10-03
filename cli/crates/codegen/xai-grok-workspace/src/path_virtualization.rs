@@ -626,10 +626,10 @@ pub(crate) fn grok_files_live_check(mountpoint: &str) -> String {
     )
 }
 
-const GROK_FILES_LIVE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-const GROK_FILES_READY_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
-const GROK_FILES_REMOUNT_SPAWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
-const GROK_FILES_MKDIR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const FRIDAY_FILES_LIVE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const FRIDAY_FILES_READY_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+const FRIDAY_FILES_REMOUNT_SPAWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+const FRIDAY_FILES_MKDIR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 fn grok_files_sh(
     script: &str,
@@ -672,7 +672,7 @@ fn grok_files_mount_live(root: &Path) -> bool {
     let Some(mp) = root.to_str() else {
         return false;
     };
-    grok_files_sh(&grok_files_live_check(mp), GROK_FILES_LIVE_CHECK_TIMEOUT)
+    grok_files_sh(&grok_files_live_check(mp), FRIDAY_FILES_LIVE_CHECK_TIMEOUT)
         .is_ok_and(|s| s.success())
 }
 
@@ -714,7 +714,7 @@ fn grok_files_remount(root: &Path, mount_command: &str) -> Result<(), BindMountE
     // The FUSE dest is `session_root` itself, which may not exist yet; a stale
     // FUSE mountpoint can hang `stat`, so create it through the timed shell.
     let mkdir = format!("mkdir -p '{}'", mp.replace('\'', "'\\''"));
-    let status = grok_files_sh(&mkdir, GROK_FILES_MKDIR_TIMEOUT)
+    let status = grok_files_sh(&mkdir, FRIDAY_FILES_MKDIR_TIMEOUT)
         .map_err(|e| BindMountError(format!("mkdir remount dest: {e}")))?;
     if !status.success() {
         return Err(BindMountError(format!(
@@ -725,15 +725,15 @@ fn grok_files_remount(root: &Path, mount_command: &str) -> Result<(), BindMountE
     let mount_command =
         grok_files_command_at(mount_command, &shell_quote(mp), &shell_quote(&jwt_file));
     let launch = grok_files_detached_mount_cmd(&mount_command);
-    let status = grok_files_sh(&launch, GROK_FILES_REMOUNT_SPAWN_TIMEOUT)
-        .map_err(|e| BindMountError(format!("grok-files remount spawn: {e}")))?;
+    let status = grok_files_sh(&launch, FRIDAY_FILES_REMOUNT_SPAWN_TIMEOUT)
+        .map_err(|e| BindMountError(format!("friday-files remount spawn: {e}")))?;
     if !status.success() {
         return Err(BindMountError(format!(
             "grok-files remount exited {status} at {mp}"
         )));
     }
-    let ready = grok_files_sh(&grok_files_ready_probe(mp), GROK_FILES_READY_PROBE_TIMEOUT)
-        .map_err(|e| BindMountError(format!("grok-files ready probe: {e}")))?;
+    let ready = grok_files_sh(&grok_files_ready_probe(mp), FRIDAY_FILES_READY_PROBE_TIMEOUT)
+        .map_err(|e| BindMountError(format!("friday-files ready probe: {e}")))?;
     if ready.success() {
         Ok(())
     } else {

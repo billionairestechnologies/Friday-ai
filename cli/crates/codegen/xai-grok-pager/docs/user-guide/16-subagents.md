@@ -14,7 +14,7 @@ Agents and personas both customize behavior, but they operate at different level
 |---|---|---|
 | **What they configure** | The whole session: model, tools, prompt mode, system prompt | A behavioral overlay added to a subagent's prompt |
 | **Scope** | Primary session or subagent | Subagents only |
-| **How you set them** | At startup, or with agent definitions (`.md` files in `.grok/agents/` or `~/.grok/agents/`) | In `config.toml` (`[subagents.personas]`) or `.toml` files under `.grok/personas/`; applied during subagent resolution |
+| **How you set them** | At startup, or with agent definitions (`.md` files in `.friday/agents/` or `~/.friday/agents/`) | In `config.toml` (`[subagents.personas]`) or `.toml` files under `.friday/personas/`; applied during subagent resolution |
 | **What they control** | Model, tool availability, prompt body, skills | Tone, output format, task focus, and input/output contracts |
 | **Who edits them** | You -- create, delete, or toggle them in the agents modal or by editing files | You -- define custom personas in config or files; bundled personas are read-only |
 | **Examples** | `grok-build`, `explore`, `plan` | `researcher`, `concise` |
@@ -27,15 +27,15 @@ Manage both in the agents modal. Open it with `/config-agents` (alias `/agents`)
 
 ## Disabling Subagents
 
-Disable subagents with a CLI flag, an environment variable, or the config file (highest priority first). The same rules apply to the interactive `grok` TUI, `grok agent stdio`, and headless runs.
+Disable subagents with a CLI flag, an environment variable, or the config file (highest priority first). The same rules apply to the interactive `friday` TUI, `friday agent stdio`, and headless runs.
 
 ```bash
-grok --no-subagents                  # This session only
-export GROK_SUBAGENTS=0              # Environment variable
+friday --no-subagents                  # This session only
+export FRIDAY_SUBAGENTS=0              # Environment variable
 ```
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [subagents]
 enabled = false
 ```
@@ -84,17 +84,17 @@ instructions = "You are a thorough researcher. Always cite specific file paths."
 description = "Deep investigator."
 ```
 
-Grok Build discovers file-based personas from these locations, in priority order:
+Friday X discovers file-based personas from these locations, in priority order:
 
-- `.grok/personas/*.toml` (project)
-- `~/.grok/personas/*.toml` (user)
+- `.friday/personas/*.toml` (project)
+- `~/.friday/personas/*.toml` (user)
 - The bundled personas directory (lowest priority)
 
 Each file defines one persona, and the file name (without the extension) becomes the persona name. Inline `config.toml` personas take precedence over files. Only `.toml` files are discovered.
 
 Manage personas in the Personas tab of the agents modal (`/personas`). Bundled personas are read-only; personas you define are editable.
 
-> **Note:** Grok Build applies personas through subagent resolution and roles, not through a `spawn_subagent` parameter. The main agent does not pass a persona name when it spawns a child.
+> **Note:** Friday X applies personas through subagent resolution and roles, not through a `spawn_subagent` parameter. The main agent does not pass a persona name when it spawns a child.
 
 ### Persona Fields
 
@@ -130,7 +130,7 @@ Each field has a `name`, an `io_type` (defaults to `file`), a `required` flag, a
 
 ### Persona Resolution
 
-When a persona applies, Grok Build resolves the effective model and reasoning effort in this order, highest priority first:
+When a persona applies, Friday X resolves the effective model and reasoning effort in this order, highest priority first:
 
 1. Explicit spawn-time override
 2. Role default
@@ -160,7 +160,7 @@ When you run a subagent in the background, retrieve its result later with `get_c
 
 ### Sending messages to subagents
 
-The `send_subagent_message` tool is off by default. Enable it with `GROK_ACTIVE_AGENT_MESSAGES` or `[features] active_agent_messages`.
+The `send_subagent_message` tool is off by default. Enable it with `FRIDAY_ACTIVE_AGENT_MESSAGES` or `[features] active_agent_messages`.
 
 The root session can send a follow-up to a subagent it owns. When the flag is on, a granted child also receives the tool:
 
@@ -187,7 +187,7 @@ The transcript shows each send as a one-line `Message` row: a verb for the outco
 - `Message rejected · Subagent “find callers”` for a refused send, `Message unconfirmed · Subagent “find callers”` for one the shell could not confirm
 - `Message sent to parent` when a child messages its parent
 
-The collapsed row never shows the message or the reason. **Right** (or `l`/`e` in vim mode) expands the row to show the requested delivery, the full message text, and the reason of a rejected or unconfirmed send; **Left** (or `h`) collapses it again. **Enter**, **Ctrl+F**, or a double-click on the row opens that subagent's view, exactly as on its `Subagent` row (Right/Left still fold it). If the subagent was never spawned in this session (a headless `grok export`, or an id from another session), the row names it `subagent …xxxxxxxx` from the last 8 characters of its id, shows the raw `Subagent ID:` when expanded, and cannot open it.
+The collapsed row never shows the message or the reason. **Right** (or `l`/`e` in vim mode) expands the row to show the requested delivery, the full message text, and the reason of a rejected or unconfirmed send; **Left** (or `h`) collapses it again. **Enter**, **Ctrl+F**, or a double-click on the row opens that subagent's view, exactly as on its `Subagent` row (Right/Left still fold it). If the subagent was never spawned in this session (a headless `friday export`, or an id from another session), the row names it `subagent …xxxxxxxx` from the last 8 characters of its id, shows the raw `Subagent ID:` when expanded, and cannot open it.
 
 ---
 
@@ -261,7 +261,7 @@ For tasks that modify files, run a subagent in an isolated git worktree with `is
 - Its changes stay isolated from the parent until you merge them.
 - The subagent's result includes the worktree path.
 
-Grok Build manages worktrees through the `x.ai/git/worktree/*` extension methods, including an apply operation that merges changes back into the main working directory.
+Friday X manages worktrees through the `x.ai/git/worktree/*` extension methods, including an apply operation that merges changes back into the main working directory.
 
 ---
 
@@ -284,15 +284,15 @@ Per-type model overrides apply for any parent. Without an override, a subagent i
 
 ### Model Selection by the Agent
 
-The `spawn_subagent` tool offers the agent a `model` argument, and its description lists the models you can pick, for when you explicitly ask for a subagent on a different model. With `[features] subagent_model_inheritance = true` (or `GROK_SUBAGENT_MODEL_INHERITANCE=1`), both are hidden whenever every model in your picker is an xAI model: subagents then always inherit the parent's model, and a spawn that still names one fails with a message asking the agent to retry without it. Catalogs with a third-party model, a model with no declared family, or a catalog still loading keep the argument. `[subagents.models]` pins, roles, and personas are unaffected. Read when a session starts; changing it requires a restart. Precedence: a `requirements.toml`/MDM pin, then the environment variable, then `config.toml`, then remote settings, then the default (off).
+The `spawn_subagent` tool offers the agent a `model` argument, and its description lists the models you can pick, for when you explicitly ask for a subagent on a different model. With `[features] subagent_model_inheritance = true` (or `FRIDAY_SUBAGENT_MODEL_INHERITANCE=1`), both are hidden whenever every model in your picker is an xAI model: subagents then always inherit the parent's model, and a spawn that still names one fails with a message asking the agent to retry without it. Catalogs with a third-party model, a model with no declared family, or a catalog still loading keep the argument. `[subagents.models]` pins, roles, and personas are unaffected. Read when a session starts; changing it requires a restart. Precedence: a `requirements.toml`/MDM pin, then the environment variable, then `config.toml`, then remote settings, then the default (off).
 
 You can also toggle it from `/settings` → Models → **Subagent model inheritance**:
 
-- On: Grok cannot set models for subagents
-- Off: Grok may choose a different model for a subagent. Takes effect after restart.
+- On: Friday X cannot set models for subagents
+- Off: Friday X may choose a different model for a subagent. Takes effect after restart.
 - NOTE: This setting only applies when all models are xAI "model_family". You likely don't need to configure this setting.
 
-The row shows the value that applies after restart. Toggling writes `[features] subagent_model_inheritance = true` or `= false` (an explicit `false` overrides a remote `true`); `d` (reset) deletes the key so `managed_config.toml`, remote settings, or the default apply again. Agents already running keep the mode they started with. When a layer your `config.toml` cannot override decides the value — a `requirements.toml`/MDM pin, the environment variable, the `GROK_CONFIG` overlay, or an active campaign — both the toggle and the reset are refused with a toast that names that layer.
+The row shows the value that applies after restart. Toggling writes `[features] subagent_model_inheritance = true` or `= false` (an explicit `false` overrides a remote `true`); `d` (reset) deletes the key so `managed_config.toml`, remote settings, or the default apply again. Agents already running keep the mode they started with. When a layer your `config.toml` cannot override decides the value — a `requirements.toml`/MDM pin, the environment variable, the `FRIDAY_CONFIG` overlay, or an active campaign — both the toggle and the reset are refused with a toast that names that layer.
 
 ### Custom Roles and Personas
 
@@ -303,7 +303,7 @@ Define custom roles with their own capability and model defaults:
 description = "Deep research agent"
 default_capability_mode = "read-only"
 model = "grok-4.6"
-prompt_file = ".grok/prompts/researcher.md"
+prompt_file = ".friday/prompts/researcher.md"
 ```
 
 Define custom personas with behavioral instructions:
@@ -311,16 +311,16 @@ Define custom personas with behavioral instructions:
 ```toml
 [subagents.personas.concise]
 instructions = "Be concise. No filler words."
-# instructions_file = ".grok/personas/concise.md"  # or load from a file
+# instructions_file = ".friday/personas/concise.md"  # or load from a file
 ```
 
-Grok Build also discovers roles from `.grok/roles/*.toml` and personas from `.grok/personas/*.toml`. Inline `config.toml` definitions take precedence over files.
+Friday X also discovers roles from `.friday/roles/*.toml` and personas from `.friday/personas/*.toml`. Inline `config.toml` definitions take precedence over files.
 
 ---
 
 ## The Tasks Pane (TUI)
 
-Grok Build shows running and finished work in side panes on the agent screen:
+Friday X shows running and finished work in side panes on the agent screen:
 
 - Press `Ctrl+G` to toggle the tasks pane, which lists active and completed subagents and background commands with their status.
 - Press `Ctrl+T` to toggle the separate todo pane.
@@ -390,7 +390,7 @@ If a prompt-queue overlay appears, it is a **read-only mirror**. You cannot edit
 
 - `q` or `Esc` from bare scrollback, or click [✗].
 - If scrollback search is open, `q` / `Esc` closes search first. A later press closes the view.
-- `Ctrl+Q` always quits Grok. It is never swallowed here.
+- `Ctrl+Q` always quits Friday X. It is never swallowed here.
 
 The parent's scrollback keeps showing the subagent's status after you close.
 

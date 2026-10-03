@@ -7,7 +7,7 @@
 //! - No blocking lock: every wait is a bounded poll driven by a deadline computed once.
 //! - Slot before open: under a guarded policy no syscall names the target until the slot is held.
 //! - The slot spans one attempt; it is released before any sleep and before returning.
-//! - Slot storage is local by construction: `GROK_FILE_LOCK_SLOT_DIR` or
+//! - Slot storage is local by construction: `FRIDAY_FILE_LOCK_SLOT_DIR` or
 //!   `/tmp/grok-file-lock-<euid>`, never `$HOME`, `$TMPDIR`, or `$XDG_RUNTIME_DIR`.
 //! - The slot name is a pure function of the path string; the target is never canonicalized
 //!   or stat'ed.

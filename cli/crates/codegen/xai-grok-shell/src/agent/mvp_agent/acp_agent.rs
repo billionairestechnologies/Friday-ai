@@ -594,7 +594,7 @@ impl acp::Agent for MvpAgent {
                 .auth_methods(auth_methods)
                 .meta({
                     let metadata = crate::util::parse_json_object_env(
-                        "GROK_AGENT_METADATA",
+                        "FRIDAY_AGENT_METADATA",
                     );
                     serde_json::json!({
                     "grokShell": true,
@@ -700,7 +700,7 @@ impl acp::Agent for MvpAgent {
                         return Err(
                             acp::Error::auth_required()
                                 .data(
-                                    "Set XAI_API_KEY or add api_key/env_key to config.toml.",
+                                    "Set FRIDAY_X_TOKEN or add api_key/env_key to config.toml.",
                                 ),
                         );
                     }
@@ -824,7 +824,7 @@ impl acp::Agent for MvpAgent {
                 self.spawn_post_auth_settings(auth_for_settings);
                 Ok(self.auth_response_with_meta())
             }
-            auth_method::GROK_COM_METHOD_ID | auth_method::OIDC_METHOD_ID => {
+            auth_method::FRIDAY_COM_METHOD_ID | auth_method::OIDC_METHOD_ID => {
                 let grok_ctx = self.auth_manager.grok_com_config();
                 let auth_meta = AuthRequestMeta::from_json(arguments.meta.as_ref());
                 tracing::info!(
@@ -2066,7 +2066,7 @@ impl acp::Agent for MvpAgent {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
-                    "Run `grok login` to authenticate.",
+                    "Run `friday login` to authenticate.",
                 )?;
                 let params: serde_json::Value = serde_json::from_str(args.params.get())
                     .map_err(|e| acp::Error::invalid_params().data(e.to_string()))?;
@@ -2098,7 +2098,7 @@ impl acp::Agent for MvpAgent {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
-                    "Run `grok login` to authenticate.",
+                    "Run `friday login` to authenticate.",
                 )?;
                 let sandbox_client = crate::remote::SandboxClient::new(
                     self.cli_chat_proxy_base_url(),
@@ -2123,7 +2123,7 @@ impl acp::Agent for MvpAgent {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
-                    "Run `grok login` to authenticate.",
+                    "Run `friday login` to authenticate.",
                 )?;
                 let params: serde_json::Value = serde_json::from_str(args.params.get())
                     .map_err(|e| acp::Error::invalid_params().data(e.to_string()))?;
@@ -2180,7 +2180,7 @@ impl acp::Agent for MvpAgent {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
-                    "Run `grok login` to authenticate.",
+                    "Run `friday login` to authenticate.",
                 )?;
                 let params: serde_json::Value = serde_json::from_str(args.params.get())
                     .map_err(|e| acp::Error::invalid_params().data(e.to_string()))?;
@@ -2240,7 +2240,7 @@ impl acp::Agent for MvpAgent {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
-                    "Run `grok login` to authenticate.",
+                    "Run `friday login` to authenticate.",
                 )?;
                 let params: serde_json::Value = serde_json::from_str(args.params.get())
                     .map_err(|e| acp::Error::invalid_params().data(e.to_string()))?;

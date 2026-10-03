@@ -88,7 +88,7 @@ async fn prefix_hold_parks_the_matching_request_and_leaves_another_alone() {
 
     let mut other_headers = HeaderMap::new();
     other_headers.insert(
-        axum::http::HeaderName::from_static("x-grok-req-id"),
+        axum::http::HeaderName::from_static("x-friday-req-id"),
         axum::http::HeaderValue::from_static("xai-title-refresh-1"),
     );
     let other = json!({ "messages": [{ "role": "user", "content": "title" }] });
@@ -107,7 +107,7 @@ async fn prefix_hold_parks_the_matching_request_and_leaves_another_alone() {
 
     let mut side_headers = HeaderMap::new();
     side_headers.insert(
-        axum::http::HeaderName::from_static("x-grok-req-id"),
+        axum::http::HeaderName::from_static("x-friday-req-id"),
         axum::http::HeaderValue::from_static("xai-btw-1"),
     );
     let side = json!({ "messages": [{ "role": "user", "content": "side" }] });

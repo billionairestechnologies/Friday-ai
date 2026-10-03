@@ -15,7 +15,7 @@ fn locked_worktrees_fixture(temp: &tempfile::TempDir) -> WorktreesFixture {
     let home = root.join("grok-home");
     let worktrees = home.join("worktrees");
     std::fs::create_dir_all(&worktrees).unwrap();
-    let env = LockedTestEnv::lock().set("GROK_HOME", &home);
+    let env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
     WorktreesFixture {
         _env: env,
         root,
@@ -71,20 +71,20 @@ fn nested_subdir_cwd_derives_label_from_second_component_after_prefix() {
 
 #[test]
 fn cwd_at_slug_level_or_at_worktrees_dir_itself_has_no_identity() {
-    let worktrees = Path::new("/home/user/.grok/worktrees");
+    let worktrees = Path::new("/home/user/.friday/worktrees");
     assert_eq!(
-        worktree_identity_in(worktrees, "/home/user/.grok/worktrees"),
+        worktree_identity_in(worktrees, "/home/user/.friday/worktrees"),
         None
     );
     assert_eq!(
-        worktree_identity_in(worktrees, "/home/user/.grok/worktrees/xai"),
+        worktree_identity_in(worktrees, "/home/user/.friday/worktrees/xai"),
         None
     );
 }
 
 #[test]
 fn cwd_outside_worktrees_dir_has_no_identity() {
-    let worktrees = Path::new("/home/user/.grok/worktrees");
+    let worktrees = Path::new("/home/user/.friday/worktrees");
     assert_eq!(
         worktree_identity_in(worktrees, "/home/user/projects/xai"),
         None
@@ -157,7 +157,7 @@ fn plain_directory_under_worktrees_dir_does_not_inherit_enclosing_repo() {
     xai_test_utils::git::init_git_repo(&fixture.root);
     std::fs::write(fixture.root.join("tracked.txt"), "x").unwrap();
     // grok-home sits inside this repo. `git add .` races a sibling that opens
-    // worktrees.db at the process-global GROK_HOME: sqlite unlinks
+    // worktrees.db at the process-global FRIDAY_HOME: sqlite unlinks
     // worktrees.db-shm between readdir and stat.
     xai_test_utils::git::run_git(&fixture.root, &["add", "tracked.txt"]);
     xai_test_utils::git::run_git(&fixture.root, &["commit", "-m", "initial"]);
@@ -212,7 +212,7 @@ fn standalone_clone_behind_symlinked_worktrees_dir_reports_no_source() {
     xai_test_utils::git::git_commit_all(&standalone, "initial");
     let link_home = root.join("link-home");
     std::os::unix::fs::symlink(&real_home, &link_home).unwrap();
-    let _env = LockedTestEnv::lock().set("GROK_HOME", &link_home);
+    let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &link_home);
 
     let link_worktrees = link_home.join("worktrees");
     let link_cwd = link_worktrees.join("repo").join("standalone");

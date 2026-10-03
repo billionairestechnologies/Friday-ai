@@ -477,9 +477,9 @@ mod tests {
     #[test]
     fn test_placeholders_system_prompt_label_override() {
         let mut ctx = test_context();
-        ctx.system_prompt_label = "Grok Internal".into();
+        ctx.system_prompt_label = "Friday X Internal".into();
         let p = ctx.placeholders();
-        assert_eq!(jp(&p, "/system_prompt_label"), "Grok Internal");
+        assert_eq!(jp(&p, "/system_prompt_label"), "Friday X Internal");
     }
     #[test]
     fn test_missing_system_prompt_label_deserializes_to_default() {
@@ -943,7 +943,7 @@ mod tests {
     #[test]
     fn test_agents_md_paths_use_display_cwd_in_rendered_section() {
         let display_path = "/home/user/my-project";
-        let overlay_path = "/root/.grok/worktrees/my-project/ab-123-a-overlay";
+        let overlay_path = "/root/.friday/worktrees/my-project/ab-123-a-overlay";
         let ctx = PromptContext {
             agents_md_files: vec![AgentConfigFile {
                 file_name: "AGENTS.md".to_string(),

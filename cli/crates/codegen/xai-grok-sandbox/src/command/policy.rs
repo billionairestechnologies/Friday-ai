@@ -8,7 +8,7 @@ mod apply;
 
 pub(crate) use apply::symlink_free_spelling;
 pub use protected::{
-    BUILD_CACHE_TREES, GROK_HOME_SECRET_GLOBS, SECRET_READ_DENY_DIRS, SECRET_READ_DENY_FILES,
+    BUILD_CACHE_TREES, FRIDAY_HOME_SECRET_GLOBS, SECRET_READ_DENY_DIRS, SECRET_READ_DENY_FILES,
     VERIFIED_BUILD_CACHES, default_tmp_dirs,
 };
 
@@ -536,7 +536,7 @@ fn read_denies_for(
             deny.push(DenyEntry::Path(secret));
         }
     }
-    deny.extend(GROK_HOME_SECRET_GLOBS.iter().map(|glob| DenyEntry::Glob {
+    deny.extend(FRIDAY_HOME_SECRET_GLOBS.iter().map(|glob| DenyEntry::Glob {
         root: grok_home.to_path_buf(),
         tail: (*glob).to_owned(),
     }));

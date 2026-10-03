@@ -1,6 +1,6 @@
 //! Folder-trust store ("do you trust this folder?").
 //!
-//! Persists per-folder trust decisions to `~/.grok/trusted_folders.toml`.
+//! Persists per-folder trust decisions to `~/.friday/trusted_folders.toml`.
 //! This is the durable backing store for the VS-Code-style folder-trust gate that decides whether repo-local MCP / LSP servers may spawn.
 //! Those servers run arbitrary commands from repo-controlled config files.
 //!
@@ -16,10 +16,10 @@
 //! Other workspace keys under the path, including nested git roots, are not covered.
 //! The persisted file is written atomically with owner-only (`0600`) permissions.
 //!
-//! The store is rooted at a fresh [`xai_dirs::resolve_grok_home`], never `grok_home()` or a cwd-relative `./.grok`.
-//! Home is `None` when `$GROK_HOME` and the user home are unset, or when the resolved home is relative.
+//! The store is rooted at a fresh [`xai_dirs::resolve_grok_home`], never `grok_home()` or a cwd-relative `./.friday`.
+//! Home is `None` when `$FRIDAY_HOME` and the user home are unset, or when the resolved home is relative.
 //! In that no-home environment [`TrustStore::load`] yields an empty store that trusts nothing and persists nothing.
-//! So a cloned repo can never ship a `./.grok/trusted_folders.toml` that self-trusts its own checkout (fail closed).
+//! So a cloned repo can never ship a `./.friday/trusted_folders.toml` that self-trusts its own checkout (fail closed).
 
 use std::collections::BTreeMap;
 use std::io;
@@ -28,7 +28,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-/// Filename of the folder-trust store under `~/.grok/`.
+/// Filename of the folder-trust store under `~/.friday/`.
 pub const TRUST_FILE_NAME: &str = xai_grok_config::TRUSTED_FOLDERS_FILENAME;
 
 /// A single folder's trust record.
@@ -387,7 +387,7 @@ impl TrustStore {
 }
 
 /// Compute the trust **workspace key** for a working directory. The key is the canonicalized git repository root when `cwd` is inside a repo (trust applies to the whole repo), otherwise the canonicalized `cwd`.
-/// A grok-managed worktree first collapses onto its recorded source repo's git ROOT (via the `~/.grok/worktrees.db` registry), so every `grok -w` worktree shares one trust key regardless of creation mode (including standalone clones that git can't link back to their source) and regardless of the subdir `grok -w` was launched from (the recorded source repo may be a repo subdir).
+/// A grok-managed worktree first collapses onto its recorded source repo's git ROOT (via the `~/.friday/worktrees.db` registry), so every `grok -w` worktree shares one trust key regardless of creation mode (including standalone clones that git can't link back to their source) and regardless of the subdir `grok -w` was launched from (the recorded source repo may be a repo subdir).
 pub fn workspace_key(cwd: &Path) -> PathBuf {
     let key = git_derived_workspace_key(cwd);
     if is_unsafe_trust_root(&key) {
@@ -444,7 +444,7 @@ fn workspace_id(path: &Path) -> PathBuf {
     workspace_key(path.ancestors().find(|p| p.exists()).unwrap_or(path))
 }
 
-/// Fresh `$GROK_HOME` or `<home>/.grok`. Does not call `grok_home()` and does not create directories.
+/// Fresh `$FRIDAY_HOME` or `<home>/.friday`. Does not call `grok_home()` and does not create directories.
 pub fn trust_store_home() -> Option<PathBuf> {
     xai_dirs::resolve_grok_home()
 }
@@ -460,7 +460,7 @@ fn now_unix() -> Option<i64> {
         .map(|d| d.as_secs() as i64)
 }
 
-/// RAII exclusive advisory lock on a sidecar lock file, released on drop. Serializes concurrent `TrustStore` writers (multiple processes / instances sharing `~/.grok/`) across the whole read-modify-write so updates merge instead of clobbering each other.
+/// RAII exclusive advisory lock on a sidecar lock file, released on drop. Serializes concurrent `TrustStore` writers (multiple processes / instances sharing `~/.friday/`) across the whole read-modify-write so updates merge instead of clobbering each other.
 /// The lock is advisory; only writers that take it (i.e.
 struct ExclusiveLock {
     file: std::fs::File,

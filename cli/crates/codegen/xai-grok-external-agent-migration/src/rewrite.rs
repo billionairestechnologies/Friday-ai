@@ -48,7 +48,7 @@ pub fn apply_import(plan: &ImportPlan, cwd: &Path) -> Result<ImportResult, Migra
     }
 
     if !plan.project_items.is_empty() {
-        let project_grok_dir = find_project_root(cwd).join(".grok");
+        let project_grok_dir = find_project_root(cwd).join(".friday");
         result.project_count = apply_items_to_grok_dir(
             &project_grok_dir,
             &plan.project_items,

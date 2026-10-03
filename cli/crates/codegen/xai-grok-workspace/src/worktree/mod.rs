@@ -853,13 +853,13 @@ pub fn resolve_label_collision(base_dir: &Path, label: &str) -> String {
     auto_label()
 }
 
-/// Grok home for worktree paths: the same resolver as `worktrees.db`, with a `temp_dir()/.grok` last resort.
-/// This is not grok-config's cwd-relative `.grok`: worktree paths need an absolute, always-writable anchor that does not move with the process cwd.
+/// Friday X home for worktree paths: the same resolver as `worktrees.db`, with a `temp_dir()/.friday` last resort.
+/// This is not grok-config's cwd-relative `.friday`: worktree paths need an absolute, always-writable anchor that does not move with the process cwd.
 fn grok_home() -> std::path::PathBuf {
-    xai_fast_worktree::resolve_grok_home().unwrap_or_else(|_| std::env::temp_dir().join(".grok"))
+    xai_fast_worktree::resolve_grok_home().unwrap_or_else(|_| std::env::temp_dir().join(".friday"))
 }
 
-/// Returns `~/.grok/worktrees/<repo_slug>` for the given git root.
+/// Returns `~/.friday/worktrees/<repo_slug>` for the given git root.
 pub fn worktree_base_dir(git_root: &Path) -> std::path::PathBuf {
     worktree_base_dir_in(&grok_home(), git_root)
 }
@@ -870,8 +870,8 @@ pub fn worktree_base_dir_in(grok_home: &Path, git_root: &Path) -> std::path::Pat
     grok_home.join("worktrees").join(slug)
 }
 
-/// Resolves the worktree base directory (`~/.grok/worktrees/<repo_name>`) for a given source path, correctly handling grok-managed worktrees.
-/// When `source_path` is already under `~/.grok/worktrees/<repo>/...`, the repo name is derived from the directory structure directly.
+/// Resolves the worktree base directory (`~/.friday/worktrees/<repo_name>`) for a given source path, correctly handling grok-managed worktrees.
+/// When `source_path` is already under `~/.friday/worktrees/<repo>/...`, the repo name is derived from the directory structure directly.
 /// This avoids `find_main_repo_root_from_path`, which misidentifies standalone worktrees as the main repo root.
 pub fn worktree_base_dir_for_source(source_path: &Path) -> Result<std::path::PathBuf> {
     worktree_base_dir_for_source_in(&grok_home(), source_path)
@@ -936,7 +936,7 @@ pub fn label_from_path(worktree_path: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Walk up from `cwd` (staying within `~/.grok/worktrees/`) to its registered worktree record. Shared resolver for [`lookup_worktree_label`] and [`touch_worktree_for_cwd`].
+/// Walk up from `cwd` (staying within `~/.friday/worktrees/`) to its registered worktree record. Shared resolver for [`lookup_worktree_label`] and [`touch_worktree_for_cwd`].
 /// Returns the open DB alongside the record so callers can issue follow-up queries.
 fn worktree_record_for_cwd(cwd: &str) -> Option<(WorktreeDb, WorktreeRecord)> {
     worktree_record_for_cwd_in(&grok_home(), cwd)
@@ -966,7 +966,7 @@ fn worktree_record_for_cwd_in(grok_home: &Path, cwd: &str) -> Option<(WorktreeDb
     None
 }
 
-/// The recorded source repo of the grok-managed worktree containing `cwd`, if any. Thin wrapper over [`worktree_record_for_cwd`] that drops the DB handle; returns `None` (without DB I/O) for paths outside `~/.grok/worktrees/`.
+/// The recorded source repo of the grok-managed worktree containing `cwd`, if any. Thin wrapper over [`worktree_record_for_cwd`] that drops the DB handle; returns `None` (without DB I/O) for paths outside `~/.friday/worktrees/`.
 pub(crate) fn source_repo_for_cwd(cwd: &str) -> Option<std::path::PathBuf> {
     worktree_record_for_cwd(cwd).map(|(_db, rec)| rec.source_repo)
 }
@@ -1744,7 +1744,7 @@ impl From<CreateWorktreeFromWorktreeRequestWire> for CreateWorktreeFromWorktreeR
     }
 }
 
-/// Resolve the target worktree path for a fork operation. When the source path is already inside `~/.grok/worktrees/<repo>/`, the repo name is derived from the directory structure rather than `git_root` (which would be the standalone worktree itself, causing nested paths).
+/// Resolve the target worktree path for a fork operation. When the source path is already inside `~/.friday/worktrees/<repo>/`, the repo name is derived from the directory structure rather than `git_root` (which would be the standalone worktree itself, causing nested paths).
 fn resolve_fork_worktree_path(
     source_worktree_path: &Path,
     git_root: &Path,
@@ -3012,12 +3012,12 @@ pub fn worktree_auto_gc_layer_from_settings(
     }
 }
 
-/// Load `$GROK_HOME/config.toml` through the shell's config pipeline and pull out `[worktree.auto_gc]`.
+/// Load `$FRIDAY_HOME/config.toml` through the shell's config pipeline and pull out `[worktree.auto_gc]`.
 ///
 /// `xai_grok_config::load_config_file` is the same reader the shell uses (`$VAR` expansion, `[[version_overrides]]`,
 /// redacted parse-error logging), so a table that the shell honors is honored here too.
 /// Returns `None` when the file is unreadable or malformed, or the table is absent or fails to deserialize.
-/// Takes `home` so the document-to-settings path is testable without touching `$GROK_HOME`.
+/// Takes `home` so the document-to-settings path is testable without touching `$FRIDAY_HOME`.
 fn load_local_worktree_auto_gc_settings(
     home: &Path,
 ) -> Option<xai_grok_config_types::WorktreeAutoGcSettings> {
@@ -3048,7 +3048,7 @@ fn worktree_auto_gc_settings_from_config(
         .ok()
 }
 
-/// Remote-blind (env and `$GROK_HOME/config.toml` only): opts in only when local `[worktree.auto_gc] enabled = true`, else returns `None`.
+/// Remote-blind (env and `$FRIDAY_HOME/config.toml` only): opts in only when local `[worktree.auto_gc] enabled = true`, else returns `None`.
 /// A forced dry-run would stamp the shared throttle and block the shell agent's remote-aware pass over the same DB, so skip instead.
 ///
 /// An explicit local opt-in makes the local layer (over built-in defaults) win for this pass: remote `worktree_auto_gc`
@@ -3062,7 +3062,7 @@ fn resolve_worktree_auto_gc_local_in(
 }
 
 /// Pure opt-in decision (no IO): `None` unless local config explicitly enables the pass.
-/// Split out of `resolve_worktree_auto_gc_local_in` so the fail-safe is testable without touching `$GROK_HOME`.
+/// Split out of `resolve_worktree_auto_gc_local_in` so the fail-safe is testable without touching `$FRIDAY_HOME`.
 fn local_auto_gc_policy(
     local: Option<&xai_grok_config_types::WorktreeAutoGcSettings>,
 ) -> Option<xai_fast_worktree::ResolvedWorktreeAutoGc> {
@@ -3146,7 +3146,7 @@ pub fn candidate_worktree_cwds_for_same_repo(current_cwd: &std::path::Path) -> R
     ))
 }
 
-/// Scan `~/.grok/worktrees/<repo_name>/` for subdirectories not tracked
+/// Scan `~/.friday/worktrees/<repo_name>/` for subdirectories not tracked
 /// in the DB. Returns a sorted list of absolute directory paths.
 fn scan_worktree_dirs_on_disk(main_repo_root: &std::path::Path) -> Vec<String> {
     let base = worktree_base_dir(main_repo_root);
@@ -3478,7 +3478,7 @@ mod tests {
     // Struct field order (see lib.rs) restores the env before the lock releases, regardless of how the caller binds the fixture's return
     use crate::LockedTestEnv;
 
-    /// Point `GROK_HOME` at an isolated tempdir (`resolve_grok_home` re-reads the env per call by design). Register one worktree record at `<home>/worktrees/repo/wt` with no `last_accessed_at`.
+    /// Point `FRIDAY_HOME` at an isolated tempdir (`resolve_grok_home` re-reads the env per call by design). Register one worktree record at `<home>/worktrees/repo/wt` with no `last_accessed_at`.
     /// Returns `(env, home, worktree dir)`.
     fn worktree_db_fixture(
         temp: &tempfile::TempDir,
@@ -3489,7 +3489,7 @@ mod tests {
         let wt = home.join("worktrees").join("repo").join("wt");
         std::fs::create_dir_all(&wt).unwrap();
         // Acquire the lock, then set the env under it (LockedTestEnv restores the env before releasing the lock on drop)
-        let env = LockedTestEnv::lock().set("GROK_HOME", &home);
+        let env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
 
         let db = WorktreeDb::open(&home).unwrap();
         let record = WorktreeRecord {
@@ -4004,7 +4004,7 @@ mod tests {
         let _inject = create_root::lock_grove_parent_inject();
 
         let temp = tempfile::TempDir::new().unwrap();
-        // tempfile `.../.tmp*/repo` slugs to shared ~/.grok/worktrees/tmp-repo; shards
+        // tempfile `.../.tmp*/repo` slugs to shared ~/.friday/worktrees/tmp-repo; shards
         // then race `git worktree add` on label `strategy-wt-N`.
         let unique = uuid::Uuid::new_v4().simple().to_string();
         let repo = temp.path().join(format!("src-{unique}"));

@@ -79,11 +79,11 @@ static CLIENT_TYPE: OnceLock<ClientType> = OnceLock::new();
 pub use xai_grok_sampler::OriginClientInfo;
 
 pub fn origin_client_info_from_env() -> Option<OriginClientInfo> {
-    std::env::var("GROK_CLIENT_NAME")
+    std::env::var("FRIDAY_CLIENT_NAME")
         .ok()
         .map(|product| OriginClientInfo {
             product,
-            version: std::env::var("GROK_CLIENT_VERSION").ok(),
+            version: std::env::var("FRIDAY_CLIENT_VERSION").ok(),
         })
 }
 
@@ -244,10 +244,10 @@ pub fn client_type_from_origin(origin: Option<&OriginClientInfo>) -> ClientType 
 }
 
 pub fn process_client_identifier() -> String {
-    std::env::var("GROK_CLIENT_NAME").unwrap_or_else(|_| "grok-shell".to_string())
+    std::env::var("FRIDAY_CLIENT_NAME").unwrap_or_else(|_| "grok-shell".to_string())
 }
 
-pub const CLIENT_MODE_HEADER: &str = "x-grok-client-mode";
+pub const CLIENT_MODE_HEADER: &str = "x-friday-client-mode";
 
 static CLIENT_MODE: OnceLock<&'static str> = OnceLock::new();
 

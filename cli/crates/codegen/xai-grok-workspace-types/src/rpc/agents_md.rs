@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use super::{RpcActivityClass, WorkspaceRpc};
 
 /// `workspace.discover_agents_md` — project-instruction files (AGENTS.md /
-/// Claude.md / `.grok/rules/*.md`) discovered from the workspace root up to
-/// the git root, plus `~/.grok` and compat dirs.
+/// Claude.md / `.friday/rules/*.md`) discovered from the workspace root up to
+/// the git root, plus `~/.friday` and compat dirs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DiscoverAgentsMdReq {}
 
@@ -31,7 +31,7 @@ pub struct AgentConfigFile {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InstructionSource {
-    /// `$GROK_HOME` and the vendor homes.
+    /// `$FRIDAY_HOME` and the vendor homes.
     Home,
     /// A `[paths] extra_rule_dirs` entry.
     Configured,

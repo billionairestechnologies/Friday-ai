@@ -388,7 +388,7 @@ const _: () = {
     assert_send::<SubagentSpawnContext>()
 };
 impl SubagentSpawnContext {
-    /// Would installing a live bearer resolver strip this subagent's only credential? A wired resolver is the sampler's sole auth source, so with no session key at spawn it must not displace a fallback key (env `XAI_API_KEY`).
+    /// Would installing a live bearer resolver strip this subagent's only credential? A wired resolver is the sampler's sole auth source, so with no session key at spawn it must not displace a fallback key (env `FRIDAY_X_TOKEN`).
     /// Keyed on the resolved config key, not the session cache alone. The cache is empty in exactly the post-wake / mid-refresh states the resolver targets, and gating on it would freeze the subagent for life.
     /// Shared by all three resolver-wiring paths so they cannot drift.
     fn would_strip_fallback_key(&self, resolved_api_key: Option<&str>) -> bool {
@@ -515,7 +515,7 @@ impl SubagentSpawnContext {
     /// Env > parent config features > this context's remote settings > default.
     pub(crate) fn resolve_compaction_mode(&self) -> xai_chat_state::CompactionMode {
         crate::agent::config::resolve_compaction_mode_from(
-            crate::agent::config::env_string("GROK_COMPACTION_MODE").as_deref(),
+            crate::agent::config::env_string("FRIDAY_COMPACTION_MODE").as_deref(),
             self.agent_config
                 .as_ref()
                 .and_then(|c| c.features.compaction_mode.as_deref()),
@@ -524,7 +524,7 @@ impl SubagentSpawnContext {
                 .and_then(|r| r.compaction_mode.as_deref()),
         )
         .with_segment_detail(crate::agent::config::resolve_compaction_detail_from(
-            crate::agent::config::env_string("GROK_COMPACTION_DETAIL").as_deref(),
+            crate::agent::config::env_string("FRIDAY_COMPACTION_DETAIL").as_deref(),
             self.agent_config
                 .as_ref()
                 .and_then(|c| c.features.compaction_detail.as_deref()),

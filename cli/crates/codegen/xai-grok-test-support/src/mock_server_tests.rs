@@ -99,8 +99,8 @@ async fn read_foreground_body(
 ) -> (reqwest::StatusCode, String) {
     let response = reqwest::Client::new()
         .post(endpoint_url(server, endpoint))
-        .header("x-grok-req-id", request_id)
-        .header("x-grok-turn-idx", "1")
+        .header("x-friday-req-id", request_id)
+        .header("x-friday-turn-idx", "1")
         .json(&body)
         .send()
         .await
@@ -141,7 +141,7 @@ async fn send_chat_turn(
 ) -> reqwest::Result<reqwest::Response> {
     reqwest::Client::new()
         .post(endpoint_url(server, InferenceEndpoint::ChatCompletions))
-        .header("x-grok-turn-idx", "1")
+        .header("x-friday-turn-idx", "1")
         .json(&chat_body(system))
         .send()
         .await
@@ -434,8 +434,8 @@ async fn overlapping_duplicate_replays_but_sequential_identical_request_claims_n
         async move {
             let response = reqwest::Client::new()
                 .post(url)
-                .header("x-grok-req-id", "turn-id")
-                .header("x-grok-turn-idx", "1")
+                .header("x-friday-req-id", "turn-id")
+                .header("x-friday-turn-idx", "1")
                 .json(&body)
                 .send()
                 .await
@@ -574,8 +574,8 @@ async fn cancelling_replay_waits_for_primary_before_satisfaction() {
         async move {
             reqwest::Client::new()
                 .post(url)
-                .header("x-grok-req-id", "cancel-replay")
-                .header("x-grok-turn-idx", "1")
+                .header("x-friday-req-id", "cancel-replay")
+                .header("x-friday-turn-idx", "1")
                 .json(&body)
                 .send()
                 .await
@@ -1471,7 +1471,7 @@ async fn status_failure_reports_its_context_window_over_the_wire() {
         .expect("POST refused chat turn");
     let context_window = refused
         .headers()
-        .get("x-grok-context-window")
+        .get("x-friday-context-window")
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
     post_chat_turn(&server, "s").await;

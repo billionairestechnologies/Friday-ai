@@ -66,7 +66,7 @@ fn sampling_bodies(server: &xai_grok_test_support::MockInferenceServer) -> Vec<S
         .into_iter()
         .filter(|r| r.path == "/v1/chat/completions" || r.path == "/v1/responses")
         .filter(|r| {
-            !r.header("x-grok-req-id")
+            !r.header("x-friday-req-id")
                 .is_some_and(|id| id.starts_with("xai-turn-summary-"))
         })
         .map(|r| r.body.map(|b| b.to_string()).unwrap_or_default())
@@ -178,7 +178,7 @@ fn poisoned_image_session_recovers_within_the_failing_turn() {
 
 /// The session's `chat_history.jsonl`; the sessions dir name encodes the cwd in an internal format, so we scan for the file.
 fn session_chat_jsonl() -> std::path::PathBuf {
-    let sessions = std::path::PathBuf::from(std::env::var("GROK_HOME").expect("GROK_HOME set"))
+    let sessions = std::path::PathBuf::from(std::env::var("FRIDAY_HOME").expect("FRIDAY_HOME set"))
         .join("sessions");
     std::fs::read_dir(&sessions)
         .expect("read sessions dir")

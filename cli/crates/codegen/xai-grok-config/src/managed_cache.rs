@@ -2,7 +2,7 @@
 //! It also holds the fail-closed enforcement gate that combines the signed-cache verdict with the best-effort marker.
 //!
 //! The marker is **unsigned** and user-writable: a refresh hint, not a tamper control.
-//! Real tamper resistance is [`crate::signed_policy`] plus the OS-protected layers (root-owned `/etc/grok`, MDM).
+//! Real tamper resistance is [`crate::signed_policy`] plus the OS-protected layers (root-owned `/etc/friday`, MDM).
 
 use std::path::Path;
 
@@ -560,9 +560,9 @@ fn managed_config_stale_at(home: Option<&Path>, identity: &ServingIdentity) -> b
     }
 }
 
-/// Override with `GROK_DEPLOYMENT_CONFIG_CACHE_TTL_SECS` for testing.
+/// Override with `FRIDAY_DEPLOYMENT_CONFIG_CACHE_TTL_SECS` for testing.
 fn managed_config_stale_threshold() -> std::time::Duration {
-    if let Ok(s) = std::env::var("GROK_DEPLOYMENT_CONFIG_CACHE_TTL_SECS")
+    if let Ok(s) = std::env::var("FRIDAY_DEPLOYMENT_CONFIG_CACHE_TTL_SECS")
         && let Ok(secs) = s.parse::<u64>()
     {
         return std::time::Duration::from_secs(secs);

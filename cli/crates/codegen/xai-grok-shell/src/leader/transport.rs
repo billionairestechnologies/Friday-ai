@@ -222,7 +222,7 @@ mod windows_impl {
         let mut hasher = SipHasher13::new_with_keys(0x67726f6b_6c656164, 0x65725f70_69706521);
         path.hash(&mut hasher);
         let hash = hasher.finish();
-        std::ffi::OsString::from(format!("grok-leader-{hash:016x}"))
+        std::ffi::OsString::from(format!("friday-leader-{hash:016x}"))
     }
 
     #[cfg(test)]
@@ -263,7 +263,7 @@ mod windows_impl {
         async fn listener_is_ready_tracks_pipe_lifecycle() {
             // Unique path per process so parallel test binaries don't collide on the derived pipe name
             let path =
-                std::env::temp_dir().join(format!("grok-ready-probe-{}.sock", std::process::id()));
+                std::env::temp_dir().join(format!("friday-ready-probe-{}.sock", std::process::id()));
 
             // Nothing is bound yet, so the probe hits ERROR_FILE_NOT_FOUND and reports not ready
             assert!(!listener_is_ready(&path));

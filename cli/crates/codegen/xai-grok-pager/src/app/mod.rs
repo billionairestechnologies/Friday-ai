@@ -185,7 +185,7 @@ pub(crate) fn minimal_mode_active() -> bool {
 pub(crate) fn set_minimal_mode_active_for_test(on: bool) {
     MINIMAL_MODE_ACTIVE.store(on, Ordering::Release);
 }
-/// Whether the opt-in mouse-reporting toggle feature is enabled (`[ui] mouse_reporting_toggle` / `GROK_MOUSE_REPORTING_TOGGLE`).
+/// Whether the opt-in mouse-reporting toggle feature is enabled (`[ui] mouse_reporting_toggle` / `FRIDAY_MOUSE_REPORTING_TOGGLE`).
 /// Seeded once at startup; gates both the `Ctrl+R` shortcut registration and the `/toggle-mouse-reporting` slash command's visibility/execution.
 pub(crate) static MOUSE_REPORTING_TOGGLE_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Read the cached opt-in mouse-reporting toggle flag (see [`MOUSE_REPORTING_TOGGLE_ENABLED`]).
@@ -210,12 +210,12 @@ pub(crate) fn dock_requirement_pin() -> Option<bool> {
 pub(crate) fn dock_config_value() -> Option<bool> {
     dock_flag_in(&xai_grok_shell::config::load_effective_config().ok()?)
 }
-/// Registry precedence: pin, `GROK_DOCK` / `GROK_DOCK_V2`, config, remote `dock_enabled`, default off.
+/// Registry precedence: pin, `FRIDAY_DOCK` / `FRIDAY_DOCK_V2`, config, remote `dock_enabled`, default off.
 pub(crate) fn resolve_dock_enabled(remote: Option<bool>) -> bool {
     use xai_grok_shell::agent::config::{Feature, FeatureSources};
     let mut sources = FeatureSources::from_process_env(Feature::Dock);
     if sources.env.is_none() {
-        sources.env = xai_grok_config::env_bool("GROK_DOCK_V2");
+        sources.env = xai_grok_config::env_bool("FRIDAY_DOCK_V2");
     }
     sources.pin = dock_requirement_pin();
     sources.config = dock_config_value();
@@ -236,7 +236,7 @@ fn terminal_theme_requirement_pin() -> Option<bool> {
 fn terminal_theme_config_value() -> Option<bool> {
     terminal_theme_flag_in(&xai_grok_shell::config::load_effective_config().ok()?)
 }
-/// Registry precedence: pin, `GROK_TERMINAL_THEME`, config, remote `terminal_theme_enabled`, default off.
+/// Registry precedence: pin, `FRIDAY_TERMINAL_THEME`, config, remote `terminal_theme_enabled`, default off.
 pub(crate) fn resolve_terminal_theme_enabled(remote: Option<bool>) -> bool {
     use xai_grok_shell::agent::config::{Feature, FeatureSources};
     let mut sources = FeatureSources::from_process_env(Feature::TerminalTheme);
@@ -913,7 +913,7 @@ pub async fn run(
         } => original_cwd.clone(),
         _ => None,
     };
-    let env_hunk_tracker_mode = std::env::var("GROK_HUNK_TRACKER").ok();
+    let env_hunk_tracker_mode = std::env::var("FRIDAY_HUNK_TRACKER").ok();
     let config_hunk_tracker_mode = raw_config
         .get("ui")
         .and_then(|ui| ui.get("hunk_tracker_mode"))
@@ -1299,9 +1299,9 @@ fn print_exit_resume_hint(info: &ExitInfo, max_width: usize, w: &mut impl Write)
     }
     let _ = writeln!(w, "Resume this session with:");
     if info.minimal {
-        let _ = writeln!(w, "  grok --minimal --resume {}", info.session_id);
+        let _ = writeln!(w, "  friday --minimal --resume {}", info.session_id);
     } else {
-        let _ = writeln!(w, "  grok --resume {}", info.session_id);
+        let _ = writeln!(w, "  friday --resume {}", info.session_id);
     }
 }
 /// Screen-mode relaunch failure fallback (same quit tail as plain resume).
@@ -2301,7 +2301,7 @@ mod tests {
         assert_eq!(
             first_5,
             vec![
-                "Grok Build TUI",
+                "Friday X TUI",
                 "",
                 "Usage: grok [OPTIONS] [PROMPT] [COMMAND]",
                 "",
@@ -2349,7 +2349,7 @@ mod tests {
         print_exit_resume_hint(&bare_exit_info("sess-abc", false), 80, &mut buf);
         assert_eq!(
             String::from_utf8(buf).unwrap(),
-            "\nResume this session with:\n  grok --resume sess-abc\n"
+            "\nResume this session with:\n  friday --resume sess-abc\n"
         );
     }
     #[test]
@@ -2358,7 +2358,7 @@ mod tests {
         print_exit_resume_hint(&bare_exit_info("sess-abc", true), 80, &mut buf);
         assert_eq!(
             String::from_utf8(buf).unwrap(),
-            "\nResume this session with:\n  grok --minimal --resume sess-abc\n"
+            "\nResume this session with:\n  friday --minimal --resume sess-abc\n"
         );
     }
     #[test]
@@ -2383,7 +2383,7 @@ mod tests {
                 "  Pinned the seed; 200 consecutive green runs.\n",
                 "\n",
                 "Resume this session with:\n",
-                "  grok --resume sess-abc\n",
+                "  friday --resume sess-abc\n",
             )
         );
     }
@@ -2404,7 +2404,7 @@ mod tests {
         assert!(out.contains(&format!("\n{}…\n", "t".repeat(19))));
         assert!(out.contains(&format!("\n> {}…\n", "p".repeat(17))));
         assert!(out.contains(&format!("\n  {}…\n", "r".repeat(17))));
-        assert!(out.contains("  grok --resume sess-abc\n"));
+        assert!(out.contains("  friday --resume sess-abc\n"));
     }
     #[test]
     fn print_relaunch_failure_hint_writes_expected_lines() {

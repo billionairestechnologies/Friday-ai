@@ -80,7 +80,7 @@ pub(crate) enum PromptGate {
 
 /// Pre-release stopgap: the daemon runs every hub tool call unasked (no permission cards) until
 /// sandboxing lands. The sandbox guest keeps the opt-in its plane already uses
-/// (`GROK_HITL_PERMISSION_LIVE`).
+/// (`FRIDAY_HITL_PERMISSION_LIVE`).
 pub fn approval_gate_for(host_kind: WorkspaceHostKind) -> ToolApprovalGate {
     resolve_gate(host_kind, hitl_permission_live_enabled())
 }
@@ -133,7 +133,7 @@ impl SessionApproval {
 struct FolderGrants {
     cwd: AbsPathBuf,
     /// The store's key: the served folder when the bound cwd is a repo-less directory under it.
-    /// Grok Desktop binds every conversation to its own scratch directory beneath the folder it
+    /// Friday X Desktop binds every conversation to its own scratch directory beneath the folder it
     /// exposes, and a cwd-keyed store made an "always" answer hold for one chat only. A cwd inside a
     /// repository keeps the repo-root key, so the CLI's per-project grants are unchanged.
     grant_dir: AbsPathBuf,

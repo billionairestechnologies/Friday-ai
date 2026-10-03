@@ -1,4 +1,4 @@
-# Grok
+# Friday X
 
 A terminal-based AI coding assistant and agentic harness.
 
@@ -17,14 +17,14 @@ grok
 grok -p "Explain this codebase"
 
 # Agent mode (for IDE/app integration)
-grok agent stdio
+friday agent stdio
 ```
 
 ## Contents
 
 - [Installation](#installation)
 - [Authentication](#authentication) — browser login, API key, OIDC, external auth providers
-- **Using Grok**
+- **Using Friday X**
   - [Interactive TUI](#interactive-tui) — shortcuts, slash commands, file references
   - [Headless Mode](#headless-mode) — scripting, CI/CD, output formats
   - [Agent Mode](#agent-mode) — stdio, ACP integration
@@ -44,14 +44,14 @@ grok agent stdio
   - [Memory](#memory) — cross-session knowledge persistence
   - [Sandbox](#sandbox) — OS-level filesystem/network isolation
 - **Reference**
-  - [Introspection (`grok inspect`)](#introspection)
+  - [Introspection (`friday inspect`)](#introspection)
   - [Claude Code Compatibility](#claude-code-compatibility)
   - [Built-in Tools](#built-in-tools)
   - [Session Persistence](#session-persistence) — storage layout, resume
   - [File Locations](#file-locations)
   - [Environment Variables](#environment-variables)
   - [Troubleshooting](#troubleshooting)
-- [Building with Grok](#building-with-grok) — headless API, ACP SDK integration
+- [Building with Friday X](#building-with-grok) — headless API, ACP SDK integration
 
 ---
 
@@ -68,13 +68,13 @@ curl -fsSL https://x.ai/cli/install.sh | bash -s 0.1.42
 Verify installation:
 
 ```bash
-grok --version
+friday --version
 ```
 
 Update to the latest version:
 
 ```bash
-grok update
+friday update
 ```
 
 ---
@@ -83,20 +83,20 @@ grok update
 
 ### Browser Login (Default)
 
-On first launch, Grok opens your browser to authenticate with grok.com:
+On first launch, Friday X opens your browser to authenticate with grok.com:
 
 ```bash
 grok
 ```
 
-Credentials are stored in `~/.grok/auth.json` and persist across sessions. Tokens expire after 7 days; Grok will prompt you to re-authenticate when needed.
+Credentials are stored in `~/.friday/auth.json` and persist across sessions. Tokens expire after 7 days; Friday X will prompt you to re-authenticate when needed.
 
 ### Re-authenticate
 
 To switch accounts or fix authentication issues:
 
 ```bash
-grok login
+friday login
 ```
 
 ### API Key
@@ -104,7 +104,7 @@ grok login
 For CI/CD, automation, or environments without browser access, use an API key from [console.x.ai](https://console.x.ai):
 
 ```bash
-export XAI_API_KEY="xai-..."
+export FRIDAY_X_TOKEN="xai-..."
 grok
 ```
 
@@ -122,7 +122,7 @@ Authenticate developers via your own Identity Provider (Okta, Azure AD, Auth0) i
 **2. Configure the CLI** (config file or env vars):
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [grok_com_config.oidc]
 issuer = "https://acme.okta.com"
 client_id = "0oa1b2c3d4e5f6g7h8i9"
@@ -130,16 +130,16 @@ client_id = "0oa1b2c3d4e5f6g7h8i9"
 
 ```bash
 # Or via environment variables
-export GROK_OIDC_ISSUER="https://acme.okta.com"
-export GROK_OIDC_CLIENT_ID="0oa1b2c3d4e5f6g7h8i9"
+export FRIDAY_OIDC_ISSUER="https://acme.okta.com"
+export FRIDAY_OIDC_CLIENT_ID="0oa1b2c3d4e5f6g7h8i9"
 ```
 
 Customers typically also override the API endpoint to point at their own proxy:
 ```bash
-export GROK_CLI_CHAT_PROXY_BASE_URL="https://grok-proxy.acme.com/v1"
+export FRIDAY_CLI_CHAT_PROXY_BASE_URL="https://grok-proxy.acme.com/v1"
 ```
 
-**3. Run `grok`.** The CLI discovers endpoints via `{issuer}/.well-known/openid-configuration`, opens the IdP login page, and stores tokens in `~/.grok/auth.json`. The OIDC token is sent as `Authorization: Bearer` to the configured proxy. Tokens auto-refresh silently via the stored `refresh_token`.
+**3. Run `friday`.** The CLI discovers endpoints via `{issuer}/.well-known/openid-configuration`, opens the IdP login page, and stores tokens in `~/.friday/auth.json`. The OIDC token is sent as `Authorization: Bearer` to the configured proxy. Tokens auto-refresh silently via the stored `refresh_token`.
 
 **Optional fields:**
 
@@ -152,13 +152,13 @@ export GROK_CLI_CHAT_PROXY_BASE_URL="https://grok-proxy.acme.com/v1"
 
 For environments where browser-based login isn't possible (sandboxed VMs, CI runners, air-gapped networks), delegate authentication to an external binary or script. This is the recommended approach for enterprise deployments where your company runs its own auth infrastructure (SSO, device code flows, certificate auth, etc.).
 
-Grok is provider-agnostic — it doesn't know or care how your binary authenticates. It just runs the command, reads a token from stdout, and stores it. Your binary is a black box that handles the entire auth flow.
+Friday X is provider-agnostic — it doesn't know or care how your binary authenticates. It just runs the command, reads a token from stdout, and stores it. Your binary is a black box that handles the entire auth flow.
 
 #### How It Works
 
 ```
 ┌──────────────┐     sh -c     ┌────────────────────────┐
-│     Grok     │──────────────▶│  your auth binary      │
+│     Friday X     │──────────────▶│  your auth binary      │
 │              │               │                        │
 │  reads       │◀── stdout ────│  prints token          │
 │  auth.json   │               │                        │
@@ -166,11 +166,11 @@ Grok is provider-agnostic — it doesn't know or care how your binary authentica
 └──────────────┘               └────────────────────────┘
 ```
 
-1. Grok runs your command via `sh -c "<command>"`
+1. Friday X runs your command via `sh -c "<command>"`
 2. Your binary does whatever auth flow it needs (SSO login, device code, cert exchange, etc.)
 3. **stderr** → displayed directly to the user (use for login URLs, status messages, progress)
-4. **stdout** → captured by Grok and saved to `~/.grok/auth.json` as the access token
-5. exit 0 → success; exit non-zero → Grok falls through to interactive login
+4. **stdout** → captured by Friday X and saved to `~/.friday/auth.json` as the access token
+5. exit 0 → success; exit non-zero → Friday X falls through to interactive login
 
 #### The stdout / stderr Contract
 
@@ -178,10 +178,10 @@ This is the most important thing to get right:
 
 | Stream | What to print | Who sees it |
 |--------|---------------|-------------|
-| **stdout** | The token — nothing else | Grok (parsed and stored in `auth.json`) |
+| **stdout** | The token — nothing else | Friday X (parsed and stored in `auth.json`) |
 | **stderr** | Login URLs, status messages, errors, progress | The user (displayed in their terminal) |
 
-**Do not print anything to stdout except the token.** No progress messages, no debug output, no "Login successful!" text. Grok reads stdout verbatim and tries to parse it as a token. Any extra text will break parsing.
+**Do not print anything to stdout except the token.** No progress messages, no debug output, no "Login successful!" text. Friday X reads stdout verbatim and tries to parse it as a token. Any extra text will break parsing.
 
 #### stdout Token Format
 
@@ -197,7 +197,7 @@ eyJhbGciOiJSUzI1NiIs...
 {"access_token": "eyJhbGciOi...", "refresh_token": "ref-tok", "expires_in": 3600}
 ```
 
-Use JSON if your tokens expire and you want Grok to automatically re-run the binary before expiry. The `expires_in` field (seconds until expiry) tells Grok when to proactively refresh. Without it, Grok assumes tokens last 30 days.
+Use JSON if your tokens expire and you want Friday X to automatically re-run the binary before expiry. The `expires_in` field (seconds until expiry) tells Friday X when to proactively refresh. Without it, Friday X assumes tokens last 30 days.
 
 #### Minimal Example
 
@@ -209,14 +209,14 @@ echo "Visit: https://sso.acme.com/device-login?code=ABCD-1234" >&2
 
 # ... do the auth flow, get a token ...
 
-# Print ONLY the token to stdout (Grok captures this)
+# Print ONLY the token to stdout (Friday X captures this)
 echo "eyJhbGciOiJSUzI1NiIs..."
 ```
 
 #### Configuration
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [auth]
 auth_provider_command = "/usr/local/bin/my-auth-provider"
 auth_provider_label = "Acme Corp"   # optional — customizes the TUI login button
@@ -225,16 +225,16 @@ auth_token_ttl = 3600               # optional — token lifetime in seconds (se
 
 ```bash
 # Or via environment variables
-export GROK_AUTH_PROVIDER_COMMAND="/usr/local/bin/my-auth-provider"
-export GROK_AUTH_PROVIDER_LABEL="Acme Corp"   # optional
-export GROK_AUTH_TOKEN_TTL=3600               # optional
+export FRIDAY_AUTH_PROVIDER_COMMAND="/usr/local/bin/my-auth-provider"
+export FRIDAY_AUTH_PROVIDER_LABEL="Acme Corp"   # optional
+export FRIDAY_AUTH_TOKEN_TTL=3600               # optional
 ```
 
-If your binary outputs a bare token string (not JSON with `expires_in`), set `auth_token_ttl` to the token's expected lifetime in seconds. Without it, Grok cannot detect expiry proactively and will only refresh after a 401.
+If your binary outputs a bare token string (not JSON with `expires_in`), set `auth_token_ttl` to the token's expected lifetime in seconds. Without it, Friday X cannot detect expiry proactively and will only refresh after a 401.
 
 The command runs through the platform shell — `sh -c` on macOS/Linux, `cmd /C` on Windows — so it can be a binary path, a script, or a pipeline.
 
-> **Windows:** write the path as a TOML *literal* string (single quotes) so backslashes survive: `auth_provider_command = 'C:\corp\grok-auth.exe'`. Inside a double-quoted TOML string `\t`, `\n`, `\r`, `\b` and `\f` are escape sequences, so `"C:\temp\auth.exe"` parses into a path containing a tab character and the provider fails to start — after which Grok falls back to browser login as if the setting were ignored.
+> **Windows:** write the path as a TOML *literal* string (single quotes) so backslashes survive: `auth_provider_command = 'C:\corp\grok-auth.exe'`. Inside a double-quoted TOML string `\t`, `\n`, `\r`, `\b` and `\f` are escape sequences, so `"C:\temp\auth.exe"` parses into a path containing a tab character and the provider fails to start — after which Friday X falls back to browser login as if the setting were ignored.
 
 When `auth_provider_label` is set, the TUI welcome screen shows **"Login with Acme Corp"** instead of "Login with grok.com". In headless mode (`grok -p`), the label has no effect — stderr from your binary is printed directly to the terminal.
 
@@ -268,20 +268,20 @@ echo "{\"access_token\": \"$TOKEN\", \"expires_in\": 3600}"
 
 #### Example: Auth Binary with Refresh Support
 
-Grok runs your binary on two different contracts, and `GROK_AUTH_EXPIRED` is how it tells them apart:
+Friday X runs your binary on two different contracts, and `FRIDAY_AUTH_EXPIRED` is how it tells them apart:
 
-| | `GROK_AUTH_EXPIRED=1` | unset |
+| | `FRIDAY_AUTH_EXPIRED=1` | unset |
 |---|---|---|
-| **What it is** | A headless refresh over a credential Grok already holds — near-expiry rotation, or a token the server rejected | A sign-in: `grok login`, the sign-in screen, or the escalation after a headless run couldn't mint |
+| **What it is** | A headless refresh over a credential Friday X already holds — near-expiry rotation, or a token the server rejected | A sign-in: `friday login`, the sign-in screen, or the escalation after a headless run couldn't mint |
 | **Is anyone watching?** | No. stdin is closed and nothing renders your prompts | Yes. A user is waiting, and your stderr reaches them |
-| **Budget** | A few seconds (7s), then Grok kills the process | 300s — enough for a browser round trip or a device code |
+| **Budget** | A few seconds (7s), then Friday X kills the process | 300s — enough for a browser round trip or a device code |
 | **So your binary should** | Mint silently, or **exit non-zero**. Never block | Do the full SSO flow, and always mint fresh |
 
 ```bash
 #!/bin/sh
-if [ "$GROK_AUTH_EXPIRED" = "1" ]; then
+if [ "$FRIDAY_AUTH_EXPIRED" = "1" ]; then
     # Headless: silent refresh only. If that can't work — the SSO session
-    # lapsed, say — exit non-zero rather than block. Grok then shows the
+    # lapsed, say — exit non-zero rather than block. Friday X then shows the
     # sign-in screen, which re-runs this binary with the variable unset.
     echo "Refreshing token..." >&2
     TOKEN=$(my-company-auth --refresh --silent) || exit 1
@@ -299,36 +299,36 @@ fi
 echo "{\"access_token\": \"$TOKEN\", \"expires_in\": 3600}"
 ```
 
-Exiting promptly on `GROK_AUTH_EXPIRED=1` is what makes the handover to the sign-in screen fast: a binary that blocks instead pays the whole refresh timeout on every start with an expired token.
+Exiting promptly on `FRIDAY_AUTH_EXPIRED=1` is what makes the handover to the sign-in screen fast: a binary that blocks instead pays the whole refresh timeout on every start with an expired token.
 
-One case stays ambiguous, and only in **leader mode** (`--leader`, or `[cli] use_leader = true`; off by default): with no credential at all, the leader makes one extra attempt in the background just after startup, and that run has the variable unset, like a sign-in. A binary that mints without help (service account, keytab, mounted token) succeeds there and the session heals itself. One that must prompt just sits, up to the 300s sign-in ceiling — nothing waits on it, the sign-in screen is already up, and its stderr goes to `~/.grok/leader.log` rather than to the user.
+One case stays ambiguous, and only in **leader mode** (`--leader`, or `[cli] use_leader = true`; off by default): with no credential at all, the leader makes one extra attempt in the background just after startup, and that run has the variable unset, like a sign-in. A binary that mints without help (service account, keytab, mounted token) succeeds there and the session heals itself. One that must prompt just sits, up to the 300s sign-in ceiling — nothing waits on it, the sign-in screen is already up, and its stderr goes to `~/.friday/leader.log` rather than to the user.
 
-`GROK_AUTH_EXPIRED` is optional — if your binary ignores it, Grok still works. It just runs the same flow for both login and refresh, and a flow that prompts will be killed on the headless run before it can finish.
+`FRIDAY_AUTH_EXPIRED` is optional — if your binary ignores it, Friday X still works. It just runs the same flow for both login and refresh, and a flow that prompts will be killed on the headless run before it can finish.
 
 ### Automatic Credential Refresh
 
-Grok supports automatic credential refresh for external auth providers and OIDC. When Grok detects that your token is expired (either locally based on `expires_in`, or when the server returns a 401), it automatically re-runs your `auth_provider_command` to obtain new credentials before retrying the request.
+Friday X supports automatic credential refresh for external auth providers and OIDC. When Friday X detects that your token is expired (either locally based on `expires_in`, or when the server returns a 401), it automatically re-runs your `auth_provider_command` to obtain new credentials before retrying the request.
 
-This is transparent — you don't need to do anything. Grok handles it in the background during your session.
+This is transparent — you don't need to do anything. Friday X handles it in the background during your session.
 
 **When does refresh happen?**
 
-- **Before expiry:** If your binary returned `expires_in` in its JSON output, or you set `auth_token_ttl` in config, Grok re-runs the binary ~5 minutes before the token expires, so you never see an auth error.
-- **On auth error:** If the server rejects a request with 401/403 (e.g. token was revoked or expired), Grok re-runs the binary and retries the request once.
-- **When the refresh run can't mint:** refreshes are headless (no stdin, short timeout), so a binary that needs you to complete an SSO flow cannot succeed there. Grok then stops treating the stored credential as usable and runs your binary in its interactive mode instead — at startup that is the same sign-in flow a machine with no credentials gets; mid-session the turn fails with a re-auth prompt and `/login` re-runs the binary.
-- **OIDC:** If you're using OIDC and have a `refresh_token`, Grok silently refreshes via your IdP without re-opening the browser.
+- **Before expiry:** If your binary returned `expires_in` in its JSON output, or you set `auth_token_ttl` in config, Friday X re-runs the binary ~5 minutes before the token expires, so you never see an auth error.
+- **On auth error:** If the server rejects a request with 401/403 (e.g. token was revoked or expired), Friday X re-runs the binary and retries the request once.
+- **When the refresh run can't mint:** refreshes are headless (no stdin, short timeout), so a binary that needs you to complete an SSO flow cannot succeed there. Friday X then stops treating the stored credential as usable and runs your binary in its interactive mode instead — at startup that is the same sign-in flow a machine with no credentials gets; mid-session the turn fails with a re-auth prompt and `/login` re-runs the binary.
+- **OIDC:** If you're using OIDC and have a `refresh_token`, Friday X silently refreshes via your IdP without re-opening the browser.
 
 **Tuning the refresh buffer:**
 
 ```bash
-# Grok refreshes tokens 5 minutes before expiry by default.
+# Friday X refreshes tokens 5 minutes before expiry by default.
 # Set to 0 to only refresh on 401. Set higher for very short-lived tokens.
-export GROK_AUTH_EARLY_INVALIDATION_SECS=300
+export FRIDAY_AUTH_EARLY_INVALIDATION_SECS=300
 ```
 
 **Keep in mind:**
-- When using `auth_provider_command`, you don't need to run `grok login` before starting — on first launch Grok runs your binary on the real terminal (URL and progress on stderr), then opens the UI already signed in. You _can_ run `grok login` to explicitly hydrate `auth.json` ahead of time if you prefer. Mid-session `/login` still uses the in-TUI copy-link overlay.
-- If both OIDC and `auth_provider_command` are configured: at **login** time, Grok tries OIDC silent refresh first (if a `refresh_token` exists), then the external binary, then browser-based login. During a **session**, whichever method is configured is used exclusively — if `auth_provider_command` is set it handles all mid-session refreshes; otherwise OIDC silent refresh is used.
+- When using `auth_provider_command`, you don't need to run `friday login` before starting — on first launch Friday X runs your binary on the real terminal (URL and progress on stderr), then opens the UI already signed in. You _can_ run `friday login` to explicitly hydrate `auth.json` ahead of time if you prefer. Mid-session `/login` still uses the in-TUI copy-link overlay.
+- If both OIDC and `auth_provider_command` are configured: at **login** time, Friday X tries OIDC silent refresh first (if a `refresh_token` exists), then the external binary, then browser-based login. During a **session**, whichever method is configured is used exclusively — if `auth_provider_command` is set it handles all mid-session refreshes; otherwise OIDC silent refresh is used.
 - Your binary's stderr output is displayed to the user but interactive stdin is not supported. This works well for browser-based SSO flows where the binary displays a URL and you complete authentication in the browser.
 
 #### Troubleshooting Auth
@@ -336,7 +336,7 @@ export GROK_AUTH_EARLY_INVALIDATION_SECS=300
 Enable debug logging to trace the auth flow:
 
 ```bash
-grok --debug-file /tmp/grok-auth.log -p "hello"
+friday --debug-file /tmp/grok-auth.log -p "hello"
 tail -f /tmp/grok-auth.log
 ```
 
@@ -344,19 +344,19 @@ Common log messages:
 
 | Log message | What it means |
 |-------------|---------------|
-| `auth: running external auth provider (headless refresh)` | Your binary is being called with `GROK_AUTH_EXPIRED=1` and a few seconds to work |
-| `auth: running external auth provider (interactive login)` | Your binary is being called on the sign-in contract: no `GROK_AUTH_EXPIRED`, stderr shown, 300s |
+| `auth: running external auth provider (headless refresh)` | Your binary is being called with `FRIDAY_AUTH_EXPIRED=1` and a few seconds to work |
+| `auth: running external auth provider (interactive login)` | Your binary is being called on the sign-in contract: no `FRIDAY_AUTH_EXPIRED`, stderr shown, 300s |
 | `auth: external auth provider returned fresh token` | Success — token was parsed and stored |
 | `auth: external auth provider failed` | Binary exited non-zero, or exited 0 but stdout was empty/unparseable (the `error` field has details) |
-| `auth: external auth provider timed out (likely needs interactive auth), killing` | Binary didn't exit before the 7s headless-refresh timeout and was killed. Exiting non-zero on `GROK_AUTH_EXPIRED=1` avoids this wait entirely |
+| `auth: external auth provider timed out (likely needs interactive auth), killing` | Binary didn't exit before the 7s headless-refresh timeout and was killed. Exiting non-zero on `FRIDAY_AUTH_EXPIRED=1` avoids this wait entirely |
 | `auth: failed to start external auth provider` | The command couldn't be spawned (e.g. binary not found) |
 
 ### Per-Model Auth Providers
 
-`auth_provider_command` above replaces Grok's *session* auth: it mints the token sent to xAI's backend. If you instead want xAI models on normal xAI login while **other models** route through a gateway (LiteLLM, corporate proxy) whose bearer tokens rotate, use a named auth provider — the rotating-token analogue of a per-model `api_key`/`env_key`.
+`auth_provider_command` above replaces Friday X's *session* auth: it mints the token sent to xAI's backend. If you instead want xAI models on normal xAI login while **other models** route through a gateway (LiteLLM, corporate proxy) whose bearer tokens rotate, use a named auth provider — the rotating-token analogue of a per-model `api_key`/`env_key`.
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [auth_provider.litellm]
 command = "/usr/local/bin/litellm-token"   # run via `sh -c`
 token_ttl_secs = 3600                      # optional: see below
@@ -374,12 +374,12 @@ auth_provider = "litellm"
 - Without `args`, the command runs via POSIX `sh -c`, so it can be a binary path, a script, or a pipeline. With `args = ["..."]`, the command runs directly with those arguments and no shell: `command` is a program name resolved via `PATH`, or a path. Use `args` to avoid shell quoting, and on Windows, where there is no `sh`.
 - stdout: a bare token, or JSON `{"access_token": "...", "expires_in": 3600}`.
 - stderr: logged when the command fails; exit 0 = success.
-- `GROK_AUTH_EXPIRED=1` is set whenever Grok re-mints over a token still cached in memory, whether from near-expiry rotation or a rejection. The first mint on a cold cache runs without it.
+- `FRIDAY_AUTH_EXPIRED=1` is set whenever Friday X re-mints over a token still cached in memory, whether from near-expiry rotation or a rejection. The first mint on a cold cache runs without it.
 
 **Token lifecycle:**
 
-- Tokens are cached in memory per provider and shared by every model referencing the provider; nothing is written to disk. The command is a credential helper: it owns durable storage and OAuth2 refresh (keychain, its own dotdir, etc.), exactly like `gcloud auth print-access-token` or a git credential helper. On an in-session re-mint the last credential is handed back via `GROK_AUTH_PROVIDER_ACCESS_TOKEN` (and, when present, `GROK_AUTH_PROVIDER_REFRESH_TOKEN` / `GROK_AUTH_PROVIDER_EXPIRES_AT`), so a refresh-grant command can refresh instead of re-authenticating. The command must be non-interactive and fast; do any interactive login out of band, and Grok re-runs the command on restart to re-mint.
-- Grok runs the command before a chat turn when the token is missing or within about a minute of expiring, and once more after the server rejects a token. A token rejected within 30 seconds of being fetched is not refetched again, so a broken helper surfaces one clear error instead of looping.
+- Tokens are cached in memory per provider and shared by every model referencing the provider; nothing is written to disk. The command is a credential helper: it owns durable storage and OAuth2 refresh (keychain, its own dotdir, etc.), exactly like `gcloud auth print-access-token` or a git credential helper. On an in-session re-mint the last credential is handed back via `FRIDAY_AUTH_PROVIDER_ACCESS_TOKEN` (and, when present, `FRIDAY_AUTH_PROVIDER_REFRESH_TOKEN` / `FRIDAY_AUTH_PROVIDER_EXPIRES_AT`), so a refresh-grant command can refresh instead of re-authenticating. The command must be non-interactive and fast; do any interactive login out of band, and Friday X re-runs the command on restart to re-mint.
+- Friday X runs the command before a chat turn when the token is missing or within about a minute of expiring, and once more after the server rejects a token. A token rejected within 30 seconds of being fetched is not refetched again, so a broken helper surfaces one clear error instead of looping.
 - Token lifetime comes from `expires_in` in the command's JSON output, else `token_ttl_secs`, else the token's own JWT expiry claim. With none of these, tokens are only replaced after the server rejects one.
 - Commands run with a `timeout_secs` bound (default 30, clamped to 1..=600) and are killed on timeout. A turn waits on the run, so keep helpers fast and non-interactive.
 - Active sessions pick up edits or removal of a provider table at the next model switch or new session. Once picked up, an edit invalidates the cached token, so the edited command runs at the next use; removal drops the cached token.
@@ -387,18 +387,18 @@ auth_provider = "litellm"
 
 **Interaction with other credentials:** a literal `api_key`/`env_key` on the model wins over its `auth_provider`. Provider-backed models are BYOK: your xAI session token is never sent to their endpoints, and a failing provider command fails the request rather than falling back to the session token.
 
-**Security:** provider commands execute code, so they are honored only from trusted config layers (`~/.grok/config.toml`, managed config, requirements). A project's `.grok/config.toml` can never define one. Whatever layer sets a model's `base_url` decides where that model's minted token is sent, and `base_url` (unlike the provider table) is not stripped from remote or campaign patches, the same as for a static `env_key`. Keep provider tables and the model `base_url` in layers you trust. The command inherits Grok's environment (so it sees `PATH`, `HOME`, and any other secrets there), but Grok's own first-party credentials (`XAI_API_KEY`, `GROK_DEPLOYMENT_KEY`, and related keys) are removed so a BYOK helper never receives them; write helpers that read only what they need, and prefer the `GROK_AUTH_PROVIDER_*` handback for the prior credential.
+**Security:** provider commands execute code, so they are honored only from trusted config layers (`~/.friday/config.toml`, managed config, requirements). A project's `.friday/config.toml` can never define one. Whatever layer sets a model's `base_url` decides where that model's minted token is sent, and `base_url` (unlike the provider table) is not stripped from remote or campaign patches, the same as for a static `env_key`. Keep provider tables and the model `base_url` in layers you trust. The command inherits Friday X's environment (so it sees `PATH`, `HOME`, and any other secrets there), but Friday X's own first-party credentials (`FRIDAY_X_TOKEN`, `FRIDAY_DEPLOYMENT_KEY`, and related keys) are removed so a BYOK helper never receives them; write helpers that read only what they need, and prefer the `FRIDAY_AUTH_PROVIDER_*` handback for the prior credential.
 
 ### Using auth.json for API Access
 
-If you've authenticated with `grok login`, you can use the stored credentials to call the CLI chat proxy directly via curl. The proxy requires specific headers that mirror what the grok CLI sends internally:
+If you've authenticated with `friday login`, you can use the stored credentials to call the CLI chat proxy directly via curl. The proxy requires specific headers that mirror what the grok CLI sends internally:
 
 ```bash
 curl -s -N -X POST "https://cli-chat-proxy.grok.com/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(jq -r '."https://accounts.x.ai/sign-in".key' ~/.grok/auth.json)" \
-  -H "X-XAI-Token-Auth: xai-grok-cli" \
-  -H "x-grok-model-override: grok-build" \
+  -H "Authorization: Bearer $(jq -r '."https://accounts.x.ai/sign-in".key' ~/.friday/auth.json)" \
+  -H "X-Friday-Token-Auth: friday-x-cli" \
+  -H "x-friday-model-override: grok-build" \
   -d '{
     "model": "grok-build",
     "messages": [{"role": "user", "content": "Hello!"}],
@@ -410,9 +410,9 @@ curl -s -N -X POST "https://cli-chat-proxy.grok.com/v1/chat/completions" \
 
 | Header                           | Required | Purpose                                                                                                                                                                                   |
 | -------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Authorization: Bearer <token>`  | Yes      | Session token from `~/.grok/auth.json` (set by `grok login`)                                                                                                                              |
-| `X-XAI-Token-Auth: xai-grok-cli` | Yes      | Tells the auth middleware to validate as a CLI session token                                                                                                                              |
-| `x-grok-model-override: <model>` | Yes\*    | The proxy uses this header (not the JSON body) to route to the correct backend. \*Can be omitted for `grok-build` which is on the default route, but always safe to include. |
+| `Authorization: Bearer <token>`  | Yes      | Session token from `~/.friday/auth.json` (set by `friday login`)                                                                                                                              |
+| `X-Friday-Token-Auth: friday-x-cli` | Yes      | Tells the auth middleware to validate as a CLI session token                                                                                                                              |
+| `x-friday-model-override: <model>` | Yes\*    | The proxy uses this header (not the JSON body) to route to the correct backend. \*Can be omitted for `grok-build` which is on the default route, but always safe to include. |
 
 **Streaming vs non-streaming:**
 
@@ -422,7 +422,7 @@ Most models behind the proxy only support streaming. Always use `"stream": true`
 | --------------------- | -------------- | ------------ |
 | `grok-build`    | ✅ Supported   | ✅ Supported |
 
-> **Note:** `auth.json` tokens expire after 7 days. Run `grok login` to refresh.
+> **Note:** `auth.json` tokens expire after 7 days. Run `friday login` to refresh.
 
 ---
 
@@ -457,16 +457,16 @@ grok [OPTIONS]
 
 ```bash
 # Start in a specific project
-grok --cwd ~/projects/my-app
+friday --cwd ~/projects/my-app
 
 # Start with an initial task
-grok --prompt "Review this codebase and suggest improvements"
+friday --prompt "Review this codebase and suggest improvements"
 
 # Add project-specific rules
-grok --rules "Always use TypeScript. Prefer functional components."
+friday --rules "Always use TypeScript. Prefer functional components."
 
 # Auto-approve mode for trusted tasks
-grok --always-approve --prompt "Format all files"
+friday --always-approve --prompt "Format all files"
 ```
 
 ### Keyboard Shortcuts
@@ -552,7 +552,7 @@ The `!` modifier allows you to attach any file in the project regardless of igno
 
 ## Headless Mode
 
-Run Grok non-interactively from the command line. Use headless mode when you need to:
+Run Friday X non-interactively from the command line. Use headless mode when you need to:
 
 - **Automate tasks** — CI/CD pipelines, pre-commit hooks, cron jobs
 - **Script workflows** — Batch process files, chain with other tools
@@ -669,7 +669,7 @@ grok -p "Refactor the code" --deny "Edit(/etc/**)"
 grok -p "Build the project" --allow "Bash"
 
 # Combine: allow fetching docs sites, deny other URLs
-grok --allow "WebFetch(domain:docs.rs)" --deny "WebFetch(*)"
+friday --allow "WebFetch(domain:docs.rs)" --deny "WebFetch(*)"
 ```
 
 `--allow` and `--deny` can be repeated to add multiple rules. Deny rules take precedence over allow rules. These flags work in both TUI and headless mode.
@@ -778,14 +778,14 @@ grok -p "Review staged changes for obvious bugs. Reply OK if fine, or list issue
 
 ## Agent Mode
 
-Run Grok as an ACP (Agent Client Protocol) agent for integration with IDEs, editors, and custom tooling.
+Run Friday X as an ACP (Agent Client Protocol) agent for integration with IDEs, editors, and custom tooling.
 
 ### stdio Transport
 
 For direct integration with ACP clients:
 
 ```bash
-grok agent stdio
+friday agent stdio
 ```
 
 Communication happens via JSON-RPC over stdin/stdout. This mode is used by:
@@ -808,7 +808,7 @@ Communication happens via JSON-RPC over stdin/stdout. This mode is used by:
 To expose the agent over the internet (instead of local network), run a WebSocket relay server and have the agent connect to it:
 
 ```bash
-grok agent headless --grok-ws-url wss://your-relay.example.com/ws
+friday agent headless --grok-ws-url wss://your-relay.example.com/ws
 ```
 
 The agent connects OUT to your relay, and your web clients connect to the same relay. Useful for building web UIs where browsers can't spawn local processes.
@@ -839,9 +839,9 @@ This runs entirely locally.
 
 ---
 
-## Building with Grok
+## Building with Friday X
 
-Grok can be used as an OpenAI-compatible chat completion backend. Choose between two integration modes:
+Friday X can be used as an OpenAI-compatible chat completion backend. Choose between two integration modes:
 
 | Mode         | Use Case                                                           |
 | ------------ | ------------------------------------------------------------------ |
@@ -1276,7 +1276,7 @@ for await (const chunk of await client.create(
 
 ### ACP Protocol Reference
 
-Grok implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.com), a standard for AI agent communication.
+Friday X implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.com), a standard for AI agent communication.
 
 #### Architecture
 
@@ -1287,7 +1287,7 @@ Grok implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.co
 └──────────────────┬──────────────────────┘
                    │ JSON-RPC over stdio
 ┌──────────────────▼──────────────────────┐
-│           grok agent stdio              │
+│           friday agent stdio              │
 │                                         │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
 │  │ Session │  │  Tools  │  │   MCP   │  │
@@ -1325,7 +1325,7 @@ Grok implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.co
 
 ## Configuration
 
-Grok reads configuration from `~/.grok/config.toml`. If the file doesn't exist, Grok uses sensible defaults. You only need to specify values you want to override.
+Friday X reads configuration from `~/.friday/config.toml`. If the file doesn't exist, Friday X uses sensible defaults. You only need to specify values you want to override.
 
 Each feature section below documents its own config. This section covers the general-purpose settings that don't have their own top-level section.
 
@@ -1344,8 +1344,8 @@ max_thoughts_width = 120               # max column width for reasoning display
 
 [features]
 support_permission = false             # prompt before tool execution
-telemetry = false                      # anonymous usage telemetry (env: GROK_TELEMETRY_ENABLED)
-feedback = false                       # feedback system (env: GROK_FEEDBACK_ENABLED)
+telemetry = false                      # anonymous usage telemetry (env: FRIDAY_TELEMETRY_ENABLED)
+feedback = false                       # feedback system (env: FRIDAY_FEEDBACK_ENABLED)
 lsp_tools = false                      # expose the lsp tool (see LSP Servers below)
 codebase_indexing = true               # code graph indexing (true, false, or glob patterns)
 
@@ -1354,7 +1354,7 @@ auto_compact_threshold_percent = 85    # auto-compact at this % of context windo
 load_envrc = true                      # load .envrc environment variables into bash commands
 
 [tools]
-respect_gitignore = true               # filter gitignored files from tools (env: GROK_RESPECT_GITIGNORE)
+respect_gitignore = true               # filter gitignored files from tools (env: FRIDAY_RESPECT_GITIGNORE)
 
 [toolset.bash]
 timeout_secs = 120.0                   # command timeout in seconds
@@ -1371,32 +1371,32 @@ Configure telemetry destinations and credentials. Empty values disable the corre
 
 ```toml
 [telemetry]
-events_url = "https://example.com/events"  # env: GROK_TELEMETRY_EVENTS_URL
-events_api_key = "..."                      # env: GROK_TELEMETRY_EVENTS_API_KEY
-mixpanel_token = "..."                      # env: GROK_TELEMETRY_MIXPANEL_TOKEN
-mixpanel_enabled = true                     # env: GROK_TELEMETRY_MIXPANEL_ENABLED
-trace_upload = true                         # env: GROK_TELEMETRY_TRACE_UPLOAD
+events_url = "https://example.com/events"  # env: FRIDAY_TELEMETRY_EVENTS_URL
+events_api_key = "..."                      # env: FRIDAY_TELEMETRY_EVENTS_API_KEY
+mixpanel_token = "..."                      # env: FRIDAY_TELEMETRY_MIXPANEL_TOKEN
+mixpanel_enabled = true                     # env: FRIDAY_TELEMETRY_MIXPANEL_ENABLED
+trace_upload = true                         # env: FRIDAY_TELEMETRY_TRACE_UPLOAD
 ```
 
-When building from source, defaults can also be baked into the binary at compile time by setting `GROK_TELEMETRY_BUILD_EVENTS_URL`, `GROK_TELEMETRY_BUILD_EVENTS_API_KEY`, and `GROK_TELEMETRY_BUILD_MIXPANEL_TOKEN` in the build environment (providing a Mixpanel token this way also enables Mixpanel by default). Config-file and runtime env values override build-time defaults.
+When building from source, defaults can also be baked into the binary at compile time by setting `FRIDAY_TELEMETRY_BUILD_EVENTS_URL`, `FRIDAY_TELEMETRY_BUILD_EVENTS_API_KEY`, and `FRIDAY_TELEMETRY_BUILD_MIXPANEL_TOKEN` in the build environment (providing a Mixpanel token this way also enables Mixpanel by default). Config-file and runtime env values override build-time defaults.
 
 ### LSP Servers
 
-Grok can connect to Language Server Protocol (LSP) servers configured in JSON files. LSP integration gives Grok language-aware code intelligence while it works in your repository.
+Friday X can connect to Language Server Protocol (LSP) servers configured in JSON files. LSP integration gives Friday X language-aware code intelligence while it works in your repository.
 
 LSP support is used in two ways:
 
-- **Passive diagnostics** — after edits, Grok can surface language-server diagnostics such as errors and warnings.
-- **The `lsp` tool** — Grok can actively query the language server for `goToDefinition`, `findReferences`, `hover`, `goToImplementation`, `documentSymbol`, and `workspaceSymbol`.
+- **Passive diagnostics** — after edits, Friday X can surface language-server diagnostics such as errors and warnings.
+- **The `lsp` tool** — Friday X can actively query the language server for `goToDefinition`, `findReferences`, `hover`, `goToImplementation`, `documentSymbol`, and `workspaceSymbol`.
 
 Reference: [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
 
 #### Config locations
 
-Grok looks for server definitions in:
+Friday X looks for server definitions in:
 
-- project config: `<repo>/.grok/lsp.json`
-- user config: `~/.grok/lsp.json`
+- project config: `<repo>/.friday/lsp.json`
+- user config: `~/.friday/lsp.json`
 
 If the same server name appears in both places, the project config wins.
 
@@ -1404,13 +1404,13 @@ If the same server name appears in both places, the project config wins.
 
 Having an `lsp.json` file is enough for passive diagnostics. The model-visible `lsp` tool is exposed when both of these are true:
 
-- LSP tools are enabled (`GROK_LSP_TOOLS=1` or `[features] lsp_tools = true`)
+- LSP tools are enabled (`FRIDAY_LSP_TOOLS=1` or `[features] lsp_tools = true`)
 - the merged LSP configuration is non-empty
 
 Enable the tool for one run:
 
 ```bash
-GROK_LSP_TOOLS=1 grok
+FRIDAY_LSP_TOOLS=1 grok
 ```
 
 Or enable it in config:
@@ -1420,7 +1420,7 @@ Or enable it in config:
 lsp_tools = true
 ```
 
-If LSP tools are enabled but no usable server config is found, Grok emits a non-fatal warning in logs and continues without the `lsp` tool. If config exists but every server fails to start, the tool may still be present and will fail on first use with a startup error.
+If LSP tools are enabled but no usable server config is found, Friday X emits a non-fatal warning in logs and continues without the `lsp` tool. If config exists but every server fails to start, the tool may still be present and will fail on first use with a startup error.
 
 #### Example `lsp.json`
 
@@ -1497,7 +1497,7 @@ verbose than `Warning` makes it stream every internal log line to the client.
 
 #### Installing language servers
 
-Grok does not bundle language server binaries. You must install the server yourself and make sure the configured `command` is runnable on your machine.
+Friday X does not bundle language server binaries. You must install the server yourself and make sure the configured `command` is runnable on your machine.
 
 Examples:
 
@@ -1509,7 +1509,7 @@ Examples:
 
 #### Notes
 
-- Passive diagnostics do **not** require `GROK_LSP_TOOLS=1`; they run whenever an applicable server is configured and starts successfully.
+- Passive diagnostics do **not** require `FRIDAY_LSP_TOOLS=1`; they run whenever an applicable server is configured and starts successfully.
 - Passive diagnostics are currently driven by `search_replace` edits; they are not a general watcher for arbitrary shell or git mutations in the workspace.
 - The `lsp` tool is intentionally hidden when disabled or unconfigured so the model does not plan around unavailable capabilities.
 - Same-workspace subagents reuse the parent session's live LSP runtime instead of starting a duplicate server pool.
@@ -1534,7 +1534,7 @@ default = "company-grok"
 [model.company-grok]
 model = "grok-build"
 base_url = "https://grok-proxy.acme.com/"
-name = "Grok Build Latest (Proxy)"
+name = "Friday X Latest (Proxy)"
 context_window = 256000
 
 [features]
@@ -1545,21 +1545,21 @@ telemetry = false
 timeout_secs = 120.0
 ```
 
-With this config, `grok` runs your auth binary, stores the token, and routes inference through your corporate proxy. See [Authentication](#authentication) for full auth setup details.
+With this config, `friday` runs your auth binary, stores the token, and routes inference through your corporate proxy. See [Authentication](#authentication) for full auth setup details.
 
 ---
 
 ## AGENTS.md
 
-Add project-specific instructions by creating an agent rules file (e.g., `AGENTS.md`). Grok reads these files and appends their contents to the system prompt.
+Add project-specific instructions by creating an agent rules file (e.g., `AGENTS.md`). Friday X reads these files and appends their contents to the system prompt.
 
-Grok scans for agent rules in this order:
+Friday X scans for agent rules in this order:
 
-1. `~/.grok/` (global rules)
+1. `~/.friday/` (global rules)
 2. If inside a git repo: every directory from the repo root → current working directory (inclusive)
 3. If **not** inside a git repo: only the current working directory
 
-Within each directory, Grok checks for these filenames:
+Within each directory, Friday X checks for these filenames:
 
 - `Agents.md`, `Claude.md`, `AGENT.md`, `AGENTS.md`
 
@@ -1571,22 +1571,22 @@ Ordering matters: files found later (deeper directories) come last, so they effe
 
 ## Skills
 
-Skills are reusable prompt packages that extend Grok with specialized workflows, domain knowledge, and tool integrations. Use them to encode repeatable procedures that would otherwise require re-explaining each session.
+Skills are reusable prompt packages that extend Friday X with specialized workflows, domain knowledge, and tool integrations. Use them to encode repeatable procedures that would otherwise require re-explaining each session.
 
 ### Skill Locations
 
-Grok discovers skills from these directories (in priority order):
+Friday X discovers skills from these directories (in priority order):
 
 | Location                    | Scope | Priority |
 | --------------------------- | ----- | -------- |
-| `./.grok/skills/`           | Local | Highest  |
-| `<repo_root>/.grok/skills/` | Repo  | Medium   |
-| `~/.grok/skills/`           | User  | Lowest   |
+| `./.friday/skills/`           | Local | Highest  |
+| `<repo_root>/.friday/skills/` | Repo  | Medium   |
+| `~/.friday/skills/`           | User  | Lowest   |
 | `~/.claude/skills/`         | User  | Lowest   |
 
 Skills with the same name are deduplicated — higher priority locations override lower ones.
 
-Repo-scoped skills (Local and Repo) respect `.gitignore` and are filtered out if ignored. User-scoped skills (`~/.grok/skills/`) are outside the repo and never filtered.
+Repo-scoped skills (Local and Repo) respect `.gitignore` and are filtered out if ignored. User-scoped skills (`~/.friday/skills/`) are outside the repo and never filtered.
 
 ### Configuration
 
@@ -1603,7 +1603,7 @@ ignore = ["~/my-team-skills/wip"]     # paths to exclude
 Each skill lives in its own directory with a `SKILL.md` file:
 
 ```
-~/.grok/skills/
+~/.friday/skills/
 └── commit/
     └── SKILL.md
 ```
@@ -1633,7 +1633,7 @@ Review staged changes and create a commit with a clear, conventional message.
 | Field         | Description                                                                  |
 | ------------- | ---------------------------------------------------------------------------- |
 | `name`        | Skill identifier (lowercase, hyphens, max 64 chars)                          |
-| `description` | What the skill does and when to use it—this is how Grok decides to invoke it |
+| `description` | What the skill does and when to use it—this is how Friday X decides to invoke it |
 
 ### Using Skills
 
@@ -1648,9 +1648,9 @@ Review staged changes and create a commit with a clear, conventional message.
 
 **Slash command shorthand:**
 
-Users can reference skills as `/skill-name` (e.g., `/commit`). When you see this pattern, Grok invokes the corresponding skill.
+Users can reference skills as `/skill-name` (e.g., `/commit`). When you see this pattern, Friday X invokes the corresponding skill.
 
-> **Tip:** The `description` field is critical — it determines when Grok automatically invokes the skill. Be specific about trigger phrases and use cases.
+> **Tip:** The `description` field is critical — it determines when Friday X automatically invokes the skill. Be specific about trigger phrases and use cases.
 
 ---
 
@@ -1658,24 +1658,24 @@ Users can reference skills as `/skill-name` (e.g., `/commit`). When you see this
 
 Agent profiles control the system prompt, toolset, and behavior of a session. A profile is a `.md` file with YAML frontmatter, or a named agent discovered from disk.
 
-Grok discovers agent definitions from `.grok/agents/` (project), `~/.grok/agents/` (user), and built-in agents. Priority (highest wins):
+Friday X discovers agent definitions from `.friday/agents/` (project), `~/.friday/agents/` (user), and built-in agents. Priority (highest wins):
 
 1. `--agent-profile <PATH>` CLI flag
 2. `[agent]` section in `config.toml`
-3. `GROK_AGENT` env var
+3. `FRIDAY_AGENT` env var
 4. Default `grok-build` agent
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [agent]
 name = "my-custom-agent"             # Discovered by name
 # definition = "/path/to/agent.md"   # OR: explicit path
 ```
 
 ```bash
-grok --agent-profile ./my-agent.md
+friday --agent-profile ./my-agent.md
 # or
-export GROK_AGENT="my-custom-agent"
+export FRIDAY_AGENT="my-custom-agent"
 ```
 
 ---
@@ -1687,11 +1687,11 @@ Subagents spawn independent child sessions that handle tasks in parallel. Each c
 ### Disabling
 
 ```bash
-export GROK_SUBAGENTS=0              # Environment variable
+export FRIDAY_SUBAGENTS=0              # Environment variable
 ```
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [subagents]
 enabled = false
 ```
@@ -1723,33 +1723,33 @@ Roles define reusable capability/model defaults. Personas layer tone and behavio
 description = "Deep research agent"
 default_capability_mode = "read-only"
 model = "grok-build"
-prompt_file = ".grok/prompts/researcher.md"
+prompt_file = ".friday/prompts/researcher.md"
 
 [subagents.personas.concise]
 instructions = "Be extremely concise. No filler words."
-# instructions_file = ".grok/personas/concise.md"  # or load from file
+# instructions_file = ".friday/personas/concise.md"  # or load from file
 ```
 
-Both are also discovered from `.grok/roles/*.toml` and `.grok/personas/*.toml` files respectively. If a requested persona is not found, the spawn fails (fail-closed).
+Both are also discovered from `.friday/roles/*.toml` and `.friday/personas/*.toml` files respectively. If a requested persona is not found, the spawn fails (fail-closed).
 
 ---
 
 ## Plugins
 
-Plugins extend Grok with additional tools, skills, and MCP servers from external packages.
+Plugins extend Friday X with additional tools, skills, and MCP servers from external packages.
 
 ### Plugin Locations
 
 | Location                    | Scope   |
 | --------------------------- | ------- |
-| `.grok/plugins/`            | Project |
-| `~/.grok/plugins/`          | User    |
+| `.friday/plugins/`            | Project |
+| `~/.friday/plugins/`          | User    |
 | `--plugin-dir <PATH>` (CLI) | Session |
 
 ### Configuration
 
 ```toml
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [plugins]
 paths = ["~/my-plugins/custom-tools"]       # additional plugin directories
 disabled = ["user/a1b2c3d4/noisy-plugin"]   # plugin IDs to skip
@@ -1763,7 +1763,7 @@ Manage plugins at runtime with `/plugins list`, `/plugins reload`, or `/plugins 
 
 Hooks run project scripts on tool and session lifecycle events (pre/post-tool-use, session start/end). Projects must be explicitly trusted before their hooks execute.
 
-Grok discovers hooks from `.grok/hooks/` in the project directory. Manage them with:
+Friday X discovers hooks from `.friday/hooks/` in the project directory. Manage them with:
 
 ```
 /hooks-list              # show hooks loaded in this session
@@ -1797,10 +1797,10 @@ Hooks from two kinds of layer are enforced: they cannot be disabled from the
 hooks modal, the enable/disable APIs, or the `disabled-hooks` file, and a
 byte-identical copy in a lower layer cannot take over their provenance.
 
-- The **root-owned** system layers (`/etc/grok/requirements.toml`,
-  `/etc/grok/managed_config.toml`). Enforcement relies on OS file ownership, so
+- The **root-owned** system layers (`/etc/friday/requirements.toml`,
+  `/etc/friday/managed_config.toml`). Enforcement relies on OS file ownership, so
   deploy these files root-owned (or via MDM).
-- The **signed** `$GROK_HOME/requirements.toml` the deployment sync writes.
+- The **signed** `$FRIDAY_HOME/requirements.toml` the deployment sync writes.
   Its hooks are enforced while the file's bytes match the server-signed
   envelope (`requirements/signed:` names); an edited copy, or one whose
   signature file is missing or unreadable, is the user's own file again
@@ -1809,7 +1809,7 @@ byte-identical copy in a lower layer cannot take over their provenance.
   refuses the session on an edited copy or a missing signature (an unreadable
   file is a read error, not tampering, and still starts).
 
-Hooks in the other `$GROK_HOME` layers (`managed_config.toml`, `config.toml`)
+Hooks in the other `$FRIDAY_HOME` layers (`managed_config.toml`, `config.toml`)
 remain convenience distribution, not an enforcement boundary: the user owns
 that directory and can edit or repoint it.
 
@@ -1844,9 +1844,9 @@ max_completion_tokens = 8192          # Max tokens per response
 context_window = 256000               # Total context window in tokens (for auto-compact)
 ```
 
-**Credential resolution order:** `api_key` → `env_key` → cached `auth_provider` token (terminal: a cache miss resolves to no credential, never the session token) → session token → `XAI_API_KEY`. See [Per-Model Auth Providers](#per-model-auth-providers).
+**Credential resolution order:** `api_key` → `env_key` → cached `auth_provider` token (terminal: a cache miss resolves to no credential, never the session token) → session token → `FRIDAY_X_TOKEN`. See [Per-Model Auth Providers](#per-model-auth-providers).
 
-The `context_window` parameter is used to calculate when auto-compact should trigger. If not specified, Grok falls back to built-in defaults for known models. To offer a choice of windows, set `context_windows = [256000, 500000]`. `context_window` stays the default (the first listed window when unset), and older clients ignore the list.
+The `context_window` parameter is used to calculate when auto-compact should trigger. If not specified, Friday X falls back to built-in defaults for known models. To offer a choice of windows, set `context_windows = [256000, 500000]`. `context_window` stays the default (the first listed window when unset), and older clients ignore the list.
 
 ### Overriding Built-in Models
 
@@ -1863,25 +1863,25 @@ temperature = 0.5
 api_key = "sk-custom"
 ```
 
-**How it works:** When you override a built-in model, Grok starts with the default configuration (including the correct `base_url` from your `[endpoints]` setting), then applies only the fields you specify. Unspecified fields inherit from the default.
+**How it works:** When you override a built-in model, Friday X starts with the default configuration (including the correct `base_url` from your `[endpoints]` setting), then applies only the fields you specify. Unspecified fields inherit from the default.
 
 **Priority order:**
 1. Your config (`[model.*]`) — highest priority
 2. Prefetched models from remote `/v1/models`
 3. Hardcoded defaults — lowest priority
 
-**Web search model:** Set `[models] web_search`, `GROK_WEB_SEARCH_MODEL`, or `--web-search-model` to point the `web_search` tool at a different model. The target endpoint must support the Responses API and web search.
+**Web search model:** Set `[models] web_search`, `FRIDAY_WEB_SEARCH_MODEL`, or `--web-search-model` to point the `web_search` tool at a different model. The target endpoint must support the Responses API and web search.
 
 > **Overriding with a custom model:** Setting `[models] web_search` alone is not
 > enough if the model isn't already in the catalog (built-in defaults or
-> `grok models` output). You also need a `[model.*]` entry so Grok knows
+> `friday models` output). You also need a `[model.*]` entry so Friday X knows
 > how to reach it. Without both, web search is silently disabled.
 >
 > ```toml
 > [models]
 > web_search = "my-custom-model"       # 1. tell web search which model to use
 >
-> [model.my-custom-model]              # 2. tell Grok how to reach it
+> [model.my-custom-model]              # 2. tell Friday X how to reach it
 > model = "my-custom-model"
 > api_backend = "responses"            # required — web search uses the Responses API
 > # base_url, api_key, env_key optional — defaults to cli-chat-proxy
@@ -1932,7 +1932,7 @@ env_key = "OPENAI_API_KEY"
 
 ```bash
 # List available models (including custom)
-grok models
+friday models
 
 # Use in TUI via slash command
 /model my-model
@@ -1948,29 +1948,29 @@ default = "my-model"
 
 ### Custom Models Endpoint
 
-Point Grok at a custom OpenAI-compatible `/v1/models` endpoint instead of the default cli-chat-proxy. Useful when models are served behind a corporate gateway or self-hosted inference stack.
+Point Friday X at a custom OpenAI-compatible `/v1/models` endpoint instead of the default cli-chat-proxy. Useful when models are served behind a corporate gateway or self-hosted inference stack.
 
 **Environment variables:**
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GROK_MODELS_BASE_URL` | Yes | Base URL for inference / chat completions (e.g. `https://api.acme.com/v1`). The model list is fetched from `{base_url}/models` automatically |
-| `XAI_API_KEY` | Yes | API key sent as `Authorization: Bearer` to the custom endpoint |
-| `GROK_MODELS_LIST_URL` | No | Override the model list URL if it differs from `{base_url}/models` |
+| `FRIDAY_MODELS_BASE_URL` | Yes | Base URL for inference / chat completions (e.g. `https://api.acme.com/v1`). The model list is fetched from `{base_url}/models` automatically |
+| `FRIDAY_X_TOKEN` | Yes | API key sent as `Authorization: Bearer` to the custom endpoint |
+| `FRIDAY_MODELS_LIST_URL` | No | Override the model list URL if it differs from `{base_url}/models` |
 
 **Setup:**
 
 ```bash
-export GROK_MODELS_BASE_URL="https://api.acme.com/v1"
-export XAI_API_KEY="xai-..."
+export FRIDAY_MODELS_BASE_URL="https://api.acme.com/v1"
+export FRIDAY_X_TOKEN="xai-..."
 grok
 ```
 
-Grok fetches the model list from `{GROK_MODELS_BASE_URL}/models` on startup and sends inference requests to `GROK_MODELS_BASE_URL`. This follows the standard OpenAI-compatible convention used by OpenAI, Anthropic, OpenRouter, Groq, Together.ai, and others.
+Friday X fetches the model list from `{FRIDAY_MODELS_BASE_URL}/models` on startup and sends inference requests to `FRIDAY_MODELS_BASE_URL`. This follows the standard OpenAI-compatible convention used by OpenAI, Anthropic, OpenRouter, Groq, Together.ai, and others.
 
-If your model list endpoint differs from `{base_url}/models`, set `GROK_MODELS_LIST_URL` explicitly.
+If your model list endpoint differs from `{base_url}/models`, set `FRIDAY_MODELS_LIST_URL` explicitly.
 
-**Combining with `[endpoints]` config:** You can also set endpoints in `~/.grok/config.toml`:
+**Combining with `[endpoints]` config:** You can also set endpoints in `~/.friday/config.toml`:
 
 ```toml
 [endpoints]
@@ -1981,19 +1981,19 @@ models_base_url = "https://api.acme.com/v1"
 api_key = "my-api-key"
 ```
 
-Each `[model.*]` section inherits `base_url` from the `[endpoints]` config. `XAI_API_KEY` is still required. A per-model `api_key`/`env_key` authenticates that model's inference requests. The startup model-list fetch still uses `XAI_API_KEY`.
+Each `[model.*]` section inherits `base_url` from the `[endpoints]` config. `FRIDAY_X_TOKEN` is still required. A per-model `api_key`/`env_key` authenticates that model's inference requests. The startup model-list fetch still uses `FRIDAY_X_TOKEN`.
 
-**Auth behavior:** When `models_base_url` is set, Grok authenticates the model-list request with `XAI_API_KEY` (`Authorization: Bearer`). That request never uses your `grok login` session. With an external auth provider (`auth_provider_command`) and no `XAI_API_KEY`, it sends the provider's token instead. Otherwise, if `XAI_API_KEY` is unset, the fetch fails with an error asking you to set it. Inference requests to the custom host authenticate with each model's `api_key`/`env_key`.
+**Auth behavior:** When `models_base_url` is set, Friday X authenticates the model-list request with `FRIDAY_X_TOKEN` (`Authorization: Bearer`). That request never uses your `friday login` session. With an external auth provider (`auth_provider_command`) and no `FRIDAY_X_TOKEN`, it sends the provider's token instead. Otherwise, if `FRIDAY_X_TOKEN` is unset, the fetch fails with an error asking you to set it. Inference requests to the custom host authenticate with each model's `api_key`/`env_key`.
 
 ---
 
 ## MCP Servers
 
-Extend Grok's capabilities with [Model Context Protocol](https://modelcontextprotocol.io) servers.
+Extend Friday X's capabilities with [Model Context Protocol](https://modelcontextprotocol.io) servers.
 
 ### Configuration
 
-MCP servers are configured in `~/.grok/config.toml`:
+MCP servers are configured in `~/.friday/config.toml`:
 
 ```toml
 [mcp_servers.<name>]
@@ -2009,36 +2009,36 @@ tool_timeouts = { create_issue = 120, search = 30 }  # Per-tool timeout override
 
 ### Project-Scoped MCP Servers
 
-MCP servers can also be configured per-project in `.grok/config.toml`. Grok walks from the current directory up to the git repo root, loading `.grok/config.toml` at each level:
+MCP servers can also be configured per-project in `.friday/config.toml`. Friday X walks from the current directory up to the git repo root, loading `.friday/config.toml` at each level:
 
 | Location                        | Scope             | Priority |
 | ------------------------------- | ----------------- | -------- |
-| `~/.grok/config.toml`           | All projects      | Lowest   |
-| `<repo-root>/.grok/config.toml` | This repository   | ↑        |
-| `<cwd>/.grok/config.toml`       | Current directory | Highest  |
+| `~/.friday/config.toml`           | All projects      | Lowest   |
+| `<repo-root>/.friday/config.toml` | This repository   | ↑        |
+| `<cwd>/.friday/config.toml`       | Current directory | Highest  |
 
 If a project defines a server with the same name as a global one, the project version **replaces** it entirely (fields are not merged — omitted fields get defaults, not the global values). Servers defined only in the global config are unaffected.
 
-**Example:** commit a `.grok/config.toml` in your repo to share MCP servers across the team:
+**Example:** commit a `.friday/config.toml` in your repo to share MCP servers across the team:
 
 ```
 my-project/
-├── .grok/
+├── .friday/
 │   └── config.toml
 ├── src/
 └── ...
 ```
 
 ```toml
-# .grok/config.toml
+# .friday/config.toml
 [mcp_servers.linear]
 command = "npx"
 args = ["-y", "mcp-remote", "https://mcp.linear.app/mcp"]
 ```
 
-If you also have a `linear` server in `~/.grok/config.toml`, the project version replaces it entirely.
+If you also have a `linear` server in `~/.friday/config.toml`, the project version replaces it entirely.
 
-> **Note:** Only `[mcp_servers]` is supported in project-scoped `.grok/config.toml`. Other config sections (models, etc.) are only read from `~/.grok/config.toml`.
+> **Note:** Only `[mcp_servers]` is supported in project-scoped `.friday/config.toml`. Other config sections (models, etc.) are only read from `~/.friday/config.toml`.
 
 ### Tool Naming
 
@@ -2106,16 +2106,16 @@ See the [MCP Server Registry](https://github.com/modelcontextprotocol/servers) f
 
 ## Memory
 
-> **Experimental:** enable with `GROK_MEMORY=1`, `[memory] enabled = true`, or managed remote settings.
+> **Experimental:** enable with `FRIDAY_MEMORY=1`, `[memory] enabled = true`, or managed remote settings.
 
-Cross-session memory lets Grok remember facts, decisions, code patterns, and debugging workflows across separate sessions in the same project.
+Cross-session memory lets Friday X remember facts, decisions, code patterns, and debugging workflows across separate sessions in the same project.
 
 ### How it works
 
-Memory is stored as Markdown files under `~/.grok/memory/`:
-- **Global** (`~/.grok/memory/MEMORY.md`) — facts that apply across all your projects
-- **Workspace** (`~/.grok/memory/<project-slug>-<hash8>/MEMORY.md`) — project-specific conventions and context
-- **Session logs** (`~/.grok/memory/<project-slug>-<hash8>/sessions/`) — per-session summaries
+Memory is stored as Markdown files under `~/.friday/memory/`:
+- **Global** (`~/.friday/memory/MEMORY.md`) — facts that apply across all your projects
+- **Workspace** (`~/.friday/memory/<project-slug>-<hash8>/MEMORY.md`) — project-specific conventions and context
+- **Session logs** (`~/.friday/memory/<project-slug>-<hash8>/sessions/`) — per-session summaries
 
 Workspace directories are suffixed with a short hash for uniqueness (e.g. `xai-a3f7b2c9/`). The hash is derived from the git remote URL so all clones and worktrees of the same repository share the same memory directory.
 
@@ -2125,18 +2125,18 @@ An SQLite index enables fast hybrid search (FTS5 keyword + optional vector KNN) 
 
 ```bash
 # Environment variable (persists for the shell session)
-export GROK_MEMORY=1
+export FRIDAY_MEMORY=1
 grok
 
 # Config file (persists permanently)
-# ~/.grok/config.toml
+# ~/.friday/config.toml
 [memory]
 enabled = true
 ```
 
 ### What gets saved automatically
 
-At the end of each session, Grok saves a **structured metadata summary** to the daily session log:
+At the end of each session, Friday X saves a **structured metadata summary** to the daily session log:
 - Message counts (user / assistant / tool)
 - Topics — the first few real user prompts from the session
 - Tool-usage breakdown (e.g., `read_file: 4, search_replace: 3`)
@@ -2152,7 +2152,7 @@ This summary is searchable in future sessions but does **not** capture full cont
 
 ### Capturing rich knowledge with `/flush`
 
-For richer capture — decisions, patterns, debugging workflows, API discoveries — use `/flush` in the TUI. This triggers an LLM-generated summary of the current session's most important content and writes it to a dated session log under `~/.grok/memory/<project-slug>-<hash8>/sessions/`, where it is indexed and searchable in future sessions.
+For richer capture — decisions, patterns, debugging workflows, API discoveries — use `/flush` in the TUI. This triggers an LLM-generated summary of the current session's most important content and writes it to a dated session log under `~/.friday/memory/<project-slug>-<hash8>/sessions/`, where it is indexed and searchable in future sessions.
 
 Use `/flush` when you want to preserve important context before compaction or at any point during a productive session.
 
@@ -2174,7 +2174,7 @@ Omit `workspace` or `global` and it defaults to workspace scope.
 
 ### Searching memory
 
-Grok searches memory automatically on the first turn of each session and after compaction. The first-turn injection can be disabled or given its own score threshold under `[memory.initial_injection]`. You can also invoke `memory_search` and `memory_get` directly via the model prompt:
+Friday X searches memory automatically on the first turn of each session and after compaction. The first-turn injection can be disabled or given its own score threshold under `[memory.initial_injection]`. You can also invoke `memory_search` and `memory_get` directly via the model prompt:
 
 ```
 Search memory for "auth middleware patterns"
@@ -2185,24 +2185,24 @@ Read my workspace MEMORY.md
 
 ```bash
 # Open workspace MEMORY.md in $EDITOR / $VISUAL
-grok memory edit
+friday memory edit
 
 # Open global MEMORY.md
-grok memory edit --global
+friday memory edit --global
 
 # Show memory statistics: file count, chunk count, and index size
-grok memory stats
+friday memory stats
 ```
 
 ### Configuration reference
 
-Key options under `[memory]` in `~/.grok/config.toml`:
+Key options under `[memory]` in `~/.friday/config.toml`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled` | `false` | Enable memory (can also be set via CLI flag or env var) |
 | `session.save_on_end` | `true` | Write the lightweight metadata summary on session end |
-| `watcher.enabled` | `true` | Watch `~/.grok/memory/` for external edits and reindex on search |
+| `watcher.enabled` | `true` | Watch `~/.friday/memory/` for external edits and reindex on search |
 | `search.max_results` | `6` | Default number of memory results to return |
 | `search.min_score` | `0.35` | Minimum relevance score threshold for explicit memory search and recovery paths |
 | `initial_injection.enabled` | `true` | Enable automatic first-turn memory injection |
@@ -2212,7 +2212,7 @@ Key options under `[memory]` in `~/.grok/config.toml`:
 
 ### Observability
 
-When first-turn memory injection runs, Grok emits the `grok-shell-memory_injection`
+When first-turn memory injection runs, Friday X emits the `grok-shell-memory_injection`
 telemetry event. It includes:
 - whether the greeting fallback query path was used
 - result counts and top score
@@ -2222,7 +2222,7 @@ telemetry event. It includes:
 
 ## Sandbox
 
-Grok can restrict what the agent process and its spawned commands can access on
+Friday X can restrict what the agent process and its spawned commands can access on
 your filesystem and network using OS-level kernel primitives (Landlock on Linux,
 Seatbelt on macOS). This is off by default.
 
@@ -2230,13 +2230,13 @@ Seatbelt on macOS). This is off by default.
 
 ```bash
 # Run with workspace sandbox (read everywhere, write only to CWD + /tmp)
-grok --sandbox workspace
+friday --sandbox workspace
 
 # Read-only mode (agent can read but not write anything)
-grok --sandbox read-only
+friday --sandbox read-only
 
 # Maximum isolation (read/write CWD only, no child network)
-grok --sandbox strict
+friday --sandbox strict
 ```
 
 ### Built-in Profiles
@@ -2244,16 +2244,16 @@ grok --sandbox strict
 | Profile         | FS Read            | FS Write                  | Child Network | Use Case                 |
 | --------------- | ------------------ | ------------------------- | ------------- | ------------------------ |
 | `off` (default) | Unrestricted       | Unrestricted              | Unrestricted  | No sandbox               |
-| `workspace`     | Everywhere         | CWD + `/tmp` + `~/.grok/` | Allowed       | Normal development       |
-| `read-only`     | Everywhere         | `~/.grok/` only           | Blocked       | Exploration, code review |
-| `strict`        | CWD + system paths | CWD + `/tmp` + `~/.grok/` | Blocked       | Untrusted code           |
+| `workspace`     | Everywhere         | CWD + `/tmp` + `~/.friday/` | Allowed       | Normal development       |
+| `read-only`     | Everywhere         | `~/.friday/` only           | Blocked       | Exploration, code review |
+| `strict`        | CWD + system paths | CWD + `/tmp` + `~/.friday/` | Blocked       | Untrusted code           |
 
-Sensitive paths (`~/.ssh/`, `~/.aws/`, `~/.gnupg/`, `~/.grok/auth/`) are always
+Sensitive paths (`~/.ssh/`, `~/.aws/`, `~/.gnupg/`, `~/.friday/auth/`) are always
 write-protected regardless of profile.
 
 ### Custom Profiles
 
-Create `~/.grok/sandbox.toml` (global) or `.grok/sandbox.toml` (per-project):
+Create `~/.friday/sandbox.toml` (global) or `.friday/sandbox.toml` (per-project):
 
 ```toml
 [profiles.devbox]
@@ -2275,7 +2275,7 @@ deny = ["/data/shared-secrets"]
 Use it:
 
 ```bash
-grok --sandbox devbox
+friday --sandbox devbox
 ```
 
 ### How It Works
@@ -2295,7 +2295,7 @@ model cannot convince the agent to relax restrictions at runtime.
 
 - **Platform support**: Sandbox enforcement uses Landlock on Linux (kernel ≥ 5.13)
   and Seatbelt on macOS. If the sandbox cannot be applied (e.g., unsupported
-  kernel, missing entitlements), Grok logs a warning and continues without
+  kernel, missing entitlements), Friday X logs a warning and continues without
   enforcement.
 
 - **Network restrictions are partial**: Profiles with `restrict_network` block
@@ -2306,24 +2306,24 @@ model cannot convince the agent to relax restrictions at runtime.
 
 ### Event Logging
 
-Sandbox events (profile applied, violations) are logged to `~/.grok/sandbox-events.jsonl`
+Sandbox events (profile applied, violations) are logged to `~/.friday/sandbox-events.jsonl`
 for telemetry and debugging.
 
 ---
 
 ## Introspection
 
-Use `grok inspect` to see everything Grok discovers in the current directory:
+Use `friday inspect` to see everything Friday X discovers in the current directory:
 
 ```bash
-grok inspect          # human-readable output
-grok inspect --json   # machine-readable JSON
+friday inspect          # human-readable output
+friday inspect --json   # machine-readable JSON
 ```
 
 The output shows all loaded configuration organized by type:
 
 - **Project Instructions** — AGENTS.md / CLAUDE.md files with token counts
-- **Skills** — from `.grok/skills/`, `~/.grok/skills/`, plugins, and config paths
+- **Skills** — from `.friday/skills/`, `~/.friday/skills/`, plugins, and config paths
 - **Agents** — built-in, user-defined, and plugin-provided subagents
 - **Plugins** — discovered plugins with what each provides (skills, agents, hooks, MCPs)
 - **MCP Servers** — from `config.toml`, plugins, `~/.claude.json`, and `.mcp.json`
@@ -2337,13 +2337,13 @@ Plugin-provided components appear in their respective sections with a `[plugin: 
 
 ## Claude Code Compatibility
 
-Grok automatically discovers configuration from Claude Code directories alongside native `.grok/` paths. No extra setup is needed.
+Friday X automatically discovers configuration from Claude Code directories alongside native `.friday/` paths. No extra setup is needed.
 
 ### What is picked up
 
-| Component         | Claude Code location                                 | How Grok uses it                 |
+| Component         | Claude Code location                                 | How Friday X uses it                 |
 | ----------------- | ---------------------------------------------------- | -------------------------------- |
-| **Skills**        | `.claude/skills/`, `~/.claude/skills/`               | Loaded as skills (same as `.grok/skills/`) |
+| **Skills**        | `.claude/skills/`, `~/.claude/skills/`               | Loaded as skills (same as `.friday/skills/`) |
 | **Agents**        | `.claude/agents/`, `~/.claude/agents/`               | Loaded as subagents              |
 | **Plugins**       | `.claude/plugins/`, `~/.claude/plugins/`             | Discovered with all components   |
 | **Installed plugins** | `~/.claude/plugins/installed_plugins.json`        | Each `installPath` is loaded     |
@@ -2354,13 +2354,13 @@ Grok automatically discovers configuration from Claude Code directories alongsid
 
 ### Plugin components
 
-Claude Code plugins can provide skills (`skills/`), commands (`commands/`), agents (`agents/`), hooks (`hooks/hooks.json`), MCP servers (`.mcp.json`), and LSP servers (`.lsp.json`). All component types are discovered and used by Grok at runtime.
+Claude Code plugins can provide skills (`skills/`), commands (`commands/`), agents (`agents/`), hooks (`hooks/hooks.json`), MCP servers (`.mcp.json`), and LSP servers (`.lsp.json`). All component types are discovered and used by Friday X at runtime.
 
 ---
 
 ## Built-in Tools
 
-Grok includes these tools by default:
+Friday X includes these tools by default:
 
 | Tool             | Description                                                    |
 | ---------------- | -------------------------------------------------------------- |
@@ -2401,7 +2401,7 @@ disallowedTools:
 
 ### `web_fetch`
 
-Fetch a specific URL and return its content as markdown. **Disabled by default** — enable with `GROK_WEB_FETCH=1`. 
+Fetch a specific URL and return its content as markdown. **Disabled by default** — enable with `FRIDAY_WEB_FETCH=1`. 
 
 When no custom `allowed_domains` is set, the tool permits a default allowlist of useful documentation sites (SpaceXAI, language docs, frameworks, cloud providers, databases, etc.). Domains not on the allowlist prompt the user for approval; `--always-approve` auto-approves all. Domain matching is case-insensitive, strips `www.` prefixes, and supports path-scoped entries (e.g. `x.ai/company`).
 
@@ -2409,14 +2409,14 @@ When no custom `allowed_domains` is set, the tool permits a default allowlist of
 
 ## Session Persistence
 
-Grok automatically persists conversations to disk. This works across all modes: TUI, headless, and agent stdio.
+Friday X automatically persists conversations to disk. This works across all modes: TUI, headless, and agent stdio.
 
 ### Storage Layout
 
-Sessions are stored under `~/.grok/sessions/`, organized by URL-encoded working directory:
+Sessions are stored under `~/.friday/sessions/`, organized by URL-encoded working directory:
 
 ```
-~/.grok/sessions/<encoded-cwd>/<session-id>/
+~/.friday/sessions/<encoded-cwd>/<session-id>/
   summary.json            # metadata: title, timestamps, model, message count
   updates.jsonl           # ACP session update stream (conversation + tool calls)
   chat_history.jsonl      # raw chat messages sent to the model
@@ -2492,19 +2492,19 @@ The agent persists all session updates automatically. Clients can reconnect and 
 
 | Path                  | Description                                         |
 | --------------------- | --------------------------------------------------- |
-| `~/.grok/config.toml` | Configuration file                                  |
-| `~/.grok/sessions/`   | Persisted sessions (organized by working directory) |
-| `~/.grok/auth.json`   | Authentication credentials (auto-managed)           |
-| `~/.grok/memory/`     | Cross-session memory files and index                |
-| `~/.grok/skills/`     | User-scoped skill definitions                       |
-| `~/.grok/plugins/`    | User-scoped plugins                                 |
-| `~/.grok/agents/`     | User-scoped agent definitions                       |
-| `.grok/config.toml`   | Project-scoped config (MCP servers)                 |
-| `.grok/skills/`       | Project-scoped skill definitions                    |
-| `.grok/plugins/`      | Project-scoped plugins                              |
-| `.grok/agents/`       | Project-scoped agent definitions                    |
-| `.grok/hooks/`        | Project-scoped hooks                                |
-| `.grok/lsp.json`      | LSP server configuration                            |
+| `~/.friday/config.toml` | Configuration file                                  |
+| `~/.friday/sessions/`   | Persisted sessions (organized by working directory) |
+| `~/.friday/auth.json`   | Authentication credentials (auto-managed)           |
+| `~/.friday/memory/`     | Cross-session memory files and index                |
+| `~/.friday/skills/`     | User-scoped skill definitions                       |
+| `~/.friday/plugins/`    | User-scoped plugins                                 |
+| `~/.friday/agents/`     | User-scoped agent definitions                       |
+| `.friday/config.toml`   | Project-scoped config (MCP servers)                 |
+| `.friday/skills/`       | Project-scoped skill definitions                    |
+| `.friday/plugins/`      | Project-scoped plugins                              |
+| `.friday/agents/`       | Project-scoped agent definitions                    |
+| `.friday/hooks/`        | Project-scoped hooks                                |
+| `.friday/lsp.json`      | LSP server configuration                            |
 | `~/.claude/skills/`   | User-scoped skills (Claude Code compat)             |
 | `~/.claude/plugins/`  | User-scoped plugins (Claude Code compat)            |
 | `~/.claude.json`      | MCP servers (Claude Code compat)                    |
@@ -2516,33 +2516,33 @@ The agent persists all session updates automatically. Clients can reconnect and 
 
 | Variable                         | Description                                                                                              |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `XAI_API_KEY`         | API key from [console.x.ai](https://console.x.ai). Used for custom endpoint auth and API key login      |
-| `GROK_CLI_CHAT_PROXY_BASE_URL`  | Override the cli-chat-proxy URL (default: `https://cli-chat-proxy.grok.com/v1`)                          |
-| `GROK_MODELS_BASE_URL`          | Custom base URL for inference. Model list auto-fetched from `{base_url}/models` (see [Custom Models Endpoint](#custom-models-endpoint)) |
-| `GROK_MODELS_LIST_URL`          | Override the model list URL if it differs from `{GROK_MODELS_BASE_URL}/models`                                              |
-| `GROK_AUTH_PROVIDER_COMMAND`     | External auth binary (alternative to config file). See [External Auth Provider](#external-auth-provider) |
-| `GROK_AUTH_TOKEN_TTL`            | Token lifetime in seconds for external auth providers that output bare tokens. See [External Auth Provider](#external-auth-provider) |
-| `GROK_AUTH_EARLY_INVALIDATION_SECS` | Seconds before `expires_at` to consider a token expired (default: `300`). See [Automatic Credential Refresh](#automatic-credential-refresh) |
-| `GROK_OIDC_ISSUER`              | OIDC issuer URL (alternative to config file). See [OIDC](#oidc-customer-sso)                             |
-| `GROK_OIDC_CLIENT_ID`           | OIDC client ID (alternative to config file). See [OIDC](#oidc-customer-sso)                              |
-| `GROK_HOME`                     | Override config directory (default: `~/.grok`)                                                           |
-| `GROK_SUBAGENTS`                | Enable (`1`) or disable (`0`) subagent/task tool support                                                 |
-| `GROK_MEMORY`                   | Enable (`1`) or disable (`0`) cross-session memory                                                       |
-| `GROK_AGENT`                    | Custom agent definition path or name (see [Agent Profiles](#agent-profiles))                             |
-| `GROK_WEB_FETCH`                | Enable (`1`) or disable (`0`) the `web_fetch` tool                                                       |
-| `GROK_WEB_FETCH_PROXY`          | Egress proxy URL for `web_fetch` requests (overridden by `[toolset.web_fetch] proxy_endpoint`)           |
-| `GROK_RESPECT_GITIGNORE`        | Disable `.gitignore` filtering in tools when set to `0`                                                  |
-| `GROK_FEEDBACK_ENABLED`         | Enable (`1`) or disable (`0`) feedback system independently from telemetry                               |
-| `GROK_DEPLOYMENT_KEY`           | Management API key for enterprise deployments                                                            |
-| `GROK_LOG_FILE`                 | Enable file logging by providing a file path (the value is used verbatim as the path)                    |
-| `GROK_DEBUG_LOG`                | Debug firehose (set by `--debug`): truthy routes per-session logs to `~/.grok/debug/<sessionId>.txt`, a path writes that one file |
-| `RUST_LOG`                      | Log filter for stderr (headless `-p` defaults to `off`, other non-TUI modes to `error`; TUI captures stderr) and for the `GROK_LOG_FILE` log; the `--debug` firehose ignores it |
+| `FRIDAY_X_TOKEN`         | API key from [console.x.ai](https://console.x.ai). Used for custom endpoint auth and API key login      |
+| `FRIDAY_CLI_CHAT_PROXY_BASE_URL`  | Override the cli-chat-proxy URL (default: `https://cli-chat-proxy.grok.com/v1`)                          |
+| `FRIDAY_MODELS_BASE_URL`          | Custom base URL for inference. Model list auto-fetched from `{base_url}/models` (see [Custom Models Endpoint](#custom-models-endpoint)) |
+| `FRIDAY_MODELS_LIST_URL`          | Override the model list URL if it differs from `{FRIDAY_MODELS_BASE_URL}/models`                                              |
+| `FRIDAY_AUTH_PROVIDER_COMMAND`     | External auth binary (alternative to config file). See [External Auth Provider](#external-auth-provider) |
+| `FRIDAY_AUTH_TOKEN_TTL`            | Token lifetime in seconds for external auth providers that output bare tokens. See [External Auth Provider](#external-auth-provider) |
+| `FRIDAY_AUTH_EARLY_INVALIDATION_SECS` | Seconds before `expires_at` to consider a token expired (default: `300`). See [Automatic Credential Refresh](#automatic-credential-refresh) |
+| `FRIDAY_OIDC_ISSUER`              | OIDC issuer URL (alternative to config file). See [OIDC](#oidc-customer-sso)                             |
+| `FRIDAY_OIDC_CLIENT_ID`           | OIDC client ID (alternative to config file). See [OIDC](#oidc-customer-sso)                              |
+| `FRIDAY_HOME`                     | Override config directory (default: `~/.friday`)                                                           |
+| `FRIDAY_SUBAGENTS`                | Enable (`1`) or disable (`0`) subagent/task tool support                                                 |
+| `FRIDAY_MEMORY`                   | Enable (`1`) or disable (`0`) cross-session memory                                                       |
+| `FRIDAY_AGENT`                    | Custom agent definition path or name (see [Agent Profiles](#agent-profiles))                             |
+| `FRIDAY_WEB_FETCH`                | Enable (`1`) or disable (`0`) the `web_fetch` tool                                                       |
+| `FRIDAY_WEB_FETCH_PROXY`          | Egress proxy URL for `web_fetch` requests (overridden by `[toolset.web_fetch] proxy_endpoint`)           |
+| `FRIDAY_RESPECT_GITIGNORE`        | Disable `.gitignore` filtering in tools when set to `0`                                                  |
+| `FRIDAY_FEEDBACK_ENABLED`         | Enable (`1`) or disable (`0`) feedback system independently from telemetry                               |
+| `FRIDAY_DEPLOYMENT_KEY`           | Management API key for enterprise deployments                                                            |
+| `FRIDAY_LOG_FILE`                 | Enable file logging by providing a file path (the value is used verbatim as the path)                    |
+| `FRIDAY_DEBUG_LOG`                | Debug firehose (set by `--debug`): truthy routes per-session logs to `~/.friday/debug/<sessionId>.txt`, a path writes that one file |
+| `RUST_LOG`                      | Log filter for stderr (headless `-p` defaults to `off`, other non-TUI modes to `error`; TUI captures stderr) and for the `FRIDAY_LOG_FILE` log; the `--debug` firehose ignores it |
 
 ---
 
 ## Shell Completions
 
-Generate completions for your shell and install them to enable tab completion for `grok` commands and flags.
+Generate completions for your shell and install them to enable tab completion for `friday` commands and flags.
 
 **Note:** The paths below are recommended defaults. Some environments do not automatically source the standard locations — you may need to adapt them to your shell framework or distro conventions.
 
@@ -2552,22 +2552,22 @@ Generate and install:
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions
-grok completions bash > ~/.local/share/bash-completion/completions/grok
+friday completions bash > ~/.local/share/bash-completion/completions/grok
 ```
 
 Reload your shell or run `source ~/.bashrc`.
 
-Alternative (Grok-managed location):
+Alternative (Friday X-managed location):
 
 ```bash
-mkdir -p ~/.grok/completions/bash
-grok completions bash > ~/.grok/completions/bash/grok.bash
+mkdir -p ~/.friday/completions/bash
+friday completions bash > ~/.friday/completions/bash/grok.bash
 ```
 
 Add to `~/.bashrc`:
 
 ```bash
-[[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
+[[ -r "$HOME/.friday/completions/bash/grok.bash" ]] && source "$HOME/.friday/completions/bash/grok.bash"
 ```
 
 ### Zsh
@@ -2576,7 +2576,7 @@ Generate and install:
 
 ```bash
 mkdir -p ~/.zsh/completions
-grok completions zsh > ~/.zsh/completions/_grok
+friday completions zsh > ~/.zsh/completions/_grok
 ```
 
 Add to `~/.zshrc`:
@@ -2587,24 +2587,24 @@ autoload -Uz compinit
 compinit
 ```
 
-Alternative (Grok-managed location):
+Alternative (Friday X-managed location):
 
 ```bash
-mkdir -p ~/.grok/completions/zsh
-grok completions zsh > ~/.grok/completions/zsh/_grok
+mkdir -p ~/.friday/completions/zsh
+friday completions zsh > ~/.friday/completions/zsh/_grok
 ```
 
 Add to `~/.zshrc`:
 
 ```zsh
-fpath=("$HOME/.grok/completions/zsh" $fpath)
+fpath=("$HOME/.friday/completions/zsh" $fpath)
 autoload -Uz compinit
 compinit
 ```
 
 ### After Upgrading
 
-Regenerate completions after upgrading `grok` — the script reflects the CLI of the installed version.
+Regenerate completions after upgrading `friday` — the script reflects the CLI of the installed version.
 
 ---
 
@@ -2612,34 +2612,34 @@ Regenerate completions after upgrading `grok` — the script reflects the CLI of
 
 ### Debug logging
 
-Write logs to a file for debugging. The TUI captures stderr, so `RUST_LOG` alone won't produce visible output in production — use `grok --debug` or `GROK_LOG_FILE` instead:
+Write logs to a file for debugging. The TUI captures stderr, so `RUST_LOG` alone won't produce visible output in production — use `friday --debug` or `FRIDAY_LOG_FILE` instead:
 
 ```bash
-# Per-session debug log (~/.grok/debug/<sessionId>.txt)
-grok --debug
+# Per-session debug log (~/.friday/debug/<sessionId>.txt)
+friday --debug
 
 # Log to a custom path
-GROK_LOG_FILE=/tmp/grok-debug.log grok
+FRIDAY_LOG_FILE=/tmp/grok-debug.log grok
 
 # Tail the most-recently-opened session's log in another terminal (Unix symlink)
-tail -f ~/.grok/debug/latest.txt
+tail -f ~/.friday/debug/latest.txt
 ```
 
-The `--debug` firehose uses a fixed filter (first-party crates at `debug`) and is not narrowed by `RUST_LOG`. A `GROK_LOG_FILE` log defaults to `debug` and honors `RUST_LOG`, so you can set module-level filters for targeted debugging:
+The `--debug` firehose uses a fixed filter (first-party crates at `debug`) and is not narrowed by `RUST_LOG`. A `FRIDAY_LOG_FILE` log defaults to `debug` and honors `RUST_LOG`, so you can set module-level filters for targeted debugging:
 
 ```bash
 # Debug auth, info for everything else
-GROK_LOG_FILE=/tmp/grok-debug.log RUST_LOG="info,xai_grok_login=debug" grok
+FRIDAY_LOG_FILE=/tmp/grok-debug.log RUST_LOG="info,xai_grok_login=debug" grok
 ```
 
 ### Authentication fails
 
 ```bash
 # Clear credentials and re-login
-grok login
+friday login
 
 # Debug auth issues — check the log for "auth:" entries
-grok --debug-file /tmp/grok-auth.log -p "hello"
+friday --debug-file /tmp/grok-auth.log -p "hello"
 grep "auth:" /tmp/grok-auth.log
 ```
 
@@ -2647,7 +2647,7 @@ grep "auth:" /tmp/grok-auth.log
 
 ```bash
 # List available models
-grok models
+friday models
 
 # Check config.toml for typos in [model.*] sections
 ```
@@ -2677,16 +2677,16 @@ Session files are plain JSON/JSONL and can be inspected directly:
 
 ```bash
 # Find sessions for the current directory
-ls ~/.grok/sessions/
+ls ~/.friday/sessions/
 
 # Read session metadata
-cat ~/.grok/sessions/<encoded-cwd>/<session-id>/summary.json | jq .
+cat ~/.friday/sessions/<encoded-cwd>/<session-id>/summary.json | jq .
 
 # View conversation history
-cat ~/.grok/sessions/<encoded-cwd>/<session-id>/updates.jsonl | head -20
+cat ~/.friday/sessions/<encoded-cwd>/<session-id>/updates.jsonl | head -20
 
 # Count turns in a session
-wc -l ~/.grok/sessions/<encoded-cwd>/<session-id>/chat_history.jsonl
+wc -l ~/.friday/sessions/<encoded-cwd>/<session-id>/chat_history.jsonl
 ```
 
 ### Context window full

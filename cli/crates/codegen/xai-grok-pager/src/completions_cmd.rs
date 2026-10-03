@@ -1,4 +1,4 @@
-//! `grok completions <shell>`: generate shell completion scripts.
+//! `friday completions <shell>`: generate shell completion scripts.
 //!
 //! Used by the installers and npm postinstall; must stay side-effect free (no network, auth, tracing, or tokio).
 
@@ -30,7 +30,7 @@ pub fn run(shell: Shell) {
 }
 
 /// Work around clap_complete's broken zsh output for an optional free-form positional (`[PROMPT]`) preceding the
-/// subcommand slot. Upstream bug: <https://github.com/clap-rs/clap/issues/6282>. `grok worktree <TAB>` then
+/// subcommand slot. Upstream bug: <https://github.com/clap-rs/clap/issues/6282>. `friday worktree <TAB>` then
 /// re-offers every top-level command. Delete this whole workaround once upstream fixes the generator.
 fn fix_zsh_root_prompt_positional(script: &str) -> String {
     let mut out = String::with_capacity(script.len());
@@ -71,7 +71,7 @@ mod tests {
     }
 
     // The optional `[PROMPT]` positional (app/cli.rs) makes clap_complete emit a `::prompt` slot before the subcommand slot
-    // Dispatch happens on `$line[2]`, so `grok worktree <TAB>` re-offered every top-level command (upstream clap-rs/clap#6282)
+    // Dispatch happens on `$line[2]`, so `friday worktree <TAB>` re-offered every top-level command (upstream clap-rs/clap#6282)
     #[test]
     fn zsh_completions_drop_prompt_slot_and_dispatch_on_line_1() {
         let raw = zsh_script();

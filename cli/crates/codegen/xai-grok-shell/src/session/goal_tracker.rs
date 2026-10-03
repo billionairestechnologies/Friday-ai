@@ -221,7 +221,7 @@ pub(crate) fn generate_verifier_id() -> String {
 /// Rooted at [`std::env::temp_dir`] (respects `TMPDIR`) and namespaced by the goal's `verifier_id`.
 /// Removed wholesale on every terminal goal transition.
 pub(crate) fn goal_scratch_root(verifier_id: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("grok-goal-{verifier_id}"))
+    std::env::temp_dir().join(format!("friday-goal-{verifier_id}"))
 }
 
 /// Create (or verify) the goal's scratch root, locked to the owner (0700 on unix).

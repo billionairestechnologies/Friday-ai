@@ -358,8 +358,8 @@ fn subagent_spawn_context_resolves_compaction_mode_like_parent() {
     use crate::agent::config::Config;
     use xai_chat_state::{CompactionDetail, CompactionMode};
     use xai_grok_test_support::EnvGuard;
-    let _mode = EnvGuard::unset("GROK_COMPACTION_MODE");
-    let _detail = EnvGuard::unset("GROK_COMPACTION_DETAIL");
+    let _mode = EnvGuard::unset("FRIDAY_COMPACTION_MODE");
+    let _detail = EnvGuard::unset("FRIDAY_COMPACTION_DETAIL");
     let mut ctx = crate::test_support::lsp_runtime::ctx_with_toggle(Default::default());
     assert_eq!(
         ctx.resolve_compaction_mode(),
@@ -394,11 +394,11 @@ fn subagent_spawn_context_resolves_compaction_mode_like_parent() {
         CompactionMode::Segments(CompactionDetail::Balanced),
         "parent config detail must win over remote detail"
     );
-    let _env_mode = EnvGuard::set("GROK_COMPACTION_MODE", "transcript");
+    let _env_mode = EnvGuard::set("FRIDAY_COMPACTION_MODE", "transcript");
     assert_eq!(
         ctx.resolve_compaction_mode(),
         CompactionMode::Transcript,
-        "GROK_COMPACTION_MODE must win over parent config and remote"
+        "FRIDAY_COMPACTION_MODE must win over parent config and remote"
     );
 }
 #[test]

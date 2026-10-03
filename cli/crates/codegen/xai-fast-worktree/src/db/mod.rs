@@ -225,8 +225,8 @@ impl WorktreeDb {
             .with_context(|| format!("failed to set journal mode {}", mode.as_ref()))
     }
 
-    /// Open `~/.grok/worktrees.db` via `resolve_grok_home` (`$GROK_HOME`, else
-    /// `<home>/.grok`). Resolved fresh each call for test overrides. Each call
+    /// Open `~/.friday/worktrees.db` via `resolve_grok_home` (`$FRIDAY_HOME`, else
+    /// `<home>/.friday`). Resolved fresh each call for test overrides. Each call
     /// opens its own connection — hot paths should cache the instance.
     pub fn open_default() -> Result<Self> {
         Self::open(&resolve_grok_home()?)
@@ -445,19 +445,19 @@ pub fn now_epoch_secs() -> i64 {
     crate::time::epoch_secs()
 }
 
-/// Resolve the grok home: `$GROK_HOME`, else `<home>/.grok`.
+/// Resolve the grok home: `$FRIDAY_HOME`, else `<home>/.friday`.
 pub fn resolve_grok_home() -> Result<PathBuf> {
     xai_dirs::resolve_grok_home()
-        .context("neither $GROK_HOME nor a home directory could be resolved")
+        .context("neither $FRIDAY_HOME nor a home directory could be resolved")
 }
 
-/// Serializes tests that mutate the process-global `GROK_HOME` env var so they
+/// Serializes tests that mutate the process-global `FRIDAY_HOME` env var so they
 /// don't clobber each other under `cargo test`, where tests share one process
 /// (nextest isolates per-process, but the suite must also pass under `cargo test`).
 #[cfg(test)]
-pub(crate) static GROK_HOME_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub(crate) static FRIDAY_HOME_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// Test-only: hold [`GROK_HOME_ENV_LOCK`], point `GROK_HOME` at a private tmp
+/// Test-only: hold [`FRIDAY_HOME_ENV_LOCK`], point `FRIDAY_HOME` at a private tmp
 /// dir, restore on drop. `Drop` restores the env before the lock releases so
 /// the next setter never sees a stale value.
 #[cfg(test)]
@@ -477,18 +477,18 @@ pub(crate) struct GrokHomeFixture {
 #[cfg(test)]
 impl GrokHomeFixture {
     pub(crate) fn new() -> Self {
-        let lock = GROK_HOME_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let lock = FRIDAY_HOME_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let tmp = tempfile::TempDir::new().unwrap();
         let home = tmp.path().join("grok-home");
         std::fs::create_dir_all(&home).unwrap();
-        // Warm journal-mode + schema before GROK_HOME is visible, so the hot
+        // Warm journal-mode + schema before FRIDAY_HOME is visible, so the hot
         // loop skips retry sleeps. This open is exclusive; the retry is the
         // actual race fix.
         let _ = WorktreeDb::open(&home);
-        let prev = std::env::var_os("GROK_HOME");
-        // SAFETY: the fixture holds the GROK_HOME env lock for its whole
+        let prev = std::env::var_os("FRIDAY_HOME");
+        // SAFETY: the fixture holds the FRIDAY_HOME env lock for its whole
         // lifetime, so no other test thread reads or writes the environment.
-        unsafe { std::env::set_var("GROK_HOME", &home) };
+        unsafe { std::env::set_var("FRIDAY_HOME", &home) };
         Self {
             _lock: lock,
             prev,
@@ -524,12 +524,12 @@ impl GrokHomeFixture {
 #[cfg(test)]
 impl Drop for GrokHomeFixture {
     fn drop(&mut self) {
-        // SAFETY: the fixture still holds the GROK_HOME env lock here, so no
+        // SAFETY: the fixture still holds the FRIDAY_HOME env lock here, so no
         // other test thread reads or writes the environment during restore.
         unsafe {
             match self.prev.take() {
-                Some(p) => std::env::set_var("GROK_HOME", p),
-                None => std::env::remove_var("GROK_HOME"),
+                Some(p) => std::env::set_var("FRIDAY_HOME", p),
+                None => std::env::remove_var("FRIDAY_HOME"),
             }
             if self.touched_grove_env {
                 match self.prev_xdg_data_home.take() {

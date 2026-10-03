@@ -1004,7 +1004,7 @@ fn resume_source_worktree_reuse() {
         child_session_id: "child-wt".into(),
         child_cwd: "/tmp/worktree".into(),
         worktree_path: Some(
-            PathBuf::from("/home/user/.grok/worktrees/myrepo/subagent-sub-wt"),
+            PathBuf::from("/home/user/.friday/worktrees/myrepo/subagent-sub-wt"),
         ),
         snapshot_ref: None,
         subagent_type: "general-purpose".into(),
@@ -1015,7 +1015,7 @@ fn resume_source_worktree_reuse() {
     assert_eq!(
             worktree.as_deref(),
             Some(Path::new(
-                "/home/user/.grok/worktrees/myrepo/subagent-sub-wt",
+                "/home/user/.friday/worktrees/myrepo/subagent-sub-wt",
             )),
             "should reuse source worktree"
         );
@@ -1097,7 +1097,7 @@ fn select_override_cwd_resume_never_falls_through_to_request_cwd() {
         child_session_id: "child-wt".into(),
         child_cwd: "/tmp/whatever".into(),
         worktree_path: Some(
-            PathBuf::from("/home/user/.grok/worktrees/repo/subagent-sub-wt"),
+            PathBuf::from("/home/user/.friday/worktrees/repo/subagent-sub-wt"),
         ),
         snapshot_ref: None,
         subagent_type: "general-purpose".into(),
@@ -2171,7 +2171,7 @@ async fn read_parent_sampling_config_keeps_catalog_threshold_when_routing_slug_i
 #[serial_test::serial]
 #[serial_test::serial(remote_sig_disarm)]
 async fn read_parent_sampling_config_keeps_auto_when_catalog_has_slug_key_only() {
-    let _env = crate::env::EnvVarGuard::remove("GROK_REQUEST_COMPRESSION");
+    let _env = crate::env::EnvVarGuard::remove("FRIDAY_REQUEST_COMPRESSION");
     let parent_base_url = "https://api.x.ai/v1";
     let mut models = indexmap::IndexMap::new();
     let mut entry = test_model_entry("grok-4.5");
@@ -2277,7 +2277,7 @@ async fn read_parent_sampling_config_live_never_strips_a_fallback_key() {
     assert_eq!(config.api_key.as_deref(), Some("xai-env-fallback"));
 }
 /// `would_strip_fallback_key` on the inherit-fallback path.
-/// The baseline keeps the env `XAI_API_KEY` even while `auth_type` flips to `SessionToken`, and no resolver may displace it.
+/// The baseline keeps the env `FRIDAY_X_TOKEN` even while `auth_type` flips to `SessionToken`, and no resolver may displace it.
 #[tokio::test]
 async fn read_parent_sampling_config_fallback_never_strips_a_fallback_key() {
     let mut ctx = ctx_with_toggle(HashMap::new());
@@ -2334,7 +2334,7 @@ fn resolve_model_override_wires_resolver_for_fresh_and_hard_expired_session_keys
     }
 }
 /// `would_strip_fallback_key` on the override path.
-/// `XAI_API_KEY`'s presence varies by environment, so assert the rule itself rather than one branch of it.
+/// `FRIDAY_X_TOKEN`'s presence varies by environment, so assert the rule itself rather than one branch of it.
 #[test]
 fn resolve_model_override_to_config_never_strips_a_fallback_key() {
     let mut ctx = ctx_with_toggle(HashMap::new());

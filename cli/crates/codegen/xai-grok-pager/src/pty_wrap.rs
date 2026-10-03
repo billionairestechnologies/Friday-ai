@@ -1,4 +1,4 @@
-//! Local PTY wrapper: the engine behind `grok wrap` (see [`crate::wrap_cmd`]).
+//! Local PTY wrapper: the engine behind `friday wrap` (see [`crate::wrap_cmd`]).
 //!
 //! Spawns a command inside a local pseudo-terminal and pipes its output through `crate::wrap_filter::Osc52Filter`.
 //! The filter intercepts OSC 52 clipboard sequences, making "copy" work for programs that cannot reach the user's clipboard (containers, SSH).
@@ -22,16 +22,16 @@ fn apply_wrap_child_env(
     cmd: &mut portable_pty::CommandBuilder,
     appearance: Option<SystemAppearance>,
 ) {
-    cmd.env("GROK_OSC52_SINK", "1");
+    cmd.env("FRIDAY_OSC52_SINK", "1");
     cmd.env("LC_GROK_OSC52_SINK", "1");
     if let Some(appearance) = appearance {
         let value = appearance.as_env_value();
-        cmd.env("GROK_APPEARANCE", value);
+        cmd.env("FRIDAY_APPEARANCE", value);
         cmd.env("LC_GROK_APPEARANCE", value);
     }
 }
 
-/// Run an arbitrary command inside a local PTY with OSC 52 output filtering. This is the engine behind `grok wrap`:
+/// Run an arbitrary command inside a local PTY with OSC 52 output filtering. This is the engine behind `friday wrap`:
 /// it spawns `program` (with `args`) attached to a local pseudo-terminal. Size changes of the outer terminal are
 /// forwarded to the child. All other output passes through unchanged.
 pub(crate) fn run_wrapped_command(program: &str, args: &[String]) -> Result<i32> {
@@ -62,7 +62,7 @@ pub(crate) fn run_wrapped_command(program: &str, args: &[String]) -> Result<i32>
     drop(pair.slave);
 
     // Obtain reader from the master PTY. Confining `write_all` to a single owner thread avoids that Handles are
-    // intentionally detached: `grok wrap` is short-lived and exits with the child.
+    // intentionally detached: `friday wrap` is short-lived and exits with the child.
     let mut pty_reader = pair.master.try_clone_reader()?;
 
     // We deliberately do NOT block SIGWINCH here
@@ -365,22 +365,22 @@ mod tests {
     #[test]
     fn apply_wrap_child_env_dark_overrides_parent_light_on_both_names() {
         let mut cmd = portable_pty::CommandBuilder::new("true");
-        cmd.env("GROK_APPEARANCE", "light");
+        cmd.env("FRIDAY_APPEARANCE", "light");
         cmd.env("LC_GROK_APPEARANCE", "light");
         apply_wrap_child_env(&mut cmd, Some(SystemAppearance::Dark));
-        assert_eq!(env_str(&cmd, "GROK_APPEARANCE").as_deref(), Some("dark"));
+        assert_eq!(env_str(&cmd, "FRIDAY_APPEARANCE").as_deref(), Some("dark"));
         assert_eq!(env_str(&cmd, "LC_GROK_APPEARANCE").as_deref(), Some("dark"));
-        assert_eq!(env_str(&cmd, "GROK_OSC52_SINK").as_deref(), Some("1"));
+        assert_eq!(env_str(&cmd, "FRIDAY_OSC52_SINK").as_deref(), Some("1"));
         assert_eq!(env_str(&cmd, "LC_GROK_OSC52_SINK").as_deref(), Some("1"));
     }
 
     #[test]
     fn apply_wrap_child_env_light_overrides_parent_dark_on_both_names() {
         let mut cmd = portable_pty::CommandBuilder::new("true");
-        cmd.env("GROK_APPEARANCE", "dark");
+        cmd.env("FRIDAY_APPEARANCE", "dark");
         cmd.env("LC_GROK_APPEARANCE", "dark");
         apply_wrap_child_env(&mut cmd, Some(SystemAppearance::Light));
-        assert_eq!(env_str(&cmd, "GROK_APPEARANCE").as_deref(), Some("light"));
+        assert_eq!(env_str(&cmd, "FRIDAY_APPEARANCE").as_deref(), Some("light"));
         assert_eq!(
             env_str(&cmd, "LC_GROK_APPEARANCE").as_deref(),
             Some("light")
@@ -390,11 +390,11 @@ mod tests {
     #[test]
     fn apply_wrap_child_env_none_does_not_stamp_from_parent_snapshot() {
         let mut cmd = portable_pty::CommandBuilder::new("true");
-        cmd.env("GROK_APPEARANCE", "dark");
+        cmd.env("FRIDAY_APPEARANCE", "dark");
         cmd.env_remove("LC_GROK_APPEARANCE");
         apply_wrap_child_env(&mut cmd, None);
-        assert_eq!(env_str(&cmd, "GROK_APPEARANCE").as_deref(), Some("dark"));
+        assert_eq!(env_str(&cmd, "FRIDAY_APPEARANCE").as_deref(), Some("dark"));
         assert_eq!(env_str(&cmd, "LC_GROK_APPEARANCE"), None);
-        assert_eq!(env_str(&cmd, "GROK_OSC52_SINK").as_deref(), Some("1"));
+        assert_eq!(env_str(&cmd, "FRIDAY_OSC52_SINK").as_deref(), Some("1"));
     }
 }

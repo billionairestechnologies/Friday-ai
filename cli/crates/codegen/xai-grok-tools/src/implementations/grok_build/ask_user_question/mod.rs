@@ -58,7 +58,7 @@ pub const RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 pub const DEFAULT_ASK_USER_QUESTION_TIMEOUT_ENABLED: bool = true;
 
 /// Env var: override [`RESPONSE_TIMEOUT`] with a duration in **seconds**.
-pub const RESPONSE_TIMEOUT_ENV: &str = "GROK_ASK_USER_QUESTION_TIMEOUT_SECS";
+pub const RESPONSE_TIMEOUT_ENV: &str = "FRIDAY_ASK_USER_QUESTION_TIMEOUT_SECS";
 
 /// Parse the [`RESPONSE_TIMEOUT_ENV`] override (positive integer seconds). Invalid or non-positive
 /// values are warned and treated as unset. Single source for this parse — the shell's env tier
@@ -150,7 +150,7 @@ pub struct QuestionOption {
     )]
     pub preview: Option<String>,
 
-    /// Opaque id; hidden from the model. Grok callers leave it `None`.
+    /// Opaque id; hidden from the model. Friday X callers leave it `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(skip)]
     pub id: Option<String>,

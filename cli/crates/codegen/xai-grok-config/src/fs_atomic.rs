@@ -33,7 +33,7 @@ pub fn resolve_atomic_destination(path: &Path) -> io::Result<PathBuf> {
 }
 
 /// Like [`resolve_atomic_destination`], but a leaf symlink is left in place so
-/// `rename` replaces that inode (project `.grok/config.toml`, managed slots).
+/// `rename` replaces that inode (project `.friday/config.toml`, managed slots).
 pub fn resolve_atomic_slot(path: &Path) -> io::Result<PathBuf> {
     resolve_destination(path, LeafSymlink::Replace)
 }
@@ -1274,9 +1274,9 @@ pub fn write_atomically(
 }
 
 /// [`write_atomically`] for a file the user owns. `rename(2)` does not follow a symlink at the
-/// destination, so a dotfile-managed `config.toml` or a `GROK_HOME`-overlay `auth.json` would be
+/// destination, so a dotfile-managed `config.toml` or a `FRIDAY_HOME`-overlay `auth.json` would be
 /// replaced by a private regular file; under the user's own grok home the link is followed and the
-/// write lands on its target. Elsewhere (a repository's `.grok/config.toml`) the link name is replaced.
+/// write lands on its target. Elsewhere (a repository's `.friday/config.toml`) the link name is replaced.
 pub fn write_user_file_atomically(
     final_path: &Path,
     contents: &str,

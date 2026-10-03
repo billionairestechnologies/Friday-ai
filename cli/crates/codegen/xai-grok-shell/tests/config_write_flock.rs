@@ -44,7 +44,7 @@ fn settings_save_serializes_against_init_flock_writer() {
     // acp_harness::run_agent_test).
     let grok_home = tempfile::tempdir().expect("grok home");
     // SAFETY: no other threads are running yet.
-    unsafe { std::env::set_var("GROK_HOME", grok_home.path()) };
+    unsafe { std::env::set_var("FRIDAY_HOME", grok_home.path()) };
 
     let config_path = grok_home.path().join("config.toml");
     std::fs::write(&config_path, "[cli]\n").unwrap();

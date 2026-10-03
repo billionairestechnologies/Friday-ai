@@ -134,8 +134,8 @@ fn canonical_resolves_the_existing_prefix_and_appends_the_rest() {
         canonical_path(&root.join("real/sub/../sub/not/yet"))
     );
     assert_eq!(
-        PathBuf::from("/opt/ws-fixture/nowhere/.grok"),
-        canonical_path(Path::new("/opt/ws-fixture/nowhere/x/../.grok"))
+        PathBuf::from("/opt/ws-fixture/nowhere/.friday"),
+        canonical_path(Path::new("/opt/ws-fixture/nowhere/x/../.friday"))
     );
     #[cfg(unix)]
     {

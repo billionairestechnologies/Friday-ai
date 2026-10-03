@@ -447,7 +447,7 @@ pub fn proposed_subject(
 /// A coarse write whose nearest existing ancestor the policy lets the command write is the OS
 /// refusing (a mode bit, a busy file), not the sandbox: the sandbox would have allowed the whole
 /// tree — unless the target itself is protected: `<ws>/.git/config` under a
-/// writable `.git`, a first `mkdir <ws>/.grok`, are the floor holding the line, and the user is
+/// writable `.git`, a first `mkdir <ws>/.friday`, are the floor holding the line, and the user is
 /// told.
 fn is_os_denial(blocked: &Blocked, policy: &SandboxPolicy) -> bool {
     match blocked {

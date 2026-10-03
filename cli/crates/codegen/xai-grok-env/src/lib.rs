@@ -35,6 +35,37 @@ pub fn friday_version_url() -> String {
     format!("{}/x/version", friday_origin())
 }
 
+/// The only Friday endpoints this client has any business calling after login. The authenticated HTTP layer
+/// refuses everything else addressed to the Friday origin, so a feature inherited from the original product
+/// (session sync, billing pages, feedback, bundles, conversation upload…) can never reach the server, whatever
+/// code still tries. Paths are relative to `<origin>/api/x`.
+pub const FRIDAY_ALLOWED_API_PATHS: &[&str] = &[
+    "/v1/models",
+    "/v1/settings",
+    "/v1/user",
+    "/v1/chat/completions",
+    "/me",
+    "/oauth2/device/code",
+    "/oauth2/token",
+    "/auth/logout",
+];
+
+/// Whether a request URL may be sent. URLs on other hosts (a user's own MCP server, a BYOK endpoint they
+/// configured) are not this function's business and pass; URLs on the Friday origin must be on the allow-list.
+pub fn friday_request_allowed(url: &str) -> bool {
+    let Ok(origin) = url::Url::parse(&friday_origin()) else { return true };
+    let Ok(target) = url::Url::parse(url) else { return true };
+    if origin.host_str() != target.host_str() || origin.port_or_known_default() != target.port_or_known_default() {
+        return true;
+    }
+    let path = target.path().trim_end_matches('/');
+    let Some(api_path) = path.strip_prefix("/api/x") else {
+        // Same host but not the API (the web app, /x installers): this client has no reason to call them either.
+        return path.starts_with("/x/");
+    };
+    FRIDAY_ALLOWED_API_PATHS.iter().any(|allowed| api_path == *allowed)
+}
+
 /// The endpoint set for one backend environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GrokBuildEndpoints {
@@ -78,7 +109,7 @@ impl GrokBuildEnvironment {
     }
     fn env_prefix(&self) -> &'static str {
         match self {
-            GrokBuildEnvironment::Production => "GROK_PRODUCTION",
+            GrokBuildEnvironment::Production => "FRIDAY_PRODUCTION",
         }
     }
     /// Compiled endpoint set for this environment (production by default).
@@ -109,7 +140,7 @@ impl GrokBuildEnvironment {
         self.resolve("_WS_URL", self.endpoints().relay_ws_url)
     }
     /// The gateway WebSocket URL for `/cloud new` sandboxes. The shell's
-    /// `GROK_GATEWAY_URL` opt-in takes precedence.
+    /// `FRIDAY_GATEWAY_URL` opt-in takes precedence.
     pub fn gateway_ws_url(&self) -> String {
         self.resolve("_GATEWAY_WS_URL", self.endpoints().gateway_ws_url)
     }
@@ -211,7 +242,7 @@ mod tests {
     fn test_env_prefix() {
         assert_eq!(
             GrokBuildEnvironment::Production.env_prefix(),
-            "GROK_PRODUCTION"
+            "FRIDAY_PRODUCTION"
         );
     }
     #[test]

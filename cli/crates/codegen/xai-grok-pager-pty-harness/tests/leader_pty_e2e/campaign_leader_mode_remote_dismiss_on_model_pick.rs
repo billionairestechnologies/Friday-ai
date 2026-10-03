@@ -27,9 +27,9 @@ async fn campaign_leader_mode_remote_dismiss_on_model_pick() {
     }));
 
     // Seed config.toml with the user's own default model
-    // Pin the leader socket under the shared GROK_HOME so every spawn elects or attaches to the same leader (mirrors `LeaderCluster`)
-    let grok_home = content.home().join(".grok");
-    std::fs::create_dir_all(&grok_home).expect("create GROK_HOME");
+    // Pin the leader socket under the shared FRIDAY_HOME so every spawn elects or attaches to the same leader (mirrors `LeaderCluster`)
+    let grok_home = content.home().join(".friday");
+    std::fs::create_dir_all(&grok_home).expect("create FRIDAY_HOME");
     std::fs::write(
         grok_home.join("config.toml"),
         format!("[models]\ndefault = \"{CONFIG_MODEL}\"\n"),
@@ -38,7 +38,7 @@ async fn campaign_leader_mode_remote_dismiss_on_model_pick() {
     let socket = grok_home.join("leader-e2e.sock");
     let socket = socket.to_str().expect("socket path is utf-8").to_owned();
 
-    // Use session (OAuth) auth instead of the harness's default XAI_API_KEY
+    // Use session (OAuth) auth instead of the harness's default FRIDAY_X_TOKEN
     // The settings fetch requires `auth_manager.auth()`: in ApiKey/BYOK mode the pager never requests `/v1/settings`
     // Without that request a remote campaign can never reach the pager (see `spawn_polling_session`'s doc)
     seed_fake_oauth(&content, "pty-campaign-leader");

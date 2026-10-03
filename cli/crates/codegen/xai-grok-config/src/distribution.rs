@@ -17,7 +17,7 @@ pub enum Capability {
     ErrorReporting,
     /// `/v1/models` and `/v1/settings` fetches and the managed-config sync.
     RemoteFetch,
-    /// A login kept in `auth.json` or `GROK_AUTH`, an auth provider command, and signing in to or
+    /// A login kept in `auth.json` or `FRIDAY_AUTH`, an auth provider command, and signing in to or
     /// out of an account. Without it the only credential is the API key the build was given.
     AccountLogin,
     /// Controlling this machine from other devices.

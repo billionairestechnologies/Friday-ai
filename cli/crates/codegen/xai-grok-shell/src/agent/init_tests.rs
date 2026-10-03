@@ -104,11 +104,11 @@ fn file_len_and_mtime(path: &std::path::Path) -> Option<(u64, Option<std::time::
 fn unit_test_bootstrap_does_not_touch_the_managed_config_lock() {
     let dir = tempfile::tempdir().expect("tempdir");
     let home = dir.path().to_str().expect("utf8 temp home");
-    let _env = crate::env::EnvVarGuard::set("GROK_HOME", home)
-        .and_set("GROK_DEPLOYMENT_KEY", "unit-test-deployment-key");
+    let _env = crate::env::EnvVarGuard::set("FRIDAY_HOME", home)
+        .and_set("FRIDAY_DEPLOYMENT_KEY", "unit-test-deployment-key");
     // `grok_home()` is a process-wide OnceLock. Read the env path directly so this
     // test neither observes a home cached by an earlier test nor pins one for later tests.
-    let grok_home = xai_dirs::resolve_grok_home().expect("GROK_HOME is set");
+    let grok_home = xai_dirs::resolve_grok_home().expect("FRIDAY_HOME is set");
     let lock = grok_home.join("managed_config.lock");
     let lock_before = file_len_and_mtime(&lock);
     let mut cfg = AgentConfig {

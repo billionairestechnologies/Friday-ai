@@ -146,9 +146,9 @@ impl Drop for EnvVarGuard {
         }
     }
 }
-/// Shared GROK_HOME boundary fixture for the resume-by-title startup and pre-sandbox tests. cwd-encoded dirnames
+/// Shared FRIDAY_HOME boundary fixture for the resume-by-title startup and pre-sandbox tests. cwd-encoded dirnames
 /// are tempdir-unique, and cleanup runs on drop so it survives assertion panics. Callers must hold
-/// `[serial_test::serial(GROK_HOME)]`.
+/// `[serial_test::serial(FRIDAY_HOME)]`.
 pub struct GrokHomeFixture {
     _home: tempfile::TempDir,
     cwd: tempfile::TempDir,
@@ -169,7 +169,7 @@ impl Default for GrokHomeFixture {
 impl GrokHomeFixture {
     pub fn new() -> Self {
         let home = tempfile::tempdir().expect("home tempdir");
-        unsafe { std::env::set_var("GROK_HOME", home.path()) };
+        unsafe { std::env::set_var("FRIDAY_HOME", home.path()) };
         let cwd = tempfile::tempdir().expect("cwd tempdir");
         Self {
             _home: home,

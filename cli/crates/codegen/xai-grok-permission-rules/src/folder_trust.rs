@@ -116,13 +116,13 @@ fn is_durably_trusted(feature_enabled: bool, inputs: &DecideInputs) -> bool {
     !feature_enabled || inputs.store_trusted
 }
 
-/// True for a binary built without a `GROK_VERSION` stamp.
+/// True for a binary built without a `FRIDAY_VERSION` stamp.
 /// That binary trusts every folder without reading the trust store.
 pub fn folder_trust_inert() -> bool {
     if std::env::var(xai_grok_version::TEST_VERSION_ENV).is_ok() {
         return false;
     }
-    option_env!("GROK_VERSION").is_none()
+    option_env!("FRIDAY_VERSION").is_none()
 }
 
 pub fn feature_enabled(remote: Option<&RemoteSettings>) -> bool {
@@ -142,7 +142,7 @@ fn feature_enabled_for_build(remote: Option<&RemoteSettings>, is_local_build: bo
             .and_then(|v| v.as_bool())
     };
 
-    BoolFlag::env("GROK_FOLDER_TRUST")
+    BoolFlag::env("FRIDAY_FOLDER_TRUST")
         .config(flag(user.as_ref()))
         .managed(flag(managed.as_ref()))
         .feature_flag(remote.and_then(|r| r.folder_trust_enabled))
@@ -309,8 +309,8 @@ mod tests {
     fn isolated_home() -> (std::sync::MutexGuard<'static, ()>, TempHome, EnvVar, EnvVar) {
         let lock = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
         let home = TempHome::new();
-        let home_var = EnvVar::set("GROK_HOME", home.0.to_str().expect("temp home is utf-8"));
-        let flag = EnvVar::unset("GROK_FOLDER_TRUST");
+        let home_var = EnvVar::set("FRIDAY_HOME", home.0.to_str().expect("temp home is utf-8"));
+        let flag = EnvVar::unset("FRIDAY_FOLDER_TRUST");
         (lock, home, home_var, flag)
     }
 
@@ -350,8 +350,8 @@ mod tests {
     fn local_build_ignores_explicit_env_optin() {
         let _lock = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
         let home = TempHome::new();
-        let _home_var = EnvVar::set("GROK_HOME", home.0.to_str().expect("temp home is utf-8"));
-        let _flag = EnvVar::set("GROK_FOLDER_TRUST", "1");
+        let _home_var = EnvVar::set("FRIDAY_HOME", home.0.to_str().expect("temp home is utf-8"));
+        let _flag = EnvVar::set("FRIDAY_FOLDER_TRUST", "1");
         assert!(!super::feature_enabled_for_build(None, true));
     }
 
@@ -369,7 +369,7 @@ mod tests {
             assert!(!folder_trust_inert());
         }
         let _unset = EnvVar::unset(xai_grok_version::TEST_VERSION_ENV);
-        if option_env!("GROK_VERSION").is_none() {
+        if option_env!("FRIDAY_VERSION").is_none() {
             assert!(folder_trust_inert());
         }
     }

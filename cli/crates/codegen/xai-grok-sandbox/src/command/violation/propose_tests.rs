@@ -18,7 +18,7 @@ struct Scratch {
 impl Scratch {
     fn new(tag: &str) -> Scratch {
         let root =
-            std::env::temp_dir().join(format!("grok-sandbox-propose-{tag}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("friday-sandbox-propose-{tag}-{}", std::process::id()));
         let ws = root.join("projects").join("ws");
         let home = root.join("home");
         std::fs::create_dir_all(&ws).unwrap();
@@ -125,7 +125,7 @@ fn a_folder_spelled_through_a_symlink_is_never_proposed() {
 #[test]
 fn a_path_no_grant_can_open_is_informational_in_both_read_modes() {
     let s = Scratch::new("read-floor");
-    let grok_home = s.home.join(".grok");
+    let grok_home = s.home.join(".friday");
     let deep = s.root.join("outside").join("deep");
     let denied = deep.join("dir");
     std::fs::create_dir_all(&grok_home).unwrap();

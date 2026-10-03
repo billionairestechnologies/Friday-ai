@@ -642,13 +642,13 @@ fn forward_lands_in_the_welcome_composer_when_the_action_leaves_welcome_up() {
 /// an ACK opens the y/N prompt. The forwarded `y` must not confirm it.
 #[cfg(feature = "local-workspace")]
 #[test]
-#[serial_test::serial(GROK_CHAT_LOCAL_WORKSPACE_ACK)]
+#[serial_test::serial(FRIDAY_CHAT_LOCAL_WORKSPACE_ACK)]
 fn leave_home_into_local_workspace_ack_keeps_the_keystroke_as_a_draft() {
     let _ack = xai_grok_test_support::EnvGuard::unset(
-        crate::app::session_startup::GROK_CHAT_LOCAL_WORKSPACE_ACK_ENV,
+        crate::app::session_startup::FRIDAY_CHAT_LOCAL_WORKSPACE_ACK_ENV,
     );
     let home = tempfile::tempdir().unwrap();
-    let _home = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path().to_str().unwrap());
+    let _home = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path().to_str().unwrap());
     crate::app::session_startup::set_active_local_workspace(None).unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let mut app = test_app();

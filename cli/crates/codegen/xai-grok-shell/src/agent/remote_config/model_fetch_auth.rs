@@ -81,7 +81,7 @@ pub(in crate::agent::remote_config) fn resolve_models_cache_scope(
             endpoints.deployment_key.as_deref().unwrap_or(""),
             alpha.unwrap_or(""),
         ]),
-        // Custom endpoints authenticate with `XAI_API_KEY`, else an external provider token.
+        // Custom endpoints authenticate with `FRIDAY_X_TOKEN`, else an external provider token.
         // Any other login identity never scopes this cache.
         ModelFetchAuth::CustomEndpoint => {
             match (read_xai_api_key_env(), external_provider_auth(auth)) {

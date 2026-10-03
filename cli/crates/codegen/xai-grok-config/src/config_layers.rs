@@ -1,5 +1,5 @@
 //! The layer *files* are read by [`crate::loader`].
-//! This module owns how those layers combine into the effective config: layer precedence, the `GROK_CONFIG` overlay, and campaign resolution.
+//! This module owns how those layers combine into the effective config: layer precedence, the `FRIDAY_CONFIG` overlay, and campaign resolution.
 
 use crate::loader::{
     deep_merge_toml, load_from_disk, load_managed_config, load_system_managed_config,
@@ -7,7 +7,7 @@ use crate::loader::{
 };
 use crate::validation::{load_requirements, load_system_requirements};
 
-/// Whether a layer merge includes the `GROK_CONFIG` overlay.
+/// Whether a layer merge includes the `FRIDAY_CONFIG` overlay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OverlayInclusion {
     Include,
@@ -20,7 +20,7 @@ pub struct ConfigLayers {
     pub system_managed: toml::Value,
     pub managed: toml::Value,
     pub user: toml::Value,
-    /// `GROK_CONFIG` / `GROK_CONFIG_PATH` overlay, above user but below requirements.
+    /// `FRIDAY_CONFIG` / `FRIDAY_CONFIG_PATH` overlay, above user but below requirements.
     /// Soft settings only; this doc is the canonical source of truth for what the overlay can and cannot reach.
     /// This is fail-closed: every code-exec, auth, egress, trust, or discovery table is absent from the allowlist and dropped by default.
     pub env_overlay: Option<toml::Value>,
@@ -112,14 +112,14 @@ impl ConfigLayers {
         })
     }
 
-    /// Layer merge (no campaigns), including the `GROK_CONFIG` overlay.
+    /// Layer merge (no campaigns), including the `FRIDAY_CONFIG` overlay.
     /// Overlay-inclusive: security gates must not read this.
     /// Use [`Self::effective_config_base_without_overlay`] for any gate (the overlay-free set is enumerated on [`Self::env_overlay`]).
     pub fn effective_config_base(&self) -> toml::Value {
         self.merge(OverlayInclusion::Include)
     }
 
-    /// Layer merge excluding the `GROK_CONFIG` overlay, for security gates.
+    /// Layer merge excluding the `FRIDAY_CONFIG` overlay, for security gates.
     pub fn effective_config_base_without_overlay(&self) -> toml::Value {
         self.merge(OverlayInclusion::Exclude)
     }
@@ -173,7 +173,7 @@ impl ConfigLayers {
     }
 
     /// Active campaigns against `base`: the kill switch, then the priority merge (first-id-wins), then dropping dismissed ids.
-    /// The environment-aware path is `effective_config::CampaignOverlay`, which also applies `GROK_CAMPAIGNS_OVERRIDE`.
+    /// The environment-aware path is `effective_config::CampaignOverlay`, which also applies `FRIDAY_CAMPAIGNS_OVERRIDE`.
     pub fn resolve_campaigns(
         &self,
         base: &toml::Value,
@@ -206,7 +206,7 @@ impl ConfigLayers {
         }
     }
 
-    /// Apply campaign patches, re-apply the `GROK_CONFIG` overlay, then restore requirements.
+    /// Apply campaign patches, re-apply the `FRIDAY_CONFIG` overlay, then restore requirements.
     pub fn apply_campaign_overrides(
         &self,
         merged: &mut toml::Value,
@@ -253,9 +253,9 @@ impl ConfigLayers {
     }
 }
 
-/// `GROK_CAMPAIGNS=0` or `[features] campaigns = false` on pre-campaign base.
+/// `FRIDAY_CAMPAIGNS=0` or `[features] campaigns = false` on pre-campaign base.
 pub fn campaigns_application_disabled(base_effective: &toml::Value) -> bool {
-    crate::env_bool("GROK_CAMPAIGNS") == Some(false) || campaigns_disabled_in_config(base_effective)
+    crate::env_bool("FRIDAY_CAMPAIGNS") == Some(false) || campaigns_disabled_in_config(base_effective)
 }
 
 /// `[features] campaigns = false` on pre-campaign base.
@@ -267,7 +267,7 @@ pub(crate) fn campaigns_disabled_in_config(base_effective: &toml::Value) -> bool
         == Some(false)
 }
 
-/// Process-global `GROK_CAMPAIGNS` lock. A mutex local to the setter is not
+/// Process-global `FRIDAY_CAMPAIGNS` lock. A mutex local to the setter is not
 /// enough because `effective_config_with_campaigns` also reads the var.
 #[cfg(test)]
 pub(crate) fn lock_grok_campaigns_env() -> std::sync::MutexGuard<'static, ()> {
@@ -276,7 +276,7 @@ pub(crate) fn lock_grok_campaigns_env() -> std::sync::MutexGuard<'static, ()> {
 }
 
 /// Disk layers only (no remote, no env override).
-/// Prefer `xai_grok_shell::util::config::load_effective_config` when remote campaigns or `GROK_CAMPAIGNS_OVERRIDE` must be honored.
+/// Prefer `xai_grok_shell::util::config::load_effective_config` when remote campaigns or `FRIDAY_CAMPAIGNS_OVERRIDE` must be honored.
 /// The name mirrors [`ConfigLayers::effective_config_disk_only`] so the divergence from the remote-aware loader is explicit at every call site.
 pub fn load_effective_config_disk_only() -> std::io::Result<toml::Value> {
     Ok(ConfigLayers::load()?.effective_config_disk_only())
@@ -293,12 +293,12 @@ pub struct CampaignsState {
     pub dismissed_ids: Vec<String>,
 }
 
-/// Path to `$GROK_HOME/campaigns_state.json` under `home`.
+/// Path to `$FRIDAY_HOME/campaigns_state.json` under `home`.
 pub fn campaigns_state_path(home: &std::path::Path) -> std::path::PathBuf {
     home.join(CAMPAIGNS_STATE_FILE)
 }
 
-/// Fail-open dismissed ids from `$GROK_HOME/campaigns_state.json`.
+/// Fail-open dismissed ids from `$FRIDAY_HOME/campaigns_state.json`.
 pub fn load_dismissed_ids_from_home() -> std::collections::HashSet<String> {
     crate::user_grok_home()
         .map(|grok_home| load_dismissed_ids(&grok_home))
@@ -355,24 +355,24 @@ mod tests {
         );
     }
 
-    /// `GROK_CAMPAIGNS=0` disables campaign application regardless of config.
+    /// `FRIDAY_CAMPAIGNS=0` disables campaign application regardless of config.
     #[test]
     fn kill_switch_env_var_disables() {
         let _g = lock_grok_campaigns_env();
-        let prior = std::env::var_os("GROK_CAMPAIGNS");
+        let prior = std::env::var_os("FRIDAY_CAMPAIGNS");
         let empty = toml::Value::Table(Default::default());
 
         // SAFETY: `lock_grok_campaigns_env` serializes this against every test that
-        // mutates or reads GROK_CAMPAIGNS.
-        unsafe { std::env::set_var("GROK_CAMPAIGNS", "0") };
+        // mutates or reads FRIDAY_CAMPAIGNS.
+        unsafe { std::env::set_var("FRIDAY_CAMPAIGNS", "0") };
         assert!(campaigns_application_disabled(&empty));
 
-        unsafe { std::env::remove_var("GROK_CAMPAIGNS") };
+        unsafe { std::env::remove_var("FRIDAY_CAMPAIGNS") };
         assert!(!campaigns_application_disabled(&empty));
 
         match prior {
-            Some(v) => unsafe { std::env::set_var("GROK_CAMPAIGNS", v) },
-            None => unsafe { std::env::remove_var("GROK_CAMPAIGNS") },
+            Some(v) => unsafe { std::env::set_var("FRIDAY_CAMPAIGNS", v) },
+            None => unsafe { std::env::remove_var("FRIDAY_CAMPAIGNS") },
         }
     }
 

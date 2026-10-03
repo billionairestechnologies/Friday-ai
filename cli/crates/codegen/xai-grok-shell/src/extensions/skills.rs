@@ -270,9 +270,9 @@ fn discover_auto_sources(cwd: &str, skills: &[SkillInfo]) -> Vec<(String, usize)
     // list_skills_with_plugins still does not read extra_skill_dirs.
     let imported = crate::claude_import::is_claude_import_marked();
     let local_dir_names: &[&str] = if imported {
-        &[".grok", ".agents"]
+        &[".friday", ".agents"]
     } else {
-        &[".grok", ".agents", ".claude"]
+        &[".friday", ".agents", ".claude"]
     };
 
     let mut sources: Vec<(String, usize)> = Vec::new();

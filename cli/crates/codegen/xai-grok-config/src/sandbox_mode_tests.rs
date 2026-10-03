@@ -281,7 +281,7 @@ fn remote_beats_user_config_as_the_rollout_switch() {
     );
 }
 
-/// A cloned repository's `.grok/workspaced.toml` cannot lower the user's
+/// A cloned repository's `.friday/workspaced.toml` cannot lower the user's
 /// mode.
 #[test]
 fn workspace_config_may_only_tighten_the_user_mode() {

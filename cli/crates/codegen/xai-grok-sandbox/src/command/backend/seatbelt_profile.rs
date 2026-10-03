@@ -290,7 +290,7 @@ fn file_filters(filters: &[PathFilter]) -> String {
 
 /// The SBPL filters that select one pinned entry, each a complete term usable as a rule filter or
 /// inside `require-not`. `literal` as well as `subpath` for a path: `subpath` alone leaves
-/// first-time creation of the protected directory itself (`mkdir .grok`) open. A glob is one
+/// first-time creation of the protected directory itself (`mkdir .friday`) open. A glob is one
 /// anchored regex per alias form, for the match and for what lies beneath it. A tree-except is
 /// `(require-all (require-any (literal T) (subpath T)) (require-not (subpath E)) …)`.
 fn pinned_filters(

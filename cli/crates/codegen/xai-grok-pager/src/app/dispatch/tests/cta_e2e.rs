@@ -516,7 +516,7 @@ fn plugin_cta_catalog_load_recomputes_match_for_typed_draft() {
         HOME.get_or_init(|| {
             let tmp = tempfile::tempdir().expect("tempdir creation");
             unsafe {
-                std::env::set_var("GROK_HOME", tmp.path());
+                std::env::set_var("FRIDAY_HOME", tmp.path());
             }
             tmp
         });
@@ -1667,7 +1667,7 @@ mod cta_e2e {
         HOME.get_or_init(|| {
             let tmp = tempfile::tempdir().expect("tempdir creation");
             unsafe {
-                std::env::set_var("GROK_HOME", tmp.path());
+                std::env::set_var("FRIDAY_HOME", tmp.path());
             }
             tmp
         });

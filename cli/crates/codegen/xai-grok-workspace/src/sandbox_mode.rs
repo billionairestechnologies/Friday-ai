@@ -1,18 +1,18 @@
-//! Per-workspace resolution of the command-sandbox rollout mode: `GROK_SANDBOX_MODE`, then the
+//! Per-workspace resolution of the command-sandbox rollout mode: `FRIDAY_SANDBOX_MODE`, then the
 //! fleet layer (`RemoteSettings.sandbox_mode`, else the host's `<grok_home>/managed_config.toml`),
 //! then `<grok_home>/workspaced.toml`, then the default (`off`); the workspace's
-//! `<workspace>/.grok/workspaced.toml` may only tighten the result. On a host with no sandbox
+//! `<workspace>/.friday/workspaced.toml` may only tighten the result. On a host with no sandbox
 //! backend, an `enforce` the rollout switch set runs as `off` (`SandboxMode::resolve_on_host`);
 //! a developer's own `enforce` keeps refusing there.
 //!
-//! Both files are the daemon's own: the `grok` CLI's `config.toml` is neither read nor written
+//! Both files are the daemon's own: the `friday` CLI's `config.toml` is neither read nor written
 //! here. They are read as the daemon reads any file a command could have planted — opened
 //! without following a symlink or blocking, only when a regular file (the user's own, for the
 //! user layer), up to a bound. A symlink on the way to a layer below the folder, or at or below
-//! the grok home — the file, a planted `.grok`, a linked grok home — is followed only to a file
+//! the grok home — the file, a planted `.friday`, a linked grok home — is followed only to a file
 //! outside every place a command may write or may have written, and that file is read the same
 //! way; `sandbox.mode.set` never writes through one. A layer whose directory is not one (a
-//! `.grok` that is a file) is absent, as a missing one is.
+//! `.friday` that is a file) is absent, as a missing one is.
 //!
 //! Invariants:
 //!
@@ -27,7 +27,7 @@
 //!    is read as the file itself would be.
 //! 3. **Links into writable places are refused**, as invariant 1 says: into the workspace, a
 //!    build-cache tree, or a place a grant or another served folder opened; a link at the file
-//!    or at a directory on the way (`.grok`) alike, and `sandbox.mode.set` writes through none.
+//!    or at a directory on the way (`.friday`) alike, and `sandbox.mode.set` writes through none.
 //!
 //! The precedence itself is `xai_grok_sandbox::command::SandboxMode::resolve`; this module reads
 //! the layers, so the pure logic and the IO are tested apart.
@@ -48,7 +48,7 @@ use xai_grok_sandbox::command::{SandboxMode, WritableLocations, canonical_path, 
 pub struct SandboxModeInputs<'a> {
     pub workspace_root: &'a Path,
     pub grok_home: &'a Path,
-    /// The already-read `GROK_SANDBOX_MODE` value.
+    /// The already-read `FRIDAY_SANDBOX_MODE` value.
     pub env: Option<&'a str>,
     /// The fleet's remote settings, when the caller has them; `None` reads the host's managed
     /// config file for them ([`managed_mode_layer`]).
@@ -120,10 +120,10 @@ pub fn user_config_path(grok_home: &Path) -> PathBuf {
     grok_home.join(WORKSPACED_CONFIG_FILENAME)
 }
 
-/// The workspace layer's file: `<workspace_root>/.grok/workspaced.toml`.
+/// The workspace layer's file: `<workspace_root>/.friday/workspaced.toml`.
 pub fn workspace_config_path(workspace_root: &Path) -> PathBuf {
     workspace_root
-        .join(".grok")
+        .join(".friday")
         .join(WORKSPACED_CONFIG_FILENAME)
 }
 
@@ -202,7 +202,7 @@ pub enum SandboxModeWriteError {
 /// are resolved again, so the answer is the mode the folder is in *now* and where it came from
 /// (the workspace layer only tightens: a `mode.set off` under a user layer of `observe` answers
 /// `observe` / `user_config`). A `workspace_root` that is not a directory is refused — the write
-/// creates `.grok/`, never the folder. A served folder's sandbox wraps this and drops its cached
+/// creates `.friday/`, never the folder. A served folder's sandbox wraps this and drops its cached
 /// resolution; [`set_workspace_mode_at`] is the same for a folder nothing serves.
 ///
 /// # Errors
@@ -245,12 +245,12 @@ pub fn set_workspace_mode_at(
     )
 }
 
-/// Set `[sandbox] mode` in the workspace's `.grok/workspaced.toml` (`sandbox.mode.set`), keeping
-/// every other key and comment and replacing the file atomically. Creates `.grok/` and the file
+/// Set `[sandbox] mode` in the workspace's `.friday/workspaced.toml` (`sandbox.mode.set`), keeping
+/// every other key and comment and replacing the file atomically. Creates `.friday/` and the file
 /// when absent. Returns the path written. The CLI's `config.toml` beside it is never touched.
 ///
 /// # Errors
-/// The folder's `.grok` is the grok home (the file is the user layer every folder reads) or a
+/// The folder's `.friday` is the grok home (the file is the user layer every folder reads) or a
 /// symlink ([`HeldDir`]), the file exists but is not TOML, `[sandbox]` is not a table, or the
 /// write fails.
 pub fn write_workspace_sandbox_mode(
@@ -273,7 +273,7 @@ pub fn write_workspace_sandbox_mode_in(
     // SECURITY: for the home folder the workspace file is the user layer; a folder's write may
     // only tighten that folder, never switch every folder's mode
     if is_same_path(
-        &canonical_path(&workspace_root.join(".grok")),
+        &canonical_path(&workspace_root.join(".friday")),
         &canonical_path(grok_home),
     ) {
         return Err(SandboxModeWriteError::UserLayer { path });
@@ -282,11 +282,11 @@ pub fn write_workspace_sandbox_mode_in(
     AFTER_USER_LAYER_CHECK.with_borrow_mut(|hook| hook.as_mut().map(|hook| hook()));
     let anchor = canonical_path(workspace_root);
     let create_dir = |source| SandboxModeWriteError::CreateDir {
-        path: workspace_root.join(".grok"),
+        path: workspace_root.join(".friday"),
         source,
     };
     let dir =
-        HeldDir::open(&anchor, &anchor.join(".grok"), FileOwner::Any, true).map_err(create_dir)?;
+        HeldDir::open(&anchor, &anchor.join(".friday"), FileOwner::Any, true).map_err(create_dir)?;
     // The root may have been relinked since the check above; the held handle cannot be
     if dir.is(grok_home).map_err(create_dir)? {
         return Err(SandboxModeWriteError::UserLayer { path });
@@ -406,7 +406,7 @@ fn read_layer_mode(
 }
 
 /// The layer file's text, `path` lying below `anchor` (the served folder, or the grok home's
-/// parent so a planted `.grok` link is judged); through a link only its real path is read, and
+/// parent so a planted `.friday` link is judged); through a link only its real path is read, and
 /// only where no command may write ([`real_path_below`]).
 fn read_layer_text(
     path: &Path,

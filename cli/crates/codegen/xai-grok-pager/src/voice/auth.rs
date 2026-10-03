@@ -36,7 +36,7 @@ impl VoiceAuthProvider for AuthManagerVoiceAuth {
 }
 /// Build the voice bearer provider from the connection's `AuthManager`.
 ///
-/// Serves xAI logins and `XAI_API_KEY` / per-model BYOK keys. A foreign-issuer login resolves to
+/// Serves xAI logins and `FRIDAY_X_TOKEN` / per-model BYOK keys. A foreign-issuer login resolves to
 /// [`VoiceAuthError::ForeignSession`] instead of a bearer.
 fn build_voice_auth(auth_manager: Arc<xai_grok_login::AuthManager>) -> SharedVoiceAuth {
     Arc::new(AuthManagerVoiceAuth(

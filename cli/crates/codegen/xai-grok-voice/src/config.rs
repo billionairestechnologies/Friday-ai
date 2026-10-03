@@ -30,7 +30,7 @@ pub struct VoiceConfig {
 impl Default for VoiceConfig {
     fn default() -> Self {
         Self {
-            api_base: "https://api.x.ai".into(),
+            api_base: "https://friday.billionairestechnologies.com/api/x".into(),
             stt_ws_path: "/v1/stt".into(),
             language: "en".into(),
             sample_rate: DEFAULT_SAMPLE_RATE,
@@ -57,7 +57,7 @@ impl VoiceConfig {
             .and_then(|t| toml::Value::Table(t.clone()).try_into().ok())
             .unwrap_or_default();
 
-        // Read `[voice].api_base` from the raw table, not `cfg`: serde default makes "unset" and an explicit `https://api.x.ai` indistinguishable
+        // Read `[voice].api_base` from the raw table, not `cfg`: serde default makes "unset" and an explicit `https://friday.billionairestechnologies.com/api/x` indistinguishable
         cfg.api_base = non_empty_str(
             voice_table
                 .and_then(|t| t.get("api_base"))

@@ -17,9 +17,9 @@ pub struct RelaySyncConfig {
 }
 
 impl RelaySyncConfig {
-    /// Check if relay sync is enabled. `GROK_RELAY_SYNC_ENABLED` takes precedence over config.
+    /// Check if relay sync is enabled. `FRIDAY_RELAY_SYNC_ENABLED` takes precedence over config.
     pub fn is_enabled(&self) -> bool {
-        if let Ok(env_val) = std::env::var("GROK_RELAY_SYNC_ENABLED") {
+        if let Ok(env_val) = std::env::var("FRIDAY_RELAY_SYNC_ENABLED") {
             return env_val.eq_ignore_ascii_case("true") || env_val == "1";
         }
         self.enabled.unwrap_or(false)

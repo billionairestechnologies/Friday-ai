@@ -282,7 +282,7 @@ mod tests {
     // Struct field order (see lib.rs) restores the env before the lock releases, no matter how the caller binds the fixture's return
     use crate::LockedTestEnv;
 
-    /// Point `GROK_HOME` at an isolated tempdir and register one grok-managed worktree at `<home>/worktrees/repo/<name>`.
+    /// Point `FRIDAY_HOME` at an isolated tempdir and register one grok-managed worktree at `<home>/worktrees/repo/<name>`.
     /// The worktree dir is a PLAIN directory (NOT a git linked worktree), so only the registry can collapse it.
     fn register_grok_worktree(
         temp: &tempfile::TempDir,
@@ -299,7 +299,7 @@ mod tests {
         std::fs::create_dir_all(&wt).unwrap();
 
         // Acquire the lock, then set the env under it (LockedTestEnv restores the env before releasing the lock on drop)
-        let env = LockedTestEnv::lock().set("GROK_HOME", &home);
+        let env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
 
         let db = WorktreeDb::open(&home).unwrap();
         let record = WorktreeRecord {
@@ -339,7 +339,7 @@ mod tests {
         assert_eq!(
             workspace_key(&wt),
             expected,
-            "a standalone grok worktree must collapse onto its recorded source repo"
+            "a standalone friday worktree must collapse onto its recorded source repo"
         );
         // A cwd nested below the worktree root collapses onto the same key (the registry walk ascends to the registered worktree)
         let nested = wt.join("crates").join("inner");

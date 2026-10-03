@@ -53,13 +53,13 @@ fn scratch(tag: &str) -> PathBuf {
 #[test]
 fn protected_table_is_pinned() {
     let ws = Path::new("/opt/ws-fixture/ws");
-    let grok_home = Path::new("/opt/ws-fixture/u/.grok");
+    let grok_home = Path::new("/opt/ws-fixture/u/.friday");
     let home = Path::new("/opt/ws-fixture/u");
     let got = floor(&inputs(&ServedRoot::pin(ws), grok_home, home));
     let own_session = xai_grok_config::sessions_cwd_dir_in(grok_home, "/opt/ws-fixture/ws");
     let mut expected: Vec<Protected> = [
         // the workspace's own agent/editor config trees
-        "/opt/ws-fixture/ws/.grok",
+        "/opt/ws-fixture/ws/.friday",
         "/opt/ws-fixture/ws/.cursor",
         "/opt/ws-fixture/ws/.claude",
         "/opt/ws-fixture/ws/.vscode",
@@ -70,38 +70,38 @@ fn protected_table_is_pinned() {
         "/opt/ws-fixture/ws/.git/config.worktree",
         "/opt/ws-fixture/ws/.git/info",
         // grok home: trust boundary files, hook sources, grants, the daemon's settings
-        "/opt/ws-fixture/u/.grok/config.toml",
-        "/opt/ws-fixture/u/.grok/trusted_folders.toml",
-        "/opt/ws-fixture/u/.grok/managed_config.toml",
-        "/opt/ws-fixture/u/.grok/requirements.toml",
-        "/opt/ws-fixture/u/.grok/sandbox.toml",
-        "/opt/ws-fixture/u/.grok/hooks",
-        "/opt/ws-fixture/u/.grok/hooks-paths",
-        "/opt/ws-fixture/u/.grok/sandbox_grants.toml",
-        "/opt/ws-fixture/u/.grok/sandbox_grants.toml.lock",
-        "/opt/ws-fixture/u/.grok/workspaced.toml",
+        "/opt/ws-fixture/u/.friday/config.toml",
+        "/opt/ws-fixture/u/.friday/trusted_folders.toml",
+        "/opt/ws-fixture/u/.friday/managed_config.toml",
+        "/opt/ws-fixture/u/.friday/requirements.toml",
+        "/opt/ws-fixture/u/.friday/sandbox.toml",
+        "/opt/ws-fixture/u/.friday/hooks",
+        "/opt/ws-fixture/u/.friday/hooks-paths",
+        "/opt/ws-fixture/u/.friday/sandbox_grants.toml",
+        "/opt/ws-fixture/u/.friday/sandbox_grants.toml.lock",
+        "/opt/ws-fixture/u/.friday/workspaced.toml",
         // what grok itself runs, starts or loads into a prompt
-        "/opt/ws-fixture/u/.grok/bin",
-        "/opt/ws-fixture/u/.grok/downloads",
-        "/opt/ws-fixture/u/.grok/vendor",
-        "/opt/ws-fixture/u/.grok/plugins",
-        "/opt/ws-fixture/u/.grok/installed-plugins",
-        "/opt/ws-fixture/u/.grok/plugin-data",
-        "/opt/ws-fixture/u/.grok/marketplace-cache",
-        "/opt/ws-fixture/u/.grok/skills",
-        "/opt/ws-fixture/u/.grok/agents",
-        "/opt/ws-fixture/u/.grok/personas",
-        "/opt/ws-fixture/u/.grok/roles",
-        "/opt/ws-fixture/u/.grok/rules",
-        "/opt/ws-fixture/u/.grok/workflows",
-        "/opt/ws-fixture/u/.grok/bundled",
-        "/opt/ws-fixture/u/.grok/memory",
-        "/opt/ws-fixture/u/.grok/memory-v2",
-        "/opt/ws-fixture/u/.grok/docs",
-        "/opt/ws-fixture/u/.grok/mcp.json",
-        "/opt/ws-fixture/u/.grok/lsp.json",
-        "/opt/ws-fixture/u/.grok/extensions",
-        "/opt/ws-fixture/u/.grok/pager.toml",
+        "/opt/ws-fixture/u/.friday/bin",
+        "/opt/ws-fixture/u/.friday/downloads",
+        "/opt/ws-fixture/u/.friday/vendor",
+        "/opt/ws-fixture/u/.friday/plugins",
+        "/opt/ws-fixture/u/.friday/installed-plugins",
+        "/opt/ws-fixture/u/.friday/plugin-data",
+        "/opt/ws-fixture/u/.friday/marketplace-cache",
+        "/opt/ws-fixture/u/.friday/skills",
+        "/opt/ws-fixture/u/.friday/agents",
+        "/opt/ws-fixture/u/.friday/personas",
+        "/opt/ws-fixture/u/.friday/roles",
+        "/opt/ws-fixture/u/.friday/rules",
+        "/opt/ws-fixture/u/.friday/workflows",
+        "/opt/ws-fixture/u/.friday/bundled",
+        "/opt/ws-fixture/u/.friday/memory",
+        "/opt/ws-fixture/u/.friday/memory-v2",
+        "/opt/ws-fixture/u/.friday/docs",
+        "/opt/ws-fixture/u/.friday/mcp.json",
+        "/opt/ws-fixture/u/.friday/lsp.json",
+        "/opt/ws-fixture/u/.friday/extensions",
+        "/opt/ws-fixture/u/.friday/pager.toml",
         // shell rc files and what they load: the next login runs them
         "/opt/ws-fixture/u/.bashrc",
         "/opt/ws-fixture/u/.bash_aliases",
@@ -214,7 +214,7 @@ fn protected_table_is_pinned() {
 #[test]
 fn the_grok_home_is_a_floor_tree_but_the_command_dir_or_a_workspace_inside_it() {
     let home = Path::new("/opt/ws-fixture/u");
-    let grok_home = home.join(".grok");
+    let grok_home = home.join(".friday");
     let ws = Path::new("/opt/ws-fixture/ws");
     let got = floor(&inputs(&ServedRoot::pin(ws), &grok_home, home));
     let own_session = xai_grok_config::sessions_cwd_dir_in(&grok_home, "/opt/ws-fixture/ws");
@@ -278,7 +278,7 @@ fn secret_stores_path_dirs_and_persistence_trees_are_in_the_floor() {
     let home = Path::new("/opt/ws-fixture/u");
     let got = floor(&inputs(
         &ServedRoot::pin(Path::new("/opt/ws-fixture/ws")),
-        Path::new("/opt/ws-fixture/u/.grok"),
+        Path::new("/opt/ws-fixture/u/.friday"),
         home,
     ));
     for rel in [
@@ -322,7 +322,7 @@ fn covers_matches_components_not_prefix_bytes() {
 #[test]
 fn a_case_variant_of_a_missing_floor_entry_is_protected_where_apfs_folds_case() {
     let ws = scratch("case-variant");
-    let grok_home = ws.join("home/.grok");
+    let grok_home = ws.join("home/.friday");
     let home = ws.join("home");
     let floor = floor(&inputs(&ServedRoot::pin(&ws), &grok_home, &home));
     assert!(is_protected(&ws.join(".git/hooks/pre-commit"), &floor));
@@ -330,7 +330,7 @@ fn a_case_variant_of_a_missing_floor_entry_is_protected_where_apfs_folds_case() 
         ws.join(".GIT/Hooks/pre-commit"),
         ws.join(".git/CONFIG"),
         ws.join(".git/modules/lib/HOOKS/post-checkout"),
-        ws.join(".Grok/config.toml"),
+        ws.join(".Friday X/config.toml"),
         home.join(".SSH/config"),
     ] {
         assert_eq!(
@@ -363,7 +363,7 @@ fn is_protected_folds_dots_before_asking() {
 /// `permission_<client>.toml` written later — but its command directory.
 #[test]
 fn every_session_directory_is_protected_but_the_own_command_directory() {
-    let grok_home = Path::new("/opt/ws-fixture/u/.grok");
+    let grok_home = Path::new("/opt/ws-fixture/u/.friday");
     let got = floor(&inputs(
         &ServedRoot::pin(Path::new("/opt/ws-fixture/ws")),
         grok_home,
@@ -406,7 +406,7 @@ fn every_session_directory_is_protected_but_the_own_command_directory() {
 #[test]
 fn the_own_grant_files_are_enumerated_as_the_volume_compares_names() {
     let root = scratch("unspellable-home");
-    let grok_home = root.join("u[1]/.grok");
+    let grok_home = root.join("u[1]/.friday");
     let ws = root.join("ws");
     let own = own_session_dir(&inputs(&ServedRoot::pin(&ws), &grok_home, &root));
     std::fs::create_dir_all(&own).unwrap();
@@ -559,7 +559,7 @@ fn racing_creators_of_one_lock_sidecar_all_open_it() {
 fn a_directory_writer_is_not_starved_by_one_re_taking_the_lock_back_to_back() {
     const WAIT: Duration = Duration::from_secs(2);
     let root = scratch("held-turns");
-    let dir = root.join(".grok");
+    let dir = root.join(".friday");
     std::fs::create_dir(&dir).unwrap();
     let stop = Arc::new(AtomicBool::new(false));
     let held = Arc::new(AtomicUsize::new(0));
@@ -848,12 +848,12 @@ fn reaches_into_selects_the_carve_outs_of_a_root() {
     let home = Path::new("/opt/ws-fixture/u");
     let got = floor(&inputs(
         &ServedRoot::pin(ws),
-        home.join(".grok").as_path(),
+        home.join(".friday").as_path(),
         home,
     ));
     let ws_carve: Vec<&Protected> = got.iter().filter(|e| e.reaches_into(ws)).collect();
     assert!(ws_carve.contains(&&path(ws.join(".git/hooks"))));
-    assert!(ws_carve.contains(&&path(ws.join(".grok"))));
+    assert!(ws_carve.contains(&&path(ws.join(".friday"))));
     assert!(ws_carve.contains(&&glob(format!("{}/.git/modules/**/hooks", ws.display()))));
     assert!(!ws_carve.iter().any(|e| e.covers(&home.join(".bashrc"))));
     let home_carve: Vec<&Protected> = got.iter().filter(|e| e.reaches_into(home)).collect();
@@ -906,7 +906,7 @@ fn a_root_at_or_beneath_a_globs_literal_prefix_is_carved_and_ungrantable() {
 #[test]
 fn anchor_is_the_path_the_tree_or_the_globs_literal_prefix() {
     let ws = Path::new("/opt/ws-fixture/ws");
-    assert_eq!(ws.join(".grok"), path(ws.join(".grok")).anchor());
+    assert_eq!(ws.join(".friday"), path(ws.join(".friday")).anchor());
     assert_eq!(
         ws.join(".git/modules"),
         glob(format!("{}/.git/modules/**/hooks", ws.display())).anchor()
@@ -1019,7 +1019,7 @@ fn home_files_linked_to_each_other_run_without_a_search() {
     std::fs::create_dir_all(home.join("dotfiles")).unwrap();
     std::fs::write(home.join(".bashrc"), "# rc\n").unwrap();
     std::fs::hard_link(home.join(".bashrc"), home.join(".bash_profile")).unwrap();
-    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".grok"), &home));
+    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".friday"), &home));
     let roots = std::slice::from_ref(&ws);
     let searches = ROOT_SEARCHES.get();
     assert_eq!(None, hard_linked_protected_file(&floor, roots));
@@ -1274,7 +1274,7 @@ fn a_100k_entry_workspace_without_a_leftover_link_runs_with_no_scan() {
     std::fs::create_dir_all(&home).unwrap();
     std::fs::write(home.join(".bashrc"), "").unwrap();
     std::fs::hard_link(home.join(".bashrc"), home.join(".bash_profile")).unwrap();
-    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".grok"), &home));
+    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".friday"), &home));
     let roots = std::slice::from_ref(&ws);
     let (searches, read) = (ROOT_SEARCHES.get(), ENTRIES_READ.get());
     assert_eq!(None, hard_linked_protected_file(&floor, roots));
@@ -1306,7 +1306,7 @@ fn an_alias_linked_deep_in_a_write_root_after_a_clean_command_is_refused_on_the_
     std::fs::create_dir_all(home.join("dotfiles")).unwrap();
     std::fs::write(home.join(".bashrc"), "# rc\n").unwrap();
     std::fs::hard_link(home.join(".bashrc"), home.join("dotfiles/bashrc")).unwrap();
-    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".grok"), &home));
+    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".friday"), &home));
     let roots = std::slice::from_ref(&ws);
     let times = |meta: std::fs::Metadata| (meta.mtime(), meta.mtime_nsec(), meta.ctime());
     let searches = ROOT_SEARCHES.get();
@@ -1333,7 +1333,7 @@ fn an_alias_linked_deep_in_a_write_root_after_a_clean_command_is_refused_on_the_
 fn another_folders_grant_file_linked_into_a_write_root_is_refused() {
     let root = scratch("nlink-other-folder");
     let (ws, home) = (root.join("ws"), root.join("home"));
-    let grok_home = home.join(".grok");
+    let grok_home = home.join(".friday");
     std::fs::create_dir_all(&ws).unwrap();
     let served = ServedRoot::pin(&ws);
     let floor_now = || floor(&inputs(&served, &grok_home, &home));
@@ -1389,7 +1389,7 @@ fn symlinks_are_neither_walked_nor_aliases_in_the_hard_link_check() {
     symlink(&outside, ws.join("vendor")).unwrap();
     symlink(&outside, ws.join(".git/hooks/lib")).unwrap();
     symlink(&config, ws.join("config-link")).unwrap();
-    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".grok"), &home));
+    let floor = floor(&inputs(&ServedRoot::pin(&ws), &home.join(".friday"), &home));
     let roots = std::slice::from_ref(&ws);
     let (searches, read) = (ROOT_SEARCHES.get(), ENTRIES_READ.get());
     assert_eq!(None, hard_linked_protected_file(&floor, roots));
@@ -1408,7 +1408,7 @@ fn symlinks_are_neither_walked_nor_aliases_in_the_hard_link_check() {
     std::fs::write(&bashrc, "# rc\n").unwrap();
     std::fs::hard_link(&bashrc, root.join("bashrc.bak")).unwrap();
     symlink(&bashrc, home.join(".bashrc")).unwrap();
-    let floor = super::floor(&inputs(&ServedRoot::pin(&ws), &home.join(".grok"), &home));
+    let floor = super::floor(&inputs(&ServedRoot::pin(&ws), &home.join(".friday"), &home));
     assert!(floor.contains(&Protected::Path {
         path: bashrc.clone()
     }));
@@ -1472,7 +1472,7 @@ fn an_enumerated_modules_directory_is_never_listed_through_a_symlink() {
 #[test]
 fn protected_entries_round_trip_through_serde() {
     let entries = vec![
-        path("/opt/ws-fixture/ws/.grok"),
+        path("/opt/ws-fixture/ws/.friday"),
         glob("/opt/ws-fixture/ws/.git/modules/**/hooks"),
         Protected::TreeExcept {
             tree: PathBuf::from("/gh/sessions"),

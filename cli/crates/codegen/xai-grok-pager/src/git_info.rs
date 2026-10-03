@@ -203,7 +203,7 @@ fn compute_snapshot(cwd: &Path) -> GitSnapshot {
         .then(|| repo.commondir().parent().map(collapse_home))
         .flatten();
 
-    // Standalone grok worktrees are CoW clones (`.git` is a directory), so `path != commondir` is false; the source marker is the back-pointer
+    // Standalone friday worktrees are CoW clones (`.git` is a directory), so `path != commondir` is false; the source marker is the back-pointer
     let mut marker_main_repo = None;
     for ancestor in cwd.ancestors() {
         let git = ancestor.join(".git");
@@ -308,7 +308,7 @@ pub(crate) fn branch_icon() -> &'static str {
     static ICON: OnceLock<&str> = OnceLock::new();
     ICON.get_or_init(|| {
         decide_branch_icon(
-            std::env::var("GROK_NERD_FONTS").ok().as_deref(),
+            std::env::var("FRIDAY_NERD_FONTS").ok().as_deref(),
             HostOs::current(),
             terminal_context().brand,
         )
@@ -332,7 +332,7 @@ fn decide_branch_icon(nerd_fonts: Option<&str>, host: HostOs, brand: TerminalNam
     }
 }
 
-/// Whether a Nerd Font (Private Use Area glyphs) is plausible for this host/terminal. An explicit `GROK_NERD_FONTS`
+/// Whether a Nerd Font (Private Use Area glyphs) is plausible for this host/terminal. An explicit `FRIDAY_NERD_FONTS`
 /// override always wins: `0`/`false` means off, anything else means on. Otherwise PUA glyphs are assumed everywhere
 /// except Windows consoles and the macOS terminals that ship stock fonts (Apple Terminal, iTerm2).
 fn decide_nerd_fonts(nerd_fonts: Option<&str>, host: HostOs, brand: TerminalName) -> bool {
@@ -590,12 +590,12 @@ mod tests {
         assert_eq!(info.branch.as_deref(), Some("dep-branch"));
     }
 
-    #[serial_test::serial(GROK_HOME)]
+    #[serial_test::serial(FRIDAY_HOME)]
     #[test]
     fn compute_cwd_git_info_nested_repo_does_not_inherit_db_record() {
         let home = tempfile::tempdir().unwrap();
-        // serial(GROK_HOME) orders peers; EnvVarGuard restores on drop so later `open_default()` callers do not see a deleted temp home
-        let _grok_home = crate::test_util::EnvVarGuard::set("GROK_HOME", home.path());
+        // serial(FRIDAY_HOME) orders peers; EnvVarGuard restores on drop so later `open_default()` callers do not see a deleted temp home
+        let _grok_home = crate::test_util::EnvVarGuard::set("FRIDAY_HOME", home.path());
         let _ = xai_fast_worktree::db::WorktreeDb::open(home.path());
 
         let wt = crate::test_util::TempGitRepo::init("wt-branch");

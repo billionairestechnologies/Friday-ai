@@ -219,7 +219,7 @@ fn apply_byte_budget(
 }
 /// Harness-compatible negative offset resolution (1-indexed start line). Negatives use the reference `split('\n')` field count plus a phantom
 /// field when the file is non-empty and has no trailing `\n`. Extraction still uses `split_inclusive`, so a start that lands on the
-/// phantom-only field yields an empty window (harness-aligned; not a Grok-line clamp).
+/// phantom-only field yields an empty window (harness-aligned; not a Friday X-line clamp).
 fn resolve_read_start_line(file_content: &str, offset: Option<i64>) -> usize {
     let offset_raw = offset.unwrap_or(1);
     if offset_raw == 0 {
@@ -1166,7 +1166,7 @@ mod tests {
     #[tokio::test]
     async fn missing_skill_read_suggests_registered_path() {
         let tmp = TempDir::new().unwrap();
-        let skill_dir = tmp.path().join(".grok/skills/code-review");
+        let skill_dir = tmp.path().join(".friday/skills/code-review");
         std::fs::create_dir_all(&skill_dir).unwrap();
         let skill_path = skill_dir.join("SKILL.md");
         std::fs::write(&skill_path, "# Code review\n").unwrap();
@@ -1191,7 +1191,7 @@ mod tests {
     #[tokio::test]
     async fn missing_skill_read_uses_display_path() {
         let tmp = TempDir::new().unwrap();
-        let skill_dir = tmp.path().join(".grok/skills/review");
+        let skill_dir = tmp.path().join(".friday/skills/review");
         std::fs::create_dir_all(&skill_dir).unwrap();
         let skill_path = skill_dir.join("SKILL.md");
         std::fs::write(&skill_path, "# Review\n").unwrap();
@@ -1216,7 +1216,7 @@ mod tests {
             msg,
             "Error: /wrong/root/review/SKILL.md does not exist.\n\
              The skill you are looking for is registered at:\n\
-             /display/project/.grok/skills/review/SKILL.md"
+             /display/project/.friday/skills/review/SKILL.md"
         );
     }
     #[tokio::test]
@@ -1255,7 +1255,7 @@ mod tests {
     #[tokio::test]
     async fn missing_skill_read_omits_stale_registered_path() {
         let tmp = TempDir::new().unwrap();
-        let stale_path = tmp.path().join(".grok/skills/review/SKILL.md");
+        let stale_path = tmp.path().join(".friday/skills/review/SKILL.md");
         let mut resources = test_resources(tmp.path());
         resources.insert(PathNotFoundHints(true));
         resources.insert(seeded_manager(vec![SkillInfo {
@@ -2260,7 +2260,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
     #[tokio::test]
     async fn skill_file_ignores_offset_and_limit() {
         let tmp = TempDir::new().unwrap();
-        let skill_dir = tmp.path().join(".grok/skills/commit");
+        let skill_dir = tmp.path().join(".friday/skills/commit");
         std::fs::create_dir_all(&skill_dir).unwrap();
         std::fs::write(
             skill_dir.join("SKILL.md"),
@@ -2270,7 +2270,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
         let tool = ReadFileTool;
         let resources = test_resources(tmp.path());
         let input = ReadFileInput {
-            path: ".grok/skills/commit/SKILL.md".to_string(),
+            path: ".friday/skills/commit/SKILL.md".to_string(),
             offset: Some(3),
             limit: Some(1),
             pages: None,
@@ -2360,7 +2360,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
     #[tokio::test]
     async fn md_in_skills_dir_ignores_model_offset_and_limit() {
         let tmp = TempDir::new().unwrap();
-        let skill_dir = tmp.path().join(".grok/skills/my-skill");
+        let skill_dir = tmp.path().join(".friday/skills/my-skill");
         std::fs::create_dir_all(&skill_dir).unwrap();
         let content = (1..=1200)
             .map(|n| format!("line{n}"))
@@ -2370,7 +2370,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
         let tool = ReadFileTool;
         let resources = test_resources(tmp.path());
         let input = ReadFileInput {
-            path: ".grok/skills/my-skill/reference.md".to_string(),
+            path: ".friday/skills/my-skill/reference.md".to_string(),
             offset: Some(3),
             limit: Some(1),
             pages: None,
@@ -2440,7 +2440,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
     async fn whole_read_policy_gates_each_exemption() {
         let tmp = TempDir::new().unwrap();
         let five_lines = "line1\nline2\nline3\nline4\nline5";
-        for rel_path in [".grok/skills/s/SKILL.md", "sub/AGENTS.md"] {
+        for rel_path in [".friday/skills/s/SKILL.md", "sub/AGENTS.md"] {
             let file = tmp.path().join(rel_path);
             std::fs::create_dir_all(file.parent().unwrap()).unwrap();
             std::fs::write(file, five_lines).unwrap();
@@ -2456,9 +2456,9 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
         let whole = (None, None, "1→line1\nline2\nline3\nline4\nline5");
         let windowed = (Some(3), Some(1), "3→line3");
         for (policy, rel_path, expected) in [
-            (skill_only, ".grok/skills/s/SKILL.md", whole),
+            (skill_only, ".friday/skills/s/SKILL.md", whole),
             (skill_only, "sub/AGENTS.md", windowed),
-            (instruction_only, ".grok/skills/s/SKILL.md", windowed),
+            (instruction_only, ".friday/skills/s/SKILL.md", windowed),
             (instruction_only, "sub/AGENTS.md", whole),
         ] {
             let mut resources = test_resources(tmp.path());
@@ -3117,7 +3117,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
         assert_eq!(extracted.content_concise, "2→");
     }
     /// Harness parity: offset=-1 on a file with no trailing `\n` resolves to the
-    /// phantom field only (start past any `split_inclusive` line), so Grok
+    /// phantom field only (start past any `split_inclusive` line), so Friday X
     /// returns empty content/raw — same as the reference phantom-only window.
     #[test]
     fn extract_file_content_lines_negative_one_no_trailing_newline_stable() {

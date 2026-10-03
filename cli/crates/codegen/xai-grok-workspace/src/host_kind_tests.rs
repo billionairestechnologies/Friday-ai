@@ -146,9 +146,9 @@ fn with_workspace<F: Future<Output = ()>>(
 ) {
     let root = tempfile::tempdir().expect("workspace root");
     let _env = LockedTestEnv::lock()
-        .set("GROK_WORKSPACE_HOME", &root.path().join("home"))
+        .set("FRIDAY_WORKSPACE_HOME", &root.path().join("home"))
         .set(
-            "GROK_WORKSPACE_DATA_COLLECTION_DISABLED",
+            "FRIDAY_WORKSPACE_DATA_COLLECTION_DISABLED",
             Path::new("false"),
         );
     tokio::runtime::Runtime::new()

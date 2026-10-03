@@ -20,9 +20,9 @@ fn session(issuer: &str) -> GrokAuth {
 #[tokio::test]
 #[serial_test::serial]
 async fn foreign_session_is_refused_and_xai_credential_is_served() {
-    let _xai = EnvGuard::unset("XAI_API_KEY");
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _auth_path = EnvGuard::unset("GROK_AUTH_PATH");
+    let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _auth_path = EnvGuard::unset("FRIDAY_AUTH_PATH");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     let auth = build_voice_auth(mgr.clone());
@@ -39,9 +39,9 @@ async fn foreign_session_is_refused_and_xai_credential_is_served() {
 #[tokio::test]
 #[serial_test::serial]
 async fn stt_routes_offer_the_clip_route_only_beside_a_foreign_session() {
-    let _xai = EnvGuard::unset("XAI_API_KEY");
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
-    let _auth_path = EnvGuard::unset("GROK_AUTH_PATH");
+    let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
+    let _auth_path = EnvGuard::unset("FRIDAY_AUTH_PATH");
     let dir = tempfile::tempdir().unwrap();
     let mgr = Arc::new(AuthManager::new(dir.path(), GrokComConfig::default()));
     let routes = build_stt_routes(mgr.clone());

@@ -27,10 +27,10 @@ pub(crate) fn has_bundle_credentials(
     auth_manager: Option<&std::sync::Arc<xai_grok_login::AuthManager>>,
     deployment_key: Option<&str>,
 ) -> bool {
-    auth_manager
-        .as_ref()
-        .is_some_and(|am| am.current_or_expired().is_some())
-        || deployment_key.is_some()
+    // Friday X has no bundle service (managed subagent/skill archives came from the original vendor's backend),
+    // so a sync is never attempted and the client never asks for one.
+    let _ = (auth_manager, deployment_key);
+    false
 }
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -451,7 +451,7 @@ mod tests {
                                 .and_then(|v| v.to_str().ok())
                                 .map(str::to_owned),
                             token_auth: headers
-                                .get("x-xai-token-auth")
+                                .get("x-friday-token-auth")
                                 .and_then(|v| v.to_str().ok())
                                 .map(str::to_owned),
                             user_id: headers
@@ -603,15 +603,15 @@ mod tests {
         let root = tmp.path().join("bundled");
         bundle::write_bundle_to_cache(&root, &sample_bundle()).unwrap();
         let project_root = tmp.path().join("workspace");
-        std::fs::create_dir_all(project_root.join(".grok/personas")).unwrap();
-        std::fs::create_dir_all(project_root.join(".grok/roles")).unwrap();
+        std::fs::create_dir_all(project_root.join(".friday/personas")).unwrap();
+        std::fs::create_dir_all(project_root.join(".friday/roles")).unwrap();
         std::fs::write(
-            project_root.join(".grok/personas/researcher.toml"),
+            project_root.join(".friday/personas/researcher.toml"),
             "instructions = \"project persona\"\n",
         )
         .unwrap();
         std::fs::write(
-            project_root.join(".grok/roles/reviewer.toml"),
+            project_root.join(".friday/roles/reviewer.toml"),
             "description = \"project role\"\n",
         )
         .unwrap();

@@ -280,12 +280,12 @@ async fn side_question_routes_on_the_session_id_when_the_key_is_not_forwarded() 
             let req = requests.last().expect("a request must be recorded");
             let session_id = actor.session_info.id.to_string();
             assert_eq!(
-                req.header("x-grok-conv-id"),
+                req.header("x-friday-conv-id"),
                 Some(session_id.as_str()),
                 "on a backend that drops the cache key the conv id must be the parent session id"
             );
             let req_id = req
-                .header("x-grok-req-id")
+                .header("x-friday-req-id")
                 .expect("req id must still be sent");
             assert!(
                 req_id.starts_with("xai-btw-"),
@@ -860,8 +860,8 @@ async fn recap_request_uses_small_model_and_compact_transcript() {
                 .find(|r| r.path.contains("responses"))
                 .expect("a responses request must be recorded");
             let conv_id = recap_req
-                .header("x-grok-conv-id")
-                .expect("recap must send x-grok-conv-id");
+                .header("x-friday-conv-id")
+                .expect("recap must send x-friday-conv-id");
             assert!(conv_id.starts_with("recap-"), "{conv_id}");
 
             let body = recap_req.body.as_ref().expect("recap body must be JSON");
@@ -1134,8 +1134,8 @@ async fn side_question_request_rides_parent_prompt_cache() {
                 .expect("a responses request must be recorded");
 
             let conv_id = btw_req
-                .header("x-grok-conv-id")
-                .expect("side question must send x-grok-conv-id");
+                .header("x-friday-conv-id")
+                .expect("side question must send x-friday-conv-id");
             assert!(
                 conv_id.starts_with("btw-"),
                 "conv id keeps the btw-* label: {conv_id}"

@@ -329,9 +329,9 @@ impl AuthManager {
                 "scope": &scope,
                 "grok_home": grok_home.display().to_string(),
                 "HOME": std::env::var("HOME").unwrap_or_else(|_| "(unset)".into()),
-                "GROK_HOME": std::env::var("GROK_HOME").unwrap_or_else(|_| "(unset)".into()),
-                "GROK_AUTH_PATH": std::env::var("GROK_AUTH_PATH").unwrap_or_else(|_| "(unset)".into()),
-                "GROK_AUTH": match std::env::var("GROK_AUTH") {
+                "FRIDAY_HOME": std::env::var("FRIDAY_HOME").unwrap_or_else(|_| "(unset)".into()),
+                "FRIDAY_AUTH_PATH": std::env::var("FRIDAY_AUTH_PATH").unwrap_or_else(|_| "(unset)".into()),
+                "FRIDAY_AUTH": match std::env::var("FRIDAY_AUTH") {
                     Err(_) => "(unset)",
                     Ok(_) if !Distribution::current().allows(Capability::AccountLogin) => "(ignored)",
                     Ok(_) => "(set)",
@@ -341,7 +341,7 @@ impl AuthManager {
         let path = auth_json_path(grok_home);
         let inline_auth = Distribution::current()
             .allows(Capability::AccountLogin)
-            .then(|| std::env::var("GROK_AUTH").ok())
+            .then(|| std::env::var("FRIDAY_AUTH").ok())
             .flatten();
         if let Some(inline_json) = inline_auth {
             if let Ok(auth) = serde_json::from_str::<GrokAuth>(&inline_json) {
@@ -354,7 +354,7 @@ impl AuthManager {
                     None,
                 );
             }
-            tracing::warn!("GROK_AUTH set but failed to parse as JSON, falling back to file");
+            tracing::warn!("FRIDAY_AUTH set but failed to parse as JSON, falling back to file");
         }
         let (auth, auth_read_detail, initial_disk_state) = match read_auth_json(&path) {
             Ok(map) => {
@@ -437,7 +437,7 @@ impl AuthManager {
         let _ = write_auth_json(path, &cleaned);
         tracing::debug!("auth: removed stale WebLogin scope from auth.json");
     }
-    /// Single field-assembly point for [`Self::new`]'s two construction paths (inline `GROK_AUTH` vs. on-disk `auth.json`), which differ only in the threaded fields. One literal means a newly added field can't be silently dropped from one branch.
+    /// Single field-assembly point for [`Self::new`]'s two construction paths (inline `FRIDAY_AUTH` vs. on-disk `auth.json`), which differ only in the threaded fields. One literal means a newly added field can't be silently dropped from one branch.
     fn assemble(
         inner: Option<GrokAuth>,
         path: PathBuf,
@@ -983,7 +983,7 @@ impl AuthManager {
         }
         enrichment::hydrate_can_administer_team(self, &auth).await
     }
-    /// Path to the `auth.json` this manager reads/writes (respects `GROK_AUTH_PATH` / constructor home).
+    /// Path to the `auth.json` this manager reads/writes (respects `FRIDAY_AUTH_PATH` / constructor home).
     /// Prefer this over `grok_home()/auth.json` so temp-home tests and custom stores stay isolated.
     pub fn auth_json_path(&self) -> &Path {
         &self.path

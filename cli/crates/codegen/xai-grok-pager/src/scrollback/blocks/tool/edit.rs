@@ -1591,7 +1591,7 @@ mod tests {
     #[test]
     fn workflow_script_header_hides_rhai_path() {
         let theme = Theme::current();
-        let block = EditToolCallBlock::new(".grok/workflows/cc-deep-research.rhai", vec![]);
+        let block = EditToolCallBlock::new(".friday/workflows/cc-deep-research.rhai", vec![]);
         let header = block.header_line(
             &theme,
             false,
@@ -1612,7 +1612,7 @@ mod tests {
         );
 
         let block =
-            EditToolCallBlock::new(".grok/workflows/triage.rhai", vec![]).with_prefix("Creating ");
+            EditToolCallBlock::new(".friday/workflows/triage.rhai", vec![]).with_prefix("Creating ");
         let header = block.header_line(
             &theme,
             false,

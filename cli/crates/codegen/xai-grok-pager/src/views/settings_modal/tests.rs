@@ -1576,7 +1576,7 @@ fn editor_render_fixture(buffer: &str, cursor_byte: usize) -> SettingsModalState
     let registry = SettingsRegistry::from_entries(vec![synthetic_meta]);
     let snapshot = PagerLocalSnapshot {
         available_models: vec![(
-            "Grok Test".to_string(),
+            "Friday X Test".to_string(),
             acp::ModelId::new(Arc::from("grok-test")),
         )],
         ..PagerLocalSnapshot::default()
@@ -1602,7 +1602,7 @@ fn editor_render_fixture(buffer: &str, cursor_byte: usize) -> SettingsModalState
 /// Cursor lands at the visual column matching `cursor_byte` for buffers that fit entirely within the visible window.
 #[test]
 fn render_editing_value_cursor_at_logical_position_when_buffer_fits() {
-    let mut s = editor_render_fixture("Grok Test", 4); // cursor between "Grok" and " Test"
+    let mut s = editor_render_fixture("Friday X Test", 4); // cursor between "Friday X" and " Test"
     let area = Rect {
         x: 0,
         y: 0,
@@ -3004,9 +3004,9 @@ fn fork_secondary_model_picker_opens_on_persisted_model() {
     assert_ne!(slug, xai_grok_shell::models::default_model());
     let snapshot = PagerLocalSnapshot {
         available_models: vec![
-            ("Grok 3".to_string(), acp::ModelId::new(Arc::from("grok-3"))),
+            ("Friday X 3".to_string(), acp::ModelId::new(Arc::from("grok-3"))),
             (
-                "Grok 4.5 Fast".to_string(),
+                "Friday X 4.5 Fast".to_string(),
                 acp::ModelId::new(Arc::from(slug)),
             ),
         ],
@@ -3021,7 +3021,7 @@ fn fork_secondary_model_picker_opens_on_persisted_model() {
     // Row value shows the display name, matching the default_model row.
     assert_eq!(
         s.value_for("fork_secondary_model"),
-        Some(SettingValue::String("Grok 4.5 Fast".to_string())),
+        Some(SettingValue::String("Friday X 4.5 Fast".to_string())),
     );
 
     assert!(s.focus_key("fork_secondary_model"));
@@ -3034,14 +3034,14 @@ fn fork_secondary_model_picker_opens_on_persisted_model() {
             ..
         } => {
             assert_eq!(key, "fork_secondary_model");
-            // Choices: [(no override), Grok 3, Grok 4.5 Fast], so idx 2
+            // Choices: [(no override), Friday X 3, Friday X 4.5 Fast], so idx 2
             assert_eq!(
                 choices_idx, 2,
                 "picker must open on the persisted model, not the stale fallback",
             );
             assert_eq!(
                 original_value,
-                &SettingValue::String("Grok 4.5 Fast".to_string()),
+                &SettingValue::String("Friday X 4.5 Fast".to_string()),
                 "original_value must carry the display name so Esc-revert round-trips",
             );
         }
@@ -4222,7 +4222,7 @@ fn editing_value_chars_mutate_buffer_and_invalid_enter_is_noop() {
          (catalog has 'Grok 4 Fast' only)",
     );
 
-    // Enter on a buffer that fails the KnownModel validator (catalog has 'Grok 4 Fast'; "a" doesn't match) is Unchanged; commit refused
+    // Enter on a buffer that fails the KnownModel validator (catalog has 'Friday X 4 Fast'; "a" doesn't match) is Unchanged; commit refused
     let outcome = handle_settings_key(&mut s, &KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     assert!(
         matches!(outcome, SettingsKeyOutcome::Unchanged),
@@ -4244,7 +4244,7 @@ fn string_editor_uses_canonical_edits_policy_and_live_validation() {
     assert!(matches!(outcome, SettingsKeyOutcome::Changed));
     assert_eq!(state.editing_buffer(), Some("alpha-"));
 
-    let mut state = editor_render_fixture("Grok Tes", "Grok Tes".len());
+    let mut state = editor_render_fixture("Friday X Tes", "Friday X Tes".len());
     assert!(state.editing_validation_error().is_some());
     let _ = handle_settings_key(
         &mut state,
@@ -4259,7 +4259,7 @@ fn string_editor_uses_canonical_edits_policy_and_live_validation() {
         &mut state,
         &KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE),
     );
-    assert_eq!(state.editing_buffer(), Some("Grok Test"));
+    assert_eq!(state.editing_buffer(), Some("Friday X Test"));
     assert!(state.editing_validation_error().is_none());
 
     let cursor = state.editing_cursor_byte();
@@ -4268,7 +4268,7 @@ fn string_editor_uses_canonical_edits_policy_and_live_validation() {
         &KeyEvent::new(KeyCode::Char('\u{202e}'), KeyModifiers::NONE),
     );
     assert!(matches!(outcome, SettingsKeyOutcome::Changed));
-    assert_eq!(state.editing_buffer(), Some("Grok Test"));
+    assert_eq!(state.editing_buffer(), Some("Friday X Test"));
     assert_eq!(state.editing_cursor_byte(), cursor);
 
     let outcome = handle_settings_key(
@@ -5047,7 +5047,7 @@ fn row_layout_bool_without_chevron() {
     assert_eq!(row_layout(39, label, value, false), RowLayout::TwoLine);
 }
 
-// User-feedback follow-up: always reserve a blank line between the "Tip · Ask Grok…" docs footer
+// User-feedback follow-up: always reserve a blank line between the "Tip · Ask Friday X…" docs footer
 // and the keybindings hints. The chrome sets `footer_lines` to `predicted_hint_rows + 1`, so a
 // blank row always separates the tip from the first hint line.
 
@@ -5410,15 +5410,15 @@ fn ctrl_u_clears_the_entire_filter_from_mid_query() {
 
 #[test]
 fn string_editor_paste_sanitizes_validates_and_consumes_rejected_text() {
-    let mut state = editor_render_fixture("Grok Tst", "Grok T".len());
+    let mut state = editor_render_fixture("Friday X Tst", "Friday X T".len());
     let outcome = handle_settings_paste(&mut state, "e\r\n");
     assert!(matches!(outcome, SettingsKeyOutcome::Changed));
-    assert_eq!(state.editing_buffer(), Some("Grok Test"));
+    assert_eq!(state.editing_buffer(), Some("Friday X Test"));
     assert!(state.editing_validation_error().is_none());
 
     let outcome = handle_settings_paste(&mut state, "\u{202e}\r\n");
     assert!(matches!(outcome, SettingsKeyOutcome::Changed));
-    assert_eq!(state.editing_buffer(), Some("Grok Test"));
+    assert_eq!(state.editing_buffer(), Some("Friday X Test"));
     assert!(state.editing_validation_error().is_none());
 }
 
@@ -5799,7 +5799,7 @@ fn docs_footer_tip_is_centered() {
     );
 
     // SHORT path: width that fits SHORT but not LONG.
-    // SHORT is "Tip · Ask Grok to change a setting" (34 cells); LONG is ~73 cells. width=40 lands in the SHORT band.
+    // SHORT is "Tip · Ask Friday X to change a setting" (34 cells); LONG is ~73 cells. width=40 lands in the SHORT band.
     let (row_short, tip_start_short, trailing_short) = render(40);
     assert!(
         row_short.contains("change a setting"),
@@ -5847,7 +5847,7 @@ fn tip_line_has_blank_row_above() {
     let mut tip_y: Option<u16> = None;
     for y in 0..area.height {
         let txt = buf_row_text(&buf, y, area.x, area.width);
-        if txt.contains("Tip") && txt.contains("Ask Grok") {
+        if txt.contains("Tip") && txt.contains("Ask Friday X") {
             tip_y = Some(y);
             break;
         }
@@ -6453,7 +6453,7 @@ fn consent_chooser_drops_tip_and_reset() {
     let mut consent = enter_picker_for("coding_data_sharing");
     let text = screen(&mut consent);
     assert!(
-        !text.contains("Ask Grok"),
+        !text.contains("Ask Friday X"),
         "consent chooser must not render the docs tip:\n{text}"
     );
     assert!(
@@ -6482,7 +6482,7 @@ fn consent_chooser_drops_tip_and_reset() {
     let mut ordinary = enter_picker_for("theme");
     let text = screen(&mut ordinary);
     assert!(
-        text.contains("d reset") && text.contains("Ask Grok"),
+        text.contains("d reset") && text.contains("Ask Friday X"),
         "ordinary pickers keep the tip and the reset hint:\n{text}"
     );
     assert!(

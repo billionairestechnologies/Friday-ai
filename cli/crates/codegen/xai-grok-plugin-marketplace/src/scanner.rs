@@ -450,7 +450,7 @@ mod tests {
                     "description": "From the .grok-plugin index",
                     "category": "design",
                     "source": { "type": "local", "path": "./plugins/grok-plugin" },
-                    "tags": ["grok"]
+                    "tags": ["friday"]
                 }]
             }"#,
         )
@@ -460,7 +460,7 @@ mod tests {
         assert_eq!(plugins.len(), 1);
         assert_eq!(nth(&plugins, 0).name, "grok-plugin");
         assert_eq!(nth(&plugins, 0).category.as_deref(), Some("design"));
-        assert_eq!(nth(&plugins, 0).tags, vec!["grok"]);
+        assert_eq!(nth(&plugins, 0).tags, vec!["friday"]);
         assert!(nth(&plugins, 0).keywords.is_empty());
     }
 

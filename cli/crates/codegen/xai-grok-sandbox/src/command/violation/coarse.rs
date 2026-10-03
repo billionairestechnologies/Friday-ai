@@ -486,8 +486,8 @@ pub(super) fn as_path_token(word: &str, quoted: bool) -> Option<String> {
     is_path.then(|| core.to_owned())
 }
 
-/// `.grok/config.toml`, `.git/config`: a cwd-relative path into a dot directory, which the shell
-/// prints as typed (`sh: cannot create .grok/config.toml: Read-only file system`). A bare `.name`
+/// `.friday/config.toml`, `.git/config`: a cwd-relative path into a dot directory, which the shell
+/// prints as typed (`sh: cannot create .friday/config.toml: Read-only file system`). A bare `.name`
 /// with no `/` is not taken (it could be a file name, an option or `...`), nor is `..name`.
 fn is_dot_dir_relative(token: &str) -> bool {
     let Some(rest) = token.strip_prefix('.') else {

@@ -64,7 +64,7 @@ pub struct PluginConfigInputs<'a> {
     pub effective_config: Option<&'a toml::Value>,
     /// The home directory, which holds the user's Claude settings.
     pub home: Option<&'a Path>,
-    /// The Grok home, whose `config.toml` is the user's and never a project's.
+    /// The Friday X home, whose `config.toml` is the user's and never a project's.
     pub grok_home: Option<&'a Path>,
     pub cwd: &'a Path,
     pub trust: Trust,
@@ -118,7 +118,7 @@ pub fn resolve_effective_plugins_config(inputs: PluginConfigInputs<'_>) -> Disco
     }
 }
 
-/// Grok's own `enabled` and `disabled` lists take precedence over Claude's.
+/// Friday X's own `enabled` and `disabled` lists take precedence over Claude's.
 fn add_unlisted_claude_plugins(
     plugins: &mut PluginsConfig,
     claude_enabled: Vec<String>,

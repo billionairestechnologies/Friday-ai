@@ -1,4 +1,4 @@
-//! Project config-file discovery: locating repo-local `.mcp.json` and `.grok/config.toml` files by walking from `cwd` up to the git root.
+//! Project config-file discovery: locating repo-local `.mcp.json` and `.friday/config.toml` files by walking from `cwd` up to the git root.
 //!
 //! These pure `git2` and filesystem walks are shared by the shell's config loaders and the folder-trust gate's `repo_configs_present`.
 
@@ -54,8 +54,8 @@ fn is_user_grok_config_file(config_path: &Path, grok_home: Option<&Path>) -> boo
     canonical_config == canonical_user
 }
 
-/// Find `.grok/config.toml` from `cwd` up to the git repo root, repo-root (lowest) to cwd (highest), matching skills and AGENTS.md discovery.
-/// No repo: only `cwd/.grok/config.toml`. Excludes user-global config so `cwd == $HOME` is not a project overlay.
+/// Find `.friday/config.toml` from `cwd` up to the git repo root, repo-root (lowest) to cwd (highest), matching skills and AGENTS.md discovery.
+/// No repo: only `cwd/.friday/config.toml`. Excludes user-global config so `cwd == $HOME` is not a project overlay.
 pub fn find_project_configs(cwd: &Path) -> Vec<PathBuf> {
     find_project_configs_under(
         cwd,
@@ -79,7 +79,7 @@ pub fn find_project_configs_in(chain_dirs: &[PathBuf], grok_home: Option<&Path>)
     chain_dirs
         .iter()
         .rev()
-        .map(|dir| dir.join(".grok").join("config.toml"))
+        .map(|dir| dir.join(".friday").join("config.toml"))
         .filter(|config_path| {
             config_path.is_file() && !is_user_grok_config_file(config_path, grok_home)
         })
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn find_project_configs_excludes_user_grok_config_file() {
         let home = tempfile::tempdir().unwrap();
-        let user_home = home.path().join(".grok");
+        let user_home = home.path().join(".friday");
         std::fs::create_dir_all(&user_home).unwrap();
         let user_config = user_home.join("config.toml");
         std::fs::write(&user_config, "# user\n").unwrap();
@@ -106,8 +106,8 @@ mod tests {
         assert!(is_user_grok_config_file(&user_config, Some(&user_home)));
 
         let project = home.path().join("repo");
-        std::fs::create_dir_all(project.join(".grok")).unwrap();
-        std::fs::write(project.join(".grok/config.toml"), "# project\n").unwrap();
+        std::fs::create_dir_all(project.join(".friday")).unwrap();
+        std::fs::write(project.join(".friday/config.toml"), "# project\n").unwrap();
         let found = find_project_configs_under(&project, Some(home.path()), Some(&user_home));
         assert_eq!(found.len(), 1);
         let Some(first) = found.first() else {

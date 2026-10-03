@@ -192,7 +192,7 @@ impl TokenRefresher for ExternalBinaryRefresher {
                 *self.ladder.lock() = StrikeLadder::default();
                 RefreshOutcome::success(auth)
             }
-            // A timeout is the contract's interactive-required signal (conforming providers decline a headless `GROK_AUTH_EXPIRED=1` run fast; only one waiting on a human outlives the budget), so it stays a single-strike permanent verdict whatever the ladder says.
+            // A timeout is the contract's interactive-required signal (conforming providers decline a headless `FRIDAY_AUTH_EXPIRED=1` run fast; only one waiting on a human outlives the budget), so it stays a single-strike permanent verdict whatever the ladder says.
             Err(ExternalRefreshError::TimedOut) => {
                 xai_grok_telemetry::unified_log::warn(
                     "auth: external binary refresh timed out",

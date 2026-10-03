@@ -13672,6 +13672,7 @@ dependencies = [
 name = "xai-grok-auth"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "http 1.4.0",
  "mockito",
@@ -13679,6 +13680,7 @@ dependencies = [
  "reqwest-middleware 0.4.2",
  "tokio",
  "tracing",
+ "xai-grok-env",
 ]
 
 [[package]]

@@ -47,7 +47,7 @@ impl Fixture {
         // macOS temp dirs sit behind the `/var` firmlink; compare canonical paths throughout
         let root = dunce::canonicalize(&root).unwrap();
         let ws = root.join("ws");
-        let grok_home = root.join("home").join(".grok");
+        let grok_home = root.join("home").join(".friday");
         let home = root.join("home");
         let tmp = root.join("tmp");
         let own_session = xai_grok_config::sessions_cwd_dir_in(&grok_home, &ws.to_string_lossy());
@@ -592,7 +592,7 @@ fn protected_subpaths_are_carved_out_of_the_workspace_root() {
     assert!(carve_outs.contains(&&path(f.ws.join(".git/hooks"))));
     assert!(carve_outs.contains(&&path(f.ws.join(".git/config"))));
     assert!(carve_outs.contains(&&path(f.ws.join(".git/info"))));
-    assert!(carve_outs.contains(&&path(f.ws.join(".grok"))));
+    assert!(carve_outs.contains(&&path(f.ws.join(".friday"))));
     assert!(
         carve_outs.contains(&&Protected::Glob {
             glob: format!("{}/.git/modules/**/hooks", f.ws.display())
@@ -608,7 +608,7 @@ fn protected_subpaths_are_carved_out_of_the_workspace_root() {
         ".git/info/exclude",
         ".git/modules/lib/hooks/post-checkout",
         ".git/modules/lib/config",
-        ".grok/settings.toml",
+        ".friday/settings.toml",
         "src/../.git/hooks/pre-commit",
     ] {
         assert!(
@@ -748,7 +748,7 @@ fn a_hooks_path_over_a_write_root_protects_its_hook_files_not_the_tree() {
         ("~".to_owned(), f.home.clone()),
         ("/".to_owned(), PathBuf::from("/")),
         (f.ws.display().to_string(), f.ws.clone()),
-        ("~/.grok".to_owned(), f.grok_home.clone()),
+        ("~/.friday".to_owned(), f.grok_home.clone()),
         ("~/.cargo".to_owned(), f.home.join(".cargo")),
         (shared_tmp.display().to_string(), shared_tmp.clone()),
     ] {
@@ -950,9 +950,9 @@ fn write_grant_widens_and_keeps_protected_carve_outs() {
         ".ssh/id_ed25519",
         ".cargo/bin/cargo",
         "Library/LaunchAgents/com.evil.plist",
-        ".grok/workspaced.toml",
-        ".grok/hooks/pre-tool",
-        ".grok/sessions/%2Fopt%2Fother/sandbox_grants.toml",
+        ".friday/workspaced.toml",
+        ".friday/hooks/pre-tool",
+        ".friday/sessions/%2Fopt%2Fother/sandbox_grants.toml",
     ] {
         expect_carved(rel);
     }
@@ -1093,10 +1093,10 @@ fn a_deny_glob_below_a_bracketed_workspace_still_matches() {
 #[test]
 fn deny_entries_match_case_insensitively_on_macos() {
     let glob = DenyEntry::Glob {
-        root: PathBuf::from("/opt/ws-fixture/u/.grok"),
+        root: PathBuf::from("/opt/ws-fixture/u/.friday"),
         tail: "auth*".to_owned(),
     };
-    assert!(glob.covers(Path::new("/opt/ws-fixture/u/.grok/AUTH.json")));
+    assert!(glob.covers(Path::new("/opt/ws-fixture/u/.friday/AUTH.json")));
     let path = DenyEntry::Path(PathBuf::from("/opt/ws-fixture/u/.ssh"));
     assert!(path.covers(Path::new("/opt/ws-fixture/u/.SSH/id_ed25519")));
 }
@@ -1333,7 +1333,7 @@ fn a_refused_grant_leaves_the_policy_as_it_was() {
     let before = policy.clone();
     for subject in [
         GrantSubject::FsWriteRoot {
-            root: f.ws.join(".grok"),
+            root: f.ws.join(".friday"),
         },
         GrantSubject::FsWriteRoot {
             root: PathBuf::from("relative/out"),
@@ -1455,7 +1455,7 @@ fn secret_read_probes(home: &Path, grok_home: &Path) -> Vec<PathBuf> {
         .map(|rel| home.join(rel).join("id_ed25519"))
         .chain(SECRET_READ_DENY_FILES.iter().map(|rel| home.join(rel)))
         .chain(
-            GROK_HOME_SECRET_GLOBS
+            FRIDAY_HOME_SECRET_GLOBS
                 .iter()
                 .map(|glob| grok_home.join(glob.replace('*', ".json"))),
         )
@@ -1486,7 +1486,7 @@ fn secret_reads_stay_denied_in_every_read_mode_under_every_widening() {
             "{rel} left the table"
         );
     }
-    assert_eq!(GROK_HOME_SECRET_GLOBS, ["auth*", "credentials*"]);
+    assert_eq!(FRIDAY_HOME_SECRET_GLOBS, ["auth*", "credentials*"]);
     let config = f.home.join(".config");
     let probes = secret_read_probes(&f.home, &f.grok_home);
     let mut cells = 0;
@@ -1884,7 +1884,7 @@ fn a_differently_spelled_grok_home_in_the_profile_still_narrows_to_the_command_d
     let f = Fixture::new("grok-home-spelling");
     let link = f.home.with_file_name("home-link");
     std::os::unix::fs::symlink(&f.home, &link).unwrap();
-    for spelling in [link.join(".grok"), f.grok_home.join("sessions/..")] {
+    for spelling in [link.join(".friday"), f.grok_home.join("sessions/..")] {
         let mut profile = profile(&f.ws, &f.grok_home);
         profile.read_write = vec![f.ws.clone(), spelling.clone()];
         let policy = build_with_profile(&f, &profile, Some(&f.home)).unwrap();
@@ -2137,7 +2137,7 @@ fn a_pinned_policy_never_resolves_the_spelling_again() {
     ] {
         assert!(deny.contains(&entry), "{entry:?} in {deny:?}");
     }
-    assert!(policy.is_protected(&real.join(".grok/settings.toml")));
+    assert!(policy.is_protected(&real.join(".friday/settings.toml")));
     assert!(policy.is_protected(&real.join("team-hooks/format.json")));
     for path in policy_paths(&policy) {
         assert!(

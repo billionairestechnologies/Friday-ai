@@ -10,7 +10,7 @@ use crate::mcp_servers::{McpServerOAuth, McpServerScope, PluginMcpServers};
 fn stdio_server_carries_its_cwd_timeouts_and_disabled_tools() {
     let workspace = Workspace::new();
     let project_config = workspace.write(
-        ".grok/config.toml",
+        ".friday/config.toml",
         r#"
 [mcp_servers.docs]
 command = "docs-server"
@@ -116,7 +116,7 @@ fn each_server_names_the_file_that_defined_it() {
         r#"{"mcpServers": {"from-cursor": {"command": "c"}}}"#,
     );
     let project_config = workspace.write(
-        "pkg/.grok/config.toml",
+        "pkg/.friday/config.toml",
         "[mcp_servers.from-project]\ncommand = \"d\"\n",
     );
     let mut sources = workspace.sources(

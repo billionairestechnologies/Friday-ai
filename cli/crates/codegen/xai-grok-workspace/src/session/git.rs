@@ -2425,7 +2425,7 @@ pub fn restore_code_checkout_allowed(supplied_cwd: &Path, persisted_cwd: Option<
 }
 /// Pure core of [`restore_code_checkout_allowed`] with the worktrees root
 /// injected so the decision can be unit-tested without touching
-/// `~/.grok`.
+/// `~/.friday`.
 fn restore_code_checkout_allowed_in(
     supplied_cwd: &Path,
     persisted_cwd: Option<&str>,
@@ -2439,7 +2439,7 @@ fn restore_code_checkout_allowed_in(
         .unwrap_or(false)
 }
 /// Env var backing the `workspace_rewind_git` flag. See [`git_rewind_enabled`].
-const REWIND_GIT_ENV: &str = "GROK_WORKSPACE_REWIND_GIT";
+const REWIND_GIT_ENV: &str = "FRIDAY_WORKSPACE_REWIND_GIT";
 /// Whether the git rewind domain (capture and soft restore) is enabled.
 /// Default OFF: git is the only domain that moves `HEAD`, so it is gated behind `workspace_rewind_git`.
 pub fn git_rewind_enabled() -> bool {
@@ -2882,7 +2882,7 @@ const DEFAULT_EXCLUDES_MARKER: &str = "grok default excludes";
 /// Lives in `.git/info/exclude`, which never enters the repo's history. `git add -f` still overrides.
 const DEFAULT_EXCLUDES_BLOCK: &str = "\
 # grok default excludes (local-only; seeded by the workspace git_commit op)
-.grok/
+.friday/
 node_modules/
 .env
 .env.*

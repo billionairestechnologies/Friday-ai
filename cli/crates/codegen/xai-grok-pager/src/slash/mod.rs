@@ -99,7 +99,7 @@ impl MenuKey {
 /// A single row in the slash suggestion dropdown.
 #[derive(Debug, Clone)]
 pub struct SuggestionRow {
-    /// Display text (e.g., "/model" or "Grok 4 Fast").
+    /// Display text (e.g., "/model" or "Friday X 4 Fast").
     pub display: String,
     /// Description text (e.g., "Switch the active model").
     pub description: String,
@@ -3073,7 +3073,7 @@ mod tests {
         // A skill arrives as an ACP command carrying skill meta (scope and path)
         let skill_meta = serde_json::json!({
             "scope": "local",
-            "path": "/home/user/.grok/skills/skill-cmd/SKILL.md",
+            "path": "/home/user/.friday/skills/skill-cmd/SKILL.md",
         })
         .as_object()
         .cloned()
@@ -3602,14 +3602,14 @@ mod tests {
         let id = acp::ModelId::new(Arc::from("grok-4.7"));
         models.available.insert(
             id.clone(),
-            acp::ModelInfo::new(id, "Grok 4.7").meta(
+            acp::ModelInfo::new(id, "Friday X 4.7").meta(
                 serde_json::json!({ "supportsReasoningEffort": true, "reasoningEffort": "high" })
                     .as_object()
                     .cloned(),
             ),
         );
 
-        // `grok-4.7` is not a subsequence of `Grok 4.7` (the hyphen). Rows must carry the id.
+        // `grok-4.7` is not a subsequence of `Friday X 4.7` (the hyphen). Rows must carry the id.
         let text = "/model grok-4.7 ";
         ctrl.refresh(&state, text, text.len(), &models);
         let snap = state.snapshot();

@@ -10,38 +10,34 @@ use xai_grok_shell::env::GrokBuildEnvironment;
 use xai_grok_shell::util::grok_home::grok_home;
 
 const TTL_SECONDS_BEFORE_AUTO_UPDATE: Duration = Duration::from_secs(60 * 30);
-const NPM_PACKAGE: &str = "@xai-official/grok";
-pub const GH_RELEASE_REPO: &str = "xai-org-shared/grok-build";
+const NPM_PACKAGE: &str = ""; // Friday X is not distributed through npm
+pub const GH_RELEASE_REPO: &str = ""; // Friday X releases are served by the Friday backend (/x), not GitHub
 
-/// Primary CLI base URL: Cloudflare-fronted x.ai endpoint with edge caching for binaries and origin-respecting no-cache for channel pointers.
-pub(crate) const CLI_BASE_URL_PRIMARY: &str = "https://x.ai/cli";
+/// Friday X updates come from one place: the Friday backend's `/x` surface (`/x/version`, `/x/download/<platform>`,
+/// `/x/sha256/<platform>`), the same one the installers use. The server decides which version is current, so a bad
+/// release is paused there (FRIDAY_X_VERSION_PIN) without touching any installed copy.
+pub(crate) fn friday_cli_base_url() -> String {
+    format!("{}/x", xai_grok_shell::env::friday_origin())
+}
 
-/// Fallback CLI base URL: direct GCS, used when the primary is unreachable (Cloudflare outage, regional CF egress issue, DNS hijack, etc.).
-pub(crate) const CLI_BASE_URL_FALLBACK: &str =
-    "https://storage.googleapis.com/grok-build-public-artifacts/cli";
-
-/// CLI base URLs in preference order.
-/// Callers (channel-pointer fetch, binary download, in-app updater) try each in turn and stop at the first success.
-pub(crate) const CLI_BASE_URLS: &[&str] = &[CLI_BASE_URL_PRIMARY, CLI_BASE_URL_FALLBACK];
-
-/// [`CLI_BASE_URLS`], unless tests set `GROK_CLI_BASE_URL` to point fetches and downloads at one base (as they set `GROK_INSTALLER`).
+/// [`CLI_BASE_URLS`], unless tests set `FRIDAY_CLI_BASE_URL` to point fetches and downloads at one base (as they set `FRIDAY_INSTALLER`).
 /// Loopback-only: downloads are verified by a smoke test, not a checksum, so redirecting to an arbitrary base could serve a hijacked install.
 pub(crate) fn cli_base_urls() -> Vec<String> {
     if let Some(base) = loopback_base_override() {
         return vec![base];
     }
-    CLI_BASE_URLS.iter().map(|s| (*s).to_owned()).collect()
+    vec![friday_cli_base_url()]
 }
 
-/// `GROK_CLI_BASE_URL` when it names a loopback base.
+/// `FRIDAY_CLI_BASE_URL` when it names a loopback base.
 pub(crate) fn loopback_base_override() -> Option<String> {
-    let base = std::env::var("GROK_CLI_BASE_URL").ok()?;
+    let base = std::env::var("FRIDAY_CLI_BASE_URL").ok()?;
     let base = base.trim();
     if is_loopback_base(base) {
         return Some(base.to_owned());
     }
     if !base.is_empty() {
-        tracing::warn!("GROK_CLI_BASE_URL ignored: only loopback bases are honored");
+        tracing::warn!("FRIDAY_CLI_BASE_URL ignored: only loopback bases are honored");
     }
     None
 }
@@ -73,9 +69,9 @@ fn is_loopback_base(base: &str) -> bool {
 pub struct UpdateConfig {
     /// Chat API proxy base URL (versioned `https://cli-chat-proxy.grok.com/v1` endpoint).
     pub proxy_base_url: String,
-    /// Auth scope key for `~/.grok/auth.json`.
+    /// Auth scope key for `~/.friday/auth.json`.
     pub auth_scope: String,
-    /// Enterprise deployment key (GROK_DEPLOYMENT_KEY).
+    /// Enterprise deployment key (FRIDAY_DEPLOYMENT_KEY).
     pub deployment_key: Option<String>,
     /// Optional extra auth material forwarded with requests when present.
     pub alpha_test_key: Option<String>,
@@ -295,7 +291,9 @@ pub async fn fetch_gcs_version_from_base(channel: &str, base_url: &str) -> Resul
 }
 
 async fn fetch_gcs_channel_pointer(channel: &str, base_url: &str) -> Result<String> {
-    let url = format!("{}/{}", base_url, channel);
+    // Friday has one release line; the channel name is accepted for the callers' sake and not sent.
+    let _ = channel;
+    let url = format!("{}/version", base_url.trim_end_matches('/'));
     let client = xai_grok_extra_ca::build_reqwest_client(|builder| {
         builder.timeout(Duration::from_secs(15))
     })?;
@@ -434,7 +432,7 @@ pub async fn is_version_cache_fresh() -> bool {
 pub use xai_grok_version::installed as get_installed_grok_version;
 
 /// Returns `None` when there is no parseable managed symlink (Windows copy-based installs, dev builds) or when the
-/// symlink is DANGLING — a link whose target binary was deleted (e.g. manual `~/.grok/downloads` cleanup) must not report
+/// symlink is DANGLING — a link whose target binary was deleted (e.g. manual `~/.friday/downloads` cleanup) must not report
 /// an installed version, or every updater would claim "already up to date" forever while no runnable binary exists.
 pub fn installed_on_disk_version() -> Option<String> {
     #[cfg(unix)]
@@ -443,7 +441,7 @@ pub fn installed_on_disk_version() -> Option<String> {
         let target = std::fs::read_link(&app).ok()?;
         // metadata() follows the symlink: Err means the target is gone (dangling link) and the version it names is not actually on disk
         std::fs::metadata(&app).ok()?;
-        version_from_versioned_binary_name(target.file_name()?.to_str()?, "grok")
+        version_from_versioned_binary_name(target.file_name()?.to_str()?, "friday")
     }
     #[cfg(not(unix))]
     {
@@ -453,7 +451,7 @@ pub fn installed_on_disk_version() -> Option<String> {
 
 /// Handles the internal layout (`grok-0.1.150-macos-aarch64`) and the npm layout without a platform suffix
 /// (`grok-0.1.150`). Pre-releases parse whole: `grok-0.1.150-alpha.1-linux-x86_64` gives `0.1.150-alpha.1`. Unknown
-/// layouts (`grok-latest`, `grok-pager-*` when `bin_prefix` is `grok`) return `None` instead of garbage.
+/// layouts (`grok-latest`, `grok-pager-*` when `bin_prefix` is `friday`) return `None` instead of garbage.
 pub(crate) fn version_from_versioned_binary_name(name: &str, bin_prefix: &str) -> Option<String> {
     const PLATFORM_OS: &[&str] = &["macos", "linux", "darwin", "windows"];
     let suffix = name.strip_prefix(bin_prefix)?.strip_prefix('-')?;
@@ -483,7 +481,7 @@ pub(crate) async fn try_fetch_stable_pointer() -> Option<String> {
     .unwrap_or(None)
 }
 
-/// Read the cached stable version from `~/.grok/version.json` (sync, for display).
+/// Read the cached stable version from `~/.friday/version.json` (sync, for display).
 ///
 /// Returns `None` if the file doesn't exist, can't be parsed, or has no `stable_version` field (e.g. written by an older binary).
 pub fn cached_stable_version() -> Option<String> {
@@ -493,7 +491,7 @@ pub fn cached_stable_version() -> Option<String> {
     gv.stable_version
 }
 
-/// An empty or `"stable"` channel means stable, the installers' default (`CHANNEL="${GROK_CHANNEL:-stable}"` in install.sh).
+/// An empty or `"stable"` channel means stable, the installers' default (`CHANNEL="${FRIDAY_CHANNEL:-stable}"` in install.sh).
 pub(crate) fn is_stable_channel(channel: &str) -> bool {
     channel.is_empty() || channel == "stable"
 }
@@ -521,7 +519,7 @@ pub fn channel_name() -> Option<&'static str> {
     })
 }
 
-/// Compares the compiled-in `VERSION` against the stable pointer stored in `~/.grok/version.json` (written by the
+/// Compares the compiled-in `VERSION` against the stable pointer stored in `~/.friday/version.json` (written by the
 /// auto-updater): `" [alpha]"` when the current version is ahead of stable,; `" [stable]"` when at or behind stable,;
 /// `""` when no cached pointer is available (first launch, old cache format).
 pub fn channel_label() -> &'static str {
@@ -589,12 +587,12 @@ mod tests {
             ("grok-0.2.46", Some("0.2.46")),                   // no platform suffix
             ("other-0.2.46-darwin-arm64", None),               // wrong prefix
             ("grok-latest", None),                             // symlink alias, not a version
-            ("grok", None),                                    // bare name
+            ("friday", None),                                    // bare name
             ("", None),
         ];
         for (name, expected) in cases {
             assert_eq!(
-                version_from_versioned_binary_name(name, "grok").as_deref(),
+                version_from_versioned_binary_name(name, "friday").as_deref(),
                 *expected,
                 "version_from_versioned_binary_name({name:?})"
             );

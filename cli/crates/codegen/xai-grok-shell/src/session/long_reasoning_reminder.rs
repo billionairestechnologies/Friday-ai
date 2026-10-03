@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 use crate::util::config::LongReasoningReminderSettings;
 use xai_grok_config_types::BoolFlag;
 
-pub(crate) const ENV: &str = "GROK_LONG_REASONING_REMINDER";
+pub(crate) const ENV: &str = "FRIDAY_LONG_REASONING_REMINDER";
 pub(crate) const DEFAULT_TOKENS: u32 = 1000;
 pub(crate) const DEFAULT_DELAY: u32 = 1;
 /// Below this a routine step counts as long; above it the reminder never fires in practice.

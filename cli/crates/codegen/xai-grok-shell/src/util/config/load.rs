@@ -20,7 +20,7 @@ fn toml_bool_sync(env_var: Option<&str>, section: &str, key: &str) -> bool {
     }
 }
 pub(crate) fn load_relay_sync_enabled_sync() -> bool {
-    toml_bool_sync(Some("GROK_RELAY_SYNC_ENABLED"), "relay", "enabled")
+    toml_bool_sync(Some("FRIDAY_RELAY_SYNC_ENABLED"), "relay", "enabled")
 }
 const DEFAULT_FLUSH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 pub(crate) fn load_upload_wait_config_sync() -> (bool, std::time::Duration) {

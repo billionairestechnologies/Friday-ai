@@ -350,7 +350,7 @@ fn managed_config_stale_at_is_false_without_user_home() {
 
 #[test]
 fn managed_config_stale_at_is_true_without_synced_marker() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-nomark-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-nomark-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let _ = std::fs::remove_file(dir.join(MANAGED_CONFIG_CACHE_FILE));
     // No recorded sync (even if config files exist) reads stale
@@ -360,7 +360,7 @@ fn managed_config_stale_at_is_true_without_synced_marker() {
 
 #[test]
 fn managed_config_stale_at_is_false_after_fresh_sync() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-fresh-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-fresh-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     mark_managed_config_synced_at(
         &dir,
@@ -379,7 +379,7 @@ fn managed_config_stale_at_is_false_after_fresh_sync() {
 
 #[test]
 fn managed_deployment_id_at_requires_matching_fingerprint() {
-    let dir = std::env::temp_dir().join(format!("grok-dep-id-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-dep-id-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let server_dep = "37c96487-eda9-4bb2-a767-6444274423c8";
     // Deploy-key path: fingerprint set, the principal is the server deployment UUID
@@ -417,7 +417,7 @@ fn managed_deployment_id_at_requires_matching_fingerprint() {
 
 #[test]
 fn managed_config_stale_at_is_true_for_old_sync() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-old-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-old-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let hour_ago = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -437,7 +437,7 @@ fn managed_config_stale_at_is_true_for_old_sync() {
 /// Served-then-deleted is stale; an armed build also treats unsigned policy on disk as stale.
 #[test]
 fn managed_config_stale_when_served_artifact_deleted() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-artgone-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-artgone-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     mark_managed_config_synced_at(
         &dir,
@@ -486,7 +486,7 @@ fn cache_missing_required_artifact_treats_empty_placeholder_as_missing() {
 /// A config-less principal that served nothing is never misread as stale.
 #[test]
 fn managed_config_not_stale_when_nothing_served() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-noart-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-noart-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     mark_managed_config_synced_at(
         &dir,
@@ -505,7 +505,7 @@ fn managed_config_not_stale_when_nothing_served() {
 /// A cache fetched for a different principal is stale for the current one.
 #[test]
 fn managed_config_stale_on_identity_mismatch() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-ident-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-ident-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     mark_managed_config_synced_at(
         &dir,
@@ -528,7 +528,7 @@ fn managed_config_stale_on_identity_mismatch() {
 /// A legacy marker (no `had_*`) is never flagged stale for a missing artifact.
 #[test]
 fn managed_config_legacy_marker_is_conservative() {
-    let dir = std::env::temp_dir().join(format!("grok-stale-legacy-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-stale-legacy-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -549,7 +549,7 @@ fn managed_config_legacy_marker_is_conservative() {
 /// Hard-stale is a missing artifact or an identity mismatch; a fresh same-identity cache is usable.
 #[test]
 fn hard_stale_only_on_missing_or_identity() {
-    let dir = std::env::temp_dir().join(format!("grok-hardstale-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-hardstale-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     mark_managed_config_synced_at(
         &dir,
@@ -579,7 +579,7 @@ fn hard_stale_only_on_missing_or_identity() {
 /// No marker is hard-stale (never synced, so fetch before use).
 #[test]
 fn hard_stale_without_marker() {
-    let dir = std::env::temp_dir().join(format!("grok-hardstale-nomark-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-hardstale-nomark-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let _ = std::fs::remove_file(dir.join(MANAGED_CONFIG_CACHE_FILE));
     assert!(is_managed_config_hard_stale_for_at(&dir, &team("team-a")));
@@ -590,7 +590,7 @@ fn hard_stale_without_marker() {
 /// The cache is hard-stale so the next sync rewrites it.
 #[test]
 fn corrupt_marker_reads_as_no_marker_and_allows() {
-    let dir = std::env::temp_dir().join(format!("grok-corrupt-marker-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-corrupt-marker-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("requirements.toml"), "fail_closed = true\n").unwrap();
     std::fs::write(dir.join(MANAGED_CONFIG_CACHE_FILE), "{ not valid json").unwrap();
@@ -609,7 +609,7 @@ fn corrupt_marker_reads_as_no_marker_and_allows() {
 /// A deploy-key switch is an offline identity mismatch; the refetch happens online.
 #[test]
 fn deployment_key_switch_is_stale_and_tampered_offline() {
-    let dir = std::env::temp_dir().join(format!("grok-dk-switch-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-dk-switch-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     // Provisioned with key A: the principal is the served deployment_id and the fingerprint is fp-a
     mark_managed_config_synced_at(
@@ -639,7 +639,7 @@ fn deployment_key_switch_is_stale_and_tampered_offline() {
 
 #[test]
 fn pre_upgrade_marker_without_fingerprint_does_not_fire_on_key() {
-    let dir = std::env::temp_dir().join(format!("grok-dk-preupgrade-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-dk-preupgrade-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -661,7 +661,7 @@ fn pre_upgrade_marker_without_fingerprint_does_not_fire_on_key() {
 
 #[test]
 fn team_path_keys_on_principal_not_key_fingerprint() {
-    let dir = std::env::temp_dir().join(format!("grok-team-nofp-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-team-nofp-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     mark_managed_config_synced_at(
         &dir,
@@ -695,7 +695,7 @@ fn team_path_keys_on_principal_not_key_fingerprint() {
 /// The eviction trigger fires only on a confirmed switch; first sync, same identity, `None`, and pre-upgrade markers never fire.
 #[test]
 fn identity_changed_only_on_confirmed_switch() {
-    let dir = std::env::temp_dir().join(format!("grok-ident-changed-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-ident-changed-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
     // No marker yet, so this is the first sync and there is nothing to evict
@@ -775,7 +775,7 @@ fn identity_changed_only_on_confirmed_switch() {
 /// A malformed `auth.json` or corrupt marker must not make the gate purge / apply eviction shed a real tenant's policy.
 #[test]
 fn blank_principal_is_never_a_confirmed_switch() {
-    let dir = std::env::temp_dir().join(format!("grok-ident-blank-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-ident-blank-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
     // A real recorded team with a blank current principal is not a switch
@@ -852,7 +852,7 @@ fn blank_principal_is_never_a_confirmed_switch() {
 /// Armed: fail-closed with served policy requires an authentic sidecar.
 #[test]
 fn compromised_only_when_opted_in_and_deleted_or_substituted() {
-    let dir = std::env::temp_dir().join(format!("grok-compromised-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-compromised-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
     // No marker means not compromised
@@ -923,7 +923,7 @@ fn compromised_only_when_opted_in_and_deleted_or_substituted() {
 #[test]
 fn compromised_on_managed_config_deletion_when_fail_closed() {
     use crate::signed_policy::SignedVerdict;
-    let dir = std::env::temp_dir().join(format!("grok-compromised-mc-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-compromised-mc-{}", std::process::id()));
     let home = dir.as_path();
     std::fs::create_dir_all(home).unwrap();
     std::fs::write(home.join("managed_config.toml"), "[cli]\n").unwrap();
@@ -976,7 +976,7 @@ fn compromised_on_managed_config_deletion_when_fail_closed() {
 #[test]
 fn compromised_on_deployment_key_switch_when_fail_closed() {
     use crate::signed_policy::SignedVerdict;
-    let dir = std::env::temp_dir().join(format!("grok-compromised-dk-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-compromised-dk-{}", std::process::id()));
     let home = dir.as_path();
     std::fs::create_dir_all(home).unwrap();
 
@@ -1042,7 +1042,7 @@ fn compromised_on_deployment_key_switch_when_fail_closed() {
 #[test]
 fn gate_excludes_pure_identity_mismatch_but_keeps_artifact_and_key_tamper() {
     use crate::signed_policy::SignedVerdict;
-    let dir = std::env::temp_dir().join(format!("grok-gate-fix1-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-gate-fix1-{}", std::process::id()));
     let home = dir.as_path();
     std::fs::create_dir_all(home).unwrap();
 
@@ -1138,7 +1138,7 @@ fn gate_excludes_pure_identity_mismatch_but_keeps_artifact_and_key_tamper() {
 #[test]
 fn mark_keeps_fail_closed_armed_without_on_disk_file() {
     use crate::signed_policy::SignedVerdict;
-    let dir = std::env::temp_dir().join(format!("grok-mark-disarm-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("friday-mark-disarm-{}", std::process::id()));
     let home = dir.as_path();
     std::fs::create_dir_all(home).unwrap();
 

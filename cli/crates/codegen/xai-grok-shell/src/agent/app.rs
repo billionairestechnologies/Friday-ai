@@ -235,9 +235,9 @@ pub async fn run_stdio_agent(
         &grok_home::grok_home(),
         xai_file_utils::queue::DEFAULT_MAX_AGE,
     );
-    if let Ok(version) = std::env::var("GROK_CLIENT_VERSION") {
+    if let Ok(version) = std::env::var("FRIDAY_CLIENT_VERSION") {
         crate::unified_log::info(
-            "GROK_CLIENT_VERSION",
+            "FRIDAY_CLIENT_VERSION",
             None,
             Some(serde_json::json!({ "version": version })),
         );
@@ -322,7 +322,7 @@ pub async fn run_headless(
     use crate::agent::relay::spawn_relay_connection_with_callback;
     use tokio_util::sync::CancellationToken;
     const HEADLESS_NO_SESSION: &str = "Headless mode requires a grok.com session. \
-        Run `grok login` to sign in, or use `grok agent stdio` for API-key access.";
+        Run `friday login` to sign in, or use `friday agent stdio` for API-key access.";
     xai_file_utils::queue::cleanup_orphaned_uploads(
         &grok_home::grok_home(),
         xai_file_utils::queue::DEFAULT_MAX_AGE,
@@ -409,7 +409,7 @@ pub async fn run_headless(
         if !did_browser_flow {
             eprintln!();
             eprintln!(
-                "Open Grok Build: {} (press Enter to open in browser)",
+                "Open Friday X: {} (press Enter to open in browser)",
                 grok_code_url
             );
             eprintln!();
@@ -669,7 +669,7 @@ pub fn apply_otel_config(auth_manager: &AuthManager, grok_com_config: &GrokComCo
         crate::agent::otel_gate::open_at_startup();
     }
 }
-/// Boot-time switches of [`run_leader`], set by `grok agent leader` flags.
+/// Boot-time switches of [`run_leader`], set by `friday agent leader` flags.
 pub struct LeaderRunOptions {
     /// Keep serving after the last IPC client disconnects (devbox / systemd leaders).
     pub no_exit_on_disconnect: bool,
@@ -683,7 +683,7 @@ pub struct LeaderRunOptions {
 }
 /// Another process is wedged inside its own open+flock of the leader lock (stalled grok home). Only `tracing`
 /// here: a socket probe, pid read, or log open under the grok home could wedge this process too. Best effort: a
-/// client-spawned leader's stderr is `$GROK_HOME/leader.log`, so even this line can park in `write(2)` there.
+/// client-spawned leader's stderr is `$FRIDAY_HOME/leader.log`, so even this line can park in `write(2)` there.
 fn refuse_in_flight_leader_lock(e: crate::leader::LockError) -> anyhow::Error {
     tracing::error!(
         error = %e,
@@ -1504,7 +1504,7 @@ mod tests {
                 mark_external_otel_settings_resolved();
             }
         }
-        const PROXY_ENV_VAR: &str = "GROK_CLI_CHAT_PROXY_BASE_URL";
+        const PROXY_ENV_VAR: &str = "FRIDAY_CLI_CHAT_PROXY_BASE_URL";
         let _restore = Restore {
             key: std::env::var_os(XAI_API_KEY_ENV_VAR),
             legacy: std::env::var_os(LEGACY_XAI_API_KEY_ENV_VAR),
@@ -1546,7 +1546,7 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(25)).await;
         }
     }
-    /// Regression test for the bare-leader relay gating bug. A bare `grok agent leader` (devbox/systemd: no local IPC clients, `relay_on_demand == false`) must connect the grok.com relay eagerly.
+    /// Regression test for the bare-leader relay gating bug. A bare `friday agent leader` (devbox/systemd: no local IPC clients, `relay_on_demand == false`) must connect the grok.com relay eagerly.
     /// Remote prompts arrive *through* the relay, so on such a leader no headless-registration demand signal can ever fire.
     /// Gating the relay on it means the agent never registers with the backend ("No online agents") even though the box is healthy.
     #[tokio::test]

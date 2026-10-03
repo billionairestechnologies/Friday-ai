@@ -4,17 +4,17 @@
 //! vmmap mislabels the jemalloc heap as "CoreMedia Capture Data" because jemalloc tags its mmaps with `VM_MAKE_TAG(101)`, `VM_MEMORY_CM_REGWARP`.
 //! Post-hoc analysis was therefore blind, so this module records what actually happened, when, attributed to which code path:
 //!
-//! - **Samples**: footprint/RSS and allocator gauges every `GROK_MEMTRACE_INTERVAL_SECS` (default 30s) from a detached thread.
+//! - **Samples**: footprint/RSS and allocator gauges every `FRIDAY_MEMTRACE_INTERVAL_SECS` (default 30s) from a detached thread.
 //! - **Purges**: every `memory_release` call, tagged with the memory cliff that triggered it (`reason`), with before/after footprint and duration.
 //!   Over- or under-purging is thus visible per call site.
-//! - **Thresholds**: the physical footprint crossing a bucket (`GROK_MEMTRACE_THRESHOLD_MB`, default 1 GiB, doubling) fires the *threshold hook*.
+//! - **Thresholds**: the physical footprint crossing a bucket (`FRIDAY_MEMTRACE_THRESHOLD_MB`, default 1 GiB, doubling) fires the *threshold hook*.
 //!   A full allocator stats dump (jemalloc `malloc_stats_print`) is written next to the trace.
 //!   The GCS trace-upload pipeline attaches to the hook (see below).
 //!   Buckets re-arm once the footprint halves, so a long-lived process can evidence repeated growth cycles.
 //!
 //! ## Files
 //!
-//! `$GROK_HOME/memtrace/<start-ts>-<pid>.jsonl` (and a `.1` after 4 MiB rotation) plus `<stem>-jemalloc-<seq>.txt` threshold dumps.
+//! `$FRIDAY_HOME/memtrace/<start-ts>-<pid>.jsonl` (and a `.1` after 4 MiB rotation) plus `<stem>-jemalloc-<seq>.txt` threshold dumps.
 //! Files are created lazily on the first event so short-lived CLI invocations leave no debris.
 //! Traces contain **process memory numbers only** (no user content), so they are safe to ship for analysis.
 //!
@@ -346,7 +346,7 @@ fn with_sink(f: impl FnOnce(&Sink)) {
     }
 }
 
-/// Whether a trace sink is installed ([`start`] ran and `GROK_MEMTRACE` is not disabled, or a test sink is scoped in).
+/// Whether a trace sink is installed ([`start`] ran and `FRIDAY_MEMTRACE` is not disabled, or a test sink is scoped in).
 /// Lets callers skip gauge sampling entirely when tracing is off.
 pub(crate) fn is_active() -> bool {
     match SINK.read() {
@@ -376,16 +376,16 @@ pub(crate) fn record_purge(
     });
 }
 
-/// Env: disable with `GROK_MEMTRACE=0|false|off`.
+/// Env: disable with `FRIDAY_MEMTRACE=0|false|off`.
 fn enabled_by_env() -> bool {
     !matches!(
-        std::env::var("GROK_MEMTRACE").ok().as_deref(),
+        std::env::var("FRIDAY_MEMTRACE").ok().as_deref(),
         Some("0") | Some("false") | Some("off")
     )
 }
 
 fn interval_from_env() -> Duration {
-    let secs = std::env::var("GROK_MEMTRACE_INTERVAL_SECS")
+    let secs = std::env::var("FRIDAY_MEMTRACE_INTERVAL_SECS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(30);
@@ -396,7 +396,7 @@ fn interval_from_env() -> Duration {
 }
 
 fn first_threshold_from_env() -> u64 {
-    std::env::var("GROK_MEMTRACE_THRESHOLD_MB")
+    std::env::var("FRIDAY_MEMTRACE_THRESHOLD_MB")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(1024)

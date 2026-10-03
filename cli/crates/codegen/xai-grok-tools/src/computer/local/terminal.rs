@@ -45,11 +45,11 @@ const SIGTERM_GRACE: Duration = Duration::from_secs(1);
 /// Max background task lifetime; 10 hours to support long monitor and bash runs.
 pub(crate) const BACKGROUND_MAX_RUNTIME: Duration = Duration::from_secs(36_000);
 /// Max time an auto-backgroundable foreground command blocks the turn before it is
-/// backgrounded (never killed), independent of `timeout`. Env: `GROK_FOREGROUND_BLOCK_BUDGET_MS`.
+/// backgrounded (never killed), independent of `timeout`. Env: `FRIDAY_FOREGROUND_BLOCK_BUDGET_MS`.
 pub(crate) const FOREGROUND_BLOCK_BUDGET: Duration = Duration::from_secs(15);
 
 pub fn foreground_block_budget_from_env() -> Duration {
-    std::env::var("GROK_FOREGROUND_BLOCK_BUDGET_MS")
+    std::env::var("FRIDAY_FOREGROUND_BLOCK_BUDGET_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .map(Duration::from_millis)
@@ -57,11 +57,11 @@ pub fn foreground_block_budget_from_env() -> Duration {
 }
 
 /// Output-file size at which the actor kills the command, stopping an unbounded
-/// writer from filling the disk. Env override: `GROK_MAX_OUTPUT_FILE_BYTES`.
+/// writer from filling the disk. Env override: `FRIDAY_MAX_OUTPUT_FILE_BYTES`.
 const MAX_OUTPUT_FILE_BYTES: u64 = 5 * 1024 * 1024 * 1024;
 
 fn output_file_cap_from_env() -> u64 {
-    std::env::var("GROK_MAX_OUTPUT_FILE_BYTES")
+    std::env::var("FRIDAY_MAX_OUTPUT_FILE_BYTES")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(MAX_OUTPUT_FILE_BYTES)
@@ -3127,7 +3127,7 @@ async fn open_output_file(path: &std::path::Path) -> std::io::Result<File> {
 }
 
 #[cfg(unix)]
-const ENV_LOGIN_ENV: &str = "GROK_LOGIN_ENV";
+const ENV_LOGIN_ENV: &str = "FRIDAY_LOGIN_ENV";
 
 #[cfg(unix)]
 fn login_env_capture_enabled() -> bool {
@@ -3146,9 +3146,9 @@ fn login_env_var_excluded(key: &str) -> bool {
             | "SHLVL"
             | "_"
             | "TERM"
-            | "GROK_AGENT"
+            | "FRIDAY_AGENT"
             | "SUDO_ASKPASS"
-            | "GROK_ASKPASS"
+            | "FRIDAY_ASKPASS"
             | "ELECTRON_RUN_AS_NODE"
             | "SSH_AUTH_SOCK"
             | "DBUS_SESSION_BUS_ADDRESS"
@@ -3156,7 +3156,7 @@ fn login_env_var_excluded(key: &str) -> bool {
             | "WAYLAND_DISPLAY"
             | "GPG_TTY"
     ) || key.to_ascii_lowercase().ends_with("_proxy")
-        || key.starts_with("GROK_SANDBOX")
+        || key.starts_with("FRIDAY_SANDBOX")
 }
 
 #[cfg(unix)]
@@ -3608,17 +3608,17 @@ mod tests {
 
         let policy = ShellEnvironmentPolicy {
             exclude: vec![EnvironmentVariablePattern::new_case_insensitive("*SECRET*")],
-            set: HashMap::from([("GROK_TEST_BASE".to_string(), "1".to_string())]),
+            set: HashMap::from([("FRIDAY_TEST_BASE".to_string(), "1".to_string())]),
             ..Default::default()
         };
         let login = HashMap::from([
-            ("GROK_TEST_LOGIN".to_string(), "l".to_string()),
+            ("FRIDAY_TEST_LOGIN".to_string(), "l".to_string()),
             ("PATH".to_string(), "/login/bin".to_string()),
         ]);
         let request = HashMap::from([
-            ("GROK_TEST_REQ".to_string(), "r".to_string()),
+            ("FRIDAY_TEST_REQ".to_string(), "r".to_string()),
             ("PATH".to_string(), "/req/bin".to_string()),
-            ("GROK_TEST_SECRET".to_string(), "s".to_string()),
+            ("FRIDAY_TEST_SECRET".to_string(), "s".to_string()),
         ]);
 
         let mut cmd = tokio::process::Command::new("true");
@@ -3629,14 +3629,14 @@ mod tests {
             .filter_map(|(k, v)| Some((k.to_str()?.to_string(), v?.to_str()?.to_string())))
             .collect();
 
-        assert_eq!(env.get("GROK_TEST_BASE").map(String::as_str), Some("1"));
-        assert_eq!(env.get("GROK_TEST_LOGIN").map(String::as_str), Some("l"));
-        assert_eq!(env.get("GROK_TEST_REQ").map(String::as_str), Some("r"));
-        assert!(!env.contains_key("GROK_TEST_SECRET"));
+        assert_eq!(env.get("FRIDAY_TEST_BASE").map(String::as_str), Some("1"));
+        assert_eq!(env.get("FRIDAY_TEST_LOGIN").map(String::as_str), Some("l"));
+        assert_eq!(env.get("FRIDAY_TEST_REQ").map(String::as_str), Some("r"));
+        assert!(!env.contains_key("FRIDAY_TEST_SECRET"));
         assert_eq!(env.get("PATH").map(String::as_str), Some("/login/bin"));
         assert_eq!(
-            env.get(crate::util::GROK_AGENT_ENV).map(String::as_str),
-            Some(crate::util::GROK_AGENT_ENV_VALUE)
+            env.get(crate::util::FRIDAY_AGENT_ENV).map(String::as_str),
+            Some(crate::util::FRIDAY_AGENT_ENV_VALUE)
         );
     }
 
@@ -4930,13 +4930,13 @@ mod tests {
         let backend = LocalTerminalBackend::with_persistent_shell();
 
         let result = backend
-            .run(make_request("export GROK_PERSIST_TEST=hello123"))
+            .run(make_request("export FRIDAY_PERSIST_TEST=hello123"))
             .await
             .unwrap();
         assert_eq!(result.exit_code, Some(0));
 
         let result = backend
-            .run(make_request("echo $GROK_PERSIST_TEST"))
+            .run(make_request("echo $FRIDAY_PERSIST_TEST"))
             .await
             .unwrap();
         assert_eq!(result.exit_code, Some(0));

@@ -1,9 +1,9 @@
 //! A managed-policy hook must not be disabled through `handle_hooks_action`.
 //!
 //! These tests drive the shipped `handle_hooks_action` with a real registry whose hook carries a managed-policy provenance
-//! (the root-owned `/etc/grok` tier and the signed synced `$GROK_HOME/requirements.toml`).
+//! (the root-owned `/etc/friday` tier and the signed synced `$FRIDAY_HOME/requirements.toml`).
 //! The per-hook `Disable` action must be refused and the bulk `ToggleSource` must skip it, both before writing any disable state.
-//! The dispatcher-level exemption and the display predicate are covered with a sandboxed `GROK_HOME` in `xai_grok_hooks::dispatcher` tests.
+//! The dispatcher-level exemption and the display predicate are covered with a sandboxed `FRIDAY_HOME` in `xai_grok_hooks::dispatcher` tests.
 
 use super::support::*;
 use super::*;
@@ -26,7 +26,7 @@ const MANAGED_HOOKS: [(&str, HookProvenance); 2] = [
 ];
 
 /// Snapshots and restores the disabled-hooks file wherever the process actually resolves it.
-/// A temp `GROK_HOME` alone cannot redirect it: `grok_home()` is `OnceLock`-cached and another test in this binary may have resolved it first.
+/// A temp `FRIDAY_HOME` alone cannot redirect it: `grok_home()` is `OnceLock`-cached and another test in this binary may have resolved it first.
 /// The guard lets the test assert nothing was written, and if the no-disable rule ever regresses it restores the developer's or CI's real file.
 struct DisabledHooksGuard {
     path: Option<std::path::PathBuf>,

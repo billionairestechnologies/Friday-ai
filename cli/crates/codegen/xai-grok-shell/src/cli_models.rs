@@ -1,9 +1,9 @@
-//! Data APIs for `grok models`. Rendering is the client's job.
+//! Data APIs for `friday models`. Rendering is the client's job.
 use crate::agent::config::Config as AgentConfig;
 use agent_client_protocol as acp;
 use anyhow::Result;
 use xai_acp_lib::{AcpAgentTx, acp_send};
-/// Status for the `grok models` banner (the display order is not the sampling priority; see [`AuthStatus::resolve`]).
+/// Status for the `friday models` banner (the display order is not the sampling priority; see [`AuthStatus::resolve`]).
 #[derive(Debug, PartialEq, Eq)]
 pub enum AuthStatus {
     ApiKey,
@@ -110,18 +110,18 @@ mod tests {
         }
     }
     /// Isolate process-global auth sources that `AuthStatus::resolve` consults.
-    /// Uses `GROK_AUTH_PATH` (not `GROK_HOME`) so a OnceLock-cached real home with `auth.json` cannot leak into these tests.
+    /// Uses `FRIDAY_AUTH_PATH` (not `FRIDAY_HOME`) so a OnceLock-cached real home with `auth.json` cannot leak into these tests.
     fn isolate_auth_sources() -> (tempfile::TempDir, [EnvGuard; 7]) {
         let dir = tempfile::tempdir().unwrap();
         let auth_path = dir.path().join("no-auth.json");
         let guards = [
             EnvGuard::unset(XAI_API_KEY_ENV_VAR),
             EnvGuard::unset(LEGACY_XAI_API_KEY_ENV_VAR),
-            EnvGuard::unset("GROK_AUTH"),
-            EnvGuard::set("GROK_AUTH_PATH", auth_path.to_str().unwrap()),
-            EnvGuard::unset("GROK_DEPLOYMENT_KEY"),
-            EnvGuard::unset("GROK_WS_ORIGIN"),
-            EnvGuard::unset("GROK_DISABLE_API_KEY_AUTH"),
+            EnvGuard::unset("FRIDAY_AUTH"),
+            EnvGuard::set("FRIDAY_AUTH_PATH", auth_path.to_str().unwrap()),
+            EnvGuard::unset("FRIDAY_DEPLOYMENT_KEY"),
+            EnvGuard::unset("FRIDAY_WS_ORIGIN"),
+            EnvGuard::unset("FRIDAY_DISABLE_API_KEY_AUTH"),
         ];
         (dir, guards)
     }
@@ -160,7 +160,7 @@ mod tests {
     fn resolve_oauth_session() {
         let (_dir, _g) = isolate_auth_sources();
         let json = serde_json::to_string(&session_credential()).unwrap();
-        let _auth = EnvGuard::set("GROK_AUTH", &json);
+        let _auth = EnvGuard::set("FRIDAY_AUTH", &json);
         assert_eq!(
             AuthStatus::resolve(&Config::default()),
             AuthStatus::LoggedIn(EXPECTED_LOGIN_HOST.to_owned())
@@ -220,7 +220,7 @@ mod tests {
     fn models_list_response_round_trips() {
         let state = acp::SessionModelState::new(
             acp::ModelId::new("grok-4"),
-            vec![acp::ModelInfo::new(acp::ModelId::new("grok-4"), "Grok 4")],
+            vec![acp::ModelInfo::new(acp::ModelId::new("grok-4"), "Friday X 4")],
         );
         let ok = crate::session::ExtMethodResult::success(state)
             .to_ext_response()
@@ -259,7 +259,7 @@ mod tests {
     fn resolve_priority_session_over_byok_and_deployment() {
         let (_dir, _g) = isolate_auth_sources();
         let json = serde_json::to_string(&session_credential()).unwrap();
-        let _auth = EnvGuard::set("GROK_AUTH", &json);
+        let _auth = EnvGuard::set("FRIDAY_AUTH", &json);
         let dm = crate::models::default_model();
         let cfg = config_from_toml(&byok_and_deployment_toml(dm));
         assert_eq!(

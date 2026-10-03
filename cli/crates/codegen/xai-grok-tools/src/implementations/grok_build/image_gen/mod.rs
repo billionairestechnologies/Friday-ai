@@ -45,7 +45,7 @@ pub use xai_grok_tools_api::slash_commands::{
 /// Prose returned to the model (as a normal, successful tool result) when a free / X Basic user calls `image_gen` or
 /// `image_edit`. The model relays it to the user. The deliberate `/imagine` slash command shows the richer SuperGrok
 /// upsell modal instead; this covers the natural-language path.
-pub(crate) const TIER_RESTRICTED_UPSELL: &str = "Image generation is a SuperGrok feature and isn't available on the free or X Basic tier. Let the user know they can unlock image and video generation by upgrading to SuperGrok: https://grok.com/supergrok?referrer=grok-build. Do not retry this tool.";
+pub(crate) const TIER_RESTRICTED_UPSELL: &str = "Image generation is a SuperGrok feature and isn't available on the free or X Basic tier. Let the user know they can unlock image and video generation by upgrading to SuperGrok: https://friday.billionairestechnologies.com/supergrok?referrer=grok-build. Do not retry this tool.";
 
 /// HTTP client for xAI Imagine API. Cloned per-request; shares `Arc` state.
 #[derive(Clone)]
@@ -322,7 +322,7 @@ pub enum ImageGenConfig {
 
 /// Session-id header attached to imagine API requests; matches the header
 /// chat requests already carry.
-pub const SESSION_ID_HEADER: &str = "x-grok-session-id";
+pub const SESSION_ID_HEADER: &str = "x-friday-session-id";
 
 impl ImageGenConfig {
     /// Credentials present — required to construct any of the clients.

@@ -31,8 +31,8 @@ fn decrypt(data: &[u8], seed: u8) -> Zeroizing<String> {
 /// behavioural prompt and stays exactly as it was.
 pub(crate) fn rebrand(text: &str) -> String {
     text.replace("released by xAI", "built by Friday")
-        .replace("Grok Build", "Friday X")
-        .replace("~/.grok/", "~/.friday/")
+        .replace("Friday X", "Friday X")
+        .replace("~/.friday/", "~/.friday/")
 }
 
 /// The base prompt template (decrypted fresh; zeroed on drop).
@@ -40,7 +40,7 @@ pub(crate) fn base_template() -> Zeroizing<String> {
     decrypt(BASE_PROMPT_ENC, PROMPT_SEEDS[0])
 }
 
-/// The base prompt template source, exposed for `grok prompt --section template`.
+/// The base prompt template source, exposed for `friday prompt --section template`.
 pub fn base_template_source() -> Zeroizing<String> {
     base_template()
 }
@@ -49,7 +49,7 @@ pub(crate) fn apply_patch_template() -> Zeroizing<String> {
     decrypt(CODEX_PROMPT_ENC, PROMPT_SEEDS[1])
 }
 
-/// Apply-patch prompt template source, exposed for `grok prompt --section apply-patch-template`.
+/// Apply-patch prompt template source, exposed for `friday prompt --section apply-patch-template`.
 pub fn apply_patch_template_source() -> Zeroizing<String> {
     apply_patch_template()
 }
@@ -70,7 +70,7 @@ mod tests {
     #[test]
     fn templates_introduce_friday_x_not_the_original_product() {
         for template in [base_template(), apply_patch_template(), subagent_template()] {
-            for needle in ["xAI", "Grok Build", "~/.grok/"] {
+            for needle in ["xAI", "Friday X", "~/.friday/"] {
                 assert!(!template.contains(needle), "template still says {needle:?}");
             }
         }
@@ -428,18 +428,18 @@ mod tests {
         jset(
             &mut placeholders,
             "memory_global_path",
-            serde_json::json!("/home/test/.grok/memory-v2/global"),
+            serde_json::json!("/home/test/.friday/memory-v2/global"),
         );
         jset(
             &mut placeholders,
             "memory_workspace_path",
-            serde_json::json!("/home/test/.grok/memory-v2/workspaces/project"),
+            serde_json::json!("/home/test/.friday/memory-v2/workspaces/project"),
         );
 
         let prompt = render_base(&default_renderer(), &placeholders);
         assert!(prompt.contains("<memory>"));
-        assert!(prompt.contains("/home/test/.grok/memory-v2/global"));
-        assert!(prompt.contains("/home/test/.grok/memory-v2/workspaces/project"));
+        assert!(prompt.contains("/home/test/.friday/memory-v2/global"));
+        assert!(prompt.contains("/home/test/.friday/memory-v2/workspaces/project"));
         assert!(prompt.contains("topics/"));
         assert!(prompt.contains("observations/_inbox/"));
         assert!(prompt.contains("NEVER edit it directly"));

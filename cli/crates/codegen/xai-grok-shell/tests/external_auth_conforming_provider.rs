@@ -1,6 +1,6 @@
 //! The published external-auth contract, end to end.
 //!
-//! Operator binaries live outside this repo and read `GROK_AUTH_EXPIRED=1` as "headless, don't prompt".
+//! Operator binaries live outside this repo and read `FRIDAY_AUTH_EXPIRED=1` as "headless, don't prompt".
 //! They decline a run they cannot complete silently.
 //! So a binary that declines the boot probe must still be able to sign the user in.
 //! The two runs have to reach it in the order boot produces them.
@@ -35,8 +35,8 @@ fn write_conforming_provider(home: &Path) -> String {
         &script,
         format!(
             "#!/bin/sh\n\
-             echo \"expired=${{GROK_AUTH_EXPIRED:-unset}}\" >> {log}\n\
-             if [ \"$GROK_AUTH_EXPIRED\" = \"1\" ]; then\n\
+             echo \"expired=${{FRIDAY_AUTH_EXPIRED:-unset}}\" >> {log}\n\
+             if [ \"$FRIDAY_AUTH_EXPIRED\" = \"1\" ]; then\n\
              \x20   echo 'SSO session lapsed; cannot mint without the user' >&2\n\
              \x20   exit 1\n\
              fi\n\
@@ -93,14 +93,14 @@ async fn a_provider_that_declines_the_headless_run_can_still_sign_the_user_in() 
     // environment is spawned. `grok_home()` memoizes, so this must stay the
     // only test in the binary.
     unsafe {
-        std::env::set_var("GROK_HOME", home.path());
-        std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &dead);
-        std::env::set_var("GROK_XAI_API_BASE_URL", &dead);
-        std::env::remove_var("XAI_API_KEY");
-        std::env::remove_var("GROK_CODE_XAI_API_KEY");
-        std::env::set_var("GROK_TELEMETRY_ENABLED", "false");
-        std::env::set_var("GROK_FEEDBACK_ENABLED", "false");
-        std::env::set_var("GROK_TRACE_UPLOAD", "false");
+        std::env::set_var("FRIDAY_HOME", home.path());
+        std::env::set_var("FRIDAY_CLI_CHAT_PROXY_BASE_URL", &dead);
+        std::env::set_var("FRIDAY_XAI_API_BASE_URL", &dead);
+        std::env::remove_var("FRIDAY_X_TOKEN");
+        std::env::remove_var("FRIDAY_X_LEGACY_TOKEN");
+        std::env::set_var("FRIDAY_TELEMETRY_ENABLED", "false");
+        std::env::set_var("FRIDAY_FEEDBACK_ENABLED", "false");
+        std::env::set_var("FRIDAY_TRACE_UPLOAD", "false");
     }
 
     let config = GrokComConfig {

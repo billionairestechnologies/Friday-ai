@@ -20,8 +20,8 @@ pub const RATE_LIMITED_USER_MESSAGE_OAUTH: &str =
 
 /// API key / team rate-limit copy.
 /// Personal grok.com upgrades do not raise API team limits; admins purchase credits or a higher spend-based tier.
-/// See https://docs.x.ai/developers/rate-limits#rate-limit-tiers
-pub const RATE_LIMITED_USER_MESSAGE_API_KEY: &str = "You\u{2019}ve hit your team\u{2019}s API rate limit. Ask a team admin to purchase more credits for higher limits, or try again later. See https://docs.x.ai/developers/rate-limits#rate-limit-tiers";
+/// See https://friday.billionairestechnologies.com#rate-limit-tiers
+pub const RATE_LIMITED_USER_MESSAGE_API_KEY: &str = "You\u{2019}ve hit your team\u{2019}s API rate limit. Ask a team admin to purchase more credits for higher limits, or try again later. See https://friday.billionairestechnologies.com#rate-limit-tiers";
 
 /// Well-known free-usage exhaustion code CCP returns on HTTP 429.
 /// Matches `prod_util_well_known_errors::SUBSCRIPTION_FREE_USAGE_EXHAUSTED`.
@@ -30,7 +30,7 @@ pub const FREE_USAGE_EXHAUSTED_ERROR_CODE: &str = "subscription:free-usage-exhau
 
 /// User-facing free-usage exhaustion copy (paywall).
 /// Promises no reset duration; the backend config drives the quota window.
-pub const FREE_USAGE_USER_MESSAGE: &str = "You\u{2019}ve reached your free Grok Build usage limit for now. Get SuperGrok for much higher limits, or try again later: https://grok.com/supergrok?referrer=grok-build";
+pub const FREE_USAGE_USER_MESSAGE: &str = "You\u{2019}ve reached your free Friday X usage limit for now. Get SuperGrok for much higher limits, or try again later: https://friday.billionairestechnologies.com/supergrok?referrer=grok-build";
 
 /// Whether flattened server detail is free-usage-quota exhaustion (paywall), not transient throttling.
 /// Sniffs the well-known code embedded by `parse_error_bytes`.
@@ -77,7 +77,7 @@ fn strip_sampling_api_error_prefix(detail: &str) -> &str {
     detail.trim()
 }
 
-/// IC sometimes reuses OAuth free-tier upsell copy on 429s ("upgrade to a Grok subscription" / grok.com/supergrok).
+/// IC sometimes reuses OAuth free-tier upsell copy on 429s ("upgrade to a Friday X subscription" / grok.com/supergrok).
 /// That is wrong for API-key / team auth: higher limits come from credits and spend-based rate-limit tiers, not a personal SuperGrok plan.
 fn pushes_consumer_subscription_upsell(detail: &str) -> bool {
     let d = detail.to_ascii_lowercase();
@@ -120,13 +120,13 @@ pub(crate) fn map_sampling_err_to_acp(err: SamplingError) -> acp::Error {
             // Examples: content-safety blocks, ZDR-gated operations, remote-settings-blocked users
             // Passing the proxy's message via internal_error keeps the explanation visible without triggering the client's re-auth flow on -32000
             StatusCode::FORBIDDEN => {
-                let message = if message.contains("requires a Grok subscription")
+                let message = if message.contains("requires a Friday X subscription")
                     && crate::agent::auth_method::has_xai_api_key_env()
                 {
                     format!(
-                        "{message}\n\nYou have an API key set (XAI_API_KEY). \
+                        "{message}\n\nYou have an API key set (FRIDAY_X_TOKEN). \
                          Your cached OAuth session is being used instead. \
-                         To use your API key, run `grok logout` or type /logout in the TUI."
+                         To use your API key, run `friday logout` or type /logout in the TUI."
                     )
                 } else {
                     message
@@ -772,29 +772,29 @@ mod tests {
         );
     }
 
-    /// Helper: run a closure with XAI_API_KEY temporarily set (or cleared).
+    /// Helper: run a closure with FRIDAY_X_TOKEN temporarily set (or cleared).
     /// Cleans up even if the closure panics.
     fn with_api_key_env<F: FnOnce()>(key: Option<&str>, f: F) {
-        let prev = std::env::var("XAI_API_KEY").ok();
-        let prev_legacy = std::env::var("GROK_CODE_XAI_API_KEY").ok();
+        let prev = std::env::var("FRIDAY_X_TOKEN").ok();
+        let prev_legacy = std::env::var("FRIDAY_X_LEGACY_TOKEN").ok();
         // SAFETY: serial_test ensures no concurrent env mutation.
         unsafe {
-            std::env::remove_var("XAI_API_KEY");
-            std::env::remove_var("GROK_CODE_XAI_API_KEY");
+            std::env::remove_var("FRIDAY_X_TOKEN");
+            std::env::remove_var("FRIDAY_X_LEGACY_TOKEN");
             if let Some(k) = key {
-                std::env::set_var("XAI_API_KEY", k);
+                std::env::set_var("FRIDAY_X_TOKEN", k);
             }
         }
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
         // Restore original state.
         unsafe {
-            std::env::remove_var("XAI_API_KEY");
-            std::env::remove_var("GROK_CODE_XAI_API_KEY");
+            std::env::remove_var("FRIDAY_X_TOKEN");
+            std::env::remove_var("FRIDAY_X_LEGACY_TOKEN");
             if let Some(v) = prev {
-                std::env::set_var("XAI_API_KEY", v);
+                std::env::set_var("FRIDAY_X_TOKEN", v);
             }
             if let Some(v) = prev_legacy {
-                std::env::set_var("GROK_CODE_XAI_API_KEY", v);
+                std::env::set_var("FRIDAY_X_LEGACY_TOKEN", v);
             }
         }
         if let Err(e) = result {
@@ -808,7 +808,7 @@ mod tests {
         with_api_key_env(Some("xai-test"), || {
             let err = SamplingError::Api {
                 status: StatusCode::FORBIDDEN,
-                message: "The model 'grok-build' requires a Grok subscription.".into(),
+                message: "The model 'grok-build' requires a Friday X subscription.".into(),
                 model_metadata: None,
                 retry_after_secs: None,
                 should_retry: None,
@@ -818,8 +818,8 @@ mod tests {
             let data = acp_err.data.unwrap();
             let msg = data.as_str().unwrap();
             assert!(
-                msg.contains("grok logout"),
-                "should suggest grok logout when API key is available: {msg}"
+                msg.contains("friday logout"),
+                "should suggest friday logout when API key is available: {msg}"
             );
             assert!(
                 msg.contains("/logout"),
@@ -834,7 +834,7 @@ mod tests {
         with_api_key_env(None, || {
             let err = SamplingError::Api {
                 status: StatusCode::FORBIDDEN,
-                message: "The model 'grok-build' requires a Grok subscription.".into(),
+                message: "The model 'grok-build' requires a Friday X subscription.".into(),
                 model_metadata: None,
                 retry_after_secs: None,
                 should_retry: None,
@@ -844,7 +844,7 @@ mod tests {
             let data = acp_err.data.unwrap();
             let msg = data.as_str().unwrap();
             assert!(
-                !msg.contains("grok logout"),
+                !msg.contains("friday logout"),
                 "should NOT suggest logout when no API key is available: {msg}"
             );
         });
@@ -866,7 +866,7 @@ mod tests {
             let data = acp_err.data.unwrap();
             let msg = data.as_str().unwrap();
             assert!(
-                !msg.contains("grok logout"),
+                !msg.contains("friday logout"),
                 "should NOT suggest logout for non-subscription 403: {msg}"
             );
         });

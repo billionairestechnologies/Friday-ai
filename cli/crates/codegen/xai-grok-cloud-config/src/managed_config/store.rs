@@ -128,7 +128,7 @@ pub(super) fn team_principal_signed_in() -> std::io::Result<bool> {
 /// Best-effort; a fail_closed opt-in is kept — swapping `auth.json` must not escape policy.
 pub fn clear_orphan() {
     // Env switch only: a served `[features] managed_config = false` must not veto evicting itself.
-    if xai_grok_env::env_bool("GROK_MANAGED_CONFIG") == Some(false)
+    if xai_grok_env::env_bool("FRIDAY_MANAGED_CONFIG") == Some(false)
         || resolve_deployment_key().is_some()
     {
         return;
@@ -566,7 +566,7 @@ pub fn resolve_deployment_id(deployment_key: Option<&str>) -> Option<String> {
         .or_else(|| Some(xai_grok_telemetry::config::deployment_id_from_key(key)))
 }
 
-/// The GROK_DEPLOYMENT_KEY env beats the config file.
+/// The FRIDAY_DEPLOYMENT_KEY env beats the config file.
 /// A blank value is unset.
 pub fn resolve_deployment_key() -> Option<String> {
     let config_val = xai_grok_config::effective_config::load_effective_config()
@@ -578,7 +578,7 @@ pub fn resolve_deployment_key() -> Option<String> {
                 .as_str()
                 .map(str::to_owned)
         });
-    xai_grok_config::resolve_string_flag(None, "GROK_DEPLOYMENT_KEY", config_val.as_deref(), None)
+    xai_grok_config::resolve_string_flag(None, "FRIDAY_DEPLOYMENT_KEY", config_val.as_deref(), None)
         .map(|resolved| resolved.value)
 }
 
@@ -587,12 +587,12 @@ pub(super) fn deployment_key_fingerprint(key: &str) -> String {
     blake3::hash(key.as_bytes()).to_hex().to_string()
 }
 
-/// Overlay-free read: a `GROK_CONFIG` overlay must not suppress a policy-enforcement sync.
+/// Overlay-free read: a `FRIDAY_CONFIG` overlay must not suppress a policy-enforcement sync.
 pub fn is_fetch_enabled() -> bool {
     if !xai_grok_config::Distribution::current().allows(xai_grok_config::Capability::RemoteFetch) {
         return false;
     }
-    if let Some(v) = xai_grok_env::env_bool("GROK_MANAGED_CONFIG") {
+    if let Some(v) = xai_grok_env::env_bool("FRIDAY_MANAGED_CONFIG") {
         return v;
     }
     xai_grok_config::ConfigLayers::load()

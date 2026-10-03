@@ -130,8 +130,8 @@ impl EmbeddingProvider for ApiEmbeddingProvider {
                 let request = xai_grok_http::shared_client()
                     .post(format!("{}/embeddings", self.api_base))
                     .json(&body_json)
-                    .header("X-XAI-Token-Auth", "xai-grok-cli")
-                    .header("x-grok-client-version", xai_grok_version::VERSION);
+                    .header("X-Friday-Token-Auth", "friday-x-cli")
+                    .header("x-friday-client-version", xai_grok_version::VERSION);
 
                 let req = match request.build() {
                     Ok(r) => r,

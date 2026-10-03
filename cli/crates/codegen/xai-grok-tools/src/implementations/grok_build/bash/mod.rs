@@ -900,11 +900,11 @@ const BACKGROUND_TIMEOUT: Duration = Duration::from_secs(86400); // 24 hours
 
 /// Max time a *non-backgroundable* foreground command may block the turn. Such a command has only its requested `timeout` (up to 10h), so a
 /// long timeout would wedge the turn; we clamp and kill at this cap instead. Backgroundable commands use the terminal's
-/// `FOREGROUND_BLOCK_BUDGET` instead. Long work should use `background: true`. Env override: `GROK_MAX_FOREGROUND_BLOCK_MS`.
+/// `FOREGROUND_BLOCK_BUDGET` instead. Long work should use `background: true`. Env override: `FRIDAY_MAX_FOREGROUND_BLOCK_MS`.
 const MAX_FOREGROUND_BLOCK: Duration = Duration::from_secs(300); // 5 minutes
 
 fn max_foreground_block() -> Duration {
-    std::env::var("GROK_MAX_FOREGROUND_BLOCK_MS")
+    std::env::var("FRIDAY_MAX_FOREGROUND_BLOCK_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .map(Duration::from_millis)
@@ -4624,7 +4624,7 @@ mod tests {
         #[test]
         fn advertised_wait_tracks_env_budget() {
             let _g = env_lock();
-            let key = "GROK_FOREGROUND_BLOCK_BUDGET_MS";
+            let key = "FRIDAY_FOREGROUND_BLOCK_BUDGET_MS";
             let prev = std::env::var(key).ok();
             // SAFETY: test-only env mutation; restored below.
             unsafe { std::env::set_var(key, "60000") };

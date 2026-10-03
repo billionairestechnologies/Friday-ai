@@ -259,7 +259,7 @@ async fn prepare_grove_parent_skips_libgit2_discover() {
     let source = root.join("org").join("acme-app");
     std::fs::create_dir_all(&source).unwrap();
 
-    let _env = LockedTestEnv::lock().set("GROK_HOME", &home);
+    let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
     let _inject = inject_grove_parent();
 
     let session_id = format!("grove-skip-{}", std::process::id());
@@ -303,7 +303,7 @@ async fn prepare_grove_off_still_discovers_git() {
     std::fs::write(repo.join("tracked.txt"), "x").unwrap();
     xai_test_utils::git::git_commit_all(&repo, "initial");
 
-    let _env = LockedTestEnv::lock().set("GROK_HOME", &home);
+    let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
     let session_id = format!("grove-off-{}", std::process::id());
     let result =
         prepare_worktree_creation(&create_req(session_id, &repo, None, Some("probe-wt"))).await;
@@ -436,7 +436,7 @@ async fn sync_fork_grove_parent_skips_libgit2_on_partialclone() {
     );
     assert!(crate::session::git::find_git_root_from_path(&repo).is_err());
 
-    let _env = LockedTestEnv::lock().set("GROK_HOME", &home);
+    let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
     let _inject = inject_grove_parent();
     let req = fork_req(
         format!("grove-sync-{}", std::process::id()),
@@ -481,7 +481,7 @@ async fn pinned_streaming_keeps_prepare_source_git_root() {
     std::fs::write(cwd.join("tracked.txt"), "x").unwrap();
     xai_test_utils::git::git_commit_all(&repo, "initial");
 
-    let _env = LockedTestEnv::lock().set("GROK_HOME", &home);
+    let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
     let _inject = inject_grove_status(mount_status_json(&repo.to_string_lossy()));
     let session_id = format!("grove-pin-sgr-{}", std::process::id());
     let prepared = prepare_worktree_creation(&create_req(
@@ -547,7 +547,7 @@ async fn create_uses_the_path_captured_before_cwd_changes() {
 
     let session_id = format!("pin-cwd-{}", std::process::id());
     let captured = {
-        let _env = LockedTestEnv::lock().set("GROK_HOME", &home);
+        let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
         let prepared = prepare_worktree_creation(&create_req(
             session_id.clone(),
             &repo,
@@ -564,7 +564,7 @@ async fn create_uses_the_path_captured_before_cwd_changes() {
     let previous = std::env::current_dir().unwrap();
     std::env::set_current_dir(&later_cwd).unwrap();
     let status = {
-        let _later = LockedTestEnv::lock().set("GROK_HOME", &later_home);
+        let _later = LockedTestEnv::lock().set("FRIDAY_HOME", &later_home);
         let mut req = create_req(session_id, &repo, Some(false), Some("moved-after-resolve"));
         req.worktree_path = Some(captured.clone());
         create_worktree_streaming(&req, &NoopNotifier).await
@@ -594,7 +594,7 @@ async fn fork_prepare_grove_parent_skips_git_dir_gate() {
     let source = root.join("org").join("acme-app");
     std::fs::create_dir_all(&source).unwrap();
 
-    let _env = LockedTestEnv::lock().set("GROK_HOME", &home);
+    let _env = LockedTestEnv::lock().set("FRIDAY_HOME", &home);
     let _inject = inject_grove_parent();
     let result = prepare_worktree_from_worktree(&fork_req(
         format!("grove-fork-prep-{}", std::process::id()),

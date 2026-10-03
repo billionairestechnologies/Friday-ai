@@ -77,7 +77,7 @@ fn locate() -> Option<BundledGit> {
         return None;
     }
     let local = std::env::var_os("LOCALAPPDATA")?;
-    bundled_git_in(&PathBuf::from(local).join("grok").join("git"))
+    bundled_git_in(&PathBuf::from(local).join("friday").join("git"))
 }
 
 /// The newest usable `<root>\<version>` payload under `root`: `cmd\git.exe`

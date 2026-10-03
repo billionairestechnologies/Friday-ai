@@ -10,8 +10,8 @@ use crate::slash::command::{
     AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand, slash_meta,
 };
 
-/// The online Build docs landing page, hardcoded like other TUI deep-links; docs.x.ai can redirect if the path moves.
-pub const BUILD_DOCS_URL: &str = "https://docs.x.ai/build/overview";
+/// The online Build docs landing page, hardcoded like other TUI deep-links; the Friday site can redirect if the path moves.
+pub const BUILD_DOCS_URL: &str = "https://friday.billionairestechnologies.com";
 
 pub struct DocsCommand;
 

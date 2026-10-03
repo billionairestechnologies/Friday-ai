@@ -951,7 +951,7 @@ impl SessionActor {
     }
 
     /// Resolve a standalone aux-model `SamplerConfig` for `slug` via the shared catalog routing, gathering the session-local auth context once.
-    /// The routing is Tier-1 catalog creds / Tier-2 xAI-proxy via session token / `XAI_API_KEY` / deployment key.
+    /// The routing is Tier-1 catalog creds / Tier-2 xAI-proxy via session token / `FRIDAY_X_TOKEN` / deployment key.
     /// Shared by image-describe and the classifier so the gather can't drift.
     pub(super) async fn resolve_aux_sampler_config(
         &self,
@@ -1549,7 +1549,7 @@ impl SessionActor {
                 "{detailed_message}\n\n\
                  You are using a deprecated authentication method (WebLogin).\n\
                  This auth method is no longer supported and will cause errors.\n\n\
-                 To fix: run `grok update`, then `grok logout`, then `grok login` to re-authenticate with OAuth2.\n\n\
+                 To fix: run `friday update`, then `friday logout`, then `friday login` to re-authenticate with OAuth2.\n\n\
                  Version: {client_version}"
             );
             self.log_terminal_failure("legacy_auth", error.status_code, &msg);

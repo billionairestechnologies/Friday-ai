@@ -112,7 +112,7 @@ fn format_acp_error_rate_limit_surfaces_detail_or_fallback() {
         ));
     assert_eq!(format_acp_error(&capacity, false), cap_body);
     assert_eq!(format_acp_error(&capacity, true), cap_body);
-    let rpm_body = "You are sending requests too quickly. Please slow down, or upgrade to a Grok subscription for higher limits: https://grok.com/supergrok";
+    let rpm_body = "You are sending requests too quickly. Please slow down, or upgrade to a Friday X subscription for higher limits: https://grok.com/supergrok";
     let rpm = acp::Error::new(RATE_LIMITED_ERROR_CODE, "Rate limited")
         .data(format!("API error (status 429 Too Many Requests): {rpm_body}"));
     assert!(format_acp_error(&rpm, false).contains("grok.com/supergrok"));
@@ -1086,11 +1086,11 @@ fn spawn_fake_acp_agent(
     });
     counter
 }
-/// Redirect `GROK_HOME` to a tempdir for test isolation.
+/// Redirect `FRIDAY_HOME` to a tempdir for test isolation.
 fn setup_grok_home_in_tempdir() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().expect("tempdir creation");
     unsafe {
-        std::env::set_var("GROK_HOME", tmp.path());
+        std::env::set_var("FRIDAY_HOME", tmp.path());
     }
     tmp
 }
@@ -1637,7 +1637,7 @@ async fn refused_interjection_shows_the_refusal_sentence() {
         while let Some(msg) = rx.recv().await {
             if let xai_acp_lib::AcpAgentMessage::ExtMethod(args) = msg {
                 let refusal = acp::Error::invalid_params()
-                    .data("Update Grok on \"desk\" to send images.");
+                    .data("Update Friday X on \"desk\" to send images.");
                 let _ = args.response_tx.send(Err(refusal));
             }
         }
@@ -1667,7 +1667,7 @@ async fn refused_interjection_shows_the_refusal_sentence() {
         panic!("expected InterjectFailed, got {result:?}");
     };
     assert_eq!(
-            "couldn't send interjection: Update Grok on \"desk\" to send images.",
+            "couldn't send interjection: Update Friday X on \"desk\" to send images.",
             error
         );
 }
@@ -2296,15 +2296,15 @@ fn subagents_without_plan_produces_no_profile() {
     };
     assert_eq!(flags.agent_profile(), None);
 }
-/// Neutralize `GROK_AGENT` for the profile-matrix tests below.
+/// Neutralize `FRIDAY_AGENT` for the profile-matrix tests below.
 /// The tests would then assert the wrong branch.
-/// Callers must be `#[serial_test::serial(GROK_AGENT)]` (process-global env).
+/// Callers must be `#[serial_test::serial(FRIDAY_AGENT)]` (process-global env).
 fn without_grok_agent() -> crate::test_util::EnvVarGuard {
-    crate::test_util::EnvVarGuard::set("GROK_AGENT", "")
+    crate::test_util::EnvVarGuard::set("FRIDAY_AGENT", "")
 }
 /// At the runtime defaults every `--no-*` flag is false, so every `SessionFlags` bool is true via `!args.no_*`.
 /// `to_meta()` then reflects the full plan profile and no separate `askUserQuestion` toggle.
-#[serial_test::serial(GROK_AGENT)]
+#[serial_test::serial(FRIDAY_AGENT)]
 #[test]
 fn runtime_default_flags_produce_plan_meta() {
     let _env = without_grok_agent();
@@ -2320,7 +2320,7 @@ fn runtime_default_flags_produce_plan_meta() {
     assert_eq!(j(&meta, "yoloMode"), false);
 }
 /// --plan alone produces meta with `agentProfile` only and a `askUserQuestion: false` since `ask_user` is off here.
-#[serial_test::serial(GROK_AGENT)]
+#[serial_test::serial(FRIDAY_AGENT)]
 #[test]
 fn plan_only_meta() {
     let _env = without_grok_agent();
@@ -2336,7 +2336,7 @@ fn plan_only_meta() {
     assert_eq!(j(&meta, "yoloMode"), false);
 }
 /// --plan --subagents selects the full plan profile.
-#[serial_test::serial(GROK_AGENT)]
+#[serial_test::serial(FRIDAY_AGENT)]
 #[test]
 fn plan_with_subagents_meta() {
     let _env = without_grok_agent();
@@ -2352,7 +2352,7 @@ fn plan_with_subagents_meta() {
     assert_eq!(j(&meta, "yoloMode"), false);
 }
 /// --ask-user alone selects the grok-build-ask-user profile.
-#[serial_test::serial(GROK_AGENT)]
+#[serial_test::serial(FRIDAY_AGENT)]
 #[test]
 fn ask_user_alone_meta() {
     let _env = without_grok_agent();
@@ -2368,7 +2368,7 @@ fn ask_user_alone_meta() {
     assert_eq!(j(&meta, "yoloMode"), false);
 }
 /// --plan --ask-user: plan already includes ask-user; profile is plan.
-#[serial_test::serial(GROK_AGENT)]
+#[serial_test::serial(FRIDAY_AGENT)]
 #[test]
 fn plan_with_ask_user_uses_plan_profile() {
     let _env = without_grok_agent();
@@ -2399,7 +2399,7 @@ fn subagents_alone_emits_only_ask_user_question_disable() {
     assert_eq!(j(&meta, "askUserQuestion"), false);
 }
 /// All three flags on at the runtime default produce grok-build-plan and no `askUserQuestion` field.
-#[serial_test::serial(GROK_AGENT)]
+#[serial_test::serial(FRIDAY_AGENT)]
 #[test]
 fn all_flags_meta() {
     let _env = without_grok_agent();
@@ -2806,19 +2806,19 @@ fn format_session_info_session_auth_ignores_api_key_env() {
     let text = format_session_info(&info, None, false, false, true);
     assert!(text.contains("Auth method: OAuth"), "{text}");
     assert!(!text.contains("Manage account and credits"), "{text}");
-    assert!(!text.contains("Also present: XAI_API_KEY"), "{text}");
+    assert!(!text.contains("Also present: FRIDAY_X_TOKEN"), "{text}");
     assert!(!text.contains("console.x.ai"), "{text}");
-    assert!(!text.contains("grok login"), "{text}");
+    assert!(!text.contains("friday login"), "{text}");
 }
 #[test]
 fn format_session_info_api_key_without_env() {
     let info = make_session_info("auto", None, 1000, 10000);
     let text = format_session_info(&info, None, false, true, false);
     assert!(text.contains("Auth method: API key\n"), "{text}");
-    assert!(!text.contains("XAI_API_KEY"), "{text}");
+    assert!(!text.contains("FRIDAY_X_TOKEN"), "{text}");
     assert!(!text.contains("Manage account and credits"), "{text}");
     assert!(
-            text.contains("Run `grok login` to use your SuperGrok subscription instead."),
+            text.contains("Run `friday login` to use your SuperGrok subscription instead."),
             "{text}"
         );
     assert!(!text.contains("grok.com"), "{text}");
@@ -2827,13 +2827,13 @@ fn format_session_info_api_key_without_env() {
 fn format_session_info_api_key_auth_suggests_grok_login() {
     let info = make_session_info("auto", None, 1000, 10000);
     let text = format_session_info(&info, None, false, true, true);
-    assert!(text.contains("Auth method: API key (XAI_API_KEY)"), "{text}");
+    assert!(text.contains("Auth method: API key (FRIDAY_X_TOKEN)"), "{text}");
     assert!(!text.contains("Manage account and credits"), "{text}");
     assert!(
-            text.contains("Run `grok login` to use your SuperGrok subscription instead."),
+            text.contains("Run `friday login` to use your SuperGrok subscription instead."),
             "{text}"
         );
-    assert!(!text.contains("Also present: XAI_API_KEY"), "{text}");
+    assert!(!text.contains("Also present: FRIDAY_X_TOKEN"), "{text}");
     assert!(!text.contains("console.x.ai"), "{text}");
     assert!(!text.contains("grok.com"), "{text}");
 }
@@ -2843,9 +2843,9 @@ fn format_session_info_session_only_shows_oauth() {
     let text = format_session_info(&info, None, false, false, false);
     assert!(text.contains("Auth method: OAuth"), "{text}");
     assert!(!text.contains("Manage account and credits"), "{text}");
-    assert!(!text.contains("Also present: XAI_API_KEY"), "{text}");
+    assert!(!text.contains("Also present: FRIDAY_X_TOKEN"), "{text}");
     assert!(!text.contains("console.x.ai"), "{text}");
-    assert!(!text.contains("grok login"), "{text}");
+    assert!(!text.contains("friday login"), "{text}");
 }
 #[test]
 fn format_session_info_shows_conversation_id_when_present() {

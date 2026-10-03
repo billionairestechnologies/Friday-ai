@@ -1278,7 +1278,7 @@ impl MvpAgent {
     /// Operator-attested FS-only toolset for mid-session attach.
     #[cfg(feature = "local-workspace")]
     fn ensure_attach_fs_only_advertised_tools() -> Result<(), String> {
-        const ENV: &str = "GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS";
+        const ENV: &str = "FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS";
         const ALLOW: &[&str] = &[
             "workspace.fs_list",
             "workspace.fs_exists",
@@ -1294,7 +1294,7 @@ impl MvpAgent {
             .filter(|s| !s.is_empty()) else {
             return Err(
                 "attached workspace_server advertised toolset is uncheckable; refuse attach \
-                 (set GROK_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS to a comma-separated FS-only catalog)"
+                 (set FRIDAY_CHAT_LOCAL_WORKSPACE_ADVERTISED_TOOLS to a comma-separated FS-only catalog)"
                     .into(),
             );
         };
@@ -1488,7 +1488,7 @@ impl MvpAgent {
             );
             return Err(acp::Error::auth_required().data(msg));
         };
-        let meta = if method_id.0.as_ref() == auth_method::GROK_COM_METHOD_ID {
+        let meta = if method_id.0.as_ref() == auth_method::FRIDAY_COM_METHOD_ID {
             serde_json::json!({ "use_oauth": true }).as_object().cloned()
         } else {
             arguments.meta
@@ -2293,8 +2293,8 @@ impl MvpAgent {
         Ok(Self::with_models(gateway, &cfg, auth_manager, models_manager))
     }
     /// Prepare the web fetch configuration based on feature flags.
-    /// Enabled gate: `disable_web_search` kill-switch > `GROK_WEB_FETCH` env > remote settings `web_fetch_enabled` > default (false).
-    /// Params resolution (TOML > env > remote settings > default): `proxy_endpoint`: `[toolset.web_fetch] proxy_endpoint` > `GROK_WEB_FETCH_PROXY` > remote settings > None `allowed_domains`: `[toolset.web_fetch] allowed_domains` > remote settings > built-in defaults `allow_local`: `[toolset.web_fetch] allow_local` > `GROK_WEB_FETCH_ALLOW_LOCAL` > false
+    /// Enabled gate: `disable_web_search` kill-switch > `FRIDAY_WEB_FETCH` env > remote settings `web_fetch_enabled` > default (false).
+    /// Params resolution (TOML > env > remote settings > default): `proxy_endpoint`: `[toolset.web_fetch] proxy_endpoint` > `FRIDAY_WEB_FETCH_PROXY` > remote settings > None `allowed_domains`: `[toolset.web_fetch] allowed_domains` > remote settings > built-in defaults `allow_local`: `[toolset.web_fetch] allow_local` > `FRIDAY_WEB_FETCH_ALLOW_LOCAL` > false
     pub(super) fn prepare_web_fetch_config(
         &self,
     ) -> xai_grok_tools::implementations::grok_build::web_fetch::WebFetchConfig {
@@ -2373,7 +2373,7 @@ impl MvpAgent {
         if relay_sync_enabled {
             tracing::info!("[grok] Relay sync: ENABLED");
         } else if tui_mode && relay_config_enabled && !has_xai_auth {
-            tracing::info!("[grok] Relay sync: DISABLED (no auth - run 'grok login' first)");
+            tracing::info!("[grok] Relay sync: DISABLED (no auth - run 'friday login' first)");
         } else if tui_mode && !relay_config_enabled {
             tracing::debug!("Relay sync: DISABLED (not configured in config.toml or env)");
         } else {
@@ -2969,7 +2969,7 @@ impl MvpAgent {
         }
     }
     /// RelaySync is only enabled when: Running in TUI interactive mode (cfg.enable_relay_sync)
-    /// Config file/env enables it ([relay] enabled or GROK_RELAY_SYNC_ENABLED)
+    /// Config file/env enables it ([relay] enabled or FRIDAY_RELAY_SYNC_ENABLED)
     /// User is authenticated
     pub(super) fn create_relay_sync(
         &self,
@@ -3901,7 +3901,7 @@ impl MvpAgent {
         })
     }
     /// Resolve the agent definition for a session. Priority (highest to lowest): Model `agent_type` if it names a strict harness (codex, …). `acp_agent_profile` from ACP `_meta.agentProfile` (remote clients).
-    /// `agent_profile_path` from CLI `--agent-profile`. `agent_config` from config.toml `[agent]`. `GROK_AGENT` env var. Built-in default agent. `GROK_AGENT` and an explicit `[agent] name` bypass step 1.
+    /// `agent_profile_path` from CLI `--agent-profile`. `agent_config` from config.toml `[agent]`. `FRIDAY_AGENT` env var. Built-in default agent. `FRIDAY_AGENT` and an explicit `[agent] name` bypass step 1.
     /// Strict-harness classification is structural; see [`xai_grok_agent::config::is_strict_harness_agent_type`]. Harness inheritance for a profile that pins its own model is applied by the caller via [`inherited_harness_template`], not here.
     pub fn resolve_agent_definition(
         cwd: &std::path::Path,
@@ -3911,7 +3911,7 @@ impl MvpAgent {
         model_agent_type: Option<&str>,
     ) -> xai_grok_agent::AgentDefinition {
         use xai_grok_agent::AgentDefinition;
-        let grok_agent_env_set = std::env::var("GROK_AGENT")
+        let grok_agent_env_set = std::env::var("FRIDAY_AGENT")
             .ok()
             .is_some_and(|s| !s.trim().is_empty());
         let config_agent_explicitly_set = agent_config.name.is_some();
@@ -3986,7 +3986,7 @@ impl MvpAgent {
                 name
             );
         }
-        let agent_name = std::env::var("GROK_AGENT").ok();
+        let agent_name = std::env::var("FRIDAY_AGENT").ok();
         let resolved = match agent_name.as_deref() {
             Some("browser-use") | Some("browser_use") => AgentDefinition::browser_use(),
             Some("grok-build-concise") | Some("grok_build_concise") => {
@@ -4308,7 +4308,7 @@ impl MvpAgent {
                 .as_ref()
                 .and_then(|s| s.loc_tracking)
                 .unwrap_or(false)
-                || std::env::var("GROK_LOC_TRACKING")
+                || std::env::var("FRIDAY_LOC_TRACKING")
                     .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
                     .unwrap_or(false));
         let (feedback_resolved, feedback_flags) = {
@@ -4609,7 +4609,7 @@ impl MvpAgent {
             if servers.is_empty() {
                 let user_path = xai_grok_tools::util::grok_home::grok_home()
                     .join("lsp.json");
-                let project_path = tool_ctx.cwd.as_path().join(".grok").join("lsp.json");
+                let project_path = tool_ctx.cwd.as_path().join(".friday").join("lsp.json");
                 tracing::debug!(
                     cwd = %tool_ctx.cwd,
                     user_lsp_path = %user_path.display(),

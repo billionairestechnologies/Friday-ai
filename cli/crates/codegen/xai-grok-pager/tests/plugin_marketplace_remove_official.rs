@@ -6,7 +6,7 @@ fn cli_remove_of_json_store_official_source_sets_sticky_flag() {
     // One #[test] per binary: the env is process-global.
     let grok_home = tempfile::tempdir().expect("grok home");
     // SAFETY: no other threads are running yet.
-    unsafe { std::env::set_var("GROK_HOME", grok_home.path()) };
+    unsafe { std::env::set_var("FRIDAY_HOME", grok_home.path()) };
 
     // Official source known ONLY via the JSON store; the sticky flag is unset.
     let plugins_dir = grok_home.path().join("plugins");

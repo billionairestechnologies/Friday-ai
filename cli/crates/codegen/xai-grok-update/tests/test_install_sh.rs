@@ -107,14 +107,14 @@ exit 0
 
 /// Seed a valid previous-good binary and symlink in the isolated home.
 fn seed_previous_good(home: &Path, platform: &str) -> PathBuf {
-    let downloads = home.join(".grok").join("downloads");
-    let bin = home.join(".grok").join("bin");
+    let downloads = home.join(".friday").join("downloads");
+    let bin = home.join(".friday").join("bin");
     std::fs::create_dir_all(&downloads).unwrap();
     std::fs::create_dir_all(&bin).unwrap();
-    let prev = downloads.join(format!("grok-{platform}"));
+    let prev = downloads.join(format!("friday-{platform}"));
     std::fs::write(&prev, GOOD_SCRIPT).unwrap();
     std::fs::set_permissions(&prev, std::fs::Permissions::from_mode(0o755)).unwrap();
-    let link = bin.join("grok");
+    let link = bin.join("friday");
     let _ = std::fs::remove_file(&link);
     std::os::unix::fs::symlink(format!("../downloads/grok-{platform}"), &link).unwrap();
     dunce::canonicalize(&prev).unwrap()
@@ -122,7 +122,7 @@ fn seed_previous_good(home: &Path, platform: &str) -> PathBuf {
 
 /// Re-resolve `$BIN_DIR/grok` from disk and re-run it: the active grok must always execute, and never be a `.tmp`/partial file.
 fn assert_active_grok_runs(home: &Path) {
-    let link = home.join(".grok").join("bin").join("grok");
+    let link = home.join(".friday").join("bin").join("friday");
     assert!(link.is_symlink(), "grok must remain a symlink");
     let resolved =
         dunce::canonicalize(&link).unwrap_or_else(|e| panic!("grok symlink dangles: {e}"));
@@ -148,8 +148,8 @@ fn run_installer(install_sh: &Path, home: &Path, fakebin: &Path, mode: &str, she
         .env("HOME", home)
         .env("PATH", path_env)
         .env("SHELL", shell)
-        .env("GROK_BIN_DIR", home.join(".grok").join("bin"))
-        .env("GROK_CHANNEL", "stable")
+        .env("FRIDAY_BIN_DIR", home.join(".friday").join("bin"))
+        .env("FRIDAY_CHANNEL", "stable")
         .env("FAKE_MODE", mode)
         .status()
         .expect("spawn bash install.sh");
@@ -379,7 +379,7 @@ fn write_fake_macos_x86_host(dir: &Path, host: FakeHost) {
 }
 
 /// Run an install script against a fake macOS/x86_64 host and return the artifact URLs it requested.
-/// The enterprise script requires auth, provided via a dummy `GROK_DEPLOYMENT_KEY`.
+/// The enterprise script requires auth, provided via a dummy `FRIDAY_DEPLOYMENT_KEY`.
 fn install_urls_on_fake_host(script: &str, host: FakeHost) -> Option<String> {
     let script_file = script_path(script)?;
     let fakedir = tempfile::tempdir().unwrap();
@@ -396,9 +396,9 @@ fn install_urls_on_fake_host(script: &str, host: FakeHost) -> Option<String> {
         .env("HOME", home.path())
         .env("PATH", path_env)
         .env("SHELL", "/bin/bash")
-        .env("GROK_BIN_DIR", home.path().join(".grok").join("bin"))
-        .env("GROK_CHANNEL", "stable")
-        .env("GROK_DEPLOYMENT_KEY", "test-deployment-key")
+        .env("FRIDAY_BIN_DIR", home.path().join(".friday").join("bin"))
+        .env("FRIDAY_CHANNEL", "stable")
+        .env("FRIDAY_DEPLOYMENT_KEY", "test-deployment-key")
         .env("FAKE_MODE", "full")
         .env("FAKE_URL_LOG", &url_log)
         .status()
@@ -438,16 +438,16 @@ fn run_with_proxy_url(script: &Path, proxy_url: &str) -> (bool, String, bool) {
         .env("HOME", home.path())
         .env("PATH", &path_env)
         .env("SHELL", "/bin/bash")
-        .env("GROK_BIN_DIR", home.path().join(".grok").join("bin"))
-        .env("GROK_CHANNEL", "stable")
-        .env("GROK_DEPLOYMENT_KEY", "test-deployment-key-must-not-leak")
-        .env("GROK_PROXY_URL", proxy_url)
+        .env("FRIDAY_BIN_DIR", home.path().join(".friday").join("bin"))
+        .env("FRIDAY_CHANNEL", "stable")
+        .env("FRIDAY_DEPLOYMENT_KEY", "test-deployment-key-must-not-leak")
+        .env("FRIDAY_PROXY_URL", proxy_url)
         .env("FAKE_MODE", "full")
         .env("FAKE_URL_LOG", &url_log)
         .status()
         .expect("spawn bash install script");
     let urls = std::fs::read_to_string(&url_log).unwrap_or_default();
-    let managed = home.path().join(".grok/managed_config.toml").exists();
+    let managed = home.path().join(".friday/managed_config.toml").exists();
     (status.success(), urls, managed)
 }
 
@@ -483,7 +483,7 @@ fn install_scripts_refuse_bad_proxy_url_for_deployment_key() {
             let (ok, urls, managed) = run_with_proxy_url(script_file, proxy_url);
             assert!(
                 !ok,
-                "{label}: GROK_PROXY_URL={proxy_url:?} must fail closed"
+                "{label}: FRIDAY_PROXY_URL={proxy_url:?} must fail closed"
             );
             assert_no_credentialed_proxy_request(label, proxy_url, &urls);
             assert!(
@@ -513,22 +513,22 @@ fn install_sh_rejects_hostile_grok_channel() {
         .env("HOME", home.path())
         .env("PATH", path_env)
         .env("SHELL", "/bin/bash")
-        .env("GROK_BIN_DIR", home.path().join(".grok").join("bin"))
-        .env("GROK_CHANNEL", hostile)
+        .env("FRIDAY_BIN_DIR", home.path().join(".friday").join("bin"))
+        .env("FRIDAY_CHANNEL", hostile)
         .env("FAKE_MODE", "full")
         .env("FAKE_URL_LOG", &url_log)
         .output()
         .expect("spawn bash install.sh");
     assert!(
         !output.status.success(),
-        "unlisted GROK_CHANNEL must fail closed"
+        "unlisted FRIDAY_CHANNEL must fail closed"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("GROK_CHANNEL"),
-        "must name GROK_CHANNEL in the error, stderr:\n{stderr}"
+        stderr.contains("FRIDAY_CHANNEL"),
+        "must name FRIDAY_CHANNEL in the error, stderr:\n{stderr}"
     );
-    let config = home.path().join(".grok/config.toml");
+    let config = home.path().join(".friday/config.toml");
     if config.exists() {
         let body = std::fs::read_to_string(&config).unwrap();
         assert!(
@@ -564,7 +564,7 @@ fn install_scripts_allow_custom_https_proxy_url() {
             let (ok, urls, _managed) = run_with_proxy_url(script_file, proxy_url);
             assert!(
                 ok,
-                "{label}: custom https GROK_PROXY_URL={proxy_url:?} must succeed"
+                "{label}: custom https FRIDAY_PROXY_URL={proxy_url:?} must succeed"
             );
             assert!(
                 urls.contains("proxy.example.com") || urls.contains("[::1]"),

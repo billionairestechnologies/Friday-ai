@@ -14,7 +14,7 @@ import {
   revokeCliSession,
   startDeviceAuthorization,
 } from "../services/cli/deviceAuth.js";
-import { assertFridayX, cliSettings, cliStatus, cliUser, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
+import { AUTO_MODEL, assertFridayX, cliSettings, cliStatus, cliUser, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
 
 /**
  * Friday X API (terminal + IDE). Three audiences share one router, each behind its own gate:
@@ -217,7 +217,19 @@ cliRouter.get(
     // plan-locked models are simply absent here (the richer /models above flags them for a picker that wants to upsell).
     res.json({
       object: "list",
-      data: models
+      data: [
+        // The server-side router: whatever coding model this user's plan allows right now. Listed first so it is the default.
+        {
+          id: AUTO_MODEL,
+          object: "model",
+          owned_by: "friday",
+          name: "Friday X (auto)",
+          description: "The best coding model your Friday plan allows. The server picks it, so it improves without an update.",
+          context_window: 200_000,
+          api_backend: "chat_completions",
+          supports_vision: false,
+        },
+        ...models
         .filter((m) => !m.locked)
         .map((m) => ({
           id: m.id,
@@ -229,6 +241,7 @@ cliRouter.get(
           api_backend: "chat_completions",
           supports_vision: m.vision,
         })),
+      ],
     });
   }),
 );

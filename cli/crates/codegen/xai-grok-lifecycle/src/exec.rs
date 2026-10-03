@@ -1,7 +1,7 @@
 //! Runs one exec handler (image or registered) for one trigger.
 //!
 //! The child is detached into its own session and process group, gets stdin from the null device and the
-//! `GROK_LIFECYCLE_*` variables on top of the server's environment, and writes stdout and stderr through pipes into
+//! `FRIDAY_LIFECYCLE_*` variables on top of the server's environment, and writes stdout and stderr through pipes into
 //! the capped [`ExecLog`]. At its effective timeout (`min(timeout_ms, remaining trigger deadline)`) the whole group
 //! gets SIGTERM, then SIGKILL [`TERM_GRACE`] later or [`KILL_SLACK`] past the trigger deadline, whichever comes first,
 //! and the child is reaped. However the run ends, whatever is left in the group is killed, so background children never
@@ -37,12 +37,12 @@ const OUTPUT_DRAIN_GRACE: Duration = Duration::from_millis(50);
 
 const OUTPUT_CHUNK_BYTES: usize = 8 * 1024;
 
-pub(crate) const ENV_EVENT: &str = "GROK_LIFECYCLE_EVENT";
-pub(crate) const ENV_REASON: &str = "GROK_LIFECYCLE_REASON";
-pub(crate) const ENV_DISK: &str = "GROK_LIFECYCLE_DISK";
+pub(crate) const ENV_EVENT: &str = "FRIDAY_LIFECYCLE_EVENT";
+pub(crate) const ENV_REASON: &str = "FRIDAY_LIFECYCLE_REASON";
+pub(crate) const ENV_DISK: &str = "FRIDAY_LIFECYCLE_DISK";
 /// Milliseconds from spawn until the handler is cut: its own `timeout_ms` or the rest of the trigger deadline,
 /// whichever is shorter.
-pub(crate) const ENV_DEADLINE_MS: &str = "GROK_LIFECYCLE_DEADLINE_MS";
+pub(crate) const ENV_DEADLINE_MS: &str = "FRIDAY_LIFECYCLE_DEADLINE_MS";
 const EVENT_PRE_STOP: &str = "pre-stop";
 
 /// Shared per-trigger resources of the exec runner.

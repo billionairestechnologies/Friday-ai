@@ -20,7 +20,7 @@ pub struct TraceArgs {
     /// Save locally only, skip remote upload
     #[arg(long)]
     pub local: bool,
-    /// Output path (default: $GROK_HOME/trace-exports/<session-id>.tar.gz)
+    /// Output path (default: $FRIDAY_HOME/trace-exports/<session-id>.tar.gz)
     #[arg(short, long)]
     pub output: Option<PathBuf>,
     /// Emit machine-readable JSON output
@@ -453,7 +453,7 @@ async fn run_upload(
         UploadGate::NoCredentials => {
             if !json {
                 eprintln!(
-                    "No upload credentials for this account (run `grok login` or set a deployment \
+                    "No upload credentials for this account (run `friday login` or set a deployment \
                      key); exporting locally."
                 );
             }
@@ -479,8 +479,8 @@ async fn run_upload(
         )
     {
         anyhow::bail!(
-            "No trace upload bucket configured. Set `GROK_TELEMETRY_GCS_BUCKET`, \
-             `GROK_TRACE_UPLOAD_BUCKET`, or `endpoints.trace_upload_bucket` in \
+            "No trace upload bucket configured. Set `FRIDAY_TELEMETRY_GCS_BUCKET`, \
+             `FRIDAY_TRACE_UPLOAD_BUCKET`, or `endpoints.trace_upload_bucket` in \
              config for direct GCS uploads."
         );
     }
@@ -632,7 +632,7 @@ impl UploadAttempt<'_> {
             eprintln!("Trace upload failed: {error}");
             eprintln!("  Bundle: {}", export_path.display());
             eprintln!("  Log:    {}", log_path.display());
-            eprintln!("  Retry:  grok trace {}", self.session_id);
+            eprintln!("  Retry:  friday trace {}", self.session_id);
             println!("{}", export_path.display());
         }
 
@@ -647,7 +647,7 @@ impl UploadAttempt<'_> {
         let _ = writeln!(log, "Trace upload debug log");
         let _ = writeln!(log, "======================");
         let _ = writeln!(log, "Timestamp:    {}", chrono::Utc::now().to_rfc3339());
-        let _ = writeln!(log, "Grok version: {}", xai_grok_version::full_version());
+        let _ = writeln!(log, "Friday X version: {}", xai_grok_version::full_version());
         let _ = writeln!(
             log,
             "OS:           {} {}",

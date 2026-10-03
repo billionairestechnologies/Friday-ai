@@ -17,7 +17,7 @@ use crate::{ClaudeImport, McpPreferencesFile};
 fn client_list_replaces_only_a_different_definition_and_keeps_a_matching_source() {
     let workspace = Workspace::new();
     let project = workspace.write(
-        ".grok/config.toml",
+        ".friday/config.toml",
         "[mcp_servers.corp]\ncommand = \"echo\"\nargs = [\"ok\"]\n\n\
          [mcp_servers.corp-redefined]\ncommand = \"echo\"\nargs = [\"old\"]\n",
     );
@@ -74,7 +74,7 @@ fn vendor_mcps_off_skips_the_matching_client_server_and_keeps_the_toml_definitio
         r#"{"mcpServers": {"killswitch-cache": {"command": "true"}}}"#,
     );
     let project = workspace.write(
-        ".grok/config.toml",
+        ".friday/config.toml",
         "[mcp_servers.killswitch-cache]\ncommand = \"echo\"\nargs = [\"ok\"]\n",
     );
     let mut sources = workspace.sources(vec![project]);
@@ -120,7 +120,7 @@ fn session_tier_is_native_only_for_config_toml_and_plugin_origins() {
         (
             SessionMcpTier::Native,
             McpServerOrigin::ConfigToml {
-                path: PathBuf::from("/u/.grok/config.toml"),
+                path: PathBuf::from("/u/.friday/config.toml"),
             },
         ),
         (

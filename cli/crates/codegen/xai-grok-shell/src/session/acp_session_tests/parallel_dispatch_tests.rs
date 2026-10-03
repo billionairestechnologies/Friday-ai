@@ -1,4 +1,4 @@
-//! These tests verify the parallel dispatch path (GROK_PARALLEL_TOOL_DISPATCH):
+//! These tests verify the parallel dispatch path (FRIDAY_PARALLEL_TOOL_DISPATCH):
 //! - Phase 1: prepare_tool_call for each tool
 //! - Phase 2: permission prompts (if any)
 //! - Phase 3: parallel dispatch via dispatch_tool

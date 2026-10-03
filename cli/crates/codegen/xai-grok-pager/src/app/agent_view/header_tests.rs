@@ -9,7 +9,7 @@ use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventK
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 const PATH: &str = "/grok-header-marker";
-/// `/dashboard` is pinned visible so the plain-session `[Dashboard]` gate does not read `GROK_AGENT_DASHBOARD` or the
+/// `/dashboard` is pinned visible so the plain-session `[Dashboard]` gate does not read `FRIDAY_AGENT_DASHBOARD` or the
 /// developer's config. `draw` re-measures the terminal from its area, so the width lives only in `last_terminal_size`.
 fn agent_at(width: u16) -> AgentView {
     let mut agent = test_fixtures::make_agent();

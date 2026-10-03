@@ -51,7 +51,7 @@ impl DirectSessionTitleRoute {
     }
 }
 
-/// Builds the title client for a daemon pinned to a direct Grok model endpoint. The route is
+/// Builds the title client for a daemon pinned to a direct Friday X model endpoint. The route is
 /// authoritative: its credential never falls through to the configured public endpoints.
 pub fn build_direct_session_title_client(
     direct: DirectSessionTitleRoute,

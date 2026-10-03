@@ -353,7 +353,7 @@ struct SubagentMetaSlice {
     worktree_path: Option<String>,
 }
 
-/// Grok home for the replay path (overridable in tests).
+/// Friday X home for the replay path (overridable in tests).
 #[cfg(not(test))]
 fn effective_grok_home() -> std::path::PathBuf {
     xai_grok_shell::util::grok_home::grok_home()

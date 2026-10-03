@@ -4,7 +4,7 @@ use super::*;
 fn each_name_comes_from_its_highest_precedence_source() {
     let workspace = Workspace::new();
     let project_config = workspace.write(
-        ".grok/config.toml",
+        ".friday/config.toml",
         "[mcp_servers.mcp-servers-test-shared]\ncommand = \"toml\"\n",
     );
     let mcp_json = workspace.write(
@@ -59,7 +59,7 @@ fn each_name_comes_from_its_highest_precedence_source() {
 fn disabled_toml_definition_hides_lower_precedence_sources() {
     let workspace = Workspace::new();
     let project_config = workspace.write(
-        ".grok/config.toml",
+        ".friday/config.toml",
         "[mcp_servers.mcp-servers-test-hidden]\ncommand = \"toml\"\nenabled = false\n",
     );
     let mcp_json = workspace.write(
@@ -171,7 +171,7 @@ fn plugin_inline_stdio_expands_plugin_root() {
             "mcpServers": {
                 "echo-mcp": {
                     "command": "python3",
-                    "args": ["${GROK_PLUGIN_ROOT}/mcp-echo-server.py"]
+                    "args": ["${FRIDAY_PLUGIN_ROOT}/mcp-echo-server.py"]
                 }
             }
         })),

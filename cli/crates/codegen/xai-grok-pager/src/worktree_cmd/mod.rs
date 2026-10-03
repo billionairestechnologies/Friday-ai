@@ -60,7 +60,7 @@ enum WorktreeCommand {
         #[arg(long)]
         max_age: Option<String>,
         /// Skip the live-process and protected-path guards.
-        /// This does not override the safety check; use `grok worktree rm` for that.
+        /// This does not override the safety check; use `friday worktree rm` for that.
         #[arg(short, long)]
         force: bool,
     },
@@ -169,7 +169,7 @@ async fn ext_call<T: serde::de::DeserializeOwned>(
         .result
         .ok_or_else(|| anyhow::anyhow!("ACP response missing result field"))
 }
-/// Stdout carries only the session directory, so `cd "$(grok worktree create)"` works.
+/// Stdout carries only the session directory, so `cd "$(friday worktree create)"` works.
 async fn cmd_create(
     tx: &xai_acp_lib::AcpAgentTx,
     source_cwd: &Path,
@@ -543,7 +543,7 @@ mod tests {
     }
     #[test]
     fn ext_envelope_unwraps_success_result() {
-        let json = r#"{"result": {"path": "/home/user/.grok/worktrees.db"}, "error": null}"#;
+        let json = r#"{"result": {"path": "/home/user/.friday/worktrees.db"}, "error": null}"#;
         #[derive(serde::Deserialize)]
         struct PathResp {
             path: String,
@@ -551,7 +551,7 @@ mod tests {
         let envelope: ExtEnvelope<PathResp> = serde_json::from_str(json).unwrap();
         assert!(envelope.error.is_none());
         let inner = envelope.result.unwrap();
-        assert_eq!(inner.path, "/home/user/.grok/worktrees.db");
+        assert_eq!(inner.path, "/home/user/.friday/worktrees.db");
     }
     #[test]
     fn ext_envelope_unwraps_error_result() {

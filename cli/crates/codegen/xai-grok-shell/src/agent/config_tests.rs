@@ -203,8 +203,8 @@ fn inject_url_derived_headers_adds_proxy_headers_for_cli_chat_proxy_url() {
     let mut headers = IndexMap::new();
     inject_url_derived_headers(&mut headers, None, crate::env::PROD_CLI_CHAT_PROXY_BASE_URL);
     assert_eq!(
-        headers.get("X-XAI-Token-Auth").map(String::as_str),
-        Some("xai-grok-cli")
+        headers.get("X-Friday-Token-Auth").map(String::as_str),
+        Some("friday-x-cli")
     );
     assert_eq!(
         headers.get("x-authenticateresponse").map(String::as_str),
@@ -221,7 +221,7 @@ fn inject_url_derived_headers_adds_proxy_headers_for_cli_chat_proxy_url() {
 fn inject_url_derived_headers_skips_proxy_headers_for_external_url() {
     let mut headers = IndexMap::new();
     inject_url_derived_headers(&mut headers, None, "https://api.x.ai/v1");
-    assert!(headers.get("X-XAI-Token-Auth").is_none());
+    assert!(headers.get("X-Friday-Token-Auth").is_none());
     assert!(headers.get("x-authenticateresponse").is_none());
     assert_eq!(
         headers
@@ -240,17 +240,17 @@ fn inject_url_derived_headers_preserves_caller_extra_headers() {
         Some("value")
     );
     assert_eq!(
-        headers.get("X-XAI-Token-Auth").map(String::as_str),
-        Some("xai-grok-cli")
+        headers.get("X-Friday-Token-Auth").map(String::as_str),
+        Some("friday-x-cli")
     );
 }
 #[test]
 fn inject_url_derived_headers_does_not_overwrite_existing_entries() {
     let mut headers = IndexMap::new();
-    headers.insert("X-XAI-Token-Auth".to_string(), "caller-set".to_string());
+    headers.insert("X-Friday-Token-Auth".to_string(), "caller-set".to_string());
     inject_url_derived_headers(&mut headers, None, crate::env::PROD_CLI_CHAT_PROXY_BASE_URL);
     assert_eq!(
-        headers.get("X-XAI-Token-Auth").map(String::as_str),
+        headers.get("X-Friday-Token-Auth").map(String::as_str),
         Some("caller-set"),
     );
 }
@@ -1033,7 +1033,7 @@ async fn resolve_credentials_serves_cached_provider_token() {
 #[tokio::test]
 async fn set_env_key_shadows_warm_provider_at_resolve_time() {
     use xai_grok_test_support::EnvGuard;
-    let var = "GROK_TEST_ENVKEY_SHADOW";
+    let var = "FRIDAY_TEST_ENVKEY_SHADOW";
     let _guard = EnvGuard::set(var, "env-token");
     let mut model = test_model_entry("m", "https://litellm.example/v1", None, Some(var), None);
     let provider = xai_grok_login::AuthProviderRef::new(
@@ -1297,18 +1297,18 @@ fn env_keys_deser_string_or_array() {
 }
 #[test]
 fn env_keys_resolve_first_set_wins() {
-    let keys = EnvKeys::new(["GROK_TEST_ENV_KEY_PRIMARY", "GROK_TEST_ENV_KEY_FALLBACK"]);
+    let keys = EnvKeys::new(["FRIDAY_TEST_ENV_KEY_PRIMARY", "FRIDAY_TEST_ENV_KEY_FALLBACK"]);
     assert_eq!(keys.resolve_value_with(|_| None), None, "none set");
     assert_eq!(
         keys.resolve_value_with(
-            |n| (n == "GROK_TEST_ENV_KEY_FALLBACK").then(|| "from-fallback".into())
+            |n| (n == "FRIDAY_TEST_ENV_KEY_FALLBACK").then(|| "from-fallback".into())
         ),
         Some("from-fallback".into())
     );
     assert_eq!(
         keys.resolve_value_with(|n| match n {
-            "GROK_TEST_ENV_KEY_PRIMARY" => Some("from-primary".into()),
-            "GROK_TEST_ENV_KEY_FALLBACK" => Some("from-fallback".into()),
+            "FRIDAY_TEST_ENV_KEY_PRIMARY" => Some("from-primary".into()),
+            "FRIDAY_TEST_ENV_KEY_FALLBACK" => Some("from-fallback".into()),
             _ => None,
         }),
         Some("from-primary".into()),
@@ -1316,8 +1316,8 @@ fn env_keys_resolve_first_set_wins() {
     );
     assert_eq!(
         keys.resolve_value_with(|n| match n {
-            "GROK_TEST_ENV_KEY_PRIMARY" => Some(String::new()),
-            "GROK_TEST_ENV_KEY_FALLBACK" => Some("from-fallback".into()),
+            "FRIDAY_TEST_ENV_KEY_PRIMARY" => Some(String::new()),
+            "FRIDAY_TEST_ENV_KEY_FALLBACK" => Some("from-fallback".into()),
             _ => None,
         }),
         Some("from-fallback".into())
@@ -1332,21 +1332,21 @@ fn env_keys_single_and_array_are_semantically_equal() {
 }
 #[test]
 fn env_keys_resolve_skips_whitespace_only_value() {
-    let keys = EnvKeys::new(["GROK_TEST_WS_PRIMARY", "GROK_TEST_WS_FALLBACK"]);
+    let keys = EnvKeys::new(["FRIDAY_TEST_WS_PRIMARY", "FRIDAY_TEST_WS_FALLBACK"]);
     assert_eq!(
         keys.resolve_value_with(|n| match n {
-            "GROK_TEST_WS_PRIMARY" => Some("   ".into()),
-            "GROK_TEST_WS_FALLBACK" => Some("real".into()),
+            "FRIDAY_TEST_WS_PRIMARY" => Some("   ".into()),
+            "FRIDAY_TEST_WS_FALLBACK" => Some("real".into()),
             _ => None,
         }),
         Some("real".into())
     );
     assert_eq!(
-        EnvKeys::single("GROK_TEST_WS_ONLY").resolve_value_with(|_| Some("   ".into())),
+        EnvKeys::single("FRIDAY_TEST_WS_ONLY").resolve_value_with(|_| Some("   ".into())),
         None
     );
     assert_eq!(
-        EnvKeys::single("GROK_TEST_WS_PAD").resolve_value_with(|_| Some("  tok  ".into())),
+        EnvKeys::single("FRIDAY_TEST_WS_PAD").resolve_value_with(|_| Some("  tok  ".into())),
         Some("  tok  ".into())
     );
 }
@@ -1354,7 +1354,7 @@ fn env_keys_resolve_skips_whitespace_only_value() {
 #[serial]
 fn first_own_credential_empty_api_key_falls_through_to_env_key() {
     use xai_grok_test_support::EnvGuard;
-    let var = "GROK_TEST_FIRST_OWN_CRED_ENV";
+    let var = "FRIDAY_TEST_FIRST_OWN_CRED_ENV";
     let _guard = EnvGuard::set(var, "env-token");
     let env_key = EnvKeys::single(var);
     assert_eq!(
@@ -1370,8 +1370,8 @@ fn first_own_credential_empty_api_key_falls_through_to_env_key() {
 #[serial]
 fn resolve_credentials_multi_env_key_uses_lc_alias() {
     use xai_chat_state::AuthType;
-    let primary = "GROK_TEST_MULTI_ENV_PRIMARY";
-    let alias = "GROK_TEST_MULTI_ENV_LC_ALIAS";
+    let primary = "FRIDAY_TEST_MULTI_ENV_PRIMARY";
+    let alias = "FRIDAY_TEST_MULTI_ENV_LC_ALIAS";
     unsafe {
         std::env::remove_var(primary);
         std::env::set_var(alias, "token-via-lc-alias");
@@ -1406,8 +1406,8 @@ fn resolve_credentials_multi_env_key_uses_lc_alias() {
 fn resolve_credentials_empty_env_key_falls_through_to_session() {
     use xai_chat_state::AuthType;
     use xai_grok_test_support::EnvGuard;
-    let primary = "GROK_TEST_EMPTY_ENV_PRIMARY";
-    let alias = "GROK_TEST_EMPTY_ENV_LC_ALIAS";
+    let primary = "FRIDAY_TEST_EMPTY_ENV_PRIMARY";
+    let alias = "FRIDAY_TEST_EMPTY_ENV_LC_ALIAS";
     let _primary = EnvGuard::set(primary, "");
     let _alias = EnvGuard::set(alias, "");
     let mut model = test_model_entry("m", "https://api.x.ai/v1", None, None, None);
@@ -1424,8 +1424,8 @@ fn resolve_credentials_empty_env_key_falls_through_to_global_key() {
     use xai_chat_state::AuthType;
     use xai_grok_test_support::EnvGuard;
     let sentinel = "xai-global-sentinel-key";
-    let primary = "GROK_TEST_EMPTY_ENV_GLOBAL_PRIMARY";
-    let alias = "GROK_TEST_EMPTY_ENV_GLOBAL_ALIAS";
+    let primary = "FRIDAY_TEST_EMPTY_ENV_GLOBAL_PRIMARY";
+    let alias = "FRIDAY_TEST_EMPTY_ENV_GLOBAL_ALIAS";
     let _primary = EnvGuard::set(primary, "");
     let _alias = EnvGuard::set(alias, "");
     let _global = EnvGuard::set(XAI_API_KEY_ENV_VAR, sentinel);
@@ -1535,9 +1535,9 @@ fn proxy_messages_models_use_bearer_auth_scheme() {
     assert_eq!(
         config
             .extra_headers
-            .get("X-XAI-Token-Auth")
+            .get("X-Friday-Token-Auth")
             .map(String::as_str),
-        Some("xai-grok-cli")
+        Some("friday-x-cli")
     );
 }
 /// Regression: without a session key, `resolve_credentials` falls through to ApiKey.
@@ -3153,7 +3153,7 @@ fn login_device_flow_reads_from_config() {
 #[test]
 fn force_login_team_uuid_parses_string_and_array() {
     use xai_grok_login::ForceLoginTeam;
-    let _g = crate::env::EnvVarGuard::remove("GROK_FORCE_LOGIN_TEAM_ID");
+    let _g = crate::env::EnvVarGuard::remove("FRIDAY_FORCE_LOGIN_TEAM_ID");
     assert!(
         xai_grok_login::force_login_team_from_requirements().is_none(),
         "clear the force_login_team_uuid pin in requirements.toml to run this test",
@@ -3205,7 +3205,7 @@ fn force_login_team_uuid_parses_string_and_array() {
 #[test]
 fn force_login_team_id_env_overrides_user_config() {
     use xai_grok_login::ForceLoginTeam;
-    let _guard = crate::env::EnvVarGuard::set("GROK_FORCE_LOGIN_TEAM_ID", "env-team");
+    let _guard = crate::env::EnvVarGuard::set("FRIDAY_FORCE_LOGIN_TEAM_ID", "env-team");
     assert!(
         xai_grok_login::force_login_team_from_requirements().is_none(),
         "clear the force_login_team_uuid pin in requirements.toml to run this test",
@@ -3232,7 +3232,7 @@ fn force_login_team_id_env_overrides_user_config() {
 #[test]
 fn force_login_team_id_env_unset_keeps_config_value() {
     use xai_grok_login::ForceLoginTeam;
-    let _guard = crate::env::EnvVarGuard::remove("GROK_FORCE_LOGIN_TEAM_ID");
+    let _guard = crate::env::EnvVarGuard::remove("FRIDAY_FORCE_LOGIN_TEAM_ID");
     assert!(
         xai_grok_login::force_login_team_from_requirements().is_none(),
         "clear the force_login_team_uuid pin in requirements.toml to run this test",
@@ -3340,10 +3340,10 @@ fn e2e_config_toml_model_overrides_default() {
     let model = models.get(dm).expect("model should exist");
     let sampling = resolve_sampling(model, Some("session-tok"));
     assert_eq!(sampling.base_url, "https://inference.example.com/v1");
-    unsafe { std::env::set_var("XAI_API_KEY", "xai-key") };
+    unsafe { std::env::set_var("FRIDAY_X_TOKEN", "xai-key") };
     let sampling = resolve_sampling(model, None);
     assert_eq!(sampling.base_url, "https://inference.example.com/v1");
-    unsafe { std::env::remove_var("XAI_API_KEY") };
+    unsafe { std::env::remove_var("FRIDAY_X_TOKEN") };
     let sampling = resolve_sampling(model, None);
     assert_eq!(sampling.base_url, "https://inference.example.com/v1");
 }
@@ -3399,7 +3399,7 @@ fn config_models_default_is_not_overwritten_by_default_models_json() {
     let remote_settings_default = Some("remote-settings-model");
     let resolved = resolve_string_flag(
         None,
-        "GROK_DEFAULT_MODEL_TEST_NONEXISTENT",
+        "FRIDAY_DEFAULT_MODEL_TEST_NONEXISTENT",
         config_default,
         remote_settings_default,
     );
@@ -3451,14 +3451,14 @@ fn e2e_default_model_with_external_api_key_routes_to_api_xai() {
     let model = models
         .get(crate::models::default_model())
         .expect("default model should exist");
-    unsafe { std::env::set_var("XAI_API_KEY", "xai-external-key") };
+    unsafe { std::env::set_var("FRIDAY_X_TOKEN", "xai-external-key") };
     let sampling = resolve_sampling(model, None);
     assert_eq!(sampling.api_key.as_deref(), Some("xai-external-key"));
     assert_eq!(
         sampling.base_url, "https://api.x.ai/v1",
         "external API key should route to api.x.ai via api_base_url"
     );
-    unsafe { std::env::remove_var("XAI_API_KEY") };
+    unsafe { std::env::remove_var("FRIDAY_X_TOKEN") };
 }
 #[test]
 fn e2e_user_config_overrides_prefetched_model() {
@@ -3503,7 +3503,7 @@ fn e2e_credential_priority_model_key_beats_session_beats_env() {
         None,
         None,
     );
-    unsafe { std::env::set_var("XAI_API_KEY", "env-key") };
+    unsafe { std::env::set_var("FRIDAY_X_TOKEN", "env-key") };
     let sampling = resolve_sampling(&model_with_key, Some("session-key"));
     assert_eq!(
         sampling.api_key.as_deref(),
@@ -3541,7 +3541,7 @@ fn e2e_credential_priority_model_key_beats_session_beats_env() {
         sampling.base_url, "https://api.x.ai/v1",
         "env key should route to api_base_url"
     );
-    unsafe { std::env::remove_var("XAI_API_KEY") };
+    unsafe { std::env::remove_var("FRIDAY_X_TOKEN") };
     let sampling = resolve_sampling(&model_no_key, None);
     assert!(
         sampling.api_key.is_none(),
@@ -3720,19 +3720,19 @@ fn e2e_enterprise_endpoints_only_no_model_override() {
 /// Gated behind `#[serial]`.
 fn unset_endpoint_env_vars() {
     for k in [
-        "GROK_CLI_CHAT_PROXY_BASE_URL",
-        "GROK_XAI_API_BASE_URL",
-        "GROK_FEEDBACK_BASE_URL",
-        "GROK_TRACE_UPLOAD_URL",
-        "GROK_MANAGED_CONFIG_URL",
-        "GROK_MODELS_BASE_URL",
-        "GROK_MODELS_LIST_URL",
+        "FRIDAY_CLI_CHAT_PROXY_BASE_URL",
+        "FRIDAY_XAI_API_BASE_URL",
+        "FRIDAY_FEEDBACK_BASE_URL",
+        "FRIDAY_TRACE_UPLOAD_URL",
+        "FRIDAY_MANAGED_CONFIG_URL",
+        "FRIDAY_MODELS_BASE_URL",
+        "FRIDAY_MODELS_LIST_URL",
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
         "OTEL_EXPORTER_OTLP_HEADERS",
-        "GROK_INTERNAL_OTLP_TRACES_ENDPOINT",
-        "GROK_INTERNAL_OTLP_HEADERS",
-        "GROK_EXTERNAL_OTEL",
+        "FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT",
+        "FRIDAY_INTERNAL_OTLP_HEADERS",
+        "FRIDAY_EXTERNAL_OTEL",
     ] {
         unsafe { std::env::remove_var(k) };
     }
@@ -4170,8 +4170,8 @@ fn non_boolean_feature_value_fails_the_load() {
 #[test]
 #[serial]
 fn resolve_title_refresh_defaults_to_turn_summary_but_decouples() {
-    unsafe { std::env::remove_var("GROK_TITLE_REFRESH") };
-    unsafe { std::env::remove_var("GROK_TURN_SUMMARY") };
+    unsafe { std::env::remove_var("FRIDAY_TITLE_REFRESH") };
+    unsafe { std::env::remove_var("FRIDAY_TURN_SUMMARY") };
     let r = Config::default().resolve_title_refresh();
     assert!(r.value, "title_refresh defaults to turn_summary (on)");
     let ts_off = Config {
@@ -4198,19 +4198,19 @@ fn resolve_title_refresh_defaults_to_turn_summary_but_decouples() {
         "title_refresh config overrides the turn_summary default"
     );
     assert_eq!(r.source, ConfigSource::Config);
-    unsafe { std::env::set_var("GROK_TITLE_REFRESH", "0") };
+    unsafe { std::env::set_var("FRIDAY_TITLE_REFRESH", "0") };
     let r = decoupled.resolve_title_refresh();
-    assert!(!r.value, "GROK_TITLE_REFRESH env wins");
+    assert!(!r.value, "FRIDAY_TITLE_REFRESH env wins");
     assert_eq!(r.source, ConfigSource::Env);
-    unsafe { std::env::remove_var("GROK_TITLE_REFRESH") };
+    unsafe { std::env::remove_var("FRIDAY_TITLE_REFRESH") };
 }
 /// A `turn_summary` pin lands in the title's default slot, so it moves the title with it.
-/// Only the default slot, so `GROK_TITLE_REFRESH` still outranks it and a user can turn the title back on.
+/// Only the default slot, so `FRIDAY_TITLE_REFRESH` still outranks it and a user can turn the title back on.
 /// Pinning `title_refresh` is what closes that.
 #[test]
 #[serial]
 fn a_turn_summary_pin_moves_the_title_default_and_the_environment_lifts_it() {
-    let _env = EnvGuard::set("GROK_TURN_SUMMARY", "1");
+    let _env = EnvGuard::set("FRIDAY_TURN_SUMMARY", "1");
     let mut cfg = Config::default();
     cfg.requirements.pin_feature(
         Feature::TurnSummary,
@@ -4218,13 +4218,13 @@ fn a_turn_summary_pin_moves_the_title_default_and_the_environment_lifts_it() {
         crate::config::RequirementSource::Unknown,
     );
     {
-        let _title = EnvGuard::unset("GROK_TITLE_REFRESH");
+        let _title = EnvGuard::unset("FRIDAY_TITLE_REFRESH");
         assert!(
             !cfg.resolve_title_refresh().value,
-            "the pin outranks GROK_TURN_SUMMARY, and the title default follows the pin"
+            "the pin outranks FRIDAY_TURN_SUMMARY, and the title default follows the pin"
         );
     }
-    let _title = EnvGuard::set("GROK_TITLE_REFRESH", "1");
+    let _title = EnvGuard::set("FRIDAY_TITLE_REFRESH", "1");
     let r = cfg.resolve_title_refresh();
     assert!(r.value, "the environment outranks a derived default");
     assert_eq!(r.source, ConfigSource::Env);
@@ -4234,13 +4234,13 @@ fn a_turn_summary_pin_moves_the_title_default_and_the_environment_lifts_it() {
 #[test]
 #[serial]
 fn a_title_refresh_pin_outranks_the_environment() {
-    let _env = EnvGuard::set("GROK_TITLE_REFRESH", "1");
+    let _env = EnvGuard::set("FRIDAY_TITLE_REFRESH", "1");
     let mut cfg = Config::default();
     cfg.requirements
         .title_refresh
         .pin(false, crate::config::RequirementSource::Unknown);
     let r = cfg.resolve_title_refresh();
-    assert!(!r.value, "the pin lost to GROK_TITLE_REFRESH");
+    assert!(!r.value, "the pin lost to FRIDAY_TITLE_REFRESH");
     assert_eq!(r.source, ConfigSource::Requirement);
 }
 #[test]
@@ -4248,7 +4248,7 @@ fn a_title_refresh_pin_outranks_the_environment() {
 fn resolve_long_reasoning_reminder_precedence() {
     use crate::session::long_reasoning_reminder::LongReasoningReminder;
     use crate::util::config::LongReasoningReminderSettings;
-    let _env = EnvGuard::unset("GROK_LONG_REASONING_REMINDER");
+    let _env = EnvGuard::unset("FRIDAY_LONG_REASONING_REMINDER");
     assert_eq!(
         LongReasoningReminder {
             enabled: false,
@@ -4319,13 +4319,13 @@ fn resolve_long_reasoning_reminder_precedence() {
         toml_on.resolve_long_reasoning_reminder(),
         "TOML true beats a remote false; TOML tokens beat remote, remote delay fills in"
     );
-    let _env = EnvGuard::set("GROK_LONG_REASONING_REMINDER", "0");
+    let _env = EnvGuard::set("FRIDAY_LONG_REASONING_REMINDER", "0");
     assert!(
         !toml_on.resolve_long_reasoning_reminder().enabled,
         "env kill switch wins over TOML + remote"
     );
     let _env = EnvGuard::set(
-        "GROK_LONG_REASONING_REMINDER",
+        "FRIDAY_LONG_REASONING_REMINDER",
         r#"{"enabled": true, "tokens": 9000}"#,
     );
     assert_eq!(
@@ -4345,7 +4345,7 @@ fn resolve_long_reasoning_reminder_precedence() {
 #[serial]
 fn resolve_doom_loop_recovery_precedence() {
     use crate::util::config::DoomLoopRecoverySettings;
-    unsafe { std::env::remove_var("GROK_DOOM_LOOP_RECOVERY") };
+    unsafe { std::env::remove_var("FRIDAY_DOOM_LOOP_RECOVERY") };
     let default_cfg = Config::default();
     let p = default_cfg
         .resolve_doom_loop_recovery()
@@ -4378,12 +4378,12 @@ fn resolve_doom_loop_recovery_precedence() {
         remote_off.resolve_doom_loop_recovery().is_none(),
         "remote settings kill switch"
     );
-    unsafe { std::env::set_var("GROK_DOOM_LOOP_RECOVERY", "0") };
+    unsafe { std::env::set_var("FRIDAY_DOOM_LOOP_RECOVERY", "0") };
     assert!(
         default_cfg.resolve_doom_loop_recovery().is_none(),
         "env kill switch"
     );
-    unsafe { std::env::remove_var("GROK_DOOM_LOOP_RECOVERY") };
+    unsafe { std::env::remove_var("FRIDAY_DOOM_LOOP_RECOVERY") };
     let remote_on = Config {
         remote_settings: Some(crate::util::config::RemoteSettings {
             doom_loop_recovery: Some(DoomLoopRecoverySettings {
@@ -4439,18 +4439,18 @@ fn resolve_doom_loop_recovery_precedence() {
         .expect("config on beats remote kill-switch");
     assert_eq!(p.max_threshold, 4);
     assert_eq!(p.max_retries, 3);
-    unsafe { std::env::set_var("GROK_DOOM_LOOP_RECOVERY", "0") };
+    unsafe { std::env::set_var("FRIDAY_DOOM_LOOP_RECOVERY", "0") };
     assert!(
         config_over_remote.resolve_doom_loop_recovery().is_none(),
         "env wins over config + remote"
     );
-    unsafe { std::env::remove_var("GROK_DOOM_LOOP_RECOVERY") };
+    unsafe { std::env::remove_var("FRIDAY_DOOM_LOOP_RECOVERY") };
 }
 /// The `[doom_loop_recovery]` TOML section deserializes through the standard config path (no bespoke parser).
 #[test]
 #[serial]
 fn doom_loop_recovery_section_parses_from_toml() {
-    unsafe { std::env::remove_var("GROK_DOOM_LOOP_RECOVERY") };
+    unsafe { std::env::remove_var("FRIDAY_DOOM_LOOP_RECOVERY") };
     let raw: toml::Value = toml::from_str(
         r#"
             [doom_loop_recovery]
@@ -4508,7 +4508,7 @@ fn worktree_auto_gc_section_parses_from_toml() {
 #[serial]
 fn resolve_doom_loop_recovery_clamps_tunables() {
     use crate::util::config::DoomLoopRecoverySettings;
-    unsafe { std::env::remove_var("GROK_DOOM_LOOP_RECOVERY") };
+    unsafe { std::env::remove_var("FRIDAY_DOOM_LOOP_RECOVERY") };
     let cfg = Config {
         doom_loop_recovery: DoomLoopRecoverySettings {
             enabled: Some(true),
@@ -4557,8 +4557,8 @@ fn resolve_doom_loop_recovery_clamps_tunables() {
 #[test]
 #[serial]
 fn resolve_trace_upload_disabled_when_telemetry_off_despite_remote_flag() {
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
-    unsafe { std::env::remove_var("GROK_TELEMETRY_TRACE_UPLOAD") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
     let mut cfg = Config::default();
     cfg.features.telemetry = Some(TelemetryMode::Disabled);
     cfg.remote_settings = Some(crate::util::config::RemoteSettings {
@@ -4572,8 +4572,8 @@ fn resolve_trace_upload_disabled_when_telemetry_off_despite_remote_flag() {
 #[test]
 #[serial]
 fn resolve_trace_upload_explicit_config_wins_over_telemetry_off() {
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
-    unsafe { std::env::remove_var("GROK_TELEMETRY_TRACE_UPLOAD") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
     let mut cfg = Config::default();
     cfg.features.telemetry = Some(TelemetryMode::Disabled);
     cfg.telemetry.trace_upload = Some(true);
@@ -4592,8 +4592,8 @@ fn resolve_trace_upload_explicit_config_wins_over_telemetry_off() {
 #[test]
 #[serial]
 fn trace_upload_stays_off_under_a_requirements_pin_when_the_distribution_withholds_telemetry() {
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
-    unsafe { std::env::remove_var("GROK_TELEMETRY_TRACE_UPLOAD") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
     let mut cfg = Config::default();
     cfg.telemetry.trace_upload = Some(true);
     cfg.requirements
@@ -4616,8 +4616,8 @@ fn trace_upload_stays_off_under_a_requirements_pin_when_the_distribution_withhol
 #[test]
 #[serial]
 fn trace_upload_decision_debug_reports_winning_source() {
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
-    unsafe { std::env::remove_var("GROK_TELEMETRY_TRACE_UPLOAD") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
     let mut cfg = Config::default();
     cfg.features.telemetry = Some(TelemetryMode::Disabled);
     cfg.remote_settings = Some(crate::util::config::RemoteSettings {
@@ -4663,9 +4663,9 @@ fn trace_upload_decision_debug_reports_winning_source() {
 #[test]
 #[serial]
 fn resolve_trace_upload_honors_config_when_telemetry_on() {
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
-    unsafe { std::env::remove_var("GROK_TELEMETRY_TRACE_UPLOAD") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
     let mut cfg = Config::default();
     cfg.features.telemetry = Some(TelemetryMode::Enabled);
     cfg.telemetry.trace_upload = Some(false);
@@ -4679,7 +4679,7 @@ fn resolve_trace_upload_honors_config_when_telemetry_on() {
 #[test]
 #[serial]
 fn resolve_goal_defaults_to_true_when_unset() {
-    unsafe { std::env::remove_var("GROK_GOAL") };
+    unsafe { std::env::remove_var("FRIDAY_GOAL") };
     let cfg = Config::default();
     let r = cfg.resolve_goal();
     assert!(r.value, "goal should be on by default");
@@ -4688,18 +4688,18 @@ fn resolve_goal_defaults_to_true_when_unset() {
 #[test]
 #[serial]
 fn resolve_goal_env_overrides_config_without_remote_kill_switch() {
-    unsafe { std::env::set_var("GROK_GOAL", "1") };
+    unsafe { std::env::set_var("FRIDAY_GOAL", "1") };
     let mut cfg = Config::default();
     cfg.goal.enabled = Some(false);
     let r = cfg.resolve_goal();
     assert_eq!(r.source, ConfigSource::Env);
     assert!(r.value);
-    unsafe { std::env::remove_var("GROK_GOAL") };
+    unsafe { std::env::remove_var("FRIDAY_GOAL") };
 }
 #[test]
 #[serial]
 fn resolve_goal_remote_false_kills_local_opt_in() {
-    unsafe { std::env::set_var("GROK_GOAL", "1") };
+    unsafe { std::env::set_var("FRIDAY_GOAL", "1") };
     let mut cfg = Config::default();
     cfg.goal.enabled = Some(true);
     cfg.remote_settings = Some(crate::util::config::RemoteSettings {
@@ -4709,12 +4709,12 @@ fn resolve_goal_remote_false_kills_local_opt_in() {
     let r = cfg.resolve_goal();
     assert_eq!(r.source, ConfigSource::Remote);
     assert!(!r.value);
-    unsafe { std::env::remove_var("GROK_GOAL") };
+    unsafe { std::env::remove_var("FRIDAY_GOAL") };
 }
 #[test]
 #[serial]
 fn resolve_goal_remote_settings_used_when_no_local() {
-    unsafe { std::env::remove_var("GROK_GOAL") };
+    unsafe { std::env::remove_var("FRIDAY_GOAL") };
     let cfg = Config {
         remote_settings: Some(crate::util::config::RemoteSettings {
             goal_enabled: Some(true),
@@ -4730,7 +4730,7 @@ fn resolve_goal_remote_settings_used_when_no_local() {
 #[test]
 #[serial]
 fn resolve_goal_remote_settings_kill_switch_overrides_default_on() {
-    unsafe { std::env::remove_var("GROK_GOAL") };
+    unsafe { std::env::remove_var("FRIDAY_GOAL") };
     let cfg = Config {
         remote_settings: Some(crate::util::config::RemoteSettings {
             goal_enabled: Some(false),
@@ -4745,7 +4745,7 @@ fn resolve_goal_remote_settings_kill_switch_overrides_default_on() {
 #[test]
 #[serial]
 fn background_workflows_default_on_without_affecting_goal() {
-    unsafe { std::env::remove_var("GROK_WORKFLOWS") };
+    unsafe { std::env::remove_var("FRIDAY_WORKFLOWS") };
     let cfg = Config::default();
     let r = cfg.resolve_workflows();
     assert!(r.value);
@@ -4755,7 +4755,7 @@ fn background_workflows_default_on_without_affecting_goal() {
 #[test]
 #[serial]
 fn resolve_workflows_remote_settings_enables() {
-    unsafe { std::env::remove_var("GROK_WORKFLOWS") };
+    unsafe { std::env::remove_var("FRIDAY_WORKFLOWS") };
     let cfg = Config {
         remote_settings: Some(crate::util::config::RemoteSettings {
             workflows_enabled: Some(true),
@@ -4770,7 +4770,7 @@ fn resolve_workflows_remote_settings_enables() {
 #[test]
 #[serial]
 fn resolve_workflows_remote_false_kills_local_opt_in() {
-    unsafe { std::env::set_var("GROK_WORKFLOWS", "1") };
+    unsafe { std::env::set_var("FRIDAY_WORKFLOWS", "1") };
     let mut cfg = Config::default();
     cfg.workflows.enabled = Some(true);
     cfg.remote_settings = Some(crate::util::config::RemoteSettings {
@@ -4780,12 +4780,12 @@ fn resolve_workflows_remote_false_kills_local_opt_in() {
     let r = cfg.resolve_workflows();
     assert_eq!(r.source, ConfigSource::Remote);
     assert!(!r.value);
-    unsafe { std::env::remove_var("GROK_WORKFLOWS") };
+    unsafe { std::env::remove_var("FRIDAY_WORKFLOWS") };
 }
 #[test]
 #[serial]
 fn resolve_workflows_env_wins() {
-    unsafe { std::env::set_var("GROK_WORKFLOWS", "0") };
+    unsafe { std::env::set_var("FRIDAY_WORKFLOWS", "0") };
     let cfg = Config::default();
     let r = cfg.resolve_workflows();
     assert_eq!(r.source, ConfigSource::Env);
@@ -4793,12 +4793,12 @@ fn resolve_workflows_env_wins() {
         !r.value,
         "env must be able to kill the default-on workflows"
     );
-    unsafe { std::env::remove_var("GROK_WORKFLOWS") };
+    unsafe { std::env::remove_var("FRIDAY_WORKFLOWS") };
 }
 #[test]
 #[serial]
 fn resolve_image_gen_model_override_remote_settings_or_config() {
-    unsafe { std::env::remove_var("GROK_IMAGE_GEN_MODEL_OVERRIDE") };
+    unsafe { std::env::remove_var("FRIDAY_IMAGE_GEN_MODEL_OVERRIDE") };
     let with = |config: Option<&str>, gb: Option<&str>| Config {
         features: Features {
             image_gen_model_override: config.map(String::from),
@@ -4824,7 +4824,7 @@ fn resolve_image_gen_model_override_remote_settings_or_config() {
 #[test]
 #[serial]
 fn resolve_image_edit_model_override_remote_settings_or_config() {
-    unsafe { std::env::remove_var("GROK_IMAGE_EDIT_MODEL_OVERRIDE") };
+    unsafe { std::env::remove_var("FRIDAY_IMAGE_EDIT_MODEL_OVERRIDE") };
     let with = |config: Option<&str>, gb: Option<&str>| Config {
         features: Features {
             image_edit_model_override: config.map(String::from),
@@ -4858,7 +4858,7 @@ fn resolve_image_edit_model_override_remote_settings_or_config() {
 #[test]
 #[serial]
 fn imagine_tools_disabled_gates_image_edit() {
-    unsafe { std::env::remove_var("GROK_IMAGE_EDIT") };
+    unsafe { std::env::remove_var("FRIDAY_IMAGE_EDIT") };
     let with_list = |tools: Vec<&str>| Config {
         remote_settings: Some(crate::util::config::RemoteSettings {
             imagine_tools_disabled: Some(tools.into_iter().map(String::from).collect()),
@@ -4866,18 +4866,18 @@ fn imagine_tools_disabled_gates_image_edit() {
         }),
         ..Default::default()
     };
-    unsafe { std::env::set_var("GROK_IMAGE_EDIT", "1") };
+    unsafe { std::env::set_var("FRIDAY_IMAGE_EDIT", "1") };
     let off = with_list(vec!["image_edit"]).resolve_image_edit();
     assert!(!off.value);
     assert_eq!(off.source, ConfigSource::Remote);
-    unsafe { std::env::remove_var("GROK_IMAGE_EDIT") };
+    unsafe { std::env::remove_var("FRIDAY_IMAGE_EDIT") };
     assert!(with_list(vec!["image_to_video"]).resolve_image_edit().value);
     assert!(Config::default().resolve_image_edit().value);
 }
 #[test]
 #[serial]
 fn resolve_image_gen_gates() {
-    unsafe { std::env::remove_var("GROK_IMAGE_GEN") };
+    unsafe { std::env::remove_var("FRIDAY_IMAGE_GEN") };
     assert!(Config::default().resolve_image_gen().value);
     assert!(
         !Config {
@@ -4901,7 +4901,7 @@ fn resolve_image_gen_gates() {
         .resolve_image_gen()
         .value
     );
-    unsafe { std::env::set_var("GROK_IMAGE_GEN", "1") };
+    unsafe { std::env::set_var("FRIDAY_IMAGE_GEN", "1") };
     let denied = Config {
         remote_settings: Some(crate::util::config::RemoteSettings {
             imagine_tools_disabled: Some(vec!["image_gen".into()]),
@@ -4912,12 +4912,12 @@ fn resolve_image_gen_gates() {
     .resolve_image_gen();
     assert!(!denied.value);
     assert_eq!(denied.source, ConfigSource::Remote);
-    unsafe { std::env::remove_var("GROK_IMAGE_GEN") };
+    unsafe { std::env::remove_var("FRIDAY_IMAGE_GEN") };
 }
 #[test]
 #[serial]
 fn resolve_video_gen_gates() {
-    unsafe { std::env::remove_var("GROK_VIDEO_GEN") };
+    unsafe { std::env::remove_var("FRIDAY_VIDEO_GEN") };
     assert!(Config::default().resolve_video_gen().value);
     assert!(
         !Config {
@@ -4956,14 +4956,14 @@ fn resolve_video_gen_gates() {
 /// Clear every env var the goal/companion resolvers read so tests start from a known baseline regardless of run order.
 fn clear_goal_envs() {
     unsafe {
-        std::env::remove_var("GROK_GOAL");
-        std::env::remove_var("GROK_GOAL_CLASSIFIER");
-        std::env::remove_var("GROK_GOAL_PLANNER");
-        std::env::remove_var("GROK_GOAL_SUMMARY");
-        std::env::remove_var("GROK_GOAL_VERIFIER_N");
-        std::env::remove_var("GROK_GOAL_CLASSIFIER_MAX");
-        std::env::remove_var("GROK_GOAL_STRATEGIST_EVERY");
-        std::env::remove_var("GROK_GOAL_REVERIFY_AFTER");
+        std::env::remove_var("FRIDAY_GOAL");
+        std::env::remove_var("FRIDAY_GOAL_CLASSIFIER");
+        std::env::remove_var("FRIDAY_GOAL_PLANNER");
+        std::env::remove_var("FRIDAY_GOAL_SUMMARY");
+        std::env::remove_var("FRIDAY_GOAL_VERIFIER_N");
+        std::env::remove_var("FRIDAY_GOAL_CLASSIFIER_MAX");
+        std::env::remove_var("FRIDAY_GOAL_STRATEGIST_EVERY");
+        std::env::remove_var("FRIDAY_GOAL_REVERIFY_AFTER");
     }
 }
 fn cfg_with_goal(goal: bool) -> Config {
@@ -5051,12 +5051,12 @@ fn resolve_goal_classifier_remote_forces_either_way() {
 #[serial]
 fn resolve_goal_classifier_env_overrides_default_and_remote() {
     clear_goal_envs();
-    unsafe { std::env::set_var("GROK_GOAL_CLASSIFIER", "0") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_CLASSIFIER", "0") };
     let r = cfg_with_goal_and_remote(true, remote_classifier(true))
         .resolve_goal_classifier_enabled(true);
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
-    unsafe { std::env::set_var("GROK_GOAL_CLASSIFIER", "1") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_CLASSIFIER", "1") };
     let r = cfg_with_goal_and_remote(false, remote_classifier(false))
         .resolve_goal_classifier_enabled(false);
     assert!(r.value);
@@ -5095,11 +5095,11 @@ fn resolve_goal_planner_remote_forces_either_way() {
 #[serial]
 fn resolve_goal_planner_env_overrides_default_and_remote() {
     clear_goal_envs();
-    unsafe { std::env::set_var("GROK_GOAL_PLANNER", "0") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_PLANNER", "0") };
     let r = cfg_with_goal_and_remote(true, remote_planner(true)).resolve_goal_planner_enabled(true);
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
-    unsafe { std::env::set_var("GROK_GOAL_PLANNER", "1") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_PLANNER", "1") };
     let r =
         cfg_with_goal_and_remote(false, remote_planner(false)).resolve_goal_planner_enabled(false);
     assert!(r.value);
@@ -5138,7 +5138,7 @@ fn resolve_goal_summary_remote_forces_either_way() {
 #[serial]
 fn resolve_goal_summary_env_overrides_default_and_remote() {
     clear_goal_envs();
-    unsafe { std::env::set_var("GROK_GOAL_SUMMARY", "0") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_SUMMARY", "0") };
     let r = cfg_with_goal_and_remote(true, remote_summary(true)).resolve_goal_summary_enabled(true);
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
@@ -5161,7 +5161,7 @@ fn resolve_goal_classifier_config_honored_when_env_unset() {
 #[serial]
 fn resolve_goal_classifier_env_beats_config() {
     clear_goal_envs();
-    unsafe { std::env::set_var("GROK_GOAL_CLASSIFIER", "0") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_CLASSIFIER", "0") };
     let r = cfg_with_goal_config(GoalConfig {
         classifier_enabled: Some(true),
         ..Default::default()
@@ -5218,7 +5218,7 @@ fn resolve_goal_planner_config_honored_when_env_unset() {
 #[serial]
 fn resolve_goal_planner_env_beats_config() {
     clear_goal_envs();
-    unsafe { std::env::set_var("GROK_GOAL_PLANNER", "0") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_PLANNER", "0") };
     let r = cfg_with_goal_config(GoalConfig {
         planner_enabled: Some(true),
         ..Default::default()
@@ -5275,7 +5275,7 @@ fn resolve_goal_summary_config_honored_when_env_unset() {
 #[serial]
 fn resolve_goal_summary_env_beats_config() {
     clear_goal_envs();
-    unsafe { std::env::set_var("GROK_GOAL_SUMMARY", "0") };
+    unsafe { std::env::set_var("FRIDAY_GOAL_SUMMARY", "0") };
     let r = cfg_with_goal_config(GoalConfig {
         summary_enabled: Some(true),
         ..Default::default()
@@ -5344,7 +5344,7 @@ reverify_after = 6
     assert_eq!(empty.goal.classifier_enabled, None);
     assert_eq!(empty.goal.verifier_count, None);
 }
-const GOAL_USE_CURRENT_ENV: &str = "GROK_GOAL_USE_CURRENT_MODEL_ONLY";
+const GOAL_USE_CURRENT_ENV: &str = "FRIDAY_GOAL_USE_CURRENT_MODEL_ONLY";
 fn clear_goal_model_env() {
     unsafe { std::env::remove_var(GOAL_USE_CURRENT_ENV) };
 }
@@ -6063,7 +6063,7 @@ fn external_otel_default_off_and_double_opt_in() {
         resolve_external_otel_config_with(
             None,
             None,
-            ext_env(&[("GROK_EXTERNAL_OTEL", "1")]),
+            ext_env(&[("FRIDAY_EXTERNAL_OTEL", "1")]),
             ext_client(),
             false,
         )
@@ -6074,7 +6074,7 @@ fn external_otel_default_off_and_double_opt_in() {
             None,
             None,
             ext_env(&[
-                ("GROK_EXTERNAL_OTEL", "1"),
+                ("FRIDAY_EXTERNAL_OTEL", "1"),
                 ("OTEL_METRICS_EXPORTER", "otlp"),
             ]),
             ext_client(),
@@ -6124,7 +6124,7 @@ fn external_otel_file_table_layered_under_env() {
         resolve_external_otel_config_with(
             Some(&effective),
             None,
-            ext_env(&[("GROK_EXTERNAL_OTEL", "0")]),
+            ext_env(&[("FRIDAY_EXTERNAL_OTEL", "0")]),
             ext_client(),
             false,
         )
@@ -6198,7 +6198,7 @@ fn external_otel_requirements_pin_wins_over_env() {
         resolve_external_otel_config_with(
             None,
             Some(&req),
-            ext_env(&[("GROK_EXTERNAL_OTEL", "1"), ("OTEL_LOGS_EXPORTER", "otlp"),]),
+            ext_env(&[("FRIDAY_EXTERNAL_OTEL", "1"), ("OTEL_LOGS_EXPORTER", "otlp"),]),
             ext_client(),
             false,
         )
@@ -6217,7 +6217,7 @@ fn external_otel_requirements_pin_wins_over_env() {
         None,
         Some(&req),
         ext_env(&[
-            ("GROK_EXTERNAL_OTEL", "1"),
+            ("FRIDAY_EXTERNAL_OTEL", "1"),
             ("OTEL_LOGS_EXPORTER", "otlp"),
             ("OTEL_LOG_USER_PROMPTS", "1"),
             ("OTEL_LOG_TOOL_DETAILS", "1"),
@@ -6650,7 +6650,7 @@ fn external_otel_carries_internal_consumed_flag() {
     let cfg = resolve_external_otel_config_with(
         None,
         None,
-        ext_env(&[("GROK_EXTERNAL_OTEL", "1"), ("OTEL_LOGS_EXPORTER", "otlp")]),
+        ext_env(&[("FRIDAY_EXTERNAL_OTEL", "1"), ("OTEL_LOGS_EXPORTER", "otlp")]),
         ext_client(),
         true,
     )
@@ -6662,22 +6662,22 @@ fn empty_config() -> toml::Value {
 }
 fn clear_runtime_env_vars() {
     unsafe {
-        std::env::remove_var("GROK_SUBAGENTS");
-        std::env::remove_var("GROK_RESPECT_GITIGNORE");
-        std::env::remove_var("GROK_WEB_SEARCH_MODEL");
-        std::env::remove_var("GROK_SESSION_SUMMARY_MODEL");
-        std::env::remove_var("GROK_CURSOR_SKILLS_ENABLED");
-        std::env::remove_var("GROK_CURSOR_RULES_ENABLED");
-        std::env::remove_var("GROK_CURSOR_AGENTS_ENABLED");
-        std::env::remove_var("GROK_CLAUDE_SKILLS_ENABLED");
-        std::env::remove_var("GROK_CLAUDE_RULES_ENABLED");
-        std::env::remove_var("GROK_CLAUDE_AGENTS_ENABLED");
+        std::env::remove_var("FRIDAY_SUBAGENTS");
+        std::env::remove_var("FRIDAY_RESPECT_GITIGNORE");
+        std::env::remove_var("FRIDAY_WEB_SEARCH_MODEL");
+        std::env::remove_var("FRIDAY_SESSION_SUMMARY_MODEL");
+        std::env::remove_var("FRIDAY_CURSOR_SKILLS_ENABLED");
+        std::env::remove_var("FRIDAY_CURSOR_RULES_ENABLED");
+        std::env::remove_var("FRIDAY_CURSOR_AGENTS_ENABLED");
+        std::env::remove_var("FRIDAY_CLAUDE_SKILLS_ENABLED");
+        std::env::remove_var("FRIDAY_CLAUDE_RULES_ENABLED");
+        std::env::remove_var("FRIDAY_CLAUDE_AGENTS_ENABLED");
     }
 }
 fn clear_managed_mcp_env_vars() {
     unsafe {
-        std::env::remove_var("GROK_MANAGED_MCPS_ENABLED");
-        std::env::remove_var("GROK_MANAGED_MCP_GATEWAY_TOOLS_ENABLED");
+        std::env::remove_var("FRIDAY_MANAGED_MCPS_ENABLED");
+        std::env::remove_var("FRIDAY_MANAGED_MCP_GATEWAY_TOOLS_ENABLED");
     }
 }
 fn isolate_compat_env() -> Vec<EnvGuard> {
@@ -6690,7 +6690,7 @@ fn isolate_compat_env() -> Vec<EnvGuard> {
 #[serial]
 fn resolve_runtime_fields_compat_asymmetric_sources() {
     let _env = isolate_compat_env();
-    let _cursor = EnvGuard::set("GROK_CURSOR_SESSIONS_ENABLED", "false");
+    let _cursor = EnvGuard::set("FRIDAY_CURSOR_SESSIONS_ENABLED", "false");
     let raw: toml::Value =
         toml::from_str("[compat.cursor]\nsessions = true\n[compat.claude]\nsessions = false")
             .unwrap();
@@ -6894,7 +6894,7 @@ fn resolve_runtime_fields_partial_subagents_table_stays_enabled() {
 #[serial]
 fn resolve_runtime_fields_gitignore_from_env() {
     clear_runtime_env_vars();
-    unsafe { std::env::set_var("GROK_RESPECT_GITIGNORE", "0") };
+    unsafe { std::env::set_var("FRIDAY_RESPECT_GITIGNORE", "0") };
     let raw = empty_config();
     let mut cfg = Config::new_from_toml_cfg(&raw).unwrap();
     cfg.resolve_runtime_fields(&RuntimeResolutionContext {
@@ -7025,12 +7025,12 @@ telemetry = "garbage"
 #[test]
 #[serial]
 fn is_telemetry_explicitly_disabled_sync_env_signals() {
-    unsafe { std::env::set_var("GROK_TELEMETRY_ENABLED", "0") };
+    unsafe { std::env::set_var("FRIDAY_TELEMETRY_ENABLED", "0") };
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
     assert!(is_telemetry_explicitly_disabled_sync());
-    unsafe { std::env::set_var("GROK_TELEMETRY_ENABLED", "1") };
+    unsafe { std::env::set_var("FRIDAY_TELEMETRY_ENABLED", "1") };
     assert!(!is_telemetry_explicitly_disabled_sync());
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
     unsafe { std::env::set_var("DISABLE_TELEMETRY", "1") };
     assert!(is_telemetry_explicitly_disabled_sync());
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
@@ -7039,8 +7039,8 @@ fn is_telemetry_explicitly_disabled_sync_env_signals() {
 #[serial]
 fn resolve_telemetry_mode_disable_env_beats_opt_in_but_not_requirements_pin() {
     let home = tempfile::tempdir().unwrap();
-    let _home = EnvGuard::set("GROK_HOME", home.path());
-    let _enable = EnvGuard::set("GROK_TELEMETRY_ENABLED", "true");
+    let _home = EnvGuard::set("FRIDAY_HOME", home.path());
+    let _enable = EnvGuard::set("FRIDAY_TELEMETRY_ENABLED", "true");
     let mut cfg = Config::default();
     cfg.features.telemetry = Some(TelemetryMode::Enabled);
     let _falsy = EnvGuard::set("DISABLE_TELEMETRY", "0");
@@ -7073,7 +7073,7 @@ fn resolve_telemetry_mode_disable_env_beats_opt_in_but_not_requirements_pin() {
 #[serial]
 fn requirements_telemetry_pin_beats_user_config() {
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
-    unsafe { std::env::remove_var("GROK_TELEMETRY_ENABLED") };
+    unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
     let mut cfg = Config::default();
     cfg.features.telemetry = Some(TelemetryMode::Enabled);
     cfg.requirements.telemetry.pin(
@@ -8058,7 +8058,7 @@ fn plain_config_overlay_preserves_bundled_visibility() {
 #[test]
 #[serial]
 fn mcp_liveness_watchers_default_is_true() {
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     let r = resolve_mcp_liveness_watchers(None, None, None, None, None);
     assert!(r.value, "default-on by spec");
     assert_eq!(r.source, ConfigSource::Default);
@@ -8066,35 +8066,35 @@ fn mcp_liveness_watchers_default_is_true() {
 #[test]
 #[serial]
 fn mcp_liveness_watchers_requirement_wins_over_everything() {
-    unsafe { std::env::set_var("GROK_MCP_LIVENESS_WATCHERS", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_LIVENESS_WATCHERS", "true") };
     let r =
         resolve_mcp_liveness_watchers(Some(false), Some(true), Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     assert!(!r.value, "requirement overrides every other layer");
     assert_eq!(r.source, ConfigSource::Requirement);
 }
 #[test]
 #[serial]
 fn mcp_liveness_watchers_cli_wins_over_env_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_LIVENESS_WATCHERS", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_LIVENESS_WATCHERS", "true") };
     let r = resolve_mcp_liveness_watchers(None, Some(false), Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Cli);
 }
 #[test]
 #[serial]
 fn mcp_liveness_watchers_env_wins_over_config_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_LIVENESS_WATCHERS", "false") };
+    unsafe { std::env::set_var("FRIDAY_MCP_LIVENESS_WATCHERS", "false") };
     let r = resolve_mcp_liveness_watchers(None, None, Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
 }
 #[test]
 #[serial]
 fn mcp_liveness_watchers_config_wins_over_managed_and_feature_flag() {
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     let r = resolve_mcp_liveness_watchers(None, None, Some(false), Some(true), Some(true));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Config);
@@ -8102,7 +8102,7 @@ fn mcp_liveness_watchers_config_wins_over_managed_and_feature_flag() {
 #[test]
 #[serial]
 fn mcp_liveness_watchers_managed_wins_over_feature_flag() {
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     let r = resolve_mcp_liveness_watchers(None, None, None, Some(false), Some(true));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::ManagedConfig);
@@ -8110,7 +8110,7 @@ fn mcp_liveness_watchers_managed_wins_over_feature_flag() {
 #[test]
 #[serial]
 fn mcp_liveness_watchers_feature_flag_used_when_no_higher_layer() {
-    unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_LIVENESS_WATCHERS") };
     let r = resolve_mcp_liveness_watchers(None, None, None, None, Some(false));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Remote);
@@ -8118,7 +8118,7 @@ fn mcp_liveness_watchers_feature_flag_used_when_no_higher_layer() {
 #[test]
 #[serial]
 fn mcp_auto_restart_default_is_true() {
-    unsafe { std::env::remove_var("GROK_MCP_AUTO_RESTART") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_AUTO_RESTART") };
     let r = resolve_mcp_auto_restart(None, None, None, None, None);
     assert!(r.value, "recovery is on by default");
     assert_eq!(r.source, ConfigSource::Default);
@@ -8126,7 +8126,7 @@ fn mcp_auto_restart_default_is_true() {
 #[test]
 #[serial]
 fn mcp_auto_restart_requirement_wins_over_everything() {
-    unsafe { std::env::set_var("GROK_MCP_AUTO_RESTART", "false") };
+    unsafe { std::env::set_var("FRIDAY_MCP_AUTO_RESTART", "false") };
     let r = resolve_mcp_auto_restart(
         Some(true),
         Some(false),
@@ -8134,23 +8134,23 @@ fn mcp_auto_restart_requirement_wins_over_everything() {
         Some(false),
         Some(false),
     );
-    unsafe { std::env::remove_var("GROK_MCP_AUTO_RESTART") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_AUTO_RESTART") };
     assert!(r.value);
     assert_eq!(r.source, ConfigSource::Requirement);
 }
 #[test]
 #[serial]
 fn mcp_auto_restart_env_wins_over_config_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_AUTO_RESTART", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_AUTO_RESTART", "true") };
     let r = resolve_mcp_auto_restart(None, None, Some(false), Some(false), Some(false));
-    unsafe { std::env::remove_var("GROK_MCP_AUTO_RESTART") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_AUTO_RESTART") };
     assert!(r.value);
     assert_eq!(r.source, ConfigSource::Env);
 }
 #[test]
 #[serial]
 fn turn_transient_retry_default_is_true() {
-    unsafe { std::env::remove_var("GROK_TURN_TRANSIENT_RETRY") };
+    unsafe { std::env::remove_var("FRIDAY_TURN_TRANSIENT_RETRY") };
     let r = resolve_turn_transient_retry(None, None, None, None, None);
     assert!(r.value, "transient retry is on by default");
     assert_eq!(r.source, ConfigSource::Default);
@@ -8158,7 +8158,7 @@ fn turn_transient_retry_default_is_true() {
 #[test]
 #[serial]
 fn turn_transient_retry_config_kill_switch() {
-    unsafe { std::env::remove_var("GROK_TURN_TRANSIENT_RETRY") };
+    unsafe { std::env::remove_var("FRIDAY_TURN_TRANSIENT_RETRY") };
     let r = resolve_turn_transient_retry(None, None, Some(false), None, None);
     assert!(
         !r.value,
@@ -8169,7 +8169,7 @@ fn turn_transient_retry_config_kill_switch() {
 #[test]
 #[serial]
 fn turn_transient_retry_remote_flag_disables_below_config() {
-    unsafe { std::env::remove_var("GROK_TURN_TRANSIENT_RETRY") };
+    unsafe { std::env::remove_var("FRIDAY_TURN_TRANSIENT_RETRY") };
     let r = resolve_turn_transient_retry(None, None, None, None, Some(false));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Remote);
@@ -8183,16 +8183,16 @@ fn turn_transient_retry_remote_flag_disables_below_config() {
 #[test]
 #[serial]
 fn turn_transient_retry_env_wins_over_config() {
-    unsafe { std::env::set_var("GROK_TURN_TRANSIENT_RETRY", "false") };
+    unsafe { std::env::set_var("FRIDAY_TURN_TRANSIENT_RETRY", "false") };
     let r = resolve_turn_transient_retry(None, None, Some(true), None, None);
-    unsafe { std::env::remove_var("GROK_TURN_TRANSIENT_RETRY") };
+    unsafe { std::env::remove_var("FRIDAY_TURN_TRANSIENT_RETRY") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
 }
 #[test]
 #[serial]
 fn mcp_push_server_status_default_is_true() {
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     let r = resolve_mcp_push_server_status(None, None, None, None, None);
     assert!(r.value, "default-on by spec");
     assert_eq!(r.source, ConfigSource::Default);
@@ -8200,35 +8200,35 @@ fn mcp_push_server_status_default_is_true() {
 #[test]
 #[serial]
 fn mcp_push_server_status_requirement_wins_over_everything() {
-    unsafe { std::env::set_var("GROK_MCP_PUSH_SERVER_STATUS", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_PUSH_SERVER_STATUS", "true") };
     let r =
         resolve_mcp_push_server_status(Some(false), Some(true), Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     assert!(!r.value, "requirement overrides every other layer");
     assert_eq!(r.source, ConfigSource::Requirement);
 }
 #[test]
 #[serial]
 fn mcp_push_server_status_cli_wins_over_env_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_PUSH_SERVER_STATUS", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_PUSH_SERVER_STATUS", "true") };
     let r = resolve_mcp_push_server_status(None, Some(false), Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Cli);
 }
 #[test]
 #[serial]
 fn mcp_push_server_status_env_wins_over_config_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_PUSH_SERVER_STATUS", "false") };
+    unsafe { std::env::set_var("FRIDAY_MCP_PUSH_SERVER_STATUS", "false") };
     let r = resolve_mcp_push_server_status(None, None, Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
 }
 #[test]
 #[serial]
 fn mcp_push_server_status_config_wins_over_managed_and_feature_flag() {
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     let r = resolve_mcp_push_server_status(None, None, Some(false), Some(true), Some(true));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Config);
@@ -8236,7 +8236,7 @@ fn mcp_push_server_status_config_wins_over_managed_and_feature_flag() {
 #[test]
 #[serial]
 fn mcp_push_server_status_managed_wins_over_feature_flag() {
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     let r = resolve_mcp_push_server_status(None, None, None, Some(false), Some(true));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::ManagedConfig);
@@ -8244,7 +8244,7 @@ fn mcp_push_server_status_managed_wins_over_feature_flag() {
 #[test]
 #[serial]
 fn mcp_push_server_status_feature_flag_used_when_no_higher_layer() {
-    unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_PUSH_SERVER_STATUS") };
     let r = resolve_mcp_push_server_status(None, None, None, None, Some(false));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Remote);
@@ -8252,7 +8252,7 @@ fn mcp_push_server_status_feature_flag_used_when_no_higher_layer() {
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_default_is_true() {
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     let r = resolve_mcp_recursive_config_watch(None, None, None, None, None);
     assert!(r.value, "default-on by spec");
     assert_eq!(r.source, ConfigSource::Default);
@@ -8260,7 +8260,7 @@ fn mcp_recursive_config_watch_default_is_true() {
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_requirement_wins_over_everything() {
-    unsafe { std::env::set_var("GROK_MCP_RECURSIVE_CONFIG_WATCH", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH", "true") };
     let r = resolve_mcp_recursive_config_watch(
         Some(false),
         Some(true),
@@ -8268,33 +8268,33 @@ fn mcp_recursive_config_watch_requirement_wins_over_everything() {
         Some(true),
         Some(true),
     );
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     assert!(!r.value, "requirement overrides every other layer");
     assert_eq!(r.source, ConfigSource::Requirement);
 }
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_cli_wins_over_env_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_RECURSIVE_CONFIG_WATCH", "true") };
+    unsafe { std::env::set_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH", "true") };
     let r =
         resolve_mcp_recursive_config_watch(None, Some(false), Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Cli);
 }
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_env_wins_over_config_and_below() {
-    unsafe { std::env::set_var("GROK_MCP_RECURSIVE_CONFIG_WATCH", "false") };
+    unsafe { std::env::set_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH", "false") };
     let r = resolve_mcp_recursive_config_watch(None, None, Some(true), Some(true), Some(true));
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Env);
 }
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_config_wins_over_managed_and_feature_flag() {
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     let r = resolve_mcp_recursive_config_watch(None, None, Some(false), Some(true), Some(true));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Config);
@@ -8302,7 +8302,7 @@ fn mcp_recursive_config_watch_config_wins_over_managed_and_feature_flag() {
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_managed_wins_over_feature_flag() {
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     let r = resolve_mcp_recursive_config_watch(None, None, None, Some(false), Some(true));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::ManagedConfig);
@@ -8310,7 +8310,7 @@ fn mcp_recursive_config_watch_managed_wins_over_feature_flag() {
 #[test]
 #[serial]
 fn mcp_recursive_config_watch_feature_flag_used_when_no_higher_layer() {
-    unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
+    unsafe { std::env::remove_var("FRIDAY_MCP_RECURSIVE_CONFIG_WATCH") };
     let r = resolve_mcp_recursive_config_watch(None, None, None, None, Some(false));
     assert!(!r.value);
     assert_eq!(r.source, ConfigSource::Remote);
@@ -8319,7 +8319,7 @@ fn mcp_recursive_config_watch_feature_flag_used_when_no_higher_layer() {
 #[serial_test::serial(remote_sig_disarm)]
 fn remote_settings_disarm_managed_config_signatures() {
     let prod = crate::env::PROD_CLI_CHAT_PROXY_BASE_URL;
-    let _env = crate::env::EnvVarGuard::remove("GROK_CLI_CHAT_PROXY_BASE_URL");
+    let _env = crate::env::EnvVarGuard::remove("FRIDAY_CLI_CHAT_PROXY_BASE_URL");
     xai_grok_config::signed_policy::apply_remote_managed_config_signature_verification(
         Some(true),
         true,
@@ -8400,7 +8400,7 @@ fn sampling_config_compresses_only_toward_the_advertising_proxy() {
         .request_compression
     };
     let proxy = crate::env::PROD_CLI_CHAT_PROXY_BASE_URL;
-    let env = crate::env::EnvVarGuard::remove("GROK_REQUEST_COMPRESSION");
+    let env = crate::env::EnvVarGuard::remove("FRIDAY_REQUEST_COMPRESSION");
     apply_remote_settings_side_effects(
         Some(&crate::util::config::RemoteSettings {
             accept_request_encodings: vec![
@@ -8443,7 +8443,7 @@ fn remote_settings_disarm_requires_prod_proxy_when_keys_embedded() {
         managed_config_signature_verification: Some(false),
         ..Default::default()
     };
-    let env = crate::env::EnvVarGuard::remove("GROK_CLI_CHAT_PROXY_BASE_URL");
+    let env = crate::env::EnvVarGuard::remove("FRIDAY_CLI_CHAT_PROXY_BASE_URL");
     apply_remote_settings_side_effects(Some(&settings), prod);
     assert!(
         !xai_grok_config::signed_policy::verification_active(),
@@ -8509,8 +8509,8 @@ async fn process_key_from_model_env_key() {
     use xai_grok_login::{AuthManager, GrokComConfig, shared_api_key_provider};
     const ENV: &str = "TEST_MODEL_ENV_KEY";
     const TOKEN: &str = "model-env-token";
-    let _xai = EnvGuard::unset("XAI_API_KEY");
-    let _legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+    let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
+    let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
     let _tok = EnvGuard::set(ENV, TOKEN);
     let dm = xai_grok_models::default_model();
     let cfg = Config::new_from_toml_cfg(

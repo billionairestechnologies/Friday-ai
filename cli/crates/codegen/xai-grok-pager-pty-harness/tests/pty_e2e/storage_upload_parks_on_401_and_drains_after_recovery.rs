@@ -14,7 +14,7 @@ async fn storage_upload_parks_on_401_and_drains_after_recovery() {
     content.set_storage_unauthorized(true);
 
     // Trace uploads are gated on first-party xAI OAuth (`is_xai_auth()` means AuthMode::Oidc with the xAI issuer)
-    // The harness's XAI_API_KEY is ApiKey mode and never uploads, so seed a fake OAuth entry instead
+    // The harness's FRIDAY_X_TOKEN is ApiKey mode and never uploads, so seed a fake OAuth entry instead
     // The mock accepts any bearer, and the entry's failing refresh_token is exactly the parked state under test
     seed_fake_oauth(&content, "pty-park-e2e");
 
@@ -22,9 +22,9 @@ async fn storage_upload_parks_on_401_and_drains_after_recovery() {
     // The seeded OAuth entry decides the auth mode
     let mut overrides = Vec::from(oauth_credential_ops());
     overrides.extend([
-        EnvOp::set("GROK_TRACE_UPLOAD", "true"),
-        EnvOp::set("GROK_TELEMETRY_TRACE_UPLOAD", "true"),
-        EnvOp::set("GROK_UPLOAD_QUEUE_AUTH_PROBE_SECS", "2"),
+        EnvOp::set("FRIDAY_TRACE_UPLOAD", "true"),
+        EnvOp::set("FRIDAY_TELEMETRY_TRACE_UPLOAD", "true"),
+        EnvOp::set("FRIDAY_UPLOAD_QUEUE_AUTH_PROBE_SECS", "2"),
     ]);
 
     let binary = pager_binary().expect("resolve pager binary");

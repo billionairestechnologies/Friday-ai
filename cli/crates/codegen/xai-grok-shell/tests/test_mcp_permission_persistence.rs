@@ -20,7 +20,7 @@ fn test_home() -> &'static PathBuf {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.keep();
         // SAFETY: called once at init before other threads touch this var.
-        unsafe { std::env::set_var("GROK_HOME", &path) };
+        unsafe { std::env::set_var("FRIDAY_HOME", &path) };
         path
     })
 }

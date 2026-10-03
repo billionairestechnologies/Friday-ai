@@ -28,7 +28,7 @@ fn the_cwd_the_served_root_and_the_env_bases_are_trees() {
         &[PathBuf::from("/opt/ws-fixture/homedir/w1-scratch/pyuser")],
     );
     assert!(own.covers(Path::new(
-        "/opt/ws-fixture/homedir/w1-scratch/ws/.grok/config.toml"
+        "/opt/ws-fixture/homedir/w1-scratch/ws/.friday/config.toml"
     )));
     assert!(own.covers(Path::new(
         "/opt/ws-fixture/homedir/w1-scratch/pyuser/lib/python3.14/site-packages/x.py"

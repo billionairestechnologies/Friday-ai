@@ -1,13 +1,13 @@
 //! The route override handed to an installed file accelerator.
 //!
 //! The value is opaque here; the accelerator parses it. A blank value at any tier is unset, so an empty
-//! `GROK_FILE_ACCELERATION_ROUTES` falls through to config and remote instead of clearing them.
+//! `FRIDAY_FILE_ACCELERATION_ROUTES` falls through to config and remote instead of clearing them.
 
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-pub const ENV_FILE_ACCELERATION_ROUTES: &str = "GROK_FILE_ACCELERATION_ROUTES";
+pub const ENV_FILE_ACCELERATION_ROUTES: &str = "FRIDAY_FILE_ACCELERATION_ROUTES";
 
 /// `[file_acceleration]` in config.toml.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

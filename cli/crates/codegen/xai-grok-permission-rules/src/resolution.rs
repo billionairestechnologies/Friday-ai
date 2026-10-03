@@ -1,4 +1,4 @@
-//! Merges native `.grok/config.toml`, managed/enterprise settings, and `.claude` settings into the effective `PermissionConfig`.
+//! Merges native `.friday/config.toml`, managed/enterprise settings, and `.claude` settings into the effective `PermissionConfig`.
 //! Also holds the MCP-server and marketplace allowlists and the always-approve policy pin.
 
 use crate::claude_settings::*;
@@ -68,7 +68,7 @@ fn synthetic_rules_for_default_mode(
     (rules, skipped, bypass_blocked)
 }
 
-/// Parse a defaultMode string; an unknown value fails safe to [`DefaultPermissionMode::Default`] with a warn and a skip record for `grok inspect`.
+/// Parse a defaultMode string; an unknown value fails safe to [`DefaultPermissionMode::Default`] with a warn and a skip record for `friday inspect`.
 fn parse_default_mode_claiming_scope(
     raw: &str,
     path: &Path,
@@ -187,7 +187,7 @@ fn extract_toml_permissions(
 
 /// Load `[permission]` rules from requirements.toml layers. Trust keys on the
 /// `is_system` flag (set at load, never from `path`): system → `SystemRequirements`,
-/// user `~/.grok` → `Requirements`, so [`is_admin_source`] trusts only the root tier.
+/// user `~/.friday` → `Requirements`, so [`is_admin_source`] trusts only the root tier.
 fn load_requirements_permissions() -> Vec<Sourced<PermissionRule>> {
     xai_grok_config::requirements_layers()
         .into_iter()
@@ -206,13 +206,13 @@ fn load_requirements_permissions() -> Vec<Sourced<PermissionRule>> {
         .collect()
 }
 
-/// Load `[permission]` rules from `~/.grok/config.toml` (lowest) then each `.grok/config.toml` from repo root to `cwd`.
+/// Load `[permission]` rules from `~/.friday/config.toml` (lowest) then each `.friday/config.toml` from repo root to `cwd`.
 /// The walk matches [`crate::project_config::find_project_configs`] so detector and loader agree. Empty if no `[permission]` section.
 fn load_config_toml_permissions(cwd: &Path, project_trusted: bool) -> Vec<Sourced<PermissionRule>> {
     let mut rules = Vec::new();
 
-    // Global `~/.grok/config.toml` first (lowest priority within this layer).
-    // Gated on user_grok_home() so a project's .grok/config.toml is never read as global permissions when neither GROK_HOME nor a home dir resolves
+    // Global `~/.friday/config.toml` first (lowest priority within this layer).
+    // Gated on user_grok_home() so a project's .friday/config.toml is never read as global permissions when neither FRIDAY_HOME nor a home dir resolves
     if let Some(global_path) = xai_grok_config::user_grok_home().map(|g| g.join("config.toml"))
         && global_path.is_file()
     {
@@ -229,7 +229,7 @@ fn load_config_toml_permissions(cwd: &Path, project_trusted: bool) -> Vec<Source
     }
 
     // Project-scoped configs walking from git root down to cwd, gated on trust.
-    // An untrusted clone must not contribute allow/deny/ask rules via `.grok/config.toml` (same gate as project `.claude/settings.json`)
+    // An untrusted clone must not contribute allow/deny/ask rules via `.friday/config.toml` (same gate as project `.claude/settings.json`)
     if project_trusted {
         for path in crate::project_config::find_project_configs(cwd) {
             match xai_grok_config::load_config_file(&path) {
@@ -263,7 +263,7 @@ fn managed_config_permissions(
 // Fallback Resolver
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// Resolve permission config, merging native Grok and Claude sources. Evaluation is deny > ask > allow; merge order is provenance only.
+/// Resolve permission config, merging native Friday X and Claude sources. Evaluation is deny > ask > allow; merge order is provenance only.
 /// Claude `acceptEdits` appends a synthetic `Allow Edit`. `project_trusted` gates project-tier rules; global/user/admin always load. Hub/cloud defaults trusted.
 pub async fn resolve_permission_config_with_fallback(
     cwd: &Path,
@@ -408,7 +408,7 @@ fn is_admin_source(source: &RequirementSource) -> bool {
 }
 
 /// Under the pin, drop untrusted catch-all Allow rules (they substitute for the blocked `--yolo`); keep admin-tier ones.
-/// Records each drop for `grok inspect`.
+/// Records each drop for `friday inspect`.
 fn drop_untrusted_catchall_allows(
     rules: Vec<Sourced<PermissionRule>>,
     policy_block: Option<&'static str>,
@@ -447,7 +447,7 @@ struct ResolveInputs<'a> {
     managed: &'a ManagedSettings,
     managed_config_rules: Vec<Sourced<PermissionRule>>,
     /// Folder-trust verdict for `cwd`.
-    /// When false, project-tier `.claude/settings.json` / `.grok/config.toml` permission rules are dropped (global/user/admin tiers still load).
+    /// When false, project-tier `.claude/settings.json` / `.friday/config.toml` permission rules are dropped (global/user/admin tiers still load).
     project_trusted: bool,
 }
 
@@ -563,7 +563,7 @@ async fn resolve_permissions_with_provenance_inner(
     // CLI `--allow '*'` is filtered at its own merge site (acp_session)
     let all_rules = drop_untrusted_catchall_allows(all_rules, policy_block, &mut skipped);
 
-    // Keep skip-only resolutions alive so the drop reaches `grok inspect`
+    // Keep skip-only resolutions alive so the drop reaches `friday inspect`
     // A rule-less explicit defaultMode must survive: dropping it to `None` erases `default_mode_configured` and lets the alwaysAllow hint upgrade it
     if all_rules.is_empty()
         && prompt_policy == PromptPolicy::Ask
@@ -640,7 +640,7 @@ fn resolve_claude_settings_inner(
             for w in &warnings {
                 warn!(path = %path.display(), "{}", w);
             }
-            // Rules *or* skip-only parse failures still own provenance for `grok inspect`
+            // Rules *or* skip-only parse failures still own provenance for `friday inspect`
             // All-invalid allow/deny/ask must not leave primary_source_path unset and panic below
             if (!cfg.rules.is_empty() || !warnings.is_empty()) && primary_source_path.is_none() {
                 primary_source_path = Some(path.clone());
@@ -677,7 +677,7 @@ fn resolve_claude_settings_inner(
     }
 
     // A blocked bypass, a claimed defaultMode (incl. a typo treated as default), or skip records still resolve (possibly zero rules).
-    // Provenance then reaches `grok inspect` via the outer resolver
+    // Provenance then reaches `friday inspect` via the outer resolver
     if all_rules.is_empty()
         && prompt_policy == PromptPolicy::Ask
         && !bypass_blocked

@@ -70,8 +70,8 @@ impl SlashCommand for ModelCommand {
             return CommandResult::Error("Usage: /model <name> [window] [effort]".into());
         }
 
-        // Prefer an exact full-string catalog match first. Model display names often contain spaces ("Grok 4.5").
-        // If we split on the last token first, a shorter catalog entry ("Grok") would steal the prefix and treat "4.5" as an effort level
+        // Prefer an exact full-string catalog match first. Model display names often contain spaces ("Friday X 4.5").
+        // If we split on the last token first, a shorter catalog entry ("Friday X") would steal the prefix and treat "4.5" as an effort level
         if let Some(id) = ctx.models.resolve_by_name_or_id(trimmed) {
             return CommandResult::Action(Action::SetDefaultModel(id));
         }
@@ -170,7 +170,7 @@ fn chained_phase(models: &ModelState, args_query: &str) -> Option<ChainedPhase> 
         // A longer model name may still match ("Foo Bar" after "Foo")
         Some(_) => return None,
         None if windows.len() > 1 => {
-            // A partial token that can't start any window row ("Grok 4.7 hi") is a typed effort
+            // A partial token that can't start any window row ("Friday X 4.7 hi") is a typed effort
             if starts_a_window(&windows, rest.trim_start()) {
                 ChainedPhase::Window {
                     model_id,
@@ -451,18 +451,18 @@ mod tests {
     #[test]
     fn split_model_rest_keeps_a_multi_word_label() {
         let mut state = ModelState::default();
-        let (id, info) = model_with_reasoning("grok-4.7", "Grok 4.7");
+        let (id, info) = model_with_reasoning("grok-4.7", "Friday X 4.7");
         state.available.insert(id.clone(), info);
         assert_eq!(
-            split_model_rest(&state, "Grok 4.7 Extra High")
+            split_model_rest(&state, "Friday X 4.7 Extra High")
                 .map(|(model, token)| { (model.0.to_string(), token.to_string()) }),
             Some(("grok-4.7".to_string(), "Extra High".to_string()))
         );
         assert_eq!(
-            split_model_rest(&state, "Grok 4.7 high").map(|(_, token)| token),
+            split_model_rest(&state, "Friday X 4.7 high").map(|(_, token)| token),
             Some("high")
         );
-        assert!(split_model_rest(&state, "Grok 4.7").is_none());
+        assert!(split_model_rest(&state, "Friday X 4.7").is_none());
         assert_eq!(
             split_model_rest(&state, "grok-4.7 Extra High")
                 .map(|(model, token)| (model.0.to_string(), token.to_string())),
@@ -473,57 +473,57 @@ mod tests {
     #[test]
     fn window_phase_sits_between_model_and_effort() {
         let mut state = ModelState::default();
-        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Grok 4.7");
+        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Friday X 4.7");
         state.available.insert(id, info);
         let cmd = ModelCommand;
         let ctx = app_ctx(&state);
 
         // A trailing space after the model opens the window phase
         let items = cmd
-            .suggest_args(&ctx, "Grok 4.7 ")
+            .suggest_args(&ctx, "Friday X 4.7 ")
             .expect("window rows after the model");
         let [first, second] = items.as_slice() else {
             panic!("expected 2 window rows: {items:?}");
         };
         assert_eq!(first.display, "256k");
         // The trailing space chains into the effort phase
-        assert_eq!(second.insert_text, "Grok 4.7 500k ");
+        assert_eq!(second.insert_text, "Friday X 4.7 500k ");
 
         // A committed window advances to the effort phase with the longer prefix
         let items = cmd
-            .suggest_args(&ctx, "Grok 4.7 500k ")
+            .suggest_args(&ctx, "Friday X 4.7 500k ")
             .expect("effort rows after a committed window");
         assert_eq!(
             items.first().map(|item| item.insert_text.as_str()),
-            Some("Grok 4.7 500k xhigh")
+            Some("Friday X 4.7 500k xhigh")
         );
 
         // A partial that can't start any window row falls back to the effort rows
         let items = cmd
-            .suggest_args(&ctx, "Grok 4.7 hi")
+            .suggest_args(&ctx, "Friday X 4.7 hi")
             .expect("effort rows for a typed effort filter");
         assert!(
-            items.iter().any(|item| item.insert_text == "Grok 4.7 high"),
+            items.iter().any(|item| item.insert_text == "Friday X 4.7 high"),
             "typed effort must keep the effort rows up: {items:?}"
         );
 
         // The fresh window menu preselects the default
         assert_eq!(
-            cmd.preselected_arg(&ctx, "Grok 4.7 ").as_deref(),
-            Some("Grok 4.7 256k ")
+            cmd.preselected_arg(&ctx, "Friday X 4.7 ").as_deref(),
+            Some("Friday X 4.7 256k ")
         );
     }
 
     #[test]
     fn picker_title_follows_the_chained_phase() {
         let mut state = ModelState::default();
-        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Grok 4.7");
+        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Friday X 4.7");
         state.available.insert(id, info);
 
         assert_eq!(picker_title(&state, ""), "Pick model");
-        assert_eq!(picker_title(&state, "Grok 4.7 "), "Pick context window");
+        assert_eq!(picker_title(&state, "Friday X 4.7 "), "Pick context window");
         assert_eq!(
-            picker_title(&state, "Grok 4.7 500k "),
+            picker_title(&state, "Friday X 4.7 500k "),
             "Pick reasoning effort"
         );
     }
@@ -554,11 +554,11 @@ mod tests {
     #[test]
     fn run_parses_window_and_effort_after_the_model() {
         let mut state = ModelState::default();
-        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Grok 4.7");
+        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Friday X 4.7");
         state.available.insert(id, info);
         let mut ctx = dummy_exec_ctx(&state);
 
-        match ModelCommand.run(&mut ctx, "Grok 4.7 500k") {
+        match ModelCommand.run(&mut ctx, "Friday X 4.7 500k") {
             CommandResult::Action(Action::SwitchModel(ModelChoice {
                 model_id,
                 effort,
@@ -574,7 +574,7 @@ mod tests {
             other => panic!("expected window-only switch, got {other:?}"),
         }
 
-        match ModelCommand.run(&mut ctx, "Grok 4.7 500k high") {
+        match ModelCommand.run(&mut ctx, "Friday X 4.7 500k high") {
             CommandResult::Action(Action::SwitchModel(ModelChoice {
                 model_id,
                 effort,
@@ -588,7 +588,7 @@ mod tests {
         }
 
         // An effort with no window leaves the window unset
-        match ModelCommand.run(&mut ctx, "Grok 4.7 high") {
+        match ModelCommand.run(&mut ctx, "Friday X 4.7 high") {
             CommandResult::Action(Action::SwitchModel(ModelChoice {
                 effort,
                 context_window_selection,
@@ -601,7 +601,7 @@ mod tests {
         }
 
         // A parseable but unoffered window gets the window error with the offered list
-        match ModelCommand.run(&mut ctx, "Grok 4.7 1m") {
+        match ModelCommand.run(&mut ctx, "Friday X 4.7 1m") {
             CommandResult::Error(msg) => {
                 assert!(msg.contains("unknown context window '1m'"), "msg={msg}");
                 assert!(msg.contains("256k, 500k"), "msg={msg}");
@@ -613,13 +613,13 @@ mod tests {
     #[test]
     fn window_only_pick_keeps_the_current_models_effort() {
         let mut state = ModelState::default();
-        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Grok 4.7");
+        let (id, info) = model_with_windows_and_reasoning("grok-4.7", "Friday X 4.7");
         state.available.insert(id.clone(), info);
         state.current = Some(id);
         state.reasoning_effort = Some(ReasoningEffort::Low);
         let mut ctx = dummy_exec_ctx(&state);
 
-        let result = ModelCommand.run(&mut ctx, "Grok 4.7 500k");
+        let result = ModelCommand.run(&mut ctx, "Friday X 4.7 500k");
 
         assert!(
             matches!(
@@ -636,11 +636,11 @@ mod tests {
     #[test]
     fn picker_preselects_the_window_the_switch_uses() {
         let mut state = ModelState::default();
-        let (current, current_info) = model_with_windows_and_reasoning("grok-4.7", "Grok 4.7");
-        let (listed, listed_info) = model_with_windows_and_reasoning("grok-4.8", "Grok 4.8");
+        let (current, current_info) = model_with_windows_and_reasoning("grok-4.7", "Friday X 4.7");
+        let (listed, listed_info) = model_with_windows_and_reasoning("grok-4.8", "Friday X 4.8");
         let unlisted_info = acp_fixtures::model_info_with_meta(
             "grok-4.5",
-            "Grok 4.5",
+            "Friday X 4.5",
             serde_json::json!({
                 "supportsReasoningEffort": true,
                 "totalContextTokens": 256_000,
@@ -656,18 +656,18 @@ mod tests {
         state.context_window_selection = Some(500_000);
         let ctx = app_ctx(&state);
 
-        let listed_row = ModelCommand.preselected_arg(&ctx, "Grok 4.8 ");
-        let unlisted_row = ModelCommand.preselected_arg(&ctx, "Grok 4.5 ");
+        let listed_row = ModelCommand.preselected_arg(&ctx, "Friday X 4.8 ");
+        let unlisted_row = ModelCommand.preselected_arg(&ctx, "Friday X 4.5 ");
 
-        assert_eq!(listed_row.as_deref(), Some("Grok 4.8 500k "));
-        assert_eq!(unlisted_row.as_deref(), Some("Grok 4.5 256k "));
+        assert_eq!(listed_row.as_deref(), Some("Friday X 4.8 500k "));
+        assert_eq!(unlisted_row.as_deref(), Some("Friday X 4.5 256k "));
     }
 
     #[test]
     fn empty_query_returns_one_row_per_logical_model() {
         let mut state = ModelState::default();
         let (rid, rinfo) = model_with_reasoning("reasoning-x", "Reasoning X");
-        let (pid, pinfo) = plain_model("grok-4.5", "Grok 4.5");
+        let (pid, pinfo) = plain_model("grok-4.5", "Friday X 4.5");
         state.available.insert(rid, rinfo);
         state.available.insert(pid, pinfo);
 
@@ -696,8 +696,8 @@ mod tests {
         assert_eq!(reasoning.insert_text, "Reasoning X ");
 
         // A plain model has no trailing space, so Enter commits immediately
-        let plain = items.iter().find(|i| i.match_text == "Grok 4.5").unwrap();
-        assert_eq!(plain.insert_text, "Grok 4.5");
+        let plain = items.iter().find(|i| i.match_text == "Friday X 4.5").unwrap();
+        assert_eq!(plain.insert_text, "Friday X 4.5");
     }
 
     #[test]
@@ -875,30 +875,30 @@ mod tests {
 
     #[test]
     fn run_prefers_full_multi_word_model_name_over_prefix_plus_effort() {
-        // The catalog has both "Grok" (reasoning) and "Grok 4.5"
-        // `/model Grok 4.5` must select the full name, not treat "4.5" as an effort on "Grok"
+        // The catalog has both "Friday X" (reasoning) and "Friday X 4.5"
+        // `/model Friday X 4.5` must select the full name, not treat "4.5" as an effort on "Friday X"
         let mut state = ModelState::default();
-        let (short_id, short_info) = model_with_reasoning("grok", "Grok");
-        let (long_id, long_info) = model_with_reasoning("grok-4.5", "Grok 4.5");
+        let (short_id, short_info) = model_with_reasoning("grok", "Friday X");
+        let (long_id, long_info) = model_with_reasoning("grok-4.5", "Friday X 4.5");
         state.available.insert(short_id, short_info);
         state.available.insert(long_id.clone(), long_info);
         let mut ctx = dummy_exec_ctx(&state);
-        let result = ModelCommand.run(&mut ctx, "Grok 4.5");
+        let result = ModelCommand.run(&mut ctx, "Friday X 4.5");
         match result {
             CommandResult::Action(Action::SetDefaultModel(resolved_id)) => {
                 assert_eq!(resolved_id, long_id);
             }
-            other => panic!("expected SetDefaultModel(Grok 4.5), got {other:?}"),
+            other => panic!("expected SetDefaultModel(Friday X 4.5), got {other:?}"),
         }
     }
 
     #[test]
     fn run_rejects_effort_for_non_reasoning_model() {
         let mut state = ModelState::default();
-        let (id, info) = plain_model("grok-4.5", "Grok 4.5");
+        let (id, info) = plain_model("grok-4.5", "Friday X 4.5");
         state.available.insert(id, info);
         let mut ctx = dummy_exec_ctx(&state);
-        let result = ModelCommand.run(&mut ctx, "Grok 4.5 high");
+        let result = ModelCommand.run(&mut ctx, "Friday X 4.5 high");
         // Falls through to "is the whole string a model name?", which it isn't, so we get an Unknown error
         assert!(matches!(result, CommandResult::Error(_)));
     }
@@ -909,10 +909,10 @@ mod tests {
     #[test]
     fn run_bare_model_name_dispatches_set_default_model() {
         let mut state = ModelState::default();
-        let (id, info) = plain_model("grok-4.5", "Grok 4.5");
+        let (id, info) = plain_model("grok-4.5", "Friday X 4.5");
         state.available.insert(id.clone(), info);
         let mut ctx = dummy_exec_ctx(&state);
-        let result = ModelCommand.run(&mut ctx, "Grok 4.5");
+        let result = ModelCommand.run(&mut ctx, "Friday X 4.5");
         match result {
             CommandResult::Action(Action::SetDefaultModel(resolved_id)) => {
                 assert_eq!(resolved_id, id);
@@ -921,11 +921,11 @@ mod tests {
         }
     }
 
-    /// Case-insensitive matching against the catalog: `/model grok 4.5` resolves to the same `ModelId` as `/model Grok 4.5`.
+    /// Case-insensitive matching against the catalog: `/model grok 4.5` resolves to the same `ModelId` as `/model Friday X 4.5`.
     #[test]
     fn run_set_default_model_resolves_case_insensitively() {
         let mut state = ModelState::default();
-        let (id, info) = plain_model("grok-4.5", "Grok 4.5");
+        let (id, info) = plain_model("grok-4.5", "Friday X 4.5");
         state.available.insert(id.clone(), info);
         let mut ctx = dummy_exec_ctx(&state);
         let result = ModelCommand.run(&mut ctx, "grok 4.5");

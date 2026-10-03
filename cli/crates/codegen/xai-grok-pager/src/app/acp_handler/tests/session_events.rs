@@ -583,7 +583,7 @@
             &RetryState::Failed {
                 error_type: "api".into(),
                 message:
-                    "API error (status 402 Payment Required): Grok Build usage balance exhausted"
+                    "API error (status 402 Payment Required): Friday X usage balance exhausted"
                         .into(),
             },
             &mut session,
@@ -719,7 +719,7 @@
         ));
     }
 
-    /// Legacy WebLogin auth keeps its verbose message (with `grok logout` / `grok login` guidance), not the generic re-auth prompt.
+    /// Legacy WebLogin auth keeps its verbose message (with `friday logout` / `friday login` guidance), not the generic re-auth prompt.
     #[test]
     fn apply_retry_state_legacy_auth_keeps_detailed_message() {
         let mut session = make_session(Some("s1"));
@@ -728,7 +728,7 @@
             &RetryState::Failed {
                 error_type: "legacy_auth".into(),
                 message: "Unauthorized (401) ... deprecated authentication method (WebLogin) ... \
-                          run `grok logout` then `grok login`"
+                          run `friday logout` then `friday login`"
                     .into(),
             },
             &mut session,

@@ -6,7 +6,7 @@
 //! Either way the auth flow fell through to the built-in browser login, so a configured provider looked like it had been ignored.
 //!
 //! The test drives the public entry point: `try_ensure_fresh_auth`, then `AuthManager::auth`, the external refresher, and the platform shell.
-//! It is hermetic: a throwaway `GROK_HOME`, no network, and a provider command that needs no binary beyond what the platform shell already provides.
+//! It is hermetic: a throwaway `FRIDAY_HOME`, no network, and a provider command that needs no binary beyond what the platform shell already provides.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -22,7 +22,7 @@ fn use_temp_grok_home(dir: &Path) {
     // SAFETY: single-threaded test entry, before any thread that reads the
     // environment is spawned.
     unsafe {
-        std::env::set_var("GROK_HOME", dir);
+        std::env::set_var("FRIDAY_HOME", dir);
     }
 }
 

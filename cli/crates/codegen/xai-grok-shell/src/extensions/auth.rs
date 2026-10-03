@@ -239,7 +239,7 @@ fn handle_info(agent: &MvpAgent) -> ExtResult {
         Some(key) if key.starts_with("http://") || key.starts_with("https://") => {
             Some(key.to_owned())
         }
-        Some(key) => Some(format!("grok-asset:///{key}")),
+        Some(key) => Some(format!("friday-asset:///{key}")),
         None => None,
     };
     to_raw_response(&AuthInfoResponse {

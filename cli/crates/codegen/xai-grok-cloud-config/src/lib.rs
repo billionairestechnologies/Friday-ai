@@ -1,4 +1,4 @@
-//! This crate fetches, caches, and refreshes the Grok config delivered from the cloud.
+//! This crate fetches, caches, and refreshes the Friday X config delivered from the cloud.
 //! Parsing and composition stay in `xai-grok-config`.
 
 #![deny(clippy::indexing_slicing)]

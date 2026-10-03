@@ -5,7 +5,7 @@
     unreachable_code,
     dead_code
 )]
-//! OS-level sandboxing for Grok Build via [nono](https://crates.io/crates/nono).
+//! OS-level sandboxing for Friday X via [nono](https://crates.io/crates/nono).
 //!
 //! Applied once at process startup. Covers in-process `tokio::fs` calls and child processes.
 //! Network is left open at the process level (agent needs LLM API); child network is blocked per-subprocess via seccomp.
@@ -925,7 +925,7 @@ mod tests {
             "arming must not require applied=true"
         );
     }
-    /// Create a temp workspace whose `.grok/sandbox.toml` contains `toml_body`.
+    /// Create a temp workspace whose `.friday/sandbox.toml` contains `toml_body`.
     /// Returns the workspace path (caller removes it).
     #[cfg(all(feature = "enforce", unix))]
     fn temp_workspace_with_sandbox_toml(tag: &str, toml_body: &str) -> PathBuf {
@@ -933,8 +933,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let ws = std::env::temp_dir().join(format!("grok-{tag}-{}-{nanos}", std::process::id()));
-        let grok = ws.join(".grok");
+        let ws = std::env::temp_dir().join(format!("friday-{tag}-{}-{nanos}", std::process::id()));
+        let grok = ws.join(".friday");
         std::fs::create_dir_all(&grok).unwrap();
         std::fs::write(
             grok.join(xai_grok_config::SANDBOX_CONFIG_FILENAME),
@@ -1077,7 +1077,7 @@ mod tests {
     #[cfg(all(feature = "enforce", target_os = "linux"))]
     fn bwrap_reexec_uses_dir_placeholder_for_directories() {
         let _g = EnvGuard::remove(BWRAP_ENV_VAR);
-        let dir = std::env::temp_dir().join(format!("grok-deny-dir-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-deny-dir-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let dir_str = dir.to_string_lossy().to_string();
         let result = bwrap_reexec_command(&[], &[&dir_str]);

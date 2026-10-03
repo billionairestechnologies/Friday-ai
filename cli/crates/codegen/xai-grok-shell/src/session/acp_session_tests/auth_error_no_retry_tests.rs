@@ -131,7 +131,7 @@ async fn make_actor_with_auth_and_credentials(
 
 /// Pin the ACP `auth_method_id` and credential `auth_type` independently.
 /// The gate keys off the stable `auth_method_id`, so this reproduces the regression.
-/// In the regression, a session-token cache miss with `XAI_API_KEY` set transiently collapsed a session method's `creds.auth_type` to `ApiKey`.
+/// In the regression, a session-token cache miss with `FRIDAY_X_TOKEN` set transiently collapsed a session method's `creds.auth_type` to `ApiKey`.
 async fn make_actor_with_method_and_credentials(
     auth_manager: Option<Arc<AuthManager>>,
     auth_method_id: &str,
@@ -564,7 +564,7 @@ async fn credential_less_401_with_permanent_failure_stays_terminal() {
         .await;
 }
 
-/// Regression: sampler 401 with API-key auth (BYOK `env_key` / `XAI_API_KEY`) must NOT attempt an OIDC session-token refresh.
+/// Regression: sampler 401 with API-key auth (BYOK `env_key` / `FRIDAY_X_TOKEN`) must NOT attempt an OIDC session-token refresh.
 /// The bearer on the wire is the static API key, so refreshing the session token reports success but the retry re-sends the same rejected key.
 /// Recovery is skipped and the 401 surfaces as a terminal error.
 #[tokio::test(flavor = "current_thread")]
@@ -929,19 +929,19 @@ async fn legacy_auth_hint_on_404_model_not_found() {
                 "404 with WebLogin must include deprecation message, got: {msg}"
             );
             assert!(
-                msg.contains("grok update"),
-                "hint must mention `grok update` before re-login, got: {msg}"
+                msg.contains("friday update"),
+                "hint must mention `friday update` before re-login, got: {msg}"
             );
             assert!(
-                msg.contains("grok logout"),
-                "hint must mention `grok logout`, got: {msg}"
+                msg.contains("friday logout"),
+                "hint must mention `friday logout`, got: {msg}"
             );
             assert!(
-                msg.contains("grok login"),
-                "hint must mention `grok login`, got: {msg}"
+                msg.contains("friday login"),
+                "hint must mention `friday login`, got: {msg}"
             );
-            let update_at = msg.find("grok update").expect("grok update");
-            let logout_at = msg.find("grok logout").expect("grok logout");
+            let update_at = msg.find("friday update").expect("friday update");
+            let logout_at = msg.find("friday logout").expect("friday logout");
             assert!(
                 update_at < logout_at,
                 "update must come before logout, got: {msg}"
@@ -960,7 +960,7 @@ async fn legacy_auth_hint_on_404_model_not_found() {
 fn unauthorized_401_error() -> xai_grok_sampler::SamplingErrorInfo {
     xai_grok_sampler::SamplingErrorInfo {
             kind: xai_grok_sampler::SamplingErrorKind::Api,
-            message: "Unauthorized (401) from https://cli-chat-proxy.grok.com/v1/responses: {\"error\":\"Invalid or expired credentials (auth_kind=bearer, x_xai_token_auth=xai-grok-cli, upstream=Unauthenticated, reason=no auth context)\"}".into(),
+            message: "Unauthorized (401) from https://cli-chat-proxy.grok.com/v1/responses: {\"error\":\"Invalid or expired credentials (auth_kind=bearer, x_xai_token_auth=friday-x-cli, upstream=Unauthenticated, reason=no auth context)\"}".into(),
             status_code: Some(401),
             is_retryable: false,
             retry_after_secs: None,
@@ -1009,19 +1009,19 @@ async fn legacy_auth_hint_on_401_unauthorized() {
                 "401 with WebLogin must include deprecation message, got: {msg}"
             );
             assert!(
-                msg.contains("grok update"),
-                "hint must mention `grok update` before re-login, got: {msg}"
+                msg.contains("friday update"),
+                "hint must mention `friday update` before re-login, got: {msg}"
             );
             assert!(
-                msg.contains("grok logout"),
-                "hint must mention `grok logout`, got: {msg}"
+                msg.contains("friday logout"),
+                "hint must mention `friday logout`, got: {msg}"
             );
             assert!(
-                msg.contains("grok login"),
-                "hint must mention `grok login`, got: {msg}"
+                msg.contains("friday login"),
+                "hint must mention `friday login`, got: {msg}"
             );
-            let update_at = msg.find("grok update").expect("grok update");
-            let logout_at = msg.find("grok logout").expect("grok logout");
+            let update_at = msg.find("friday update").expect("friday update");
+            let logout_at = msg.find("friday logout").expect("friday logout");
             assert!(
                 update_at < logout_at,
                 "update must come before logout, got: {msg}"

@@ -11,8 +11,8 @@ fn empty_store_trusts_nothing() {
 #[test]
 fn default_path_in_maps_home_and_preserves_no_home() {
     // With a resolvable home the store sits at <home>/trusted_folders.toml.
-    // `/home/alice/.grok` is not absolute on Windows; use a platform-absolute path.
-    let home = std::env::temp_dir().join(".grok");
+    // `/home/alice/.friday` is not absolute on Windows; use a platform-absolute path.
+    let home = std::env::temp_dir().join(".friday");
     assert!(
         home.is_absolute(),
         "positive case requires a platform-absolute home"
@@ -23,16 +23,16 @@ fn default_path_in_maps_home_and_preserves_no_home() {
     );
 
     // With NO resolvable home the path is `None`, never a synthesized fallback
-    // This is the regression guard that keeps the store off the cwd-relative `./.grok` that grok_home() would invent
-    // That is how a cloned repo's own `<repo>/.grok/trusted_folders.toml` could masquerade as the user-global store and self-trust the checkout
+    // This is the regression guard that keeps the store off the cwd-relative `./.friday` that grok_home() would invent
+    // That is how a cloned repo's own `<repo>/.friday/trusted_folders.toml` could masquerade as the user-global store and self-trust the checkout
     assert_eq!(TrustStore::default_path_in(None), None);
 
     assert_eq!(
-        TrustStore::default_path_in(Some(PathBuf::from(".grok"))),
+        TrustStore::default_path_in(Some(PathBuf::from(".friday"))),
         None
     );
     assert_eq!(
-        TrustStore::default_path_in(Some(PathBuf::from("repo/.grok"))),
+        TrustStore::default_path_in(Some(PathBuf::from("repo/.friday"))),
         None
     );
 }
@@ -43,11 +43,11 @@ fn default_path_follows_live_grok_home_not_once_lock() {
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     let pinned = tempfile::tempdir().unwrap();
-    let _pinned_env = crate::TestEnvGuard::set("GROK_HOME", pinned.path());
+    let _pinned_env = crate::TestEnvGuard::set("FRIDAY_HOME", pinned.path());
     let _pin = xai_grok_config::grok_home();
     let home = tempfile::tempdir().unwrap();
-    let _env = crate::TestEnvGuard::set("GROK_HOME", home.path());
-    let fresh = TrustStore::default_path().expect("GROK_HOME set");
+    let _env = crate::TestEnvGuard::set("FRIDAY_HOME", home.path());
+    let fresh = TrustStore::default_path().expect("FRIDAY_HOME set");
     assert_eq!(fresh, home.path().join(TRUST_FILE_NAME));
 }
 
@@ -67,7 +67,7 @@ fn default_path_sources_from_fresh_home_not_once_lock() {
 #[test]
 fn no_home_store_trusts_nothing_and_persists_nothing() {
     // Simulate the no-home environment where `default_path()` is `None`: `load()` yields `empty()`, a store with no backing path
-    // It must trust nothing and silently no-op on writes, never touching a cwd-relative `./.grok`
+    // It must trust nothing and silently no-op on writes, never touching a cwd-relative `./.friday`
     let mut store = TrustStore::empty();
     assert!(store.is_empty());
 

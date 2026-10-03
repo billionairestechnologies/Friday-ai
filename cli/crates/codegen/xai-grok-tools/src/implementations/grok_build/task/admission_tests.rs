@@ -30,8 +30,8 @@ fn limits_accept_plain_positive_digits_and_ignore_everything_else() {
     let from = |concurrent: Option<&str>, behavior: Option<&str>| {
         SubagentLimits::from_lookup(|var| {
             match var {
-                "GROK_MAX_CONCURRENT_SUBAGENTS" => concurrent,
-                "GROK_SUBAGENT_LIMIT_BEHAVIOR" => behavior,
+                "FRIDAY_MAX_CONCURRENT_SUBAGENTS" => concurrent,
+                "FRIDAY_SUBAGENT_LIMIT_BEHAVIOR" => behavior,
                 other => panic!("unexpected lookup: {other}"),
             }
             .map(str::to_owned)

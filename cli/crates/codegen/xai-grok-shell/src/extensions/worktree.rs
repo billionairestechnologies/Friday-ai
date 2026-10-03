@@ -736,10 +736,10 @@ mod tests {
     #[test]
     fn db_path_response_serializes() {
         let resp = WorktreeDbPathResponse {
-            path: "/home/user/.grok/worktrees.db".into(),
+            path: "/home/user/.friday/worktrees.db".into(),
         };
         let json = serde_json::to_string(&resp).unwrap();
-        assert!(json.contains("\"path\":\"/home/user/.grok/worktrees.db\""));
+        assert!(json.contains("\"path\":\"/home/user/.friday/worktrees.db\""));
     }
 
     #[test]

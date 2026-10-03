@@ -20,7 +20,7 @@ errno it names.
 | `cat-ssh-eperm` | `cat …/fakehome/.ssh/id_rsa` |
 | `sh-redirect-relative` | `sh -c 'echo hi > ../outside.txt'` |
 | `touch-git-hooks` | `touch $WS/.git/hooks/x` |
-| `mkdir-ws-grok` | `mkdir $WS/.grok` (absent) |
+| `mkdir-ws-grok` | `mkdir $WS/.friday` (absent) |
 | `mv-rename-root` | `mv $WS ~/w1-scratch/ws2` |
 | `curl-resolve-off` | `curl https://example.com`, network off |
 | `bash-dev-tcp-connect` | `exec 3<>/dev/tcp/1.1.1.1/80` |

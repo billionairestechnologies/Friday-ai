@@ -1,6 +1,6 @@
 # Getting Started
 
-Grok Build is a terminal-based AI coding assistant from SpaceXAI. It runs as a TUI (Terminal User Interface) that understands your codebase, executes shell commands, edits files, searches the web, and manages tasks.
+Friday X is a terminal-based AI coding assistant from SpaceXAI. It runs as a TUI (Terminal User Interface) that understands your codebase, executes shell commands, edits files, searches the web, and manages tasks.
 
 You can use it interactively as a full-screen TUI, run it headlessly for scripting and CI/CD, or integrate it into editors via the Agent Client Protocol (ACP).
 
@@ -29,38 +29,38 @@ irm https://x.ai/cli/install.ps1 | iex
 Install a specific version:
 
 ```powershell
-$env:GROK_VERSION="0.1.42"; irm https://x.ai/cli/install.ps1 | iex
+$env:FRIDAY_VERSION="0.1.42"; irm https://x.ai/cli/install.ps1 | iex
 ```
 
-The PowerShell installer automatically adds `%USERPROFILE%\.grok\bin` to your User PATH. Alternatively, install via [Git for Windows](https://gitforwindows.org/) (Git Bash) or MSYS2 using the bash script above. WSL users get the Linux binary automatically.
+The PowerShell installer automatically adds `%USERPROFILE%\.friday\bin` to your User PATH. Alternatively, install via [Git for Windows](https://gitforwindows.org/) (Git Bash) or MSYS2 using the bash script above. WSL users get the Linux binary automatically.
 
 Verify the installation:
 
 ```bash
-grok --version
+friday --version
 ```
 
 Update to the latest version at any time:
 
 ```bash
-grok update
+friday update
 ```
 
-If you installed Grok Build with WinGet, update it with WinGet instead. Quit
-Grok first, then run:
+If you installed Friday X with WinGet, update it with WinGet instead. Quit
+Friday X first, then run:
 
 ```powershell
 winget upgrade --id xAI.GrokBuild -e
 ```
 
-On a WinGet install, `grok update` prints this command and changes nothing.
+On a WinGet install, `friday update` prints this command and changes nothing.
 The WinGet package tracks the stable channel, and new releases can take a few
 days to reach it.
 
 To fetch a repository through Grove (NFS on macOS, FUSE on Linux), enable
-`grok clone` with `[clone] enabled = true` in Grove config, `GROK_CLONE=1`,
-or the enable-both convenience `GROK_GROVE=1` / `[cli] grove = true` in
-`~/.grok/config.toml`:
+`grok clone` with `[clone] enabled = true` in Grove config, `FRIDAY_CLONE=1`,
+or the enable-both convenience `FRIDAY_GROVE=1` / `[cli] grove = true` in
+`~/.friday/config.toml`:
 
 ```bash
 grok clone <url> [dir]
@@ -76,18 +76,18 @@ and [Configuration reference](26-config-reference.md).
 
 ## First Launch
 
-Start Grok by running:
+Start Friday X by running:
 
 ```bash
 grok
 ```
 
-On first launch, Grok opens your browser to authenticate with grok.com. After you sign in, Grok stores your credentials in `~/.grok/auth.json`, where they persist across sessions. Grok refreshes your credentials automatically and prompts you to sign in again when they can no longer be renewed.
+On first launch, Friday X opens your browser to authenticate with grok.com. After you sign in, Friday X stores your credentials in `~/.friday/auth.json`, where they persist across sessions. Friday X refreshes your credentials automatically and prompts you to sign in again when they can no longer be renewed.
 
-If you prefer API key authentication (e.g., for CI/CD or environments without a browser), set the `XAI_API_KEY` environment variable instead:
+If you prefer API key authentication (e.g., for CI/CD or environments without a browser), set the `FRIDAY_X_TOKEN` environment variable instead:
 
 ```bash
-export XAI_API_KEY="xai-..."
+export FRIDAY_X_TOKEN="xai-..."
 grok
 ```
 
@@ -97,12 +97,12 @@ See [Authentication](02-authentication.md) for the full set of auth options incl
 
 ## Basic Interaction
 
-Once authenticated, Grok presents a full-screen TUI with two main areas:
+Once authenticated, Friday X presents a full-screen TUI with two main areas:
 
-- **Scrollback** -- the conversation history showing your prompts, Grok's responses, tool calls, file edits, and more.
+- **Scrollback** -- the conversation history showing your prompts, Friday X's responses, tool calls, file edits, and more.
 - **Prompt** -- the input area at the bottom where you type messages.
 
-Type a message and press `Enter` to send it. Grok reads files, runs commands, and edits code as needed. Each tool run streams into the scrollback in real time.
+Type a message and press `Enter` to send it. Friday X reads files, runs commands, and edits code as needed. Each tool run streams into the scrollback in real time.
 
 Press `Tab` to move focus between the prompt and the scrollback. While a turn is running, `Ctrl+C` cancels it once the composer is empty — with a draft, the first press only clears it. `Esc` never cancels a turn; mid-turn it shows a reminder to use `Ctrl+C`. Idle, press `Esc` twice within 800ms to clear a non-empty prompt, or (with an empty prompt and conversation messages) to open rewind — see [Keyboard Shortcuts](03-keyboard-shortcuts.md#escape). With the scrollback focused, use the arrow keys to select entries and to collapse or expand them. To navigate with `j`/`k` and fold with `h`/`l` instead, enable Vim mode.
 
@@ -125,10 +125,10 @@ The `@` operator opens a fuzzy file picker. By default it respects `.gitignore` 
 
 ### Permissions
 
-By default, Grok asks for permission before executing shell commands or editing files. You can approve individually or toggle always-approve mode:
+By default, Friday X asks for permission before executing shell commands or editing files. You can approve individually or toggle always-approve mode:
 
 - Press `Ctrl+O` to toggle always-approve mode
-- Use the `--yolo` flag at launch: `grok --yolo`
+- Use the `--yolo` flag at launch: `friday --yolo`
 - Type `/always-approve` in the prompt to toggle the mode
 
 ---
@@ -137,7 +137,7 @@ By default, Grok asks for permission before executing shell commands or editing 
 
 ### Sessions
 
-Every conversation is a **session**. Sessions are automatically saved to `~/.grok/sessions/` and can be resumed later. Each session tracks the full conversation history, tool calls, file edits, and task state.
+Every conversation is a **session**. Sessions are automatically saved to `~/.friday/sessions/` and can be resumed later. Each session tracks the full conversation history, tool calls, file edits, and task state.
 
 - Start a new session: `Ctrl+N` or `/new`
 - Resume a previous session: `/resume` in the TUI, or `--resume <ID>` from the CLI
@@ -148,8 +148,8 @@ Every conversation is a **session**. Sessions are automatically saved to `~/.gro
 The scrollback is the main display area. It shows:
 
 - **User prompts** -- your messages, rendered as sticky headers
-- **Agent messages** -- Grok's responses with full markdown rendering and syntax highlighting
-- **Thinking blocks** -- Grok's reasoning process (collapsible)
+- **Agent messages** -- Friday X's responses with full markdown rendering and syntax highlighting
+- **Thinking blocks** -- Friday X's reasoning process (collapsible)
 - **Tool calls** -- file edits (with inline diffs), command executions, search results, and more
 - **Task lists** -- TODO items tracking progress
 
@@ -157,7 +157,7 @@ Collapse or expand the selected entry with the `Left`/`Right` arrow keys (or `h`
 
 ### Tools
 
-Grok has built-in tools for:
+Friday X has built-in tools for:
 
 | Tool | Description |
 |------|-------------|
@@ -196,36 +196,36 @@ grok "fix the failing auth test and run it"
 # Initial prompt in a new git worktree. Use --worktree=<name> (with `=`) so the
 # prompt isn't swallowed as the worktree name — `grok -w "refactor module X"`
 # would treat "refactor module X" as the worktree label, not the prompt.
-grok --worktree=feat "refactor module X"
+friday --worktree=feat "refactor module X"
 
 # Base the worktree on a specific branch (e.g. main) instead of the current HEAD:
 grok -w --ref main "implement feature from main"
 
 
 # Start in a specific project directory
-grok --cwd ~/projects/my-app
+friday --cwd ~/projects/my-app
 
 # Add project-specific rules
-grok --rules "Always use TypeScript. Prefer functional components."
+friday --rules "Always use TypeScript. Prefer functional components."
 
 # Auto-approve all tool executions
-grok --yolo
+friday --yolo
 
 # Use a specific model
 grok -m grok-4.6
 
 # Resume a previous session
-grok --resume <session-id>
+friday --resume <session-id>
 
 # Continue the most recent session
 grok -c
 
-# Experimental scrollback-native render mode. Sticky: plain `grok` reopens in
+# Experimental scrollback-native render mode. Sticky: plain `friday` reopens in
 # the mode last chosen via --minimal/--fullscreen (or /minimal//fullscreen).
-grok --minimal
+friday --minimal
 
 # Back to the standard fullscreen TUI (and make it sticky again)
-grok --fullscreen
+friday --fullscreen
 
 # Headless mode (for scripts)
 grok -p "Explain this codebase"
@@ -235,7 +235,7 @@ grok -p "Explain this codebase"
 
 ## Headless Mode
 
-Run Grok non-interactively for scripting, CI/CD, and automation:
+Run Friday X non-interactively for scripting, CI/CD, and automation:
 
 ```bash
 grok -p "Your prompt here"
@@ -259,15 +259,15 @@ grok -p "Review changes for bugs" --output-format json --yolo | jq -r '.text'
 
 ## Project Rules (AGENTS.md)
 
-Add per-project instructions by creating an `AGENTS.md` file in your repository. Grok reads these files and injects their contents as a project-instructions message at the start of the conversation:
+Add per-project instructions by creating an `AGENTS.md` file in your repository. Friday X reads these files and injects their contents as a project-instructions message at the start of the conversation:
 
 ```
-~/.grok/AGENTS.md           # Global rules (apply to all projects)
+~/.friday/AGENTS.md           # Global rules (apply to all projects)
 <repo-root>/AGENTS.md       # Repository-level rules
 <cwd>/AGENTS.md             # Directory-level rules (highest priority)
 ```
 
-Deeper files take precedence. Grok also reads `CLAUDE.md` files for compatibility.
+Deeper files take precedence. Friday X also reads `CLAUDE.md` files for compatibility.
 
 ---
 

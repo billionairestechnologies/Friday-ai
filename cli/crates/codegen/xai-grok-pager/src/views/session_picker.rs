@@ -192,10 +192,10 @@ pub(crate) fn loading_spinner_active(
         })
 }
 /// Filter session entries by native, headless, remote, or external source. Default is
-/// [`Self::Grok`]: native Grok sessions only (local / remote / conversation).
+/// [`Self::Friday X`]: native Friday X sessions only (local / remote / conversation).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SourceFilter {
-    /// Native Grok sessions only; excludes Claude/Codex/Cursor foreign rows.
+    /// Native Friday X sessions only; excludes Claude/Codex/Cursor foreign rows.
     #[default]
     Grok,
     /// `grok -p` one-shots only (`session_kind == "headless"`).
@@ -209,7 +209,7 @@ pub enum SourceFilter {
 impl SourceFilter {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Grok => "Grok",
+            Self::Grok => "Friday X",
             Self::Headless => "Headless",
             Self::Local => "Local",
             Self::Remote => "Remote",

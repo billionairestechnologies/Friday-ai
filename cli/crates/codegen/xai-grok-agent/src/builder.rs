@@ -173,7 +173,7 @@ fn task_lifecycle_satisfier(
         || has(ToolNamespace::GrokBuildConcise, "run_terminal_cmd", true)
         || has(ToolNamespace::OpenCode, "bash", false)
 }
-/// `Cursor:Shell` can background, but it does not satisfy Grok Build output tools.
+/// `Cursor:Shell` can background, but it does not satisfy Friday X output tools.
 fn cursor_shell_can_background(
     tool_config: &xai_grok_tools::registry::types::ToolServerConfig,
 ) -> bool {
@@ -526,7 +526,7 @@ impl AgentBuilder {
         self.backend_search = enabled;
         self
     }
-    /// `Disabled` (default) does not register the tool; flagged via remote `web_fetch_enabled` and the `GROK_WEB_FETCH` env.
+    /// `Disabled` (default) does not register the tool; flagged via remote `web_fetch_enabled` and the `FRIDAY_WEB_FETCH` env.
     pub fn with_web_fetch_config(
         mut self,
         config: xai_grok_tools::implementations::grok_build::web_fetch::WebFetchConfig,
@@ -1763,7 +1763,7 @@ mod tests {
         use xai_grok_tools::notification::ToolNotificationHandle;
         let tmp = tempfile::tempdir().unwrap();
         let write_skill = |dir: &str, content: &str| {
-            let d = tmp.path().join(".grok/skills").join(dir);
+            let d = tmp.path().join(".friday/skills").join(dir);
             std::fs::create_dir_all(&d).unwrap();
             std::fs::write(d.join("SKILL.md"), content).unwrap();
         };

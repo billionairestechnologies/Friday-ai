@@ -100,7 +100,7 @@ impl Fixture {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("ws");
         let grok_home = tmp.path().join("grok-home");
-        std::fs::create_dir_all(root.join(".grok")).unwrap();
+        std::fs::create_dir_all(root.join(".friday")).unwrap();
         std::fs::create_dir_all(&grok_home).unwrap();
         let fx = Fixture {
             _tmp: tmp,

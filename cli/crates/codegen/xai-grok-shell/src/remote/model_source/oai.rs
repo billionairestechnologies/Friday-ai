@@ -44,9 +44,9 @@ impl ModelSource for OaiModelSource {
                     })?;
                 request = request
                     .header("Authorization", format!("Bearer {}", &auth.key))
-                    .header("X-XAI-Token-Auth", "xai-grok-cli")
+                    .header("X-Friday-Token-Auth", "friday-x-cli")
                     .header("x-userid", &auth.user_id)
-                    .header("x-grok-client-version", xai_grok_version::VERSION)
+                    .header("x-friday-client-version", xai_grok_version::VERSION)
                     .header(
                         crate::http::CLIENT_MODE_HEADER,
                         crate::http::process_client_mode(),
@@ -89,7 +89,7 @@ impl ModelSource for OaiModelSource {
         Ok(FetchModelsResult { models, etag })
     }
 }
-/// A grok login session token must not reach a custom models endpoint.
+/// A friday login session token must not reach a custom models endpoint.
 fn list_fetch_api_key(auth: Option<&GrokAuth>) -> Result<String, BackendError> {
     crate::agent::auth_method::read_xai_api_key_env()
         .or_else(|_| {
@@ -98,7 +98,7 @@ fn list_fetch_api_key(auth: Option<&GrokAuth>) -> Result<String, BackendError> {
                 .ok_or(std::env::VarError::NotPresent)
         })
         .map_err(|_| {
-            BackendError::Auth("No API key for custom models endpoint. Set XAI_API_KEY.".into())
+            BackendError::Auth("No API key for custom models endpoint. Set FRIDAY_X_TOKEN.".into())
         })
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,9 +139,9 @@ mod tests {
         use crate::agent::config::EndpointsConfig;
         use crate::agent::remote_config::ModelFetchAuth;
         for k in [
-            "GROK_CLI_CHAT_PROXY_BASE_URL",
-            "GROK_XAI_API_BASE_URL",
-            "GROK_MODELS_LIST_URL",
+            "FRIDAY_CLI_CHAT_PROXY_BASE_URL",
+            "FRIDAY_XAI_API_BASE_URL",
+            "FRIDAY_MODELS_LIST_URL",
         ] {
             unsafe { std::env::remove_var(k) };
         }
@@ -181,8 +181,8 @@ mod tests {
     #[serial_test::serial]
     fn custom_endpoint_list_fetch_never_sends_the_session_token() {
         use xai_grok_test_support::EnvGuard;
-        let _no_key = EnvGuard::unset("XAI_API_KEY");
-        let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+        let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+        let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
         let cfg = EndpointsConfig::from_config_value(
             &toml::from_str(
                 r#"[endpoints]
@@ -192,20 +192,20 @@ mod tests {
         );
         let source = OaiModelSource::new(&cfg, ModelFetchAuth::CustomEndpoint);
         let err = match source.fetch(Some(&GrokAuth::test_default())) {
-            Ok(_) => panic!("fetch must fail when no XAI_API_KEY is set"),
+            Ok(_) => panic!("fetch must fail when no FRIDAY_X_TOKEN is set"),
             Err(err) => err,
         };
         assert!(
-            matches!(&err, BackendError::Auth(msg) if msg.contains("Set XAI_API_KEY")),
-            "expected the Set XAI_API_KEY auth error, got: {err:?}",
+            matches!(&err, BackendError::Auth(msg) if msg.contains("Set FRIDAY_X_TOKEN")),
+            "expected the Set FRIDAY_X_TOKEN auth error, got: {err:?}",
         );
     }
     #[test]
     #[serial_test::serial]
     fn custom_endpoint_list_fetch_sends_an_external_provider_token_with_any_issuer() {
         use xai_grok_test_support::EnvGuard;
-        let _no_key = EnvGuard::unset("XAI_API_KEY");
-        let _no_legacy = EnvGuard::unset("GROK_CODE_XAI_API_KEY");
+        let _no_key = EnvGuard::unset("FRIDAY_X_TOKEN");
+        let _no_legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
         let xai_issued_external = GrokAuth {
             key: "provider-token".to_owned(),
             auth_mode: xai_grok_login::AuthMode::External,

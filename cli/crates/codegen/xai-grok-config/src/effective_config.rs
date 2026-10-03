@@ -63,7 +63,7 @@ fn dismiss_campaign_ids_at(
     use fs2::FileExt as _;
     let _guard = DISMISS_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let path = campaigns_state_path(home);
-    // Cross-process advisory lock over the read-modify-write: in leader mode several grok processes share `$GROK_HOME`
+    // Cross-process advisory lock over the read-modify-write: in leader mode several grok processes share `$FRIDAY_HOME`
     // The in-process mutex alone would let one process overwrite another's update
     // The lock is best-effort; a lock failure still proceeds
     let lock = std::fs::OpenOptions::new()
@@ -112,19 +112,19 @@ fn dismiss_campaign_ids_at(
 /// The campaign switches a process reads from its environment.
 #[derive(Debug, Clone, Default)]
 pub struct CampaignEnv {
-    /// `GROK_CAMPAIGNS_OVERRIDE`: a JSON array of campaigns that replaces every other source and
+    /// `FRIDAY_CAMPAIGNS_OVERRIDE`: a JSON array of campaigns that replaces every other source and
     /// beats the kill switch. Invalid JSON replaces them with none: the variable means "exactly
     /// these campaigns", so a typo must not fall back to the sources it was meant to replace.
     pub override_json: Option<String>,
-    /// `GROK_CAMPAIGNS=0` stops campaigns from applying.
+    /// `FRIDAY_CAMPAIGNS=0` stops campaigns from applying.
     pub is_kill_switch_set: bool,
 }
 
 impl CampaignEnv {
     pub fn from_process() -> CampaignEnv {
         CampaignEnv {
-            override_json: std::env::var("GROK_CAMPAIGNS_OVERRIDE").ok(),
-            is_kill_switch_set: crate::env_bool("GROK_CAMPAIGNS") == Some(false),
+            override_json: std::env::var("FRIDAY_CAMPAIGNS_OVERRIDE").ok(),
+            is_kill_switch_set: crate::env_bool("FRIDAY_CAMPAIGNS") == Some(false),
         }
     }
 
@@ -137,7 +137,7 @@ impl CampaignEnv {
                     .collect(),
             ),
             Err(e) => {
-                tracing::warn!(error = %e, "invalid GROK_CAMPAIGNS_OVERRIDE JSON; suppressing all campaigns");
+                tracing::warn!(error = %e, "invalid FRIDAY_CAMPAIGNS_OVERRIDE JSON; suppressing all campaigns");
                 Some(Vec::new())
             }
         }

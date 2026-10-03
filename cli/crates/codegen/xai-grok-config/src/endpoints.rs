@@ -17,39 +17,39 @@ pub struct EndpointsConfig {
     /// An extra access header value for matching first-party hosts, used only with the optional non-production feature.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alpha_test_key: Option<String>,
-    /// Env: `GROK_MODELS_BASE_URL`. Setting it makes `has_custom_endpoint` true.
+    /// Env: `FRIDAY_MODELS_BASE_URL`. Setting it makes `has_custom_endpoint` true.
     /// The models list URL defaults to `{models_base_url}/models`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models_base_url: Option<String>,
-    /// Env: `GROK_MODELS_LIST_URL`. Overrides the default `{base}/models` list URL.
+    /// Env: `FRIDAY_MODELS_LIST_URL`. Overrides the default `{base}/models` list URL.
     #[serde(alias = "models_endpoint", skip_serializing_if = "Option::is_none")]
     pub models_list_url: Option<String>,
-    /// Env: `GROK_FEEDBACK_BASE_URL`. Where feedback submissions go.
+    /// Env: `FRIDAY_FEEDBACK_BASE_URL`. Where feedback submissions go.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub feedback_base_url: Option<String>,
-    /// Env: `GROK_TRACE_UPLOAD_URL`. Where trace uploads go.
+    /// Env: `FRIDAY_TRACE_UPLOAD_URL`. Where trace uploads go.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_upload_url: Option<String>,
-    /// Env: `GROK_TRACE_UPLOAD_BUCKET`. A `gs://` or `s3://` bucket that receives uploads directly, without the proxy.
+    /// Env: `FRIDAY_TRACE_UPLOAD_BUCKET`. A `gs://` or `s3://` bucket that receives uploads directly, without the proxy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_upload_bucket: Option<String>,
-    /// Env: `GROK_TRACE_UPLOAD_REGION`. AWS region (S3 only).
+    /// Env: `FRIDAY_TRACE_UPLOAD_REGION`. AWS region (S3 only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_upload_region: Option<String>,
-    /// Env: `GROK_TRACE_UPLOAD_CREDENTIALS_FILE`. The path to a GCS service account key or an AWS credentials file.
+    /// Env: `FRIDAY_TRACE_UPLOAD_CREDENTIALS_FILE`. The path to a GCS service account key or an AWS credentials file.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_upload_credentials_file: Option<String>,
     /// Inline credentials as JSON or INI, preferred over `trace_upload_credentials_file`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_upload_credentials: Option<String>,
-    /// Env: `GROK_TRACE_UPLOAD_ENDPOINT_URL`. Custom S3-compatible endpoint.
+    /// Env: `FRIDAY_TRACE_UPLOAD_ENDPOINT_URL`. Custom S3-compatible endpoint.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_upload_endpoint_url: Option<String>,
-    /// Env: `GROK_DEPLOYMENT_KEY`. The management API key for an enterprise deployment.
+    /// Env: `FRIDAY_DEPLOYMENT_KEY`. The management API key for an enterprise deployment.
     /// Telemetry and service requests carry it to identify the deployment.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deployment_key: Option<String>,
-    /// Env: `GROK_MANAGED_CONFIG_URL`. The managed config endpoint.
+    /// Env: `FRIDAY_MANAGED_CONFIG_URL`. The managed config endpoint.
     /// The default is `{proxy_url()}/deployment/config`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub managed_config_url: Option<String>,
@@ -65,11 +65,11 @@ pub struct EndpointsConfig {
     /// The internal trace pipeline treats it like `otel_exporter_otlp_endpoint`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub otel_exporter_otlp_headers: Option<String>,
-    /// Env: `GROK_INTERNAL_OTLP_TRACES_ENDPOINT`. The full internal traces endpoint, used verbatim and preferred over the legacy `OTEL_*` vars.
+    /// Env: `FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT`. The full internal traces endpoint, used verbatim and preferred over the legacy `OTEL_*` vars.
     /// Developers set it to send internal spans elsewhere, for example to a local collector.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grok_internal_otlp_traces_endpoint: Option<String>,
-    /// Env: `GROK_INTERNAL_OTLP_HEADERS`. Extra `k=v,k2=v2` debug headers for the internal export.
+    /// Env: `FRIDAY_INTERNAL_OTLP_HEADERS`. Extra `k=v,k2=v2` debug headers for the internal export.
     /// They are preferred over the legacy `OTEL_EXPORTER_OTLP_HEADERS`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grok_internal_otlp_headers: Option<String>,
@@ -146,7 +146,7 @@ impl EndpointsConfig {
     pub fn resolve_trace_upload_url(&self) -> String {
         blank_as_unset(&self.trace_upload_url).unwrap_or_else(|| self.proxy_url())
     }
-    /// The managed deployment config URL for `grok setup`.
+    /// The managed deployment config URL for `friday setup`.
     /// The deployment key sent here must reach the proxy, never the inference host.
     pub fn resolve_managed_config_url(&self) -> String {
         blank_as_unset(&self.managed_config_url).unwrap_or_else(|| {
@@ -168,7 +168,7 @@ impl EndpointsConfig {
             tracing::warn!(
                 "Repointing the internal trace pipeline via OTEL_EXPORTER_OTLP_ENDPOINT / \
                  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is deprecated; use \
-                 GROK_INTERNAL_OTLP_TRACES_ENDPOINT instead — the standard OTEL_* vars will \
+                 FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT instead — the standard OTEL_* vars will \
                  route the external OTEL stream only in a future release"
             );
             return legacy;
@@ -257,7 +257,7 @@ impl EndpointsConfig {
         format!("{}/models", base)
     }
 }
-/// Parses a `k=v,k2=v2` header list, the format of `OTEL_EXPORTER_OTLP_HEADERS` and `GROK_INTERNAL_OTLP_HEADERS`.
+/// Parses a `k=v,k2=v2` header list, the format of `OTEL_EXPORTER_OTLP_HEADERS` and `FRIDAY_INTERNAL_OTLP_HEADERS`.
 fn parse_otlp_header_list(raw: &str) -> Vec<(String, String)> {
     raw.split(',')
         .filter_map(|kv| {
@@ -270,26 +270,26 @@ fn parse_otlp_header_list(raw: &str) -> Vec<(String, String)> {
 impl Default for EndpointsConfig {
     fn default() -> Self {
         Self {
-            cli_chat_proxy_base_url: std::env::var("GROK_CLI_CHAT_PROXY_BASE_URL").ok(),
-            xai_api_base_url: std::env::var("GROK_XAI_API_BASE_URL")
+            cli_chat_proxy_base_url: std::env::var("FRIDAY_CLI_CHAT_PROXY_BASE_URL").ok(),
+            xai_api_base_url: std::env::var("FRIDAY_XAI_API_BASE_URL")
                 .unwrap_or_else(|_| xai_grok_env::friday_inference_base()),
             alpha_test_key: None,
-            models_base_url: env_string("GROK_MODELS_BASE_URL"),
-            models_list_url: env_string("GROK_MODELS_LIST_URL"),
-            feedback_base_url: env_string("GROK_FEEDBACK_BASE_URL"),
-            trace_upload_url: env_string("GROK_TRACE_UPLOAD_URL"),
-            trace_upload_bucket: env_string("GROK_TRACE_UPLOAD_BUCKET"),
-            trace_upload_region: env_string("GROK_TRACE_UPLOAD_REGION"),
-            trace_upload_credentials_file: env_string("GROK_TRACE_UPLOAD_CREDENTIALS_FILE"),
+            models_base_url: env_string("FRIDAY_MODELS_BASE_URL"),
+            models_list_url: env_string("FRIDAY_MODELS_LIST_URL"),
+            feedback_base_url: env_string("FRIDAY_FEEDBACK_BASE_URL"),
+            trace_upload_url: env_string("FRIDAY_TRACE_UPLOAD_URL"),
+            trace_upload_bucket: env_string("FRIDAY_TRACE_UPLOAD_BUCKET"),
+            trace_upload_region: env_string("FRIDAY_TRACE_UPLOAD_REGION"),
+            trace_upload_credentials_file: env_string("FRIDAY_TRACE_UPLOAD_CREDENTIALS_FILE"),
             trace_upload_credentials: None,
-            trace_upload_endpoint_url: env_string("GROK_TRACE_UPLOAD_ENDPOINT_URL"),
-            deployment_key: env_string("GROK_DEPLOYMENT_KEY"),
-            managed_config_url: env_string("GROK_MANAGED_CONFIG_URL"),
+            trace_upload_endpoint_url: env_string("FRIDAY_TRACE_UPLOAD_ENDPOINT_URL"),
+            deployment_key: env_string("FRIDAY_DEPLOYMENT_KEY"),
+            managed_config_url: env_string("FRIDAY_MANAGED_CONFIG_URL"),
             otel_exporter_otlp_endpoint: env_string("OTEL_EXPORTER_OTLP_ENDPOINT"),
             otel_exporter_otlp_traces_endpoint: env_string("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
             otel_exporter_otlp_headers: env_string("OTEL_EXPORTER_OTLP_HEADERS"),
-            grok_internal_otlp_traces_endpoint: env_string("GROK_INTERNAL_OTLP_TRACES_ENDPOINT"),
-            grok_internal_otlp_headers: env_string("GROK_INTERNAL_OTLP_HEADERS"),
+            grok_internal_otlp_traces_endpoint: env_string("FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT"),
+            grok_internal_otlp_headers: env_string("FRIDAY_INTERNAL_OTLP_HEADERS"),
             external_otel_master_switch: external_otel_master_switch_resolved(),
             otel_traces_exporter: env_string("OTEL_TRACES_EXPORTER"),
             otel_traces_export_interval: env_string("OTEL_BSP_SCHEDULE_DELAY")
@@ -307,7 +307,7 @@ impl Default for EndpointsConfig {
 fn external_otel_master_switch_resolved() -> bool {
     external_otel_master_switch_from(
         crate::load_merged_requirements().as_ref(),
-        env_bool("GROK_EXTERNAL_OTEL"),
+        env_bool("FRIDAY_EXTERNAL_OTEL"),
         crate::effective_config::load_effective_config()
             .ok()
             .as_ref(),

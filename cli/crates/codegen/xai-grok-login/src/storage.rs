@@ -52,15 +52,15 @@ fn resolve_auth_json_path(grok_auth_path: Option<OsString>, grok_home: &Path) ->
 }
 
 pub fn auth_json_path(grok_home: &Path) -> PathBuf {
-    resolve_auth_json_path(std::env::var_os("GROK_AUTH_PATH"), grok_home)
+    resolve_auth_json_path(std::env::var_os("FRIDAY_AUTH_PATH"), grok_home)
 }
 
 pub fn read_auth_json(auth_file: &Path) -> std::io::Result<AuthStore> {
     read_auth_json_as(Distribution::current(), auth_file)
 }
 
-/// A distribution without account logins has no login store, whatever `GROK_HOME` or
-/// `GROK_AUTH_PATH` point at: reads find nothing and writes are refused. Every reader and writer in
+/// A distribution without account logins has no login store, whatever `FRIDAY_HOME` or
+/// `FRIDAY_AUTH_PATH` point at: reads find nothing and writes are refused. Every reader and writer in
 /// this crate comes through here, and each already treats a missing store as no login.
 /// `xai-grok-workspace`'s hub auth keeps its own and needs `local-workspace`.
 fn read_auth_json_as(distribution: Distribution, auth_file: &Path) -> std::io::Result<AuthStore> {
@@ -272,7 +272,7 @@ fn write_store_to(path: &Path, auth_store: &AuthStore) -> std::io::Result<()> {
 #[cfg(test)]
 pub(super) static WRITE_FAULT_PATH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
 
-/// Atomic write: a temp file, then a rename, through a symlinked `auth.json` (dotfiles, `GROK_HOME` overlays).
+/// Atomic write: a temp file, then a rename, through a symlinked `auth.json` (dotfiles, `FRIDAY_HOME` overlays).
 fn write_auth_json_atomic(auth_file: &Path, auth_store: &AuthStore) -> std::io::Result<()> {
     #[cfg(test)]
     if WRITE_FAULT_PATH
@@ -400,7 +400,7 @@ mod write_fallback_tests {
         assert_eq!(
             resolve_auth_json_path(
                 Some("/custom/creds.json".into()),
-                Path::new("/home/u/.grok")
+                Path::new("/home/u/.friday")
             ),
             PathBuf::from("/custom/creds.json"),
         );
@@ -409,16 +409,16 @@ mod write_fallback_tests {
     #[test]
     fn auth_json_path_falls_back_to_home() {
         assert_eq!(
-            resolve_auth_json_path(None, Path::new("/home/u/.grok")),
-            PathBuf::from("/home/u/.grok/auth.json"),
+            resolve_auth_json_path(None, Path::new("/home/u/.friday")),
+            PathBuf::from("/home/u/.friday/auth.json"),
         );
     }
 
     #[test]
     fn auth_json_path_treats_empty_override_as_unset() {
         assert_eq!(
-            resolve_auth_json_path(Some(OsString::new()), Path::new("/home/u/.grok")),
-            PathBuf::from("/home/u/.grok/auth.json"),
+            resolve_auth_json_path(Some(OsString::new()), Path::new("/home/u/.friday")),
+            PathBuf::from("/home/u/.friday/auth.json"),
         );
     }
 
@@ -554,7 +554,7 @@ mod write_fallback_tests {
     fn atomic_write_writes_through_symlink_and_keeps_owner_only() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
-        let _home = xai_grok_test_support::EnvGuard::set("GROK_HOME", dir.path());
+        let _home = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", dir.path());
         let target = dir.path().join("shared").join("auth.json");
         write_auth_json(&target, &AuthStore::new()).unwrap();
         let link = dir.path().join("auth.json");

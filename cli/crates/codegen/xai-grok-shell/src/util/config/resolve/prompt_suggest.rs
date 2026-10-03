@@ -2,7 +2,7 @@ use crate::util::config::RemoteSettings;
 use toml::Value as TomlValue;
 use xai_grok_sampling_types::ReasoningEffort;
 
-pub(crate) const ENV_PROMPT_SUGGESTIONS: &str = "GROK_PROMPT_SUGGESTIONS";
+pub(crate) const ENV_PROMPT_SUGGESTIONS: &str = "FRIDAY_PROMPT_SUGGESTIONS";
 
 const PROMPT_SUGGEST_MAX_OUTPUT_TOKENS_MIN: u32 = 16;
 const PROMPT_SUGGEST_MAX_OUTPUT_TOKENS_DEFAULT: u32 = 64;

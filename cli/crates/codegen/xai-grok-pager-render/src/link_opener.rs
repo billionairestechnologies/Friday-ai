@@ -9,7 +9,7 @@ use crate::terminal::hyperlinks::SchemeFilter;
 /// Outcome of attempting to open a URL in the system browser/handler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenUrlResult {
-    /// Opener was launched (or `GROK_TEST_OPEN_URL_FILE` recorded the URL).
+    /// Opener was launched (or `FRIDAY_TEST_OPEN_URL_FILE` recorded the URL).
     Opened,
     /// Scheme was rejected by the safety filter.
     RejectedScheme,
@@ -60,7 +60,7 @@ pub fn browser_unavailable_line(url: &str, copied: bool) -> String {
 pub fn open_url(url: &str) -> bool {
     // PTY e2e tests must see the open without launching a real browser
     // When this env var is set, append the URL to the file and skip the OS opener
-    if let Ok(path) = std::env::var("GROK_TEST_OPEN_URL_FILE") {
+    if let Ok(path) = std::env::var("FRIDAY_TEST_OPEN_URL_FILE") {
         use std::io::Write;
         // Report the failed write: swallowing it leaves the PTY test failing with a generic timeout and no clue why
         if let Err(e) = std::fs::OpenOptions::new()
@@ -69,7 +69,7 @@ pub fn open_url(url: &str) -> bool {
             .open(&path)
             .and_then(|mut f| writeln!(f, "{url}"))
         {
-            tracing::warn!(error = %e, path, "GROK_TEST_OPEN_URL_FILE write failed");
+            tracing::warn!(error = %e, path, "FRIDAY_TEST_OPEN_URL_FILE write failed");
             return false;
         }
         return true;

@@ -65,11 +65,11 @@ pub mod types;
 /// StartSession env whose value is the dest-less `grok-files` remount
 /// command (knobs included). The bind hook applies dest from `session_root`
 /// (conversation / parent id) per bind. Absent / empty keeps the no-op hook.
-pub const ARTIFACTS_BIND_REMOUNT_ENV: &str = "GROK_ARTIFACTS_BIND_REMOUNT";
+pub const ARTIFACTS_BIND_REMOUNT_ENV: &str = "FRIDAY_ARTIFACTS_BIND_REMOUNT";
 
 /// `grok-files mount` flag naming the token file the worker re-reads per
 /// request.
-pub const GROK_FILES_JWT_FILE_FLAG: &str = "--jwt-file";
+pub const FRIDAY_FILES_JWT_FILE_FLAG: &str = "--jwt-file";
 
 /// Path of the Files token scoped to one conversation. The
 /// `/workspace/<conversation_id>` remount reads it, so each mount
@@ -82,14 +82,14 @@ pub fn grok_files_conversation_jwt_path(conversation_id: &str) -> String {
 /// Append the conversation token file to a remount command. Kept as one
 /// function so `mount_at` and the bind hook emit the same argv.
 pub fn with_grok_files_jwt_file(mount_command: &str, jwt_file: &str) -> String {
-    format!("{mount_command} {GROK_FILES_JWT_FILE_FLAG} {jwt_file}")
+    format!("{mount_command} {FRIDAY_FILES_JWT_FILE_FLAG} {jwt_file}")
 }
 
 /// Flags whose next token is a value, not a dest path. `command_at` and
 /// the bind hook must share this list so remount dest cannot
 /// drift (boolean long flags must not be treated as value-taking).
 pub fn grok_files_opt_takes_value(flag: &str) -> bool {
-    flag == GROK_FILES_JWT_FILE_FLAG
+    flag == FRIDAY_FILES_JWT_FILE_FLAG
         || matches!(
             flag,
             "--content-cache"
@@ -111,7 +111,7 @@ pub fn grok_files_opt_takes_value(flag: &str) -> bool {
 pub fn rewrite_grok_files_mount_dest(mount_command: &str, dest: &str) -> String {
     let tokens: Vec<&str> = mount_command.split_whitespace().collect();
     if tokens.is_empty() {
-        return format!("grok-files mount / {dest}");
+        return format!("friday-files mount / {dest}");
     }
 
     let mut skip_next = false;

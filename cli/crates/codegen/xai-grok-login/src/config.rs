@@ -46,7 +46,7 @@ fn default_team_oauth2_scopes() -> Vec<String> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PreferredAuthMethod {
-    /// `XAI_API_KEY` / auth.json `xai::api_key` / per-model BYOK (`xai.api_key`).
+    /// `FRIDAY_X_TOKEN` / auth.json `xai::api_key` / per-model BYOK (`xai.api_key`).
     ApiKey,
     /// OIDC / OAuth2 session (`cached_token`, interactive `grok.com` / `oidc`, including devbox-minted OIDC).
     Oidc,
@@ -66,19 +66,19 @@ pub struct GrokComConfig {
     /// External auth provider command; stdout carries the token, stderr the user-facing output, and exit 0 means success.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_provider_command: Option<String>,
-    /// Login button label (env: `GROK_AUTH_PROVIDER_LABEL`).
+    /// Login button label (env: `FRIDAY_AUTH_PROVIDER_LABEL`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_provider_label: Option<String>,
     /// Token TTL in seconds for external auth providers that output bare tokens without `expires_in`.
-    /// Synthesizes `expires_at` so proactive refresh works. Env: `GROK_AUTH_TOKEN_TTL`.
+    /// Synthesizes `expires_at` so proactive refresh works. Env: `FRIDAY_AUTH_TOKEN_TTL`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_token_ttl: Option<u64>,
     /// Admin kill switch: when `Some(true)`, the `xai.api_key` auth method is neither advertised nor accepted.
-    /// `XAI_API_KEY` and per-model credentials then can't bypass the deployment's IdP login. Env: `GROK_DISABLE_API_KEY_AUTH`.
+    /// `FRIDAY_X_TOKEN` and per-model credentials then can't bypass the deployment's IdP login. Env: `FRIDAY_DISABLE_API_KEY_AUTH`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_api_key_auth: Option<bool>,
     /// Restricts login to a specific team: the login token's team principal must equal this.
-    /// Also settable via `GROK_FORCE_LOGIN_TEAM_ID`; see `resolve_force_login_team` for how the tiers resolve.
+    /// Also settable via `FRIDAY_FORCE_LOGIN_TEAM_ID`; see `resolve_force_login_team` for how the tiers resolve.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub force_login_team_uuid: Option<ForceLoginTeam>,
     /// See [`PreferredAuthMethod`].
@@ -104,7 +104,7 @@ pub struct OidcAuthConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audience: Option<String>,
 }
-/// OAuth2 provider configuration (`GROK_OAUTH2_ISSUER` / `GROK_OAUTH2_CLIENT_ID`).
+/// OAuth2 provider configuration (`FRIDAY_OAUTH2_ISSUER` / `FRIDAY_OAUTH2_CLIENT_ID`).
 ///
 /// Uses the standard OAuth 2.1 authorization code flow with PKCE via [`OidcAuthConfig`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,7 +124,7 @@ pub struct OAuth2ProviderConfig {
 /// Production Friday X API root, the only OAuth2 issuer this client knows (`FRIDAY_X_URL` moves it, see `xai_oauth2_issuer`).
 pub const XAI_OAUTH2_ISSUER: &str = "https://friday.billionairestechnologies.com/api/x";
 /// A separate const so the frozen contract test pins the production allowlist even when the non-production feature adds staging and local origins.
-const PROD_ACCOUNTS_APP_ORIGINS: &[&str] = &["https://accounts.x.ai"];
+const PROD_ACCOUNTS_APP_ORIGINS: &[&str] = &["https://friday.billionairestechnologies.com"];
 /// Production build: accepts only the production accounts app.
 pub fn allowed_accounts_app_origins() -> Vec<String> {
     PROD_ACCOUNTS_APP_ORIGINS
@@ -151,9 +151,9 @@ pub fn accounts_app_cors_layer(method: axum::http::Method) -> tower_http::cors::
 /// Local-dev OAuth2 issuer (accounts-app running on localhost).
 const XAI_OAUTH2_LOCAL_ISSUER: &str = "http://localhost:22255";
 const DEFAULT_OAUTH2_REFERRER: &str = "grok-build";
-/// Returns `true` when `GROK_LOCAL_AUTH=1` is set, indicating the local accounts-app should be used as the OAuth2 issuer.
+/// Returns `true` when `FRIDAY_LOCAL_AUTH=1` is set, indicating the local accounts-app should be used as the OAuth2 issuer.
 pub fn use_local_auth() -> bool {
-    std::env::var("GROK_LOCAL_AUTH")
+    std::env::var("FRIDAY_LOCAL_AUTH")
         .map(|v| !v.is_empty() && v != "0")
         .unwrap_or(false)
 }
@@ -167,9 +167,9 @@ pub fn xai_oauth2_issuer() -> &'static str {
 pub fn is_xai_oauth2_issuer(issuer: &str) -> bool {
     issuer == xai_oauth2_issuer() || issuer == XAI_OAUTH2_ISSUER
 }
-/// auth.json scope key used by the pre-OIDC `grok login --legacy` flow.
+/// auth.json scope key used by the pre-OIDC `friday login --legacy` flow.
 /// Matches the key format produced by the original `accounts.x.ai` relay auth.
-pub const LEGACY_AUTH_SCOPE: &str = "https://accounts.x.ai/sign-in";
+pub const LEGACY_AUTH_SCOPE: &str = "https://friday.billionairestechnologies.com";
 /// `[grok_com_config]` as a config writes it. A field it omits keeps the value it is merged over,
 /// down to a single field of a provider table: the provider fields' serde default is `None`, so
 /// parsing the section as a [`GrokComConfig`] would drop the default provider instead.
@@ -300,7 +300,7 @@ impl GrokComConfig {
         );
     }
     /// Pinning a team (`force_login_team_uuid`) disables `xai.api_key` auth: team membership can't be verified from a bare API key.
-    /// The `GROK_DISABLE_API_KEY_AUTH` env lockdown is read at call time and OR-ed in, so a lower-trust user `config.toml` cannot turn it back off.
+    /// The `FRIDAY_DISABLE_API_KEY_AUTH` env lockdown is read at call time and OR-ed in, so a lower-trust user `config.toml` cannot turn it back off.
     /// `requirements.toml` already wins by layer precedence.
     pub fn api_key_auth_disabled(&self) -> bool {
         self.disable_api_key_auth == Some(true)
@@ -308,7 +308,7 @@ impl GrokComConfig {
             || env_lockdown_forced()
     }
     /// When `preferred_method = api_key`, automatic OIDC paths (interactive browser login, external auth provider) must not run.
-    /// The pin is fail-closed; explicit `grok login --devbox` and `--api-key` bypass it.
+    /// The pin is fail-closed; explicit `friday login --devbox` and `--api-key` bypass it.
     pub fn blocks_automatic_oidc(&self) -> bool {
         matches!(self.preferred_method, Some(PreferredAuthMethod::ApiKey))
     }
@@ -328,10 +328,10 @@ impl OAuth2ProviderConfig {
         self.principal_type.as_deref() == Some(TEAM_PRINCIPAL_TYPE)
     }
     pub fn from_env() -> Option<Self> {
-        let issuer = std::env::var("GROK_OAUTH2_ISSUER").ok()?;
-        let client_id = std::env::var("GROK_OAUTH2_CLIENT_ID").ok()?;
-        let principal_type = std::env::var("GROK_OAUTH2_PRINCIPAL_TYPE").ok();
-        let principal_id = std::env::var("GROK_OAUTH2_PRINCIPAL_ID").ok();
+        let issuer = std::env::var("FRIDAY_OAUTH2_ISSUER").ok()?;
+        let client_id = std::env::var("FRIDAY_OAUTH2_CLIENT_ID").ok()?;
+        let principal_type = std::env::var("FRIDAY_OAUTH2_PRINCIPAL_TYPE").ok();
+        let principal_id = std::env::var("FRIDAY_OAUTH2_PRINCIPAL_ID").ok();
         let default_scopes = match principal_type.as_deref() {
             Some(TEAM_PRINCIPAL_TYPE) => default_team_oauth2_scopes(),
             _ => default_oauth2_scopes(),
@@ -339,13 +339,13 @@ impl OAuth2ProviderConfig {
         Some(Self {
             issuer,
             client_id,
-            scopes: std::env::var("GROK_OAUTH2_SCOPES")
+            scopes: std::env::var("FRIDAY_OAUTH2_SCOPES")
                 .map(|s| s.split(',').map(|s| s.trim().to_owned()).collect())
                 .unwrap_or(default_scopes),
             principal_type,
             principal_id,
             referrer: Some(
-                std::env::var("GROK_OAUTH2_REFERRER")
+                std::env::var("FRIDAY_OAUTH2_REFERRER")
                     .unwrap_or_else(|_| DEFAULT_OAUTH2_REFERRER.to_owned()),
             ),
         })
@@ -384,19 +384,19 @@ impl Default for GrokComConfig {
             )
         };
         let mut config = Self {
-            grok_ws_origin: std::env::var("GROK_WS_ORIGIN")
+            grok_ws_origin: std::env::var("FRIDAY_WS_ORIGIN")
                 .unwrap_or_else(|_| PROD_WS_ORIGIN.to_owned()),
-            grok_ws_url: std::env::var("GROK_WS_URL")
+            grok_ws_url: std::env::var("FRIDAY_WS_URL")
                 .unwrap_or_else(|_| PROD_RELAY_WS_URL.to_owned()),
-            token_header: "xai-grok-cli".to_owned(),
+            token_header: "friday-x-cli".to_owned(),
             oidc,
             oauth2,
-            auth_provider_command: std::env::var("GROK_AUTH_PROVIDER_COMMAND").ok(),
-            auth_provider_label: std::env::var("GROK_AUTH_PROVIDER_LABEL").ok(),
-            auth_token_ttl: std::env::var("GROK_AUTH_TOKEN_TTL")
+            auth_provider_command: std::env::var("FRIDAY_AUTH_PROVIDER_COMMAND").ok(),
+            auth_provider_label: std::env::var("FRIDAY_AUTH_PROVIDER_LABEL").ok(),
+            auth_token_ttl: std::env::var("FRIDAY_AUTH_TOKEN_TTL")
                 .ok()
                 .and_then(|v| v.parse().ok()),
-            disable_api_key_auth: std::env::var("GROK_DISABLE_API_KEY_AUTH")
+            disable_api_key_auth: std::env::var("FRIDAY_DISABLE_API_KEY_AUTH")
                 .ok()
                 .map(|v| env_flag_enabled(&v)),
             force_login_team_uuid: None,
@@ -408,25 +408,25 @@ impl Default for GrokComConfig {
 }
 /// Parses a boolean env-var value for grok's on/off flags.
 /// Bare presence enables the flag, but falsy spellings (`0`, `false`, `off`, `no`, empty) count as disabled.
-/// `GROK_DISABLE_API_KEY_AUTH=false` therefore does NOT enable the flag.
+/// `FRIDAY_DISABLE_API_KEY_AUTH=false` therefore does NOT enable the flag.
 fn env_flag_enabled(value: &str) -> bool {
     !matches!(
         value.trim().to_ascii_lowercase().as_str(),
         "" | "0" | "false" | "off" | "no"
     )
 }
-/// True when the admin has set `GROK_DISABLE_API_KEY_AUTH` to a truthy value in the process environment.
+/// True when the admin has set `FRIDAY_DISABLE_API_KEY_AUTH` to a truthy value in the process environment.
 /// It is read at call time and OR-ed into `api_key_auth_disabled()`, so a user-layer `config.toml` cannot override the lockdown.
 fn env_lockdown_forced() -> bool {
-    std::env::var("GROK_DISABLE_API_KEY_AUTH")
+    std::env::var("FRIDAY_DISABLE_API_KEY_AUTH")
         .ok()
         .is_some_and(|v| env_flag_enabled(&v))
 }
 /// Env var for the login-team pin.
 /// It is named `..._TEAM_ID` (the user-facing "team id") while the config key stays `force_login_team_uuid` for backward compatibility.
 /// The two intentionally differ, so do not rename either.
-const FORCE_LOGIN_TEAM_ID_ENV: &str = "GROK_FORCE_LOGIN_TEAM_ID";
-/// The `GROK_FORCE_LOGIN_TEAM_ID` env override; the env tier in [`resolve_force_login_team`].
+const FORCE_LOGIN_TEAM_ID_ENV: &str = "FRIDAY_FORCE_LOGIN_TEAM_ID";
+/// The `FRIDAY_FORCE_LOGIN_TEAM_ID` env override; the env tier in [`resolve_force_login_team`].
 pub fn force_login_team_from_env() -> Option<ForceLoginTeam> {
     let raw = std::env::var(FORCE_LOGIN_TEAM_ID_ENV).ok()?;
     parse_force_login_team(&raw)
@@ -483,7 +483,7 @@ pub fn expand_auth_alias(config: &toml::Value) -> toml::Value {
 }
 /// Resolves the effective login-team pin by tier: `requirements` beats `env` beats `config`.
 /// `requirements` is the non-overridable `requirements.toml` / MDM pin.
-/// `env` (`GROK_FORCE_LOGIN_TEAM_ID`) wins over the merged user/managed `config.toml`.
+/// `env` (`FRIDAY_FORCE_LOGIN_TEAM_ID`) wins over the merged user/managed `config.toml`.
 pub fn resolve_force_login_team(
     requirements: Option<ForceLoginTeam>,
     env: Option<ForceLoginTeam>,
@@ -491,7 +491,7 @@ pub fn resolve_force_login_team(
 ) -> Option<ForceLoginTeam> {
     requirements.or(env).or(config)
 }
-/// Parses a `GROK_FORCE_LOGIN_TEAM_ID` value into a [`ForceLoginTeam`]. A bare value is a single team, a JSON array is an any-of set (each element trimmed), and an empty or whitespace-only value yields `None`.
+/// Parses a `FRIDAY_FORCE_LOGIN_TEAM_ID` value into a [`ForceLoginTeam`]. A bare value is a single team, a JSON array is an any-of set (each element trimmed), and an empty or whitespace-only value yields `None`.
 /// A value that looks like a JSON array but does not parse fails closed (an empty any-of, which blocks login). A typo in the array therefore cannot silently drop the restriction.
 fn parse_force_login_team(raw: &str) -> Option<ForceLoginTeam> {
     let trimmed = raw.trim();
@@ -505,7 +505,7 @@ fn parse_force_login_team(raw: &str) -> Option<ForceLoginTeam> {
             )),
             Err(_) => {
                 tracing::warn!(
-                    "GROK_FORCE_LOGIN_TEAM_ID is not a valid JSON array; failing closed"
+                    "FRIDAY_FORCE_LOGIN_TEAM_ID is not a valid JSON array; failing closed"
                 );
                 Some(ForceLoginTeam::AnyOf(vec![]))
             }
@@ -516,15 +516,15 @@ fn parse_force_login_team(raw: &str) -> Option<ForceLoginTeam> {
 }
 impl OidcAuthConfig {
     pub fn from_env() -> Option<Self> {
-        let issuer = std::env::var("GROK_OIDC_ISSUER").ok()?;
-        let client_id = std::env::var("GROK_OIDC_CLIENT_ID").ok()?;
+        let issuer = std::env::var("FRIDAY_OIDC_ISSUER").ok()?;
+        let client_id = std::env::var("FRIDAY_OIDC_CLIENT_ID").ok()?;
         Some(Self {
             issuer,
             client_id,
-            scopes: std::env::var("GROK_OIDC_SCOPES")
+            scopes: std::env::var("FRIDAY_OIDC_SCOPES")
                 .map(|s| s.split(',').map(|s| s.trim().to_owned()).collect())
                 .unwrap_or_else(|_| default_oidc_scopes()),
-            audience: std::env::var("GROK_OIDC_AUDIENCE").ok(),
+            audience: std::env::var("FRIDAY_OIDC_AUDIENCE").ok(),
         })
     }
 }
@@ -657,7 +657,7 @@ mod tests {
         let cfg: GrokComConfig = toml::from_str("").expect("parse empty");
         assert_eq!(cfg.preferred_method, None);
     }
-    /// Every `GROK_FORCE_LOGIN_TEAM_ID` shape: bare value, arrays, empty-array, malformed, and empty/whitespace.
+    /// Every `FRIDAY_FORCE_LOGIN_TEAM_ID` shape: bare value, arrays, empty-array, malformed, and empty/whitespace.
     #[test]
     fn parse_force_login_team_handles_all_shapes() {
         assert_eq!(

@@ -430,7 +430,7 @@ impl SessionActor {
         }
 
         // New prompt while generating: keep artifact, skip display, leave watermark.
-        // Applies to manual `/recap` too: spinner-less clients (e.g. Grok Desktop) would otherwise append the late recap mid-turn.
+        // Applies to manual `/recap` too: spinner-less clients (e.g. Friday X Desktop) would otherwise append the late recap mid-turn.
         if self.recap_was_cancelled(recap_epoch) {
             tracing::info!(
                 auto,

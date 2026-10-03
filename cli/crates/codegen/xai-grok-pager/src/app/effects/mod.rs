@@ -4973,7 +4973,7 @@ pub(crate) fn execute(
                                 .auth_scope();
                             let auth = xai_grok_login::lookup_auth(&store, &scope)?;
                             let proxy_base = std::env::var(
-                                    "GROK_CLI_CHAT_PROXY_BASE_URL",
+                                    "FRIDAY_CLI_CHAT_PROXY_BASE_URL",
                                 )
                                 .unwrap_or_else(|_| {
                                     xai_grok_shell::agent::config::CLI_CHAT_PROXY_BASE_URL_DEFAULT
@@ -5368,12 +5368,12 @@ fn format_session_info(
 fn format_auth_lines(is_api_key_auth: bool, api_key_env_set: bool) -> String {
     if is_api_key_auth {
         let method = if api_key_env_set {
-            "  Auth method: API key (XAI_API_KEY)\n"
+            "  Auth method: API key (FRIDAY_X_TOKEN)\n"
         } else {
             "  Auth method: API key\n"
         };
         return format!(
-            "{method}  Run `grok login` to use your SuperGrok subscription instead.\n"
+            "{method}  Run `friday login` to use your SuperGrok subscription instead.\n"
         );
     }
     String::from("  Auth method: OAuth\n")

@@ -128,7 +128,7 @@ pub enum ClipboardProbeDropReason {
     Panicked,
 }
 
-/// The pager's paste-time probe dropped the attachment; completion-side discards and the `grok wrap` host read are not counted.
+/// The pager's paste-time probe dropped the attachment; completion-side discards and the `friday wrap` host read are not counted.
 /// `clipboard_image_paste` may still report `outcome == "image"` for the raster this drop discards; join on `image_hash`.
 #[derive(Serialize)]
 pub struct ClipboardPasteProbeDropped {
@@ -184,7 +184,7 @@ pub struct ClipboardCopy {
     pub osc52_ok: bool,
     /// Evidence classification: `confirmed` | `unverified` | `failed`.
     pub delivery: &'static str,
-    /// An explicit `grok wrap` OSC 52 sink was active.
+    /// An explicit `friday wrap` OSC 52 sink was active.
     pub osc52_sink: bool,
     /// The process was inside a container without a display server.
     pub container_no_display: bool,

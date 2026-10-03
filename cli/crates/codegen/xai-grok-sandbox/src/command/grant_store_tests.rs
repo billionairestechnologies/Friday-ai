@@ -22,7 +22,7 @@ impl Home {
         let root =
             std::env::temp_dir().join(format!("xai-sandbox-grants-{}-{tag}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let grok_home = root.join(".grok");
+        let grok_home = root.join(".friday");
         let ws = root.join("proj");
         let user_home = root.join("home/user");
         for dir in [&grok_home, &ws, &user_home] {

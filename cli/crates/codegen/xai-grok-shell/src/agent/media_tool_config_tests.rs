@@ -61,8 +61,8 @@ fn media_headers_identify_build_traffic() {
     else {
         panic!("image tools are enabled by default");
     };
-    assert!(extra_headers.contains_key("x-grok-client-identifier"));
-    assert!(extra_headers.contains_key("x-grok-client-version"));
+    assert!(extra_headers.contains_key("x-friday-client-identifier"));
+    assert!(extra_headers.contains_key("x-friday-client-version"));
     assert!(
         extra_headers
             .get("user-agent")

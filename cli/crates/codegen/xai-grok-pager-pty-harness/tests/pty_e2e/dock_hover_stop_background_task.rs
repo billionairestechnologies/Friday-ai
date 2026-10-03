@@ -40,7 +40,7 @@ async fn dock_hover_reveals_and_dispatches_stop() {
         DEFAULT_COLS,
         &content,
         &["--yolo", "--trust"],
-        &[("GROK_DOCK", "1")],
+        &[("FRIDAY_DOCK", "1")],
         Some(content.home()),
     )
     .expect("spawn pager");

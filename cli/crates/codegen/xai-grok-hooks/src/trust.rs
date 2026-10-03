@@ -52,7 +52,7 @@ impl Trust {
 /// Why a hook is skipped at dispatch and shown disabled in the modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HookSkipReason {
-    /// Its `enabled` flag is off or its name is in `$GROK_HOME/disabled-hooks`.
+    /// Its `enabled` flag is off or its name is in `$FRIDAY_HOME/disabled-hooks`.
     UserDisabled,
     /// `allow_managed_hooks_only` is pinned and the hook is not managed policy.
     ManagedOnly,
@@ -125,10 +125,10 @@ fn is_hook_disabled_with_file(hook_name: &str, file: &Path) -> bool {
         .any(|l| !l.trim().is_empty() && !l.trim().starts_with('#') && l.trim() == hook_name)
 }
 
-/// Disable a hook by name (append to `$GROK_HOME/disabled-hooks`).
+/// Disable a hook by name (append to `$FRIDAY_HOME/disabled-hooks`).
 pub fn disable_hook(hook_name: &str) -> Result<(), String> {
     let file = disabled_hooks_file_path()
-        .ok_or_else(|| "no user grok home (set $GROK_HOME or $HOME)".to_string())?;
+        .ok_or_else(|| "no user grok home (set $FRIDAY_HOME or $HOME)".to_string())?;
     disable_hook_with_file(hook_name, &file)
 }
 
@@ -149,7 +149,7 @@ fn disable_hook_with_file(hook_name: &str, file: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Enable a hook by name (remove from `$GROK_HOME/disabled-hooks`).
+/// Enable a hook by name (remove from `$FRIDAY_HOME/disabled-hooks`).
 pub fn enable_hook(hook_name: &str) -> Result<bool, String> {
     match disabled_hooks_file_path() {
         Some(file) => enable_hook_with_file(hook_name, &file),
@@ -193,7 +193,7 @@ fn enable_hook_with_file(hook_name: &str, file: &Path) -> Result<bool, String> {
 
 const DISABLED_HOOKS_FILE: &str = "disabled-hooks";
 
-/// Returns the path to `$GROK_HOME/disabled-hooks`, or `None` when no user grok home resolves.
+/// Returns the path to `$FRIDAY_HOME/disabled-hooks`, or `None` when no user grok home resolves.
 fn disabled_hooks_file_path() -> Option<PathBuf> {
     Some(xai_grok_config::user_grok_home()?.join(DISABLED_HOOKS_FILE))
 }
@@ -204,7 +204,7 @@ mod tests {
 
     /// Each test creates its own legacy file in its own temp dir, so no state is shared.
     fn trust_file_in(dir: &Path) -> PathBuf {
-        let grok_dir = dir.join(".grok");
+        let grok_dir = dir.join(".friday");
         std::fs::create_dir_all(&grok_dir).unwrap();
         grok_dir.join("trusted-hook-projects")
     }

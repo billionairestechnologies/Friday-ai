@@ -68,16 +68,16 @@ fn add_cli_chat_proxy_headers_blocking(
 ) -> reqwest::blocking::RequestBuilder {
     let mut builder = builder
         .header("Authorization", format!("Bearer {}", &auth.key))
-        .header("X-XAI-Token-Auth", GrokComConfig::default().token_header)
+        .header("X-Friday-Token-Auth", GrokComConfig::default().token_header)
         .header("x-userid", &auth.user_id)
-        .header("x-grok-client-version", xai_grok_version::VERSION);
+        .header("x-friday-client-version", xai_grok_version::VERSION);
     if let Some(email) = &auth.email {
         builder = builder.header("x-email", email);
     }
     let _ = (alpha_test_key, url);
     builder
         .header(
-            "x-grok-client-identifier",
+            "x-friday-client-identifier",
             xai_grok_http::process_client_identifier(),
         )
         .header(

@@ -12,7 +12,7 @@ pub(crate) use stub::{SlotGuard, SlotHandle};
 pub(crate) use unix::{SlotGuard, SlotHandle};
 
 /// Environment variable naming an absolute directory that replaces the default slot directory.
-pub const SLOT_DIR_ENV: &str = "GROK_FILE_LOCK_SLOT_DIR";
+pub const SLOT_DIR_ENV: &str = "FRIDAY_FILE_LOCK_SLOT_DIR";
 
 /// Outcome of taking the slot for one attempt.
 pub(crate) enum SlotAttempt {
@@ -149,7 +149,7 @@ mod unix {
         Ok(())
     }
 
-    /// Resolve, create (mode 0700), and verify the slot directory: `$GROK_FILE_LOCK_SLOT_DIR` when
+    /// Resolve, create (mode 0700), and verify the slot directory: `$FRIDAY_FILE_LOCK_SLOT_DIR` when
     /// set and absolute, else `/tmp/grok-file-lock-<euid>`. `None` means no usable directory; the
     /// caller then acquires unguarded, since exclusion comes from the target lock alone.
     pub(crate) fn slot_dir() -> Option<PathBuf> {

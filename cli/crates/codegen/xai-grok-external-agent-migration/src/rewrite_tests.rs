@@ -236,7 +236,7 @@ fn project_import_replaces_config_symlink_not_referent() {
     git2::Repository::init(tmp.path()).unwrap();
     let outside = tmp.path().join("outside.toml");
     std::fs::write(&outside, "[paths]\nextra_rule_dirs = [\"/keep\"]\n").unwrap();
-    let project_cfg = tmp.path().join(".grok").join("config.toml");
+    let project_cfg = tmp.path().join(".friday").join("config.toml");
     std::fs::create_dir_all(project_cfg.parent().unwrap()).unwrap();
     std::os::unix::fs::symlink(&outside, &project_cfg).unwrap();
 

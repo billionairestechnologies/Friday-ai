@@ -16,14 +16,14 @@ use xai_grok_test_support::TestSandbox;
 
 use crate::pty::EnvOp;
 
-const CLIPBOARD_SINK_ENV_VARS: &[&str] = &["GROK_OSC52_SINK", "LC_GROK_OSC52_SINK"];
+const CLIPBOARD_SINK_ENV_VARS: &[&str] = &["FRIDAY_OSC52_SINK", "LC_GROK_OSC52_SINK"];
 
 /// Host / wrap appearance hints that would make `theme=auto` non-deterministic
 /// in PTY tests (layout depends on the resolved palette).
 const APPEARANCE_ENV_VARS: &[&str] = &[
-    "GROK_APPEARANCE",
+    "FRIDAY_APPEARANCE",
     "LC_GROK_APPEARANCE",
-    "GROK_THEME",
+    "FRIDAY_THEME",
     "LC_GROK_THEME",
     "COLORFGBG",
 ];
@@ -149,7 +149,7 @@ pub(crate) fn apply_child_env<S: EnvSink>(cmd: &mut S, env: &[EnvOp<'_>]) {
     for ssh_var in ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "SSH_AUTH_SOCK"] {
         cmd.remove_var(OsStr::new(ssh_var));
     }
-    // A harness launched under `grok wrap` must not silently confirm clipboard
+    // A harness launched under `friday wrap` must not silently confirm clipboard
     // delivery for no-sink scenarios. Explicit sink tests re-inject a marker
     // through `env` after this hygiene pass.
     for sink_var in CLIPBOARD_SINK_ENV_VARS {
@@ -287,7 +287,7 @@ mod tests {
         }
         // Sandboxed launches remove unrelated inherited variables before
         // re-applying the baseline and explicit overrides.
-        cmd.env("GROK_SCROLL_LOG", "/tmp/scroll.jsonl");
+        cmd.env("FRIDAY_SCROLL_LOG", "/tmp/scroll.jsonl");
         let sandbox = TestSandbox::new();
         cmd.env_clear();
         sandbox.apply_to_command_builder(&mut cmd);
@@ -329,12 +329,12 @@ mod tests {
             Some("xterm-256color")
         );
         assert_eq!(
-            cmd.get_env("GROK_SCROLL_LOG").and_then(|v| v.to_str()),
+            cmd.get_env("FRIDAY_SCROLL_LOG").and_then(|v| v.to_str()),
             None,
             "hermetic baseline must remove unrelated inherited vars"
         );
         assert_eq!(
-            cmd.get_env("GROK_HOME").and_then(|v| v.to_str()),
+            cmd.get_env("FRIDAY_HOME").and_then(|v| v.to_str()),
             sandbox.grok_home().to_str()
         );
     }
@@ -353,10 +353,10 @@ mod tests {
             sandbox.home().to_str()
         );
         assert_eq!(
-            cmd.get_env("GROK_HOME").and_then(|v| v.to_str()),
+            cmd.get_env("FRIDAY_HOME").and_then(|v| v.to_str()),
             sandbox.grok_home().to_str()
         );
-        assert_eq!(cmd.get_env("GROK_LEADER_SOCKET"), None);
+        assert_eq!(cmd.get_env("FRIDAY_LEADER_SOCKET"), None);
     }
 
     /// Sandbox baseline wins, hygiene strips markers seeded into the same map, caller ops apply last.
@@ -421,11 +421,11 @@ mod tests {
         cmd.env_clear();
         sandbox.apply_to_command_builder(&mut cmd);
 
-        apply_child_env(&mut cmd, &[EnvOp::remove("XAI_API_KEY")]);
+        apply_child_env(&mut cmd, &[EnvOp::remove("FRIDAY_X_TOKEN")]);
 
-        assert_eq!(cmd.get_env("XAI_API_KEY"), None);
+        assert_eq!(cmd.get_env("FRIDAY_X_TOKEN"), None);
         assert_eq!(
-            cmd.get_env("GROK_XAI_API_BASE_URL")
+            cmd.get_env("FRIDAY_XAI_API_BASE_URL")
                 .and_then(|v| v.to_str()),
             Some("http://127.0.0.1:43123/v1")
         );
@@ -461,7 +461,7 @@ mod tests {
                 EnvOp::set("TERM_PROGRAM", "vscode"),
                 EnvOp::set("NVIM", "/tmp/fake-nvim.sock"),
                 EnvOp::set("TERM", "xterm-kitty"),
-                EnvOp::set("GROK_OSC52_SINK", "1"),
+                EnvOp::set("FRIDAY_OSC52_SINK", "1"),
             ],
         );
 
@@ -483,7 +483,7 @@ mod tests {
             Some("xterm-kitty")
         );
         assert_eq!(
-            cmd.get_env("GROK_OSC52_SINK").and_then(|v| v.to_str()),
+            cmd.get_env("FRIDAY_OSC52_SINK").and_then(|v| v.to_str()),
             Some("1"),
             "explicit sink scenarios must be able to re-inject the marker"
         );

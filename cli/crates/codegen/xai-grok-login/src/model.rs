@@ -9,9 +9,9 @@ pub const TOKEN_TTL: Duration = Duration::days(30);
 const DEFAULT_EARLY_INVALIDATION_SECS: u64 = 300; // 5 minutes
 
 /// Legacy auth.json scope key. Fallback for old devbox auth files.
-pub(super) const LEGACY_SCOPE: &str = "https://accounts.x.ai/sign-in";
+pub(super) const LEGACY_SCOPE: &str = "https://friday.billionairestechnologies.com";
 
-/// auth.json scope key for plain API key auth (desktop login, `grok login --api-key`).
+/// auth.json scope key for plain API key auth (desktop login, `friday login --api-key`).
 pub(super) const API_KEY_SCOPE: &str = "xai::api_key";
 
 const BLOCKED_REASON_NO_LOGS: &str = "BLOCKED_REASON_NO_LOGS";
@@ -35,7 +35,7 @@ pub enum AuthMode {
     Oidc,
     /// External auth provider binary
     External,
-    /// Plain API key (e.g. from grok-desktop login or `grok login --api-key`)
+    /// Plain API key (e.g. from grok-desktop login or `friday login --api-key`)
     ApiKey,
 }
 
@@ -150,7 +150,7 @@ impl GrokAuth {
             .num_seconds()
     }
 
-    /// `true` when the token comes from a first-party xAI account. That is either an OIDC login against https://auth.x.ai (or the local-dev equivalent), or an external auth provider declaring an xAI issuer.
+    /// `true` when the token comes from a first-party xAI account. That is either an OIDC login against https://friday.billionairestechnologies.com/api/x (or the local-dev equivalent), or an external auth provider declaring an xAI issuer.
     /// The issuer is a client-side hint, not a trust assertion. Everything it unlocks still authenticates the actual token server-side, and it never influences endpoints.
     pub fn is_xai_auth(&self) -> bool {
         match self.auth_mode {
@@ -305,7 +305,7 @@ pub struct UserInfo {
     pub subscription_tier: Option<String>,
 }
 
-/// Look up auth from the store by scope key. Legacy `WebLogin` tokens (from the pre-OIDC `grok login --legacy` flow) are skipped. They are validated via a per-request DB lookup server-side, which fails at high volume.
+/// Look up auth from the store by scope key. Legacy `WebLogin` tokens (from the pre-OIDC `friday login --legacy` flow) are skipped. They are validated via a per-request DB lookup server-side, which fails at high volume.
 /// Skipping them here forces affected users to re-authenticate via OIDC on next launch.
 pub fn lookup_auth(map: &AuthStore, scope: &str) -> Option<GrokAuth> {
     let auth = map
@@ -331,9 +331,9 @@ fn inherited_lookup(map: &AuthStore, scope: &str) -> Option<GrokAuth> {
 }
 
 /// Early-invalidation buffer.
-/// Override with `GROK_AUTH_EARLY_INVALIDATION_SECS` for testing (e.g. `=5` to shrink the buffer to 5 seconds).
+/// Override with `FRIDAY_AUTH_EARLY_INVALIDATION_SECS` for testing (e.g. `=5` to shrink the buffer to 5 seconds).
 pub(super) fn early_invalidation() -> Duration {
-    std::env::var("GROK_AUTH_EARLY_INVALIDATION_SECS")
+    std::env::var("FRIDAY_AUTH_EARLY_INVALIDATION_SECS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .map(|s| Duration::seconds(s as i64))

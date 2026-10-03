@@ -5,7 +5,7 @@ use super::*;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 use xai_grok_config::mcp_servers::parse_mcp_config_with_oauth;
-/// First-run `ensure` creates a 0-byte `$GROK_HOME/config.toml`.
+/// First-run `ensure` creates a 0-byte `$FRIDAY_HOME/config.toml`.
 /// Empty and whitespace-only files must parse as an empty table so the first settings write is not "refusing to overwrite unparseable".
 /// Non-empty garbage still refuses.
 #[test]
@@ -1060,7 +1060,7 @@ mod resolve_auto_compact {
     use std::sync::Mutex;
     const TEST_MODEL: &str = "grok-4.5";
     const OTHER_MODEL: &str = "grok-4.3";
-    /// Serialize tests that mutate `GROK_AUTO_COMPACT_THRESHOLD_PERCENT`.
+    /// Serialize tests that mutate `FRIDAY_AUTO_COMPACT_THRESHOLD_PERCENT`.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
     /// Build a `Config` populated with optional per-source values for the `TEST_MODEL`.
     /// Any `None` argument means "that source is unset".
@@ -1475,7 +1475,7 @@ custom_unknown_key = 42
 fn project_slot_symlink(dir: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
     let outside = dir.join("outside.toml");
     std::fs::write(&outside, "keep\n").unwrap();
-    let link = dir.join(".grok").join("config.toml");
+    let link = dir.join(".friday").join("config.toml");
     std::fs::create_dir_all(link.parent().unwrap()).unwrap();
     std::os::unix::fs::symlink(&outside, &link).unwrap();
     (link, outside)
@@ -1504,7 +1504,7 @@ fn assert_still_symlink(path: &std::path::Path) {
             .is_symlink()
     );
 }
-/// Project `.grok/config.toml` must replace a leaf symlink, not follow it.
+/// Project `.friday/config.toml` must replace a leaf symlink, not follow it.
 #[cfg(unix)]
 #[test]
 fn atomic_replace_string_replaces_project_config_symlink() {
@@ -1520,7 +1520,7 @@ fn atomic_replace_string_replaces_project_config_symlink() {
     assert_eq!("[mcp_servers]\n", std::fs::read_to_string(&link).unwrap());
     assert_eq!("keep\n", std::fs::read_to_string(&outside).unwrap());
 }
-/// No user grok home: persist must resolve the cwd `.grok/config.toml` as a
+/// No user grok home: persist must resolve the cwd `.friday/config.toml` as a
 /// slot (replace), not follow an external referent.
 #[cfg(unix)]
 #[test]

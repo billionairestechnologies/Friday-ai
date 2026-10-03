@@ -63,7 +63,7 @@ async fn start_bundle_server(
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned),
                         token_auth: headers
-                            .get("x-xai-token-auth")
+                            .get("x-friday-token-auth")
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned),
                         user_id: headers
@@ -79,7 +79,7 @@ async fn start_bundle_server(
                             None
                         },
                         client_version: headers
-                            .get("x-grok-client-version")
+                            .get("x-friday-client-version")
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned),
                     });
@@ -99,7 +99,7 @@ async fn start_bundle_server(
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned),
                         token_auth: headers
-                            .get("x-xai-token-auth")
+                            .get("x-friday-token-auth")
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned),
                         user_id: headers
@@ -115,7 +115,7 @@ async fn start_bundle_server(
                             None
                         },
                         client_version: headers
-                            .get("x-grok-client-version")
+                            .get("x-friday-client-version")
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned),
                     });
@@ -169,7 +169,7 @@ async fn fetch_subagent_bundle_success() {
     let headers = seen_headers.lock().unwrap();
     let headers = headers.last().unwrap();
     assert_eq!(headers.authorization.as_deref(), Some("Bearer token"));
-    assert_eq!(headers.token_auth.as_deref(), Some("xai-grok-cli"));
+    assert_eq!(headers.token_auth.as_deref(), Some("friday-x-cli"));
     assert_eq!(headers.user_id.as_deref(), Some("user-1"));
     assert_eq!(headers.email.as_deref(), Some("test@example.com"));
     assert_eq!(headers.alpha_test_key, None);
@@ -804,19 +804,19 @@ fn get_object_returns_some_for_actual_object() {
         &serde_json::json!("two")
     );
 }
-/// REGRESSION: `grok setup` must send the deployment key to the proxy, never the inference endpoint.
+/// REGRESSION: `friday setup` must send the deployment key to the proxy, never the inference endpoint.
 #[test]
 #[serial_test::serial]
 fn deployment_config_url_uses_cli_chat_proxy_when_not_overridden() {
     use crate::agent::config::EndpointsConfig;
     for k in [
-        "GROK_CLI_CHAT_PROXY_BASE_URL",
-        "GROK_MANAGED_CONFIG_URL",
-        "GROK_XAI_API_BASE_URL",
+        "FRIDAY_CLI_CHAT_PROXY_BASE_URL",
+        "FRIDAY_MANAGED_CONFIG_URL",
+        "FRIDAY_XAI_API_BASE_URL",
     ] {
         unsafe { std::env::remove_var(k) };
     }
-    unsafe { std::env::set_var("GROK_DEPLOYMENT_KEY", "xai-token-ENTERPRISE") };
+    unsafe { std::env::set_var("FRIDAY_DEPLOYMENT_KEY", "xai-token-ENTERPRISE") };
     let managed: toml::Value = toml::from_str(
         r#"[endpoints]
             deployment_key = "xai-token-ENTERPRISE"
@@ -839,7 +839,7 @@ fn deployment_config_url_uses_cli_chat_proxy_when_not_overridden() {
         EndpointsConfig::from_config_value(&pinned).resolve_managed_config_url(),
         "https://proxy.acme-corp.example/v1/deployment/config"
     );
-    unsafe { std::env::remove_var("GROK_DEPLOYMENT_KEY") };
+    unsafe { std::env::remove_var("FRIDAY_DEPLOYMENT_KEY") };
 }
 #[derive(Clone)]
 struct DualBundleServerState {

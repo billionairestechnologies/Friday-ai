@@ -1714,7 +1714,7 @@
         let model_id = agent_client_protocol::ModelId::new(Arc::from("grok-4.5"));
         models.available.insert(
             model_id.clone(),
-            agent_client_protocol::ModelInfo::new(model_id, "Grok 4.5".to_string()),
+            agent_client_protocol::ModelInfo::new(model_id, "Friday X 4.5".to_string()),
         );
 
         // Type "/model gr" and position cursor at end (in args).
@@ -1725,11 +1725,11 @@
         assert!(snap.open, "arg suggestions should be open");
         assert!(snap.args_range.is_some());
 
-        // Accepting the arg completion should replace "gr" with "Grok 4.5"
+        // Accepting the arg completion should replace "gr" with "Friday X 4.5"
         pw.accept_slash_completion(&models);
         let text = pw.textarea.text().to_string();
         assert!(
-            text.contains("Grok 4.5"),
+            text.contains("Friday X 4.5"),
             "arg should be replaced, got: {:?}",
             text
         );

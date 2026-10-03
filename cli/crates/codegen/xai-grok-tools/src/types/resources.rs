@@ -355,12 +355,12 @@ impl std::fmt::Debug for Resources {
 pub struct Cwd(pub PathBuf);
 /// Absolute path to the plan file for this session. Set by the session layer (from
 /// `PlanModeTracker::plan_file_path()`); read by `ExitPlanMode` to locate the plan on disk. When
-/// absent the tool falls back to `Cwd/.grok/plan.md`.
+/// absent the tool falls back to `Cwd/.friday/plan.md`.
 #[derive(Debug, Clone)]
 pub struct PlanFilePath(pub PathBuf);
 /// Default plan-file path (relative to the workspace root) used when no
 /// explicit [`PlanFilePath`] is set. Shared by the plan-mode tools.
-pub const PLAN_FILE_RELATIVE_PATH: &str = ".grok/plan.md";
+pub const PLAN_FILE_RELATIVE_PATH: &str = ".friday/plan.md";
 /// Resolve the session plan-file path from resources as `(absolute_target, display)`. `absolute_target` is `Some` ONLY
 /// when the resolved path is absolute, so callers that write/seed never create a file under the process CWD; it is
 /// `None` for the display-only relative fallback. `display` is the model-facing path string.

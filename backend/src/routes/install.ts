@@ -36,6 +36,17 @@ installRouter.get(
 
 const versionOf = async (raw: unknown) => (typeof raw === "string" && raw && raw !== "latest" ? raw : latestVersion());
 
+// Release notes the client shows after an update (`<version>.external.md` / `.external.json`). Served from the
+// releases store when it has them; a missing file is a plain 404 (the client treats that as "no notes").
+installRouter.get("/changelogs/:file", (req, res) => {
+  const file = String(req.params.file);
+  if (!/^[0-9A-Za-z._-]{1,80}\.external\.(md|json)$/.test(file) || !env.fridayXReleasesUrl) {
+    res.status(404).end();
+    return;
+  }
+  res.redirect(302, `${env.fridayXReleasesUrl}/changelogs/${file}`);
+});
+
 installRouter.get(
   "/download/:platform",
   asyncHandler(async (req, res) => {

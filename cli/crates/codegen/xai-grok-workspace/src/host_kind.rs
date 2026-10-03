@@ -1,6 +1,6 @@
 //! Which host runs a workspace server, and what its credential lets the server do.
 //!
-//! A sandbox's credential reaches the Grok API; every other host's only serves the hub. The
+//! A sandbox's credential reaches the Friday X API; every other host's only serves the hub. The
 //! catalog table is shared with the sandbox, so the tools that would call the API with the
 //! server's own credential are cut per host here and nowhere else.
 
@@ -15,7 +15,7 @@ use crate::session::tool_config::WorkspaceSessionContextFactory;
 pub enum WorkspaceHostKind {
     /// A hosted sandbox.
     Sandbox,
-    /// A daemon on a user's or remote machine, whoever started it (Grok Desktop, the `grok` CLI,
+    /// A daemon on a user's or remote machine, whoever started it (Friday X Desktop, the `friday` CLI,
     /// or by hand). The fail-closed default for a caller that names no host.
     #[default]
     Daemon,

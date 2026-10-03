@@ -66,7 +66,7 @@ fn arg_picker_chains_through_the_window_phase_to_effort() {
     let id = acp::ModelId::new(Arc::from("grok-4.7"));
     agent.session.models.available.insert(
         id.clone(),
-        acp::ModelInfo::new(id, "Grok 4.7").meta(
+        acp::ModelInfo::new(id, "Friday X 4.7").meta(
             serde_json::json!({
                 "supportsReasoningEffort": true,
                 "totalContextTokens": 256_000,
@@ -93,11 +93,11 @@ fn arg_picker_chains_through_the_window_phase_to_effort() {
     else {
         panic!("expected the /model picker to chain through the window phase");
     };
-    assert_eq!("Grok 4.7 256k ", args_query);
+    assert_eq!("Friday X 4.7 256k ", args_query);
     assert!(
         items
             .iter()
-            .all(|item| item.insert_text.starts_with("Grok 4.7 256k ")),
+            .all(|item| item.insert_text.starts_with("Friday X 4.7 256k ")),
         "got {items:?}"
     );
 }

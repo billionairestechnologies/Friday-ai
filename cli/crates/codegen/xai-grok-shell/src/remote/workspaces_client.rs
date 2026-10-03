@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use xai_grok_login::AuthManager;
 
-const GROK_WEB_URL: &str = "https://grok.com";
+const FRIDAY_WEB_URL: &str = "https://friday.billionairestechnologies.com";
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,11 +63,11 @@ pub struct WorkspacesClient {
 impl WorkspacesClient {
     pub fn new(auth: Arc<AuthManager>) -> Self {
         let base_url = first_nonempty_env(&[
-            "GROK_WORKSPACES_BASE_URL",
-            "GROK_CONVERSATIONS_BASE_URL",
-            "GROK_CODE_WEB_URL",
+            "FRIDAY_WORKSPACES_BASE_URL",
+            "FRIDAY_CONVERSATIONS_BASE_URL",
+            "FRIDAY_CODE_WEB_URL",
         ])
-        .unwrap_or_else(|| GROK_WEB_URL.to_string());
+        .unwrap_or_else(|| FRIDAY_WEB_URL.to_string());
         Self {
             http: crate::http::shared_client(),
             base_url,
@@ -99,13 +99,13 @@ impl WorkspacesClient {
             .query(&query)
             .header("Authorization", format!("Bearer {}", auth.key))
             .header(
-                "X-XAI-Token-Auth",
+                "X-Friday-Token-Auth",
                 self.auth.grok_com_config().token_header.clone(),
             )
             .header("x-userid", &auth.user_id)
-            .header("x-grok-client-version", xai_grok_version::VERSION)
+            .header("x-friday-client-version", xai_grok_version::VERSION)
             .header(
-                "x-grok-client-identifier",
+                "x-friday-client-identifier",
                 crate::http::process_client_identifier(),
             )
             .header(

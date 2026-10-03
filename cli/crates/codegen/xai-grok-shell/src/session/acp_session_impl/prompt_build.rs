@@ -83,7 +83,7 @@ mod partition_rules_by_scope_tests {
         ];
         let (workspace, user) = partition_rules_by_scope(
             files,
-            Path::new("/home/user/.grok"),
+            Path::new("/home/user/.friday"),
             &[],
             &[Path::new("/repo")],
         );
@@ -133,7 +133,7 @@ mod partition_rules_by_scope_tests {
         let files = vec![
             file("/repo/config/AGENTS.md"),
             file("/repo/config/rules/global.md"),
-            file("/repo/config/.grok/rules/project.md"),
+            file("/repo/config/.friday/rules/project.md"),
             file("/repo/config/src/AGENTS.md"),
         ];
         let (workspace, user) =
@@ -145,7 +145,7 @@ mod partition_rules_by_scope_tests {
         assert_eq!(
             paths(&workspace),
             vec![
-                "/repo/config/.grok/rules/project.md",
+                "/repo/config/.friday/rules/project.md",
                 "/repo/config/src/AGENTS.md",
             ]
         );
@@ -216,7 +216,7 @@ mod partition_rules_by_scope_tests {
             },
             AgentConfigFile {
                 file_name: "AGENTS.md".into(),
-                file_path: "/home/user/.grok/AGENTS.md".into(),
+                file_path: "/home/user/.friday/AGENTS.md".into(),
                 content: "home-grok-body".into(),
                 source: Default::default(),
             },
@@ -228,7 +228,7 @@ mod partition_rules_by_scope_tests {
             },
             AgentConfigFile {
                 file_name: "x.md".into(),
-                file_path: "/repo/.grok/rules/x.md".into(),
+                file_path: "/repo/.friday/rules/x.md".into(),
                 content: "repo-grok-rules-x".into(),
                 source: Default::default(),
             },
@@ -236,7 +236,7 @@ mod partition_rules_by_scope_tests {
         let vendor_homes = vec![(Path::new("/home/user/.claude").to_path_buf(), true)];
         let (workspace, user) = partition_rules_by_scope(
             files.clone(),
-            Path::new("/home/user/.grok"),
+            Path::new("/home/user/.friday"),
             &vendor_homes,
             &[Path::new("/repo")],
         );
@@ -255,7 +255,7 @@ mod partition_rules_by_scope_tests {
         }
         assert!(rules.contains("name=\"/repo/AGENTS.md\""));
         assert!(rules.contains("name=\"/repo/CLAUDE.md\""));
-        assert!(rules.contains("name=\"/repo/.grok/rules/x.md\""));
+        assert!(rules.contains("name=\"/repo/.friday/rules/x.md\""));
         assert!(rules.contains("<user_rule>\nhome-grok-body\n</user_rule>"));
         assert!(rules.contains("<user_rule>\nhome-claude-body\n</user_rule>"));
         assert!(!rules.contains("## From:"));
@@ -264,27 +264,27 @@ mod partition_rules_by_scope_tests {
     #[test]
     fn fork_ondisk_and_display_prefixes_both_count_as_workspace() {
         let files = vec![
-            file("/home/user/.grok/worktrees/repo/AGENTS.md"),
+            file("/home/user/.friday/worktrees/repo/AGENTS.md"),
             file("/home/user/repo/crates/foo/AGENTS.md"),
-            file("/home/user/.grok/AGENTS.md"),
+            file("/home/user/.friday/AGENTS.md"),
         ];
         let (workspace, user) = partition_rules_by_scope(
             files,
-            Path::new("/home/user/.grok"),
+            Path::new("/home/user/.friday"),
             &[],
             &[
-                Path::new("/home/user/.grok/worktrees/repo"),
+                Path::new("/home/user/.friday/worktrees/repo"),
                 Path::new("/home/user/repo/crates/foo"),
             ],
         );
         assert_eq!(
             paths(&workspace),
             vec![
-                "/home/user/.grok/worktrees/repo/AGENTS.md",
+                "/home/user/.friday/worktrees/repo/AGENTS.md",
                 "/home/user/repo/crates/foo/AGENTS.md",
             ]
         );
-        assert_eq!(paths(&user), vec!["/home/user/.grok/AGENTS.md"]);
+        assert_eq!(paths(&user), vec!["/home/user/.friday/AGENTS.md"]);
     }
 }
 /// True iff `conversation` already contains a project-instructions reminder (see [`is_project_instructions`]).

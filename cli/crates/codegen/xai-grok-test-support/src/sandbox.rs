@@ -209,7 +209,7 @@ impl TestSandboxBuilder {
     pub fn build(self) -> TestSandbox {
         let root = TempDir::new().expect("create test sandbox root");
         let home = root.path().join("home");
-        let grok_home = home.join(".grok");
+        let grok_home = home.join(".friday");
         let workspace = root.path().join("workspace");
         let temp = root.path().join("tmp");
         for path in [&home, &grok_home, &workspace, &temp] {
@@ -243,7 +243,7 @@ impl TestSandbox {
     pub fn init_git_workspace(&self) {
         run_git(self, &["init"]);
         run_git(self, &["config", "user.email", "test@test.invalid"]);
-        run_git(self, &["config", "user.name", "Grok Test"]);
+        run_git(self, &["config", "user.name", "Friday X Test"]);
         let readme = self.workspace.join("README.md");
         if !readme.exists() {
             std::fs::write(&readme, "test file\n").expect("write sandbox git fixture");
@@ -277,18 +277,18 @@ fn run_git(sandbox: &TestSandbox, args: &[&str]) {
 
 fn apply_mock_url(env: &mut BTreeMap<OsString, OsString>, url: String) {
     for key in [
-        "GROK_CLI_CHAT_PROXY_BASE_URL",
-        "GROK_XAI_API_BASE_URL",
-        "GROK_MODELS_BASE_URL",
-        "GROK_FEEDBACK_BASE_URL",
-        "GROK_TRACE_UPLOAD_URL",
-        "GROK_MANAGED_CONFIG_URL",
-        "GROK_CODE_WEB_URL",
-        "GROK_CONVERSATIONS_BASE_URL",
+        "FRIDAY_CLI_CHAT_PROXY_BASE_URL",
+        "FRIDAY_XAI_API_BASE_URL",
+        "FRIDAY_MODELS_BASE_URL",
+        "FRIDAY_FEEDBACK_BASE_URL",
+        "FRIDAY_TRACE_UPLOAD_URL",
+        "FRIDAY_MANAGED_CONFIG_URL",
+        "FRIDAY_CODE_WEB_URL",
+        "FRIDAY_CONVERSATIONS_BASE_URL",
     ] {
         env.insert(key.into(), url.clone().into());
     }
-    env.insert("XAI_API_KEY".into(), TEST_API_KEY.into());
+    env.insert("FRIDAY_X_TOKEN".into(), TEST_API_KEY.into());
 }
 
 fn baseline_env(
@@ -323,7 +323,7 @@ fn baseline_env_from_parent(
     for (key, value) in [
         ("HOME", home),
         ("USERPROFILE", home),
-        ("GROK_HOME", grok_home),
+        ("FRIDAY_HOME", grok_home),
         ("TMPDIR", temp),
         ("TMP", temp),
         ("TEMP", temp),
@@ -331,29 +331,29 @@ fn baseline_env_from_parent(
         env.insert(key.into(), value.as_os_str().to_owned());
     }
     for (key, value) in [
-        ("GROK_TELEMETRY_ENABLED", "false"),
+        ("FRIDAY_TELEMETRY_ENABLED", "false"),
         // A test that re-enables the mode must still have no production sink: the pager bakes in the analytics token and events URL.
-        ("GROK_TELEMETRY_MIXPANEL_ENABLED", "false"),
-        ("GROK_TELEMETRY_MIXPANEL_TOKEN", ""),
-        ("GROK_TELEMETRY_EVENTS_URL", ""),
-        ("GROK_TELEMETRY_EVENTS_API_KEY", ""),
-        ("GROK_TELEMETRY_TRACE_UPLOAD", "false"),
-        ("GROK_FEEDBACK_ENABLED", "false"),
-        ("GROK_TRACE_UPLOAD", "false"),
-        ("GROK_INSTRUMENTATION", "disabled"),
+        ("FRIDAY_TELEMETRY_MIXPANEL_ENABLED", "false"),
+        ("FRIDAY_TELEMETRY_MIXPANEL_TOKEN", ""),
+        ("FRIDAY_TELEMETRY_EVENTS_URL", ""),
+        ("FRIDAY_TELEMETRY_EVENTS_API_KEY", ""),
+        ("FRIDAY_TELEMETRY_TRACE_UPLOAD", "false"),
+        ("FRIDAY_FEEDBACK_ENABLED", "false"),
+        ("FRIDAY_TRACE_UPLOAD", "false"),
+        ("FRIDAY_INSTRUMENTATION", "disabled"),
         ("OTEL_SDK_DISABLED", "true"),
         ("DISABLE_TELEMETRY", "1"),
         ("DISABLE_FEEDBACK_COMMAND", "1"),
-        ("GROK_DISABLE_AUTOUPDATER", "1"),
-        ("GROK_PROMPT_SUGGESTIONS", "false"),
-        // Every sandbox has an empty `GROK_HOME`, so without this the agent id is
+        ("FRIDAY_DISABLE_AUTOUPDATER", "1"),
+        ("FRIDAY_PROMPT_SUGGESTIONS", "false"),
+        // Every sandbox has an empty `FRIDAY_HOME`, so without this the agent id is
         // recomputed per test; on Windows that is a ~30s `powershell Get-WmiObject`
         // run inside `initialize`, which blew the harness deadlines (GB-5593).
-        ("GROK_AGENT_ID", "grok-e2e-sandbox"),
+        ("FRIDAY_AGENT_ID", "grok-e2e-sandbox"),
         // Pin so a developer-exported override cannot flake empty-home launch tests.
-        ("GROK_DEFAULT_PERMISSION_MODE", "ask"),
+        ("FRIDAY_DEFAULT_PERMISSION_MODE", "ask"),
         // The post-turn summary would send unscripted requests to the mock server and break exact wire-traffic assertions
-        ("GROK_TURN_SUMMARY", "0"),
+        ("FRIDAY_TURN_SUMMARY", "0"),
         ("NO_PROXY", "127.0.0.1,localhost,::1"),
         ("no_proxy", "127.0.0.1,localhost,::1"),
         ("GIT_CONFIG_NOSYSTEM", "1"),
@@ -372,7 +372,7 @@ fn baseline_env_from_parent(
     // Leader-lock acquire slots stay inside the sandbox instead of the developer's `/tmp/grok-file-lock-<uid>`.
     // Literal on purpose: `xai_grok_file_lock::SLOT_DIR_ENV` lives in a crate this one does not depend on.
     env.insert(
-        "GROK_FILE_LOCK_SLOT_DIR".into(),
+        "FRIDAY_FILE_LOCK_SLOT_DIR".into(),
         temp.join("lock-slots").into_os_string(),
     );
     env
@@ -529,7 +529,7 @@ fn diagnostic_value_is_sensitive(key: &OsStr) -> bool {
         || is_endpoint_key(&key)
         || matches!(
             key.to_ascii_uppercase().as_str(),
-            "HOME" | "USERPROFILE" | "GROK_HOME" | "TMPDIR" | "TMP" | "TEMP" | "GIT_CONFIG_GLOBAL"
+            "HOME" | "USERPROFILE" | "FRIDAY_HOME" | "TMPDIR" | "TMP" | "TEMP" | "GIT_CONFIG_GLOBAL"
         )
 }
 
@@ -582,7 +582,7 @@ mod tests {
         }
         assert_ne!(sandbox.home(), sandbox.workspace());
         assert_ne!(sandbox.home(), sandbox.temp_dir());
-        assert_eq!(sandbox.grok_home(), sandbox.home().join(".grok"));
+        assert_eq!(sandbox.grok_home(), sandbox.home().join(".friday"));
     }
 
     #[test]
@@ -622,7 +622,7 @@ mod tests {
         let root = tempfile::tempdir().expect("create baseline fixture");
         baseline_env_from_parent(
             &root.path().join("home"),
-            &root.path().join("home/.grok"),
+            &root.path().join("home/.friday"),
             &root.path().join("tmp"),
             parent_cwd,
             &parent_env,
@@ -711,7 +711,7 @@ mod tests {
         );
         let sandbox = TestSandbox {
             home: root.path().join("home"),
-            grok_home: root.path().join("home/.grok"),
+            grok_home: root.path().join("home/.friday"),
             workspace: root.path().join("workspace"),
             temp: root.path().join("tmp"),
             root,
@@ -778,7 +778,7 @@ mod tests {
             .build();
         assert_eq!(env_value(&sandbox, "HOME"), Some(sandbox.home().into()));
         assert_eq!(
-            env_value(&sandbox, "GROK_HOME"),
+            env_value(&sandbox, "FRIDAY_HOME"),
             Some(sandbox.grok_home().into())
         );
         assert_eq!(
@@ -786,36 +786,36 @@ mod tests {
             Some(sandbox.temp_dir().into())
         );
         assert_eq!(
-            env_value(&sandbox, "GROK_FILE_LOCK_SLOT_DIR"),
+            env_value(&sandbox, "FRIDAY_FILE_LOCK_SLOT_DIR"),
             Some(sandbox.temp_dir().join("lock-slots").into())
         );
         assert_eq!(
-            env_value(&sandbox, "XAI_API_KEY").as_deref(),
+            env_value(&sandbox, "FRIDAY_X_TOKEN").as_deref(),
             Some(OsStr::new(TEST_API_KEY))
         );
         assert_eq!(
-            env_value(&sandbox, "GROK_DISABLE_AUTOUPDATER").as_deref(),
+            env_value(&sandbox, "FRIDAY_DISABLE_AUTOUPDATER").as_deref(),
             Some(OsStr::new("1"))
         );
         assert_eq!(
-            env_value(&sandbox, "GROK_TELEMETRY_TRACE_UPLOAD").as_deref(),
+            env_value(&sandbox, "FRIDAY_TELEMETRY_TRACE_UPLOAD").as_deref(),
             Some(OsStr::new("false"))
         );
         assert_eq!(
-            env_value(&sandbox, "GROK_AGENT_ID").as_deref(),
+            env_value(&sandbox, "FRIDAY_AGENT_ID").as_deref(),
             Some(OsStr::new("grok-e2e-sandbox")),
-            "GROK_AGENT_ID must be pinned so a fresh GROK_HOME never computes a machine id (WMI on Windows)"
+            "FRIDAY_AGENT_ID must be pinned so a fresh FRIDAY_HOME never computes a machine id (WMI on Windows)"
         );
         for (sink, value) in [
-            ("GROK_TELEMETRY_MIXPANEL_ENABLED", "false"),
-            ("GROK_TELEMETRY_MIXPANEL_TOKEN", ""),
-            ("GROK_TELEMETRY_EVENTS_URL", ""),
-            ("GROK_TELEMETRY_EVENTS_API_KEY", ""),
+            ("FRIDAY_TELEMETRY_MIXPANEL_ENABLED", "false"),
+            ("FRIDAY_TELEMETRY_MIXPANEL_TOKEN", ""),
+            ("FRIDAY_TELEMETRY_EVENTS_URL", ""),
+            ("FRIDAY_TELEMETRY_EVENTS_API_KEY", ""),
         ] {
             assert_eq!(
                 env_value(&sandbox, sink).as_deref(),
                 Some(OsStr::new(value)),
-                "{sink} must be pinned off so GROK_TELEMETRY_ENABLED=true cannot reach a production sink"
+                "{sink} must be pinned off so FRIDAY_TELEMETRY_ENABLED=true cannot reach a production sink"
             );
         }
         assert_eq!(
@@ -832,9 +832,9 @@ mod tests {
         ] {
             assert_eq!(env_value(&sandbox, proxy), None, "{proxy} must not leak");
         }
-        assert_eq!(env_value(&sandbox, "GROK_LEADER_SOCKET"), None);
-        assert_eq!(env_value(&sandbox, "GROK_DISABLE_WEB_FETCH"), None);
-        assert_eq!(env_value(&sandbox, "GROK_WEB_FETCH"), None);
+        assert_eq!(env_value(&sandbox, "FRIDAY_LEADER_SOCKET"), None);
+        assert_eq!(env_value(&sandbox, "FRIDAY_DISABLE_WEB_FETCH"), None);
+        assert_eq!(env_value(&sandbox, "FRIDAY_WEB_FETCH"), None);
     }
 
     #[cfg(unix)]
@@ -865,16 +865,16 @@ mod tests {
         let sandbox = TestSandbox::new();
         let mut cmd = Command::new("unused");
         cmd.env("AMBIENT_SECRET", "must-disappear")
-            .env("GROK_PROMPT_SUGGESTIONS", "ambient");
+            .env("FRIDAY_PROMPT_SUGGESTIONS", "ambient");
         sandbox.apply_to_std_command(&mut cmd);
-        cmd.env("GROK_PROMPT_SUGGESTIONS", "command");
+        cmd.env("FRIDAY_PROMPT_SUGGESTIONS", "command");
         let env: BTreeMap<_, _> = cmd
             .get_envs()
             .filter_map(|(key, value)| value.map(|value| (key.to_owned(), value.to_owned())))
             .collect();
         assert!(!env.contains_key(OsStr::new("AMBIENT_SECRET")));
         assert_eq!(
-            env.get(OsStr::new("GROK_PROMPT_SUGGESTIONS"))
+            env.get(OsStr::new("FRIDAY_PROMPT_SUGGESTIONS"))
                 .map(OsString::as_os_str),
             Some(OsStr::new("command"))
         );
@@ -885,22 +885,22 @@ mod tests {
         let mut sandbox = TestSandbox::new();
         sandbox
             .set_env("TERM_PROGRAM", "vscode")
-            .set_env("GROK_PROMPT_SUGGESTIONS", "true")
+            .set_env("FRIDAY_PROMPT_SUGGESTIONS", "true")
             .set_env("NO_PROXY", "override.invalid")
-            .remove_env("GROK_DISABLE_AUTOUPDATER");
+            .remove_env("FRIDAY_DISABLE_AUTOUPDATER");
         assert_eq!(
             env_value(&sandbox, "TERM_PROGRAM").as_deref(),
             Some(OsStr::new("vscode"))
         );
         assert_eq!(
-            env_value(&sandbox, "GROK_PROMPT_SUGGESTIONS").as_deref(),
+            env_value(&sandbox, "FRIDAY_PROMPT_SUGGESTIONS").as_deref(),
             Some(OsStr::new("true"))
         );
         assert_eq!(
             env_value(&sandbox, "NO_PROXY").as_deref(),
             Some(OsStr::new("override.invalid"))
         );
-        assert_eq!(env_value(&sandbox, "GROK_DISABLE_AUTOUPDATER"), None);
+        assert_eq!(env_value(&sandbox, "FRIDAY_DISABLE_AUTOUPDATER"), None);
     }
 
     #[test]
@@ -986,8 +986,8 @@ mod tests {
             ("DB_PASSWORD_FILE", "/secret/password-file"),
             ("AWS_CREDENTIALS", "credentials-do-not-print"),
             ("SESSION_COOKIE", "cookie-do-not-print"),
-            ("GROK_DEPLOYMENT_KEY", "deployment-key-do-not-print"),
-            ("GROK_EXTRA_AUTH_KEY", "alpha-test-key-do-not-print"),
+            ("FRIDAY_DEPLOYMENT_KEY", "deployment-key-do-not-print"),
+            ("FRIDAY_EXTRA_AUTH_KEY", "alpha-test-key-do-not-print"),
             ("AWS_ACCESS_KEY_ID", "aws-access-key-do-not-print"),
             ("PRIVATE_KEY", "private-key-do-not-print"),
         ] {
@@ -1002,8 +1002,8 @@ mod tests {
             "DB_PASSWORD_FILE",
             "AWS_CREDENTIALS",
             "SESSION_COOKIE",
-            "GROK_DEPLOYMENT_KEY",
-            "GROK_EXTRA_AUTH_KEY",
+            "FRIDAY_DEPLOYMENT_KEY",
+            "FRIDAY_EXTRA_AUTH_KEY",
             "AWS_ACCESS_KEY_ID",
             "PRIVATE_KEY",
         ] {

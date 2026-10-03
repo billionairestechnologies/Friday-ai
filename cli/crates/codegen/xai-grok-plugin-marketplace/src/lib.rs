@@ -22,16 +22,17 @@ pub use error::MarketplaceError;
 pub use scanner::scan_marketplace;
 pub use types::*;
 
-/// Display name of the official xAI marketplace source.
-pub const OFFICIAL_SOURCE_NAME: &str = "xAI Official";
+/// Display name of the official marketplace source. Friday X has none yet: plugins come from sources the user
+/// adds themselves, so nothing is auto-registered and nothing is fetched from a vendor repository.
+pub const OFFICIAL_SOURCE_NAME: &str = "Friday Official";
 
-/// Git URL of the official xAI marketplace source, auto-registered on first run.
-pub const OFFICIAL_SOURCE_GIT_URL: &str = "https://github.com/xai-org/plugin-marketplace.git";
+/// Git URL of the official marketplace source. Empty = there is no official source to auto-register.
+pub const OFFICIAL_SOURCE_GIT_URL: &str = "";
 
-/// Whether `url` is the official xAI marketplace source.
-/// Case, a `www.` prefix, a trailing `/` or `.git`, and HTTPS/SSH forms are normalized before comparing.
+/// Whether `url` is the official marketplace source. With no official source this is always false.
 pub fn is_official_source_url(url: &str) -> bool {
-    canonical_github_owner_repo(url).as_deref() == Some("xai-org/plugin-marketplace")
+    !OFFICIAL_SOURCE_GIT_URL.is_empty()
+        && canonical_github_owner_repo(url) == canonical_github_owner_repo(OFFICIAL_SOURCE_GIT_URL)
 }
 
 /// Normalized lowercase `owner/repo` from a GitHub URL (HTTPS/http/ssh/scp, `www.`, trailing `.git`/`/`), or `None` if not a GitHub URL.

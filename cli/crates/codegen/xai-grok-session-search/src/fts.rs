@@ -816,8 +816,8 @@ mod tests {
 
     #[test]
     fn test_open_or_create_uses_wal_on_local_fs() {
-        // The `GROK_SQLITE_JOURNAL_MODE` env var would override the decision; skip if set
-        if std::env::var("GROK_SQLITE_JOURNAL_MODE").is_ok() {
+        // The `FRIDAY_SQLITE_JOURNAL_MODE` env var would override the decision; skip if set
+        if std::env::var("FRIDAY_SQLITE_JOURNAL_MODE").is_ok() {
             return;
         }
         let tmp = TempDir::new().unwrap();

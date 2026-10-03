@@ -210,7 +210,7 @@ fn open_writer() -> Option<LogWriter> {
 }
 
 /// Open (creating if needed) a writer for an explicit path. Split from [`open_writer`] so a writer re-points at its own
-/// path when healing a stale handle rather than re-resolving `$GROK_HOME`. That also makes the healing path testable
+/// path when healing a stale handle rather than re-resolving `$FRIDAY_HOME`. That also makes the healing path testable
 /// against a temp directory.
 fn open_writer_at(path: PathBuf) -> Option<LogWriter> {
     if let Some(parent) = path.parent()
@@ -472,7 +472,7 @@ mod tests {
     use super::*;
 
     /// Pre-main, so no test in this binary can race the lazily-opened
-    /// writer onto the developer's real `~/.grok/logs/unified.jsonl`.
+    /// writer onto the developer's real `~/.friday/logs/unified.jsonl`.
     #[ctor::ctor]
     fn redirect_for_tests() {
         redirect_to_temp_for_tests();

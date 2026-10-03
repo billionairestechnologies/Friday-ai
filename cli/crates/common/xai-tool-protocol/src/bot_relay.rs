@@ -31,9 +31,9 @@ pub const BOT_RELAY_CAPABILITIES: &[&str] = &[
 /// `bot.event` envelope version carried in [`BotEventEnvelope::v`].
 pub const BOT_EVENT_ENVELOPE_V: u32 = 1;
 
-/// Prefix of the `clientNonce` the hub mints for a prompt Grok chat sends to
+/// Prefix of the `clientNonce` the hub mints for a prompt Friday X chat sends to
 /// a bot: `grok-chat.<conversationId>.<uuid>`. Clients may not send it.
-pub const GROK_CHAT_CLIENT_NONCE_PREFIX: &str = "grok-chat.";
+pub const FRIDAY_CHAT_CLIENT_NONCE_PREFIX: &str = "grok-chat.";
 
 /// `reason` on `command_rejected` when the command is compiled in but not allowlisted.
 pub const COMMAND_REJECTED_NOT_YET_ENABLED: &str = "not_yet_enabled";
@@ -380,7 +380,7 @@ pub struct BotTranscriptEntryStamp {
 #[typeshare]
 pub type BotUsageParams = BotEmptyParams;
 
-/// `bot.usage` result: the caller's weekly Grok Bot allowance. Percent-only
+/// `bot.usage` result: the caller's weekly Friday X Bot allowance. Percent-only
 /// by contract — no currency amounts cross the wire — so clients render a
 /// meter, not a balance.
 ///
@@ -411,7 +411,7 @@ pub struct BotUsageResult {
     /// population funding the meter; absent when another plan funds it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub funding_plan: Option<String>,
-    /// Server-owned meter label (e.g. `SuperGrok Heavy`, `Grok Bot Plan`).
+    /// Server-owned meter label (e.g. `SuperGrok Heavy`, `Friday X Bot Plan`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan_label: Option<String>,
     /// Where the caller manages on-demand usage for this meter.
@@ -736,7 +736,7 @@ impl<'de> Deserialize<'de> for BotRelayErrorCode {
     }
 }
 
-/// How one of the caller's Grok accounts signs in. Senders emit only the
+/// How one of the caller's Friday X accounts signs in. Senders emit only the
 /// named variants. Receivers treat any unknown wire string as
 /// [`Self::Other`].
 #[typeshare]
@@ -805,7 +805,7 @@ impl<'de> Deserialize<'de> for BotRelaySignIn {
     }
 }
 
-/// One of the caller's other Grok accounts on the same verified email.
+/// One of the caller's other Friday X accounts on the same verified email.
 ///
 /// `signIn` is a string on the wire. Generated clients see `string` and
 /// compare against [`BotRelaySignIn`]. Unknown values degrade to `other`.

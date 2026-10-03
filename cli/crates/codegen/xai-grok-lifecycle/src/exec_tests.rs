@@ -64,7 +64,7 @@ async fn is_gone_within(pid: u32, bound: Duration) -> bool {
 async fn exec_env_carries_event_reason_disk_and_remaining_deadline() {
     let harness = Harness::new().await;
     let out = harness.path("env.txt");
-    let script = r#"printf '%s|%s|%s|%s' "$GROK_LIFECYCLE_EVENT" "$GROK_LIFECYCLE_REASON" "$GROK_LIFECYCLE_DISK" "$GROK_LIFECYCLE_DEADLINE_MS" > "$0""#;
+    let script = r#"printf '%s|%s|%s|%s' "$FRIDAY_LIFECYCLE_EVENT" "$FRIDAY_LIFECYCLE_REASON" "$FRIDAY_LIFECYCLE_DISK" "$FRIDAY_LIFECYCLE_DEADLINE_MS" > "$0""#;
 
     let outcome = harness
         .run(
@@ -92,7 +92,7 @@ async fn exec_env_carries_event_reason_disk_and_remaining_deadline() {
 async fn deadline_env_is_the_handlers_own_timeout_when_that_is_shorter() {
     let harness = Harness::new().await;
     let out = harness.path("deadline.txt");
-    let script = r#"printf '%s' "$GROK_LIFECYCLE_DEADLINE_MS" > "$0""#;
+    let script = r#"printf '%s' "$FRIDAY_LIFECYCLE_DEADLINE_MS" > "$0""#;
 
     let outcome = harness
         .run(

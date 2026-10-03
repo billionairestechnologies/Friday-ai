@@ -505,7 +505,7 @@ impl AgentView {
     }
 }
 
-/// Grok's own notice quotes only the characters an MCP catalog name allows.
+/// Friday X's own notice quotes only the characters an MCP catalog name allows.
 /// Quotes, spaces, and url punctuation from a configured name could otherwise reshape the notice or become a link.
 fn notice_server_name(server: &str) -> String {
     let name: String = server

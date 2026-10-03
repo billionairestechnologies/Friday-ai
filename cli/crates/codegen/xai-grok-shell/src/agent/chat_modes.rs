@@ -16,7 +16,7 @@ const COLD_FETCH_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_LOCALE: &str = "en";
 /// Process-wide flag set by the pager when started with `--chat`.
 /// Initialize and early UI then seed the chat `/rest/modes` catalog instead of build models.
-pub const GROK_CHAT_MODE_ENV: &str = "GROK_CHAT_MODE";
+pub const FRIDAY_CHAT_MODE_ENV: &str = "FRIDAY_CHAT_MODE";
 /// True when the process is a gateway light-frontend (`--chat`) agent.
 /// Hard-off in release builds so it can't be enabled via env.
 pub fn process_chat_mode_enabled() -> bool {

@@ -283,7 +283,7 @@ mod tests {
     #[serial_test::serial]
     fn hydrated_summary_stamps_worktree_identity_for_worktree_cwd() {
         let home = tempfile::TempDir::new().unwrap();
-        let _env = xai_grok_test_support::EnvGuard::set("GROK_HOME", home.path());
+        let _env = xai_grok_test_support::EnvGuard::set("FRIDAY_HOME", home.path());
         let cwd = home.path().join("worktrees").join("xai").join("fix-bug");
         std::fs::create_dir_all(&cwd).unwrap();
 

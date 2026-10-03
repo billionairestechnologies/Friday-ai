@@ -258,7 +258,7 @@ impl MockInferenceServer {
     /// [`Self::url`] is `https://127.0.0.1:PORT/v1` and [`Self::ca_pem_path`] is the path to the
     /// CA PEM the client must trust. Only [`crate::headless::run_headless`] and
     /// [`crate::headless::run_headless_with_env`] inject it; any other runner must set
-    /// `GROK_EXTRA_CA_BUNDLE` to [`Self::ca_pem_path`] on its own `TestSandbox` via `set_env`.
+    /// `FRIDAY_EXTRA_CA_BUNDLE` to [`Self::ca_pem_path`] on its own `TestSandbox` via `set_env`.
     pub async fn start_tls() -> anyhow::Result<Self> {
         Self::start_inner(
             vec![MockModelEntry::new(DEFAULT_MODEL)],
@@ -397,7 +397,7 @@ impl MockInferenceServer {
         self.state.inference.set_foreground_hold();
     }
 
-    /// Park the next auxiliary whose `x-grok-req-id` starts with `prefix`.
+    /// Park the next auxiliary whose `x-friday-req-id` starts with `prefix`.
     /// An auxiliary with a different id leaves the hold armed.
     pub fn set_auxiliary_hold_matching(&self, prefix: impl Into<String>) {
         self.state.inference.set_auxiliary_hold_matching(prefix);

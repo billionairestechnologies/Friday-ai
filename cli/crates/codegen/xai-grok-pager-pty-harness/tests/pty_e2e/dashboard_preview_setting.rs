@@ -113,7 +113,7 @@ async fn verify_preview_preference(workspace: &str) {
         DEFAULT_COLS,
         &content,
         &["--no-leader"],
-        &[("GROK_WORKSPACE_DASHBOARD", workspace)],
+        &[("FRIDAY_WORKSPACE_DASHBOARD", workspace)],
     )
     .expect("start pager");
     harness
@@ -173,7 +173,7 @@ async fn verify_preview_preference(workspace: &str) {
         DEFAULT_COLS,
         &content,
         &["--no-leader", "-c"],
-        &[("GROK_WORKSPACE_DASHBOARD", workspace)],
+        &[("FRIDAY_WORKSPACE_DASHBOARD", workspace)],
     )
     .expect("restart pager");
     harness

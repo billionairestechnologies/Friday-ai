@@ -3,7 +3,7 @@
 //!
 //! The exporters are plain `opentelemetry_otlp` http/protobuf or gRPC/protobuf exporters.
 //! They are built with **only** the customer headers from `OTEL_EXPORTER_OTLP_HEADERS`.
-//! No code path here can attach `Authorization`, `X-XAI-Token-Auth`, or `x-userid`.
+//! No code path here can attach `Authorization`, `X-Friday-Token-Auth`, or `x-userid`.
 //! Those header constants live in `otel_layer` and are not referenced by this module.
 //! No `AuthCredentialProvider` is ever read.
 
@@ -299,7 +299,7 @@ fn grpc_tls_candidates(
     }
     let mut base =
         ClientTlsConfig::new().trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    // Process-wide `GROK_EXTRA_CA_BUNDLE` roots (fail-open by that crate's contract), matching the HTTP transport's client policy
+    // Process-wide `FRIDAY_EXTRA_CA_BUNDLE` roots (fail-open by that crate's contract), matching the HTTP transport's client policy
     // The same corporate CA must work on both transports
     if let Some(extra_pem) = ders_to_pem_bundle(xai_grok_extra_ca::extra_root_ders()) {
         base = base.ca_certificate(Certificate::from_pem(extra_pem));
@@ -726,7 +726,7 @@ mod tests {
     fn cfg_with_headers(headers: Vec<(String, String)>) -> ExternalOtelConfig {
         let mut cfg = ExternalOtelConfig::resolve_with(
             |name| match name {
-                "GROK_EXTERNAL_OTEL" => Some("1".into()),
+                "FRIDAY_EXTERNAL_OTEL" => Some("1".into()),
                 "OTEL_LOGS_EXPORTER" => Some("otlp".into()),
                 _ => None,
             },
@@ -739,7 +739,7 @@ mod tests {
     }
 
     /// Header-isolation invariant: the outgoing header map equals exactly the parsed `OTEL_EXPORTER_OTLP_HEADERS`.
-    /// None of `Authorization`, `X-XAI-Token-Auth`, `x-userid`, or `x-teamid` appears unless customer-supplied.
+    /// None of `Authorization`, `X-Friday-Token-Auth`, `x-userid`, or `x-teamid` appears unless customer-supplied.
     /// The complement of the internal pipeline's `extra_headers_override_bearer_but_keep_static_identity`.
     #[test]
     fn exporter_headers_are_exactly_customer_headers() {
@@ -748,7 +748,7 @@ mod tests {
         let expected: HashMap<String, String> =
             [("x-collector-token".to_string(), "abc".to_string())].into();
         assert_eq!(headers, expected);
-        for forbidden in ["Authorization", "X-XAI-Token-Auth", "x-userid", "x-teamid"] {
+        for forbidden in ["Authorization", "X-Friday-Token-Auth", "x-userid", "x-teamid"] {
             assert!(
                 !headers.contains_key(forbidden),
                 "{forbidden} must never be auto-attached to external exports"
@@ -775,7 +775,7 @@ mod tests {
     fn grpc_exporters_build_for_https_endpoints() {
         let cfg = ExternalOtelConfig::resolve_with(
             |name| match name {
-                "GROK_EXTERNAL_OTEL" => Some("1".into()),
+                "FRIDAY_EXTERNAL_OTEL" => Some("1".into()),
                 "OTEL_LOGS_EXPORTER" | "OTEL_METRICS_EXPORTER" => Some("otlp".into()),
                 "OTEL_EXPORTER_OTLP_PROTOCOL" => Some("grpc".into()),
                 // Nothing listens here: gRPC channels connect lazily, so exporter construction must still succeed
@@ -839,7 +839,7 @@ mod tests {
     fn inactive_signal_ca_does_not_disable_http_stream() {
         let cfg = ExternalOtelConfig::resolve_with(
             |name| match name {
-                "GROK_EXTERNAL_OTEL" => Some("1".into()),
+                "FRIDAY_EXTERNAL_OTEL" => Some("1".into()),
                 // Only metrics export; logs are off but carry a broken CA.
                 "OTEL_METRICS_EXPORTER" => Some("otlp".into()),
                 "OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE" => {
@@ -940,7 +940,7 @@ mod tests {
         assert!(err.to_string().contains("CLIENT_KEY"), "{err}");
     }
 
-    /// The DER-to-PEM re-encode used for `GROK_EXTRA_CA_BUNDLE` must produce a bundle other PEM parsers can read back, one block per DER.
+    /// The DER-to-PEM re-encode used for `FRIDAY_EXTRA_CA_BUNDLE` must produce a bundle other PEM parsers can read back, one block per DER.
     #[test]
     fn ders_to_pem_bundle_roundtrips() {
         assert!(ders_to_pem_bundle(&[]).is_none());
@@ -1032,7 +1032,7 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some("abc")
         );
-        for forbidden in ["x-xai-token-auth", "x-userid", "x-teamid"] {
+        for forbidden in ["x-friday-token-auth", "x-userid", "x-teamid"] {
             assert!(metadata.get(forbidden).is_none());
         }
     }

@@ -1,4 +1,4 @@
-//! Voice input for Grok Build CLI: an xAI streaming STT client and the [`run_voice_pipeline`] task that emits [`VoiceEvent`]s for the pager.
+//! Voice input for Friday X CLI: an xAI streaming STT client and the [`run_voice_pipeline`] task that emits [`VoiceEvent`]s for the pager.
 //!
 //! Voice is dictation only: the mic streams to STT and the transcript lands in the prompt box.
 //!
@@ -102,15 +102,15 @@ mod intercept_tests {
 
     #[test]
     fn capture_subcommand_matches_only_argv1() {
-        assert!(is_capture_subcommand(&argv(&["grok", "__mic-capture"])));
+        assert!(is_capture_subcommand(&argv(&["friday", "__mic-capture"])));
         assert!(is_capture_subcommand(&argv(&[
             "grok",
             "__mic-capture",
             "--rate",
             "16000"
         ])));
-        assert!(!is_capture_subcommand(&argv(&["grok"])));
-        assert!(!is_capture_subcommand(&argv(&["grok", "chat"])));
+        assert!(!is_capture_subcommand(&argv(&["friday"])));
+        assert!(!is_capture_subcommand(&argv(&["friday", "chat"])));
         assert!(!is_capture_subcommand(&argv(&[
             "grok",
             "chat",

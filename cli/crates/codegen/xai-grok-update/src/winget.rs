@@ -59,15 +59,15 @@ impl Target<'_> {
     }
 }
 
-/// What `grok update` prints for a WinGet install. `channel` is the requested or configured channel, which WinGet
+/// What `friday update` prints for a WinGet install. `channel` is the requested or configured channel, which WinGet
 /// cannot honor unless it is stable.
 pub(crate) fn hand_off_message(target: Target<'_>, channel: &str) -> String {
     let command = target.command();
     let channel_note = ignored_channel_note(channel);
     format!(
-        "Grok Build was installed with WinGet, so WinGet manages its updates.\n\
+        "Friday X was installed with WinGet, so WinGet manages its updates.\n\
          {channel_note}\
-         Quit all running Grok sessions (`grok leader kill` stops a background leader), then run:\n  \
+         Quit all running Grok sessions (`friday leader kill` stops a background leader), then run:\n  \
          {command}\n\
          Use an administrator terminal if WinGet installed Grok for all users.\n\
          New releases can take a few days to reach WinGet. \
@@ -86,10 +86,10 @@ pub(crate) fn ignored_channel_note(channel: &str) -> String {
     }
 }
 
-/// Follows "A new version of Grok Build is available" in headless runs and `grok update --check`.
+/// Follows "A new version of Friday X is available" in headless runs and `friday update --check`.
 pub(crate) fn update_available_note(target: Target<'_>) -> String {
     format!(
-        "Installed with WinGet: quit Grok and run `{}` \
+        "Installed with WinGet: quit Friday X and run `{}` \
          (new releases can take a few days to reach WinGet).",
         target.command()
     )

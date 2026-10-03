@@ -202,7 +202,7 @@ pub struct WorktreeBuilder {
     worktree_id: Option<String>,
     #[cfg(feature = "metadata")]
     metadata: Option<serde_json::Value>,
-    /// Grok home whose `worktrees.db` receives the record; the resolved home when `None`.
+    /// Friday X home whose `worktrees.db` receives the record; the resolved home when `None`.
     #[cfg(feature = "metadata")]
     registry_home: Option<PathBuf>,
     nfs: Option<NfsWorktreeOpts>,
@@ -1754,7 +1754,7 @@ mod tests {
     fn remove_with_delegate_deregisters_plain_worktree_without_calling_delegate() {
         xai_test_utils::require_git!();
         use xai_test_utils::git::{git_commit_all, init_git_repo};
-        // Isolate GROK_HOME so the post-removal unregister writes to a private DB.
+        // Isolate FRIDAY_HOME so the post-removal unregister writes to a private DB.
         #[cfg(feature = "metadata")]
         let _fx = crate::db::GrokHomeFixture::new();
 
@@ -1897,7 +1897,7 @@ mod tests {
 
         let report = delete_snapshot_with_delegate_fallback(
             Path::new("/mnt/btrfs/worktrees/snap-1"),
-            Path::new("/home/u/.grok/worktrees/repo/wt"),
+            Path::new("/home/u/.friday/worktrees/repo/wt"),
             Some(&delegate),
             |_| anyhow::bail!("operation not permitted (os error 1)"),
         )
@@ -2103,7 +2103,7 @@ mod tests {
         let snapshot_path = worktrees_dir.join("wt-live");
         std::fs::create_dir(&snapshot_path).unwrap();
         let unrestored_home = tmp.path().join("unrestored-home");
-        let mount_target = unrestored_home.join(".grok/worktrees/x/wt-live");
+        let mount_target = unrestored_home.join(".friday/worktrees/x/wt-live");
         assert!(
             !mount_target.parent().unwrap().exists(),
             "precondition: mount_target parent must be absent"
@@ -2153,7 +2153,7 @@ mod tests {
         let worktrees_dir = tmp.path().join("worktrees");
         std::fs::create_dir(&worktrees_dir).unwrap();
 
-        let mount_target = std::path::PathBuf::from("/home/user/.grok/worktrees/active-wt");
+        let mount_target = std::path::PathBuf::from("/home/user/.friday/worktrees/active-wt");
 
         let meta = btrfs::BtrfsSnapshotMetadata {
             kind: std::borrow::Cow::Borrowed("btrfs"),

@@ -24,16 +24,16 @@ fn unset_env(key: &str) {
 async fn disabled_trace_export_stays_silent_while_product_posts() {
     let home = std::env::temp_dir().join(format!("tool-call-trace-off-{}", std::process::id()));
     std::fs::create_dir_all(&home).unwrap();
-    set_env("GROK_HOME", home.to_str().unwrap());
-    set_env("GROK_TELEMETRY_ENABLED", "true");
-    set_env("GROK_INSTRUMENTATION", "server");
+    set_env("FRIDAY_HOME", home.to_str().unwrap());
+    set_env("FRIDAY_TELEMETRY_ENABLED", "true");
+    set_env("FRIDAY_INSTRUMENTATION", "server");
     set_env("OTEL_TRACES_EXPORTER", "none");
     unset_env("DISABLE_TELEMETRY");
-    unset_env("GROK_EXTERNAL_OTEL");
+    unset_env("FRIDAY_EXTERNAL_OTEL");
     let traces = MockOtelServer::start().await.expect("traces");
     let product = MockInferenceServer::start().await.expect("product");
     set_env(
-        "GROK_INTERNAL_OTLP_TRACES_ENDPOINT",
+        "FRIDAY_INTERNAL_OTLP_TRACES_ENDPOINT",
         &format!("{}/v1/traces", traces.origin()),
     );
     let config = xai_grok_shell::agent::init::build_default_otel_layer_config();

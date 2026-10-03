@@ -183,7 +183,7 @@ async fn handle_with_sandbox(
 ) -> (WorkspaceHandle, Arc<WorkspaceSandbox>) {
     let grok_home = root.join("grok-home");
     let workspace = root.join("ws");
-    std::fs::create_dir_all(workspace.join(".grok")).unwrap();
+    std::fs::create_dir_all(workspace.join(".friday")).unwrap();
     std::fs::create_dir_all(&grok_home).unwrap();
     std::fs::write(
         crate::sandbox_mode::workspace_config_path(&workspace),

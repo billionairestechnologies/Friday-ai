@@ -1,11 +1,11 @@
 //! # xai-grok-hooks
 //!
-//! Runtime hook system for Grok: file-based discovery, command execution, and policy enforcement.
+//! Runtime hook system for Friday X: file-based discovery, command execution, and policy enforcement.
 //!
 //! ## Overview
 //!
-//! This crate provides a minimal hooks system for Grok. Hooks are discovered
-//! from dedicated directories (`~/.grok/hooks/` and `<git-worktree-root>/.grok/hooks/`),
+//! This crate provides a minimal hooks system for Friday X. Hooks are discovered
+//! from dedicated directories (`~/.friday/hooks/` and `<git-worktree-root>/.friday/hooks/`),
 //! defined in JSON files (compatible settings format), and executed as child processes.
 //!
 //! ## Scope
@@ -24,8 +24,8 @@
 //! use xai_grok_hooks::event::HookEventName;
 //!
 //! let (registry, errors) = load_hooks(
-//!     Some(Path::new("/home/user/.grok/hooks")),
-//!     Some(Path::new("/project/.grok/hooks")),
+//!     Some(Path::new("/home/user/.friday/hooks")),
+//!     Some(Path::new("/project/.friday/hooks")),
 //! );
 //!
 //! for err in &errors {

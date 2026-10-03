@@ -205,14 +205,14 @@ fn doctor_planning_opens_refuses_remote_and_rejects_stale_identity() {
         TaskResult::DoctorFixPlanned {
             target: target.clone(),
             result: Ok(crate::app::actions::DoctorPlanningOutcome::RunLocally(
-                "grok doctor fix ssh-wrap".to_owned(),
+                "friday doctor fix ssh-wrap".to_owned(),
             )),
         },
         &mut app,
     );
     assert!(
         last_system_text(&app, id)
-            .contains("On your local computer, run: grok doctor fix ssh-wrap")
+            .contains("On your local computer, run: friday doctor fix ssh-wrap")
     );
 
     app.agents
@@ -600,7 +600,7 @@ fn wrap_host_image_request_eligible_covers_full_miss_and_attachment_error_only()
     use crate::app::actions::{ClipboardPasteCompletion, ClipboardPasteFailure};
 
     // A clean empty miss and a remote read *error* both fall through to the wrap host-image request
-    // That request is how `grok wrap` pastes images over headless SSH
+    // That request is how `friday wrap` pastes images over headless SSH
     assert!(wrap_host_image_request_eligible(
         ClipboardPasteCompletion::FullMiss
     ));
@@ -1268,7 +1268,7 @@ fn switch_model_complete_success_updates_model_and_pushes_message() {
         .available
         .insert(
             model_id.clone(),
-            acp::ModelInfo::new(model_id.clone(), "Grok 4.5".to_string()),
+            acp::ModelInfo::new(model_id.clone(), "Friday X 4.5".to_string()),
         );
     app.agents
         .get_mut(&id)
@@ -1315,7 +1315,7 @@ fn switch_model_complete_skips_message_and_persist_when_unchanged() {
     let agent = app.agents.get_mut(&id).unwrap();
     agent.session.models.available.insert(
         model_id.clone(),
-        acp::ModelInfo::new(model_id.clone(), "Grok 4.5".to_string()),
+        acp::ModelInfo::new(model_id.clone(), "Friday X 4.5".to_string()),
     );
     agent.session.models.current = Some(model_id.clone());
     agent.session.models.reasoning_effort = None;
@@ -1436,7 +1436,7 @@ fn switch_to_non_reasoning_model_clears_persisted_effort() {
         .available
         .insert(
             model_id.clone(),
-            acp::ModelInfo::new(model_id.clone(), "Grok Build".to_string()),
+            acp::ModelInfo::new(model_id.clone(), "Friday X".to_string()),
         );
     app.agents
         .get_mut(&id)
@@ -1701,12 +1701,12 @@ fn same_agent_type_switch_no_modal() {
     let agent = app.agents.get_mut(&id).unwrap();
     agent.session.models.available.insert(
         model_a.clone(),
-        acp::ModelInfo::new(model_a.clone(), "Grok Build A".to_string()),
+        acp::ModelInfo::new(model_a.clone(), "Friday X A".to_string()),
     );
     agent.session.models.set_current(model_a, None);
     agent.session.models.available.insert(
         model_b.clone(),
-        acp::ModelInfo::new(model_b.clone(), "Grok Build B".to_string()),
+        acp::ModelInfo::new(model_b.clone(), "Friday X B".to_string()),
     );
     agent.session.model_switch_pending = true;
 

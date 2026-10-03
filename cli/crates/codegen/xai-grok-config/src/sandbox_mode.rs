@@ -3,11 +3,11 @@ use std::str::FromStr;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// Environment override for the mode, above every config file.
-pub const SANDBOX_MODE_ENV: &str = "GROK_SANDBOX_MODE";
+pub const SANDBOX_MODE_ENV: &str = "FRIDAY_SANDBOX_MODE";
 
 /// Rollout mode of the per-command sandbox. Resolved per workspace by [`SandboxMode::resolve`]:
-/// `GROK_SANDBOX_MODE`, then the remote rollout switch, then `<grok_home>/workspaced.toml`, then
-/// the default (`Off`); the workspace's `.grok/workspaced.toml` may only tighten the result. On a
+/// `FRIDAY_SANDBOX_MODE`, then the remote rollout switch, then `<grok_home>/workspaced.toml`, then
+/// the default (`Off`); the workspace's `.friday/workspaced.toml` may only tighten the result. On a
 /// host with no sandbox backend the result is then subject to [`ResolvedSandboxMode::on_host`].
 ///
 /// - `Off` (the default): no wrapper, no proxy env, no decode — the spawn is byte-identical to a
@@ -99,7 +99,7 @@ impl SandboxMode {
     /// - The env value is a string; one that does not name a mode is logged (never echoed) and
     ///   skipped, so a typo cannot turn the sandbox off (or on) through a lower layer's silence.
     /// - The workspace layer applies only when neither the env nor the remote layer decided: a
-    ///   cloned repository's `.grok/workspaced.toml` may raise the mode above the user's, never
+    ///   cloned repository's `.friday/workspaced.toml` may raise the mode above the user's, never
     ///   lower it (a lower value is ignored with one warning), and never override a developer's
     ///   env or the fleet's rollout switch. It is read whether or not the folder is trusted: a
     ///   layer that can only tighten needs no trust, and gating it on trust would let a
@@ -241,7 +241,7 @@ pub struct SandboxModeLayers<'a> {
     /// the user's or folder's own names it ([`SandboxMode::resolve_on_host`]).
     pub remote: Option<SandboxMode>,
     pub user: Option<SandboxMode>,
-    /// The folder's own `.grok/workspaced.toml`.
+    /// The folder's own `.friday/workspaced.toml`.
     pub workspace: Option<SandboxMode>,
     /// The file layers that are there but were refused or could not be read; their values above
     /// are not used.
@@ -328,7 +328,7 @@ impl ResolvedSandboxMode {
             requested = <&str>::from(self.mode),
             source = <&str>::from(self.source),
             "the rollout switch asks for enforce but this host has no sandbox backend: running \
-             off; a developer's own enforce (GROK_SANDBOX_MODE or workspaced.toml) would refuse \
+             off; a developer's own enforce (FRIDAY_SANDBOX_MODE or workspaced.toml) would refuse \
              every command instead"
         );
         ResolvedSandboxMode {

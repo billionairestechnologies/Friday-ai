@@ -230,7 +230,7 @@ fn log_coding_data_consent_selected(
 }
 
 /// Set coding-data-sharing preference.
-/// The shell owns this setting and stores it in auth metadata (persists via ACP ext-request, NOT `~/.grok/config.toml`).
+/// The shell owns this setting and stores it in auth metadata (persists via ACP ext-request, NOT `~/.friday/config.toml`).
 pub(super) fn set_coding_data_sharing(
     app: &mut AppView,
     opted_in: bool,
@@ -445,7 +445,7 @@ pub(super) fn dispatch_manage_billing(app: &mut AppView) -> Vec<Effect> {
         return vec![];
     }
     super::router::dispatch(
-        crate::app::actions::Action::OpenUrl("https://grok.com/?_s=usage".to_string()),
+        crate::app::actions::Action::OpenUrl("https://friday.billionairestechnologies.com/upgrade".to_string()),
         app,
     )
 }
@@ -528,7 +528,7 @@ pub(super) fn notify_session_ready(
 ) {
     notification_service.notify(NotificationEvent {
         kind: NotificationEventKind::SessionReady,
-        title: "Grok".into(),
+        title: "Friday X".into(),
         body: NotificationEventKind::SessionReady.as_ref().into(),
         session_id: agent.session.session_id.as_ref().map(|s| s.0.to_string()),
     });

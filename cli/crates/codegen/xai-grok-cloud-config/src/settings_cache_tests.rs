@@ -190,7 +190,7 @@ fn persist_replaces_a_newer_entry_this_process_cannot_read() {
             },
         ),
         (
-            "another grok version",
+            "another friday version",
             SettingsCache {
                 grok_version: format!("{}-other", xai_grok_version::VERSION),
                 ..unreadable()

@@ -1368,11 +1368,11 @@ mod tests {
             })
         );
 
-        let environment_key_command = "XAI_API_KEY='xai-some-key' cargo run --bin xai-grok-pager";
+        let environment_key_command = "FRIDAY_X_TOKEN='xai-some-key' cargo run --bin xai-grok-pager";
         assert_eq!(
             primary_command_from_script(environment_key_command),
             Some(BashCommandHighlights {
-                prefix: vec!["XAI_API_KEY=xai-some-key".to_owned()],
+                prefix: vec!["FRIDAY_X_TOKEN=xai-some-key".to_owned()],
                 highlighted_words: vec![
                     "cargo".to_owned(),
                     "run".to_owned(),

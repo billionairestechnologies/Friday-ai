@@ -1,5 +1,5 @@
 //! Sandbox profiles. Built-in: `workspace`, `devbox`, `read-only`, `strict`,
-//! `off`. Custom profiles via `~/.grok/sandbox.toml` or `.grok/sandbox.toml`.
+//! `off`. Custom profiles via `~/.friday/sandbox.toml` or `.friday/sandbox.toml`.
 //! A custom profile's `deny` list is kernel-enforced (read and write/rename) on both platforms.
 
 #[cfg(all(feature = "enforce", unix))]
@@ -111,20 +111,20 @@ impl std::str::FromStr for ProfileName {
     }
 }
 
-/// Load sandbox config from `~/.grok/sandbox.toml` and `.grok/sandbox.toml`. Project config may add new profile names
+/// Load sandbox config from `~/.friday/sandbox.toml` and `.friday/sandbox.toml`. Project config may add new profile names
 /// only. It cannot redefine a name already present in the global config. Last-write-wins would let a malicious workspace
 /// hollow out a user/enterprise custom profile while keeping the trusted name.
 pub fn load_sandbox_config(workspace: &Path) -> SandboxConfig {
     let mut config = SandboxConfig::default();
 
-    // Global config: ~/.grok/sandbox.toml
+    // Global config: ~/.friday/sandbox.toml
     let global_path = grok_home().join(SANDBOX_CONFIG_FILENAME);
     if let Some(global) = load_config_file(&global_path) {
         config = global;
     }
 
-    // Project config: <workspace>/.grok/sandbox.toml (additive only)
-    let project_path = workspace.join(".grok").join(SANDBOX_CONFIG_FILENAME);
+    // Project config: <workspace>/.friday/sandbox.toml (additive only)
+    let project_path = workspace.join(".friday").join(SANDBOX_CONFIG_FILENAME);
     if let Some(project) = load_config_file(&project_path) {
         merge_project_profiles(&mut config, project);
     }
@@ -134,7 +134,7 @@ pub fn load_sandbox_config(workspace: &Path) -> SandboxConfig {
 
 pub fn sandbox_profile_conflicts(workspace: &Path) -> Vec<String> {
     let global = load_config_file(&grok_home().join(SANDBOX_CONFIG_FILENAME)).unwrap_or_default();
-    let project = load_config_file(&workspace.join(".grok").join(SANDBOX_CONFIG_FILENAME))
+    let project = load_config_file(&workspace.join(".friday").join(SANDBOX_CONFIG_FILENAME))
         .unwrap_or_default();
     mismatched_profile_names(&global, &project)
 }
@@ -233,7 +233,7 @@ impl ProfileName {
                     return Some(real);
                 }
                 let default_sessions =
-                    xai_dirs::home_dir().map(|user_home| user_home.join(".grok").join("sessions"));
+                    xai_dirs::home_dir().map(|user_home| user_home.join(".friday").join("sessions"));
                 if path.file_name() == Some(std::ffi::OsStr::new("sessions"))
                     && default_sessions.as_ref() == Some(&real)
                 {
@@ -278,7 +278,7 @@ impl ProfileName {
 
         // Read-write paths. nono/Landlock need the path to exist at apply time (it opens an O_PATH fd), but new files within a
         // granted directory can be created freely after the sandbox is applied. Symlink children of grok_home fail closed unless
-        // the canonical dir is this home's same-named child or default ~/.grok/sessions.
+        // the canonical dir is this home's same-named child or default ~/.friday/sessions.
         let home = grok_home();
         for path in &profile.read_write {
             let Some(grant) = Self::read_write_grant_path(path, &home) else {
@@ -502,7 +502,7 @@ impl ProfileName {
                 let profile_config = config.profiles.get(name).ok_or_else(|| {
                     anyhow::anyhow!(
                         "Custom sandbox profile '{name}' not found. \
-                         Define it in ~/.grok/sandbox.toml or .grok/sandbox.toml:\n\n\
+                         Define it in ~/.friday/sandbox.toml or .friday/sandbox.toml:\n\n\
                          [profiles.{name}]\n\
                          extends = \"workspace\"\n\
                          read_only = [\"/data\"]\n"
@@ -1130,7 +1130,7 @@ read_write = ["/tmp/ci-artifacts"]
         // Directories must stay grantable
         // On Linux, File::open returns EISDIR; on macOS it often succeeds
         // Either way the probe must return true so directory devices (e.g. /dev/fd via DEVICE_DIRS) are not dropped.
-        let dir = std::env::temp_dir().join(format!("grok-sbx-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("friday-sbx-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         match std::fs::File::open(&dir) {
             Err(e) => {

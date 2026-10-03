@@ -24,7 +24,7 @@ use crate::types::resources::SharedResources;
 use crate::types::template_renderer::TemplateRenderer;
 use crate::types::tool::{ToolKind, ToolNamespace};
 
-/// Grok-tools-specific metadata trait. Each tool struct implements this alongside `xai_tool_runtime::Tool`. Only `kind()`, `namespace()`, and
+/// Friday X-tools-specific metadata trait. Each tool struct implements this alongside `xai_tool_runtime::Tool`. Only `kind()`, `namespace()`, and
 /// `description_template()` are required; all other methods have defaults. The `ToolRegistry` stores a type-erased handle to each tool's
 /// `ToolMetadata` impl so it can call `versioned_definition()`, etc. after dispatch.
 pub trait ToolMetadata: Send + Sync {
