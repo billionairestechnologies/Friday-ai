@@ -1,0 +1,13 @@
+flowchart TB
+  prompt[System prompt persona]
+  recap[Capped account recap]
+  turn[User turn]
+  friday[Friday answers]
+  beat[One curious beat]
+  wait[She waits]
+  memory[(Session summary on the account)]
+  turn --> friday
+  prompt --> friday
+  recap --> friday
+  friday --> beat --> wait
+  wait --> memory

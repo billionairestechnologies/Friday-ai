@@ -10,3 +10,5 @@ These are the records the phone session uses. They are not a second database des
 | [Presence](04-presence.md) | Which of the user's systems are connected |
 | [Delivery](05-delivery.md) | Where the result is spoken or sent |
 | [Entitlements](06-entitlements.md) | Who may call, and how many minutes they have |
+| [Persona](07-persona.md) | How Friday speaks on the line |
+| [Memory](08-memory.md) | Capped recap on the verified account |

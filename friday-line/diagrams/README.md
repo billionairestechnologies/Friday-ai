@@ -12,6 +12,7 @@ Sources are Mermaid. SVG and PNG sit next to each source after render.
 | 06 | Co-working with a sandbox or a connected system | [png](06-coworking.png) | [mmd](06-coworking.mmd) |
 | 07 | Premium gate, minutes, admin | [png](07-entitlements.png) | [mmd](07-entitlements.mmd) |
 | 08 | Agents and workflows | [png](08-agents-and-workflows.png) | [mmd](08-agents-and-workflows.mmd) |
+| 09 | Persona and memory on a turn | [png](09-persona-and-memory.png) | [mmd](09-persona-and-memory.mmd) |
 
 Regenerate from this folder:
 
@@ -20,4 +21,4 @@ npx -p @mermaid-js/mermaid-cli mmdc -i 01-phone-session.mmd -o 01-phone-session.
 npx -p @mermaid-js/mermaid-cli mmdc -i 01-phone-session.mmd -o 01-phone-session.png -b white -s 2
 ```
 
-Open [view.html](view.html) in a browser to see all eight without exporting.
+Open [view.html](view.html) in a browser to see all nine without exporting.

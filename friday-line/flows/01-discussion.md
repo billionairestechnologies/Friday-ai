@@ -10,7 +10,7 @@ The call is a conversation with Friday. It is not a menu, and it is not a script
 4. That answer is spoken.
 5. Friday stops. The line stays quiet until the user speaks again.
 
-If Friday did not understand the job, she asks one question and waits. She does not stack questions.
+If Friday did not understand the job, she asks one question and waits. She does not stack questions. The rest of the spoken shape, including the one curious beat, is [the persona](../models/07-persona.md).
 
 If the user talks over her, barge-in stops her audio and the new turn replaces the rest of that reply.
 
