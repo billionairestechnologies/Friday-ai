@@ -25,14 +25,14 @@ use tokio::io::AsyncReadExt;
 // Marker constants
 // ============================================================================
 
-const BASH_STATE_START_MARKER: &str = "__GROK_BASH_STATE_START__";
-const BASH_STATE_END_MARKER: &str = "__GROK_BASH_STATE_END__";
-const ZSH_STATE_START_MARKER: &str = "__GROK_ZSH_STATE_START__";
-const ZSH_STATE_END_MARKER: &str = "__GROK_ZSH_STATE_END__";
+const BASH_STATE_START_MARKER: &str = "__FRIDAY_BASH_STATE_START__";
+const BASH_STATE_END_MARKER: &str = "__FRIDAY_BASH_STATE_END__";
+const ZSH_STATE_START_MARKER: &str = "__FRIDAY_ZSH_STATE_START__";
+const ZSH_STATE_END_MARKER: &str = "__FRIDAY_ZSH_STATE_END__";
 
 /// Marker emitted by the init path to separate login-shell noise (MOTD, etc.)
 /// from the actual state dump on stdout.
-const INIT_STATE_MARKER: &str = "__GROK_INIT_STATE_MARKER__";
+const INIT_STATE_MARKER: &str = "__FRIDAY_INIT_STATE_MARKER__";
 
 /// Maximum time to wait for a shell state init (login shell + rc files).
 const INIT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -92,13 +92,13 @@ dump_bash_state() {
     if [[ -n "$content" ]]; then
       builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'FRIDAY_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
       command base64 <<<"$content" | command tr -d '\n'
-      builtin printf '\nGROK_SNAP_EOF_%s\n' "$var_name"
+      builtin printf '\nFRIDAY_SNAP_EOF_%s\n' "$var_name"
       builtin printf ')\n'
       builtin printf 'eval "$grok_snap_%s"\n' "$var_name"
     fi
   }
 
-  _emit "__GROK_BASH_STATE_START__"
+  _emit "__FRIDAY_BASH_STATE_START__"
 
   _emit "$PWD"
 
@@ -125,7 +125,7 @@ dump_bash_state() {
   _emit_encoded "$aliases" "ALIASES_B64"
 
   _emit "# end of bash state dump"
-  _emit "__GROK_BASH_STATE_END__"
+  _emit "__FRIDAY_BASH_STATE_END__"
 }
 "##;
 
@@ -148,13 +148,13 @@ function dump_zsh_state() {
     if [[ -n "$content" ]]; then
       builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'FRIDAY_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
       command base64 <<<"$content" | command tr -d '\n'
-      builtin printf '\nGROK_SNAP_EOF_%s\n' "$var_name"
+      builtin printf '\nFRIDAY_SNAP_EOF_%s\n' "$var_name"
       builtin printf ')\n'
       builtin printf 'eval "$grok_snap_%s"\n' "$var_name"
     fi
   }
 
-  _emit "__GROK_ZSH_STATE_START__"
+  _emit "__FRIDAY_ZSH_STATE_START__"
 
   _emit "$PWD"
 
@@ -178,7 +178,7 @@ function dump_zsh_state() {
   _emit_encoded "$aliases" "ALIASES_B64"
 
   _emit "# end of zsh state dump"
-  _emit "__GROK_ZSH_STATE_END__"
+  _emit "__FRIDAY_ZSH_STATE_END__"
 }
 "##;
 
@@ -871,11 +871,11 @@ mod tests {
 
     #[test]
     fn parse_dump_valid_bash() {
-        let raw = "__GROK_BASH_STATE_START__\n\
+        let raw = "__FRIDAY_BASH_STATE_START__\n\
                     /home/user/project\n\
                     export FOO=bar\n\
                     # end of bash state dump\n\
-                    __GROK_BASH_STATE_END__\n";
+                    __FRIDAY_BASH_STATE_END__\n";
         let (cwd, rest) = parse_dump(ShellKind::Bash, raw).unwrap();
         assert_eq!(cwd, PathBuf::from("/home/user/project"));
         assert!(rest.contains("export FOO=bar"));
@@ -883,11 +883,11 @@ mod tests {
 
     #[test]
     fn parse_dump_valid_zsh() {
-        let raw = "__GROK_ZSH_STATE_START__\n\
+        let raw = "__FRIDAY_ZSH_STATE_START__\n\
                     /tmp\n\
                     typeset -x FOO=bar\n\
                     # end of zsh state dump\n\
-                    __GROK_ZSH_STATE_END__\n";
+                    __FRIDAY_ZSH_STATE_END__\n";
         let (cwd, rest) = parse_dump(ShellKind::Zsh, raw).unwrap();
         assert_eq!(cwd, PathBuf::from("/tmp"));
         assert!(rest.contains("typeset -x FOO=bar"));
@@ -895,28 +895,28 @@ mod tests {
 
     #[test]
     fn parse_dump_missing_start_marker() {
-        let raw = "/home/user\nexport FOO=bar\n__GROK_BASH_STATE_END__\n";
+        let raw = "/home/user\nexport FOO=bar\n__FRIDAY_BASH_STATE_END__\n";
         assert!(parse_dump(ShellKind::Bash, raw).is_none());
     }
 
     #[test]
     fn parse_dump_missing_end_marker() {
-        let raw = "__GROK_BASH_STATE_START__\n/home/user\nexport FOO=bar\n";
+        let raw = "__FRIDAY_BASH_STATE_START__\n/home/user\nexport FOO=bar\n";
         assert!(parse_dump(ShellKind::Bash, raw).is_none());
     }
 
     #[test]
     fn parse_dump_wrong_shell_markers() {
-        let raw = "__GROK_ZSH_STATE_START__\n/tmp\nstuff\n__GROK_ZSH_STATE_END__\n";
+        let raw = "__FRIDAY_ZSH_STATE_START__\n/tmp\nstuff\n__FRIDAY_ZSH_STATE_END__\n";
         assert!(parse_dump(ShellKind::Bash, raw).is_none());
     }
 
     #[test]
     fn parse_dump_empty_snapshot() {
-        let raw = "__GROK_BASH_STATE_START__\n\
+        let raw = "__FRIDAY_BASH_STATE_START__\n\
                     /home/user\n\
                     # end of bash state dump\n\
-                    __GROK_BASH_STATE_END__\n";
+                    __FRIDAY_BASH_STATE_END__\n";
         let (cwd, rest) = parse_dump(ShellKind::Bash, raw).unwrap();
         assert_eq!(cwd, PathBuf::from("/home/user"));
         assert!(rest.contains("# end of bash state dump"));
@@ -924,15 +924,15 @@ mod tests {
 
     #[test]
     fn parse_after_marker_found() {
-        let output = "Welcome to Ubuntu\nMOTD line\n__GROK_INIT_STATE_MARKER__\nactual data\n";
-        let result = parse_after_marker(output, "__GROK_INIT_STATE_MARKER__");
+        let output = "Welcome to Ubuntu\nMOTD line\n__FRIDAY_INIT_STATE_MARKER__\nactual data\n";
+        let result = parse_after_marker(output, "__FRIDAY_INIT_STATE_MARKER__");
         assert_eq!(result, "actual data\n");
     }
 
     #[test]
     fn parse_after_marker_not_found() {
         let output = "just some output\n";
-        let result = parse_after_marker(output, "__GROK_INIT_STATE_MARKER__");
+        let result = parse_after_marker(output, "__FRIDAY_INIT_STATE_MARKER__");
         assert_eq!(result, output);
     }
 
@@ -978,11 +978,11 @@ mod tests {
             shell: ShellKind::Bash,
         };
 
-        let dump = "__GROK_BASH_STATE_START__\n\
+        let dump = "__FRIDAY_BASH_STATE_START__\n\
                      /new/dir\n\
                      export X=1\n\
                      # end of bash state dump\n\
-                     __GROK_BASH_STATE_END__\n";
+                     __FRIDAY_BASH_STATE_END__\n";
         assert!(state.update_from_dump(dump));
         assert_eq!(state.cwd, PathBuf::from("/new/dir"));
         assert!(state.snapshot.contains("export X=1"));
@@ -1006,7 +1006,7 @@ mod tests {
         let payload = base64::engine::general_purpose::STANDARD.encode(script);
         format!(
             "\ngrok_snap_ENV_VARS_B64=$(command base64 -d <<'FRIDAY_SNAP_EOF_ENV_VARS_B64'\n\
-             {payload}\nGROK_SNAP_EOF_ENV_VARS_B64\n)\neval \"$grok_snap_ENV_VARS_B64\"\n"
+             {payload}\nFRIDAY_SNAP_EOF_ENV_VARS_B64\n)\neval \"$grok_snap_ENV_VARS_B64\"\n"
         )
     }
 

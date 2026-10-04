@@ -383,7 +383,7 @@ fn apply_recheck_meta(app: &mut AppView, mut meta: xai_grok_login::AuthMeta) {
     app.apply_auth_meta(&meta);
 }
 
-/// `x.ai/auth/check_subscription` completed.
+/// `friday/auth/check_subscription` completed.
 /// A failed check only promotes the deferred gate it was verifying (the `verify` generation).
 /// Generic watch, focus, and paywall-chain failures never touch it.
 pub(super) fn handle_check_subscription_complete(

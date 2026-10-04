@@ -10,3 +10,4 @@ Each flow is the working path for one part of a call. The diagrams in [../diagra
 | [Delivery](04-delivery.md) | Call, app, Telegram, WhatsApp, email |
 | [Co-working](05-coworking.md) | The call drives a sandbox or a connected system |
 | [Agents and workflows](06-agents-and-workflows.md) | Loops, schedules, and automations from the phone |
+| [Persona and memory](07-persona-and-memory.md) | How a turn sounds, and what the next call remembers |

@@ -1,4 +1,4 @@
-//! `x.ai/share_session` extension handler.
+//! `friday/share_session` extension handler.
 //!
 //! Loads a local session, exports it, uploads the message payload to cloud storage via a signed URL, and asks the backend for a public share URL.
 //! The signed URL lets large sessions bypass the proxy/backend body-size limits.
@@ -19,7 +19,7 @@ use xai_grok_telemetry::id::agent_id;
 #[tracing::instrument(skip_all, fields(method = %args.method))]
 pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     match args.method.as_ref() {
-        "x.ai/share_session" => {
+        "friday/share_session" => {
             tracing::info!("handling share session request");
             handle_share_session(agent, args).await
         }
@@ -204,6 +204,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
     fn share_works_outside_the_5m_early_invalidation_window() {
         let (mgr, _dir) = make_auth_manager_with_token_expiring_in(Duration::minutes(10));
         assert!(mgr.current().is_some());
@@ -211,6 +212,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
     fn share_succeeds_inside_the_5m_early_invalidation_window() {
         let (mgr, _dir) = make_auth_manager_with_token_expiring_in(Duration::seconds(1));
         // The regression state: the token sits inside the early-invalidation buffer

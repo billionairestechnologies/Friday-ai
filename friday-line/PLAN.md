@@ -8,9 +8,18 @@ Someone who will not live in an app can still run Friday. They call. Friday is t
 
 The phone is not a smaller Friday. If a computer, the CLI, or a sandbox is connected, the call can drive that too. They talk. Friday operates the connected system.
 
+## Upgrades
+
+Four upgrades sit on this session. They do not replace the runtime, the delivery channels, or the hold-or-release rule. The spec is [UPGRADES.md](UPGRADES.md).
+
+- **Persona.** Style lives in Friday's system prompt. Short spoken turns, one curious beat, then she waits.
+- **Memory.** Transcript and a capped recap are stored on the verified account. The next call sees last job, last channel, and open loops. Memory does not grant a tool.
+- **Cost guard.** The hold-or-release rule stands. She stays short because the line is metered. The gateway enforces the same entitlements as the app.
+- **Human in the loop.** Spoken yes, voice PIN when it leaves the account, and "rukho" or "stop" pauses a loop. Unknown numbers never reach the agent.
+
 ## How the call feels
 
-A discussion. The user asks. Friday answers. She stops and waits.
+A discussion. The user asks. Friday answers. She stops and waits. The full spoken style is the persona upgrade.
 
 - One turn each. Friday does not keep talking, and she does not fill silence.
 - She asks a clarifying question only when the job is actually ambiguous, then she waits.
@@ -91,7 +100,7 @@ Sarvam for speech. Exotel for the Indian number (`api.in.exotel.com`, KYC, Exoph
 
 - Each turn goes to the runtime with the call session id.
 - The runtime returns a spoken reply, or a spoken acknowledgement plus a job id and a delivery target.
-- `on_end` stores the transcript on the session and deducts minutes.
+- `on_end` stores the transcript on the session, keyed to the verified account, and deducts minutes. The next call gets a capped recap, not the full history.
 - Gateway hosted in India. Sarvam's tool-call egress `4.213.167.70` is allowlisted. The service token stays on the server.
 
 Latency to hold while testing the short path: a spoken acknowledgement under a second, a simple answer inside the 5–10 second hold. A US-east voice hop adds 200–300 ms on its own.

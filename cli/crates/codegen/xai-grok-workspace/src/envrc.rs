@@ -22,7 +22,7 @@ const PIPE_DRAIN_CAP: Duration = Duration::from_secs(2);
 const MAX_DRAIN_BYTES: usize = 4 * 1024 * 1024;
 
 /// Prefix only; each run appends a nonce so no env entry can forge the anchor.
-const OUTPUT_SENTINEL: &str = "__GROK_ENVRC_COMPLETE__";
+const OUTPUT_SENTINEL: &str = "__FRIDAY_ENVRC_COMPLETE__";
 
 /// Loader-side slack over the evaluator deadline (covers a wedged stat).
 pub const JOIN_SLACK: Duration = Duration::from_secs(10);
@@ -779,13 +779,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(
             dir.path().join(".envrc"),
-            "export __GROK_ENVRC_COMPLETE__=decoy\nexport ZZ_AFTER_DECOY=survives\n",
+            "export __FRIDAY_ENVRC_COMPLETE__=decoy\nexport ZZ_AFTER_DECOY=survives\n",
         )
         .unwrap();
 
         let env = load_envrc_with_timeout(dir.path(), Duration::from_secs(10), None).unwrap();
         assert_eq!(
-            env.get("__GROK_ENVRC_COMPLETE__"),
+            env.get("__FRIDAY_ENVRC_COMPLETE__"),
             Some(&"decoy".to_string())
         );
         assert_eq!(env.get("ZZ_AFTER_DECOY"), Some(&"survives".to_string()));

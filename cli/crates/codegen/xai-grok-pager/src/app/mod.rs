@@ -330,6 +330,7 @@ mod voice_gate_tests {
     use super::{resolve_voice_mode_enabled, resolve_voice_mode_enabled_as};
     use xai_grok_config::Distribution;
     #[test]
+    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
     fn a_distribution_without_voice_outranks_every_tier_and_the_api_key_force_on() {
         for remote in [None, Some(false), Some(true)] {
             assert!(!resolve_voice_mode_enabled_as(
@@ -349,6 +350,7 @@ mod voice_gate_tests {
         ));
     }
     #[test]
+    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
     fn api_key_force_on_over_remote_kill_only() {
         assert!(resolve_voice_mode_enabled(None, None, Some(false), true));
         assert!(!resolve_voice_mode_enabled(None, None, Some(false), false));
@@ -2289,9 +2291,9 @@ mod tests {
         assert!(!args.no_alt_screen);
     }
     #[test]
-    fn cli_command_name_is_grok() {
+    fn cli_command_name_is_friday() {
         use clap::CommandFactory;
-        assert_eq!(PagerArgs::command().get_name(), "grok");
+        assert_eq!(PagerArgs::command().get_name(), "friday");
     }
     #[test]
     fn cli_help_output_header() {
@@ -2303,7 +2305,7 @@ mod tests {
             vec![
                 "Friday X TUI",
                 "",
-                "Usage: grok [OPTIONS] [PROMPT] [COMMAND]",
+                "Usage: friday [OPTIONS] [PROMPT] [COMMAND]",
                 "",
                 "Arguments:",
             ]

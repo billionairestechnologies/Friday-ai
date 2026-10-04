@@ -626,30 +626,30 @@ fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> b
         return handle_session_notification(notif, app);
     }
     match method {
-        "x.ai/follow_ups" => handle_follow_ups(notif, app),
-        "x.ai/task_backgrounded" => handle_task_backgrounded(notif, app),
-        "x.ai/task_completed" => handle_task_completed(notif, app),
-        "x.ai/models/update" => handle_models_update(notif, app),
-        "x.ai/settings/update" => handle_settings_update(notif, app),
-        "x.ai/sessions/changed" => handle_sessions_changed(notif, app),
-        "x.ai/queue/changed" => handle_queue_changed(notif, app),
-        "x.ai/session/prompt_complete" => handle_prompt_complete(notif, app),
-        "x.ai/session/interjection" => handle_interjection(notif, app),
-        "x.ai/monitor_event" => handle_monitor_event(notif, app),
-        "x.ai/scheduled_task_created" => handle_scheduled_task_created(notif, app),
-        "x.ai/scheduled_task_fired" => handle_scheduled_task_fired(notif, app),
-        "x.ai/scheduled_task_deleted" => handle_scheduled_task_deleted(notif, app),
-        "x.ai/announcements/update" => handle_announcements_update(notif, app),
-        "x.ai/git_head_changed" => handle_git_head_changed(notif, app),
-        "x.ai/leader/version_mismatch" => handle_version_mismatch(notif, app),
-        "x.ai/mcp/init_progress" => handle_mcp_init_progress(notif, app),
-        "x.ai/session/setup" => handle_session_setup_phase(notif, app),
-        "x.ai/mcp/tools_changed" | "x.ai/mcp_initialized" => handle_mcp_tools_changed(notif, app),
-        "x.ai/mcp/server_status" if push_server_status_enabled() => {
+        "friday/follow_ups" => handle_follow_ups(notif, app),
+        "friday/task_backgrounded" => handle_task_backgrounded(notif, app),
+        "friday/task_completed" => handle_task_completed(notif, app),
+        "friday/models/update" => handle_models_update(notif, app),
+        "friday/settings/update" => handle_settings_update(notif, app),
+        "friday/sessions/changed" => handle_sessions_changed(notif, app),
+        "friday/queue/changed" => handle_queue_changed(notif, app),
+        "friday/session/prompt_complete" => handle_prompt_complete(notif, app),
+        "friday/session/interjection" => handle_interjection(notif, app),
+        "friday/monitor_event" => handle_monitor_event(notif, app),
+        "friday/scheduled_task_created" => handle_scheduled_task_created(notif, app),
+        "friday/scheduled_task_fired" => handle_scheduled_task_fired(notif, app),
+        "friday/scheduled_task_deleted" => handle_scheduled_task_deleted(notif, app),
+        "friday/announcements/update" => handle_announcements_update(notif, app),
+        "friday/git_head_changed" => handle_git_head_changed(notif, app),
+        "friday/leader/version_mismatch" => handle_version_mismatch(notif, app),
+        "friday/mcp/init_progress" => handle_mcp_init_progress(notif, app),
+        "friday/session/setup" => handle_session_setup_phase(notif, app),
+        "friday/mcp/tools_changed" | "friday/mcp_initialized" => handle_mcp_tools_changed(notif, app),
+        "friday/mcp/server_status" if push_server_status_enabled() => {
             handle_mcp_server_status(notif, app)
         }
-        "x.ai/mcp/elicit_complete" => handle_mcp_elicit_complete(notif, app),
-        "x.ai/mcp/servers_updated" => handle_mcp_servers_updated(notif, app),
+        "friday/mcp/elicit_complete" => handle_mcp_elicit_complete(notif, app),
+        "friday/mcp/servers_updated" => handle_mcp_servers_updated(notif, app),
         _ => false,
     }
 }
@@ -751,9 +751,9 @@ fn handle_interjection(notif: &acp::ExtNotification, app: &mut AppView) -> bool 
 }
 fn handle_ext_method(ext: xai_acp_lib::AcpArgs<acp::ExtRequest>, app: &mut AppView) -> bool {
     match ext.request.method.as_ref() {
-        "x.ai/ask_user_question" => handle_ask_user_question(ext, app),
-        "x.ai/exit_plan_mode" => handle_exit_plan_mode(ext, app),
-        "x.ai/mcp/elicit" => handle_mcp_elicit(ext, app),
+        "friday/ask_user_question" => handle_ask_user_question(ext, app),
+        "friday/exit_plan_mode" => handle_exit_plan_mode(ext, app),
+        "friday/mcp/elicit" => handle_mcp_elicit(ext, app),
         unknown => {
             tracing::warn!("Unknown ext_method: {unknown}");
             ext.response_tx

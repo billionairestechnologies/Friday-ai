@@ -105,7 +105,7 @@ impl CommandTrigger {
 }
 
 /// Pager builtins that shadow a shell builtin of the same name and stay hidden until the shell's
-/// catalog advertises it. Any backend advertising one must implement the matching `x.ai/memory/*`
+/// catalog advertises it. Any backend advertising one must implement the matching `friday/memory/*`
 /// extension method.
 const SHELL_GATED_COMMANDS: &[&str] = &["memory", "flush", "dream"];
 

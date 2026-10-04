@@ -1512,7 +1512,7 @@ fn prompt_response_releases_retained_memory_once() {
     assert_eq!(test_support::calls(), before + 1);
 }
 
-/// Turn end with prompt suggestions enabled fires the `x.ai/suggestPrompt` fetch (before the billing refresh).
+/// Turn end with prompt suggestions enabled fires the `friday/suggestPrompt` fetch (before the billing refresh).
 /// The loaded suggestion routes back into the agent's controller by id and generation.
 #[test]
 fn turn_end_fetches_prompt_suggestion_when_enabled() {
@@ -2230,7 +2230,7 @@ fn turn_complete_notification_suppressed_when_queue_non_empty() {
 
 /// Regression: cancelling while prompts are queued must hand the queue to the agent untouched.
 /// The FRONT queued prompt runs next (promoted server-side) and the rest stay queued in order.
-/// The authoritative `x.ai/queue/changed` rebroadcast (not client-side prediction) updates the mirror.
+/// The authoritative `friday/queue/changed` rebroadcast (not client-side prediction) updates the mirror.
 #[test]
 fn cancel_hands_queue_to_agent_without_reordering() {
     use crate::app::prompt_queue::{QueueChanged, QueueEntryWire};
@@ -4595,7 +4595,7 @@ fn plain_send_during_pending_subagent_wait_keeps_confirmed_queue_row_reachable()
     crate::app::acp_handler::handle(
         AcpClientMessage::ExtNotification(xai_acp_lib::AcpArgs {
             request: acp::ExtNotification::new(
-                "x.ai/queue/changed",
+                "friday/queue/changed",
                 std::sync::Arc::from(serde_json::value::to_raw_value(&params).unwrap()),
             ),
             response_tx,
@@ -4904,7 +4904,7 @@ fn goal_send_now_painted_block_survives_queue_changed_removal() {
     crate::app::acp_handler::handle(
         AcpClientMessage::ExtNotification(xai_acp_lib::AcpArgs {
             request: acp::ExtNotification::new(
-                "x.ai/queue/changed",
+                "friday/queue/changed",
                 std::sync::Arc::from(serde_json::value::to_raw_value(&params).unwrap()),
             ),
             response_tx,

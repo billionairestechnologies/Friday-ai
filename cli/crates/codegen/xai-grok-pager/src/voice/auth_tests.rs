@@ -19,6 +19,7 @@ fn session(issuer: &str) -> GrokAuth {
 /// `xai-grok-login`.
 #[tokio::test]
 #[serial_test::serial]
+#[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
 async fn foreign_session_is_refused_and_xai_credential_is_served() {
     let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
     let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");
@@ -38,6 +39,7 @@ async fn foreign_session_is_refused_and_xai_credential_is_served() {
 /// xAI credential is untouched.
 #[tokio::test]
 #[serial_test::serial]
+#[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
 async fn stt_routes_offer_the_clip_route_only_beside_a_foreign_session() {
     let _xai = EnvGuard::unset("FRIDAY_X_TOKEN");
     let _legacy = EnvGuard::unset("FRIDAY_X_LEGACY_TOKEN");

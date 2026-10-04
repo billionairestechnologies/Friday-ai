@@ -16,7 +16,7 @@ pub(crate) use file_provider::FilePathProvider;
 pub(crate) use history_provider::HistoryProvider;
 pub(crate) use path_provider::PathProvider;
 
-pub const SUGGEST_METHOD: &str = "x.ai/suggest";
+pub const SUGGEST_METHOD: &str = "friday/suggest";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -182,12 +182,12 @@ fn splice_token_into_line(results: &mut [RankedSuggestion], text: &str, range: (
 pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     match args.method.as_ref() {
         SUGGEST_METHOD => handle_suggest(agent, args).await,
-        "x.ai/suggestPrompt" => handle_suggest_prompt(agent, args).await,
+        "friday/suggestPrompt" => handle_suggest_prompt(agent, args).await,
         _ => Err(acp::Error::method_not_found()),
     }
 }
 
-/// Request/response for `x.ai/suggestPrompt`: predict the user's likely next prompt after a completed turn (tab-autocomplete ghost text).
+/// Request/response for `friday/suggestPrompt`: predict the user's likely next prompt after a completed turn (tab-autocomplete ghost text).
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SuggestPromptRequest {
@@ -302,7 +302,7 @@ async fn handle_suggest(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     })
 }
 
-/// Answers `x.ai/suggest` with history, `PATH` and file rows, even when `includeAi` is set.
+/// Answers `friday/suggest` with history, `PATH` and file rows, even when `includeAi` is set.
 /// The returned future is `Send`.
 pub async fn answer_without_session(args: &acp::ExtRequest) -> ExtResult {
     let req: SuggestRequest = parse_params(args)?;
@@ -326,7 +326,7 @@ pub async fn answer_without_session(args: &acp::ExtRequest) -> ExtResult {
     })
 }
 
-/// Answers `x.ai/suggest` with no rows and the request's `generation`.
+/// Answers `friday/suggest` with no rows and the request's `generation`.
 /// An error reply would leave the client's pending request waiting.
 pub fn answer_empty(args: &acp::ExtRequest) -> ExtResult {
     let req: SuggestRequest = parse_params(args)?;

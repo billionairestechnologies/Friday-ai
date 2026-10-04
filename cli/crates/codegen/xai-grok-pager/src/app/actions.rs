@@ -82,7 +82,7 @@ pub enum Action {
     },
     /// Open grok.com in the browser for SuperGrok subscription upsell.
     OpenSupergrokUrl,
-    /// Re-check subscription status via the shell's `x.ai/auth/check_subscription`.
+    /// Re-check subscription status via the shell's `friday/auth/check_subscription`.
     CheckSubscription,
     /// Open an arbitrary URL in the system browser (with scheme validation).
     OpenUrl(String),
@@ -218,20 +218,20 @@ pub enum Action {
     /// Try to drain the next queued prompt (after editing completes, etc.).
     DrainQueue,
     /// Remove a server-authoritative (shared) queued prompt by its stable `prompt_id`.
-    /// Routed to the agent as `x.ai/queue/remove`; the resulting `x.ai/queue/changed` rebroadcast is the source of truth.
+    /// Routed to the agent as `friday/queue/remove`; the resulting `friday/queue/changed` rebroadcast is the source of truth.
     QueueRemoveShared {
         id: String,
         expected_version: u64,
     },
-    /// Reorder the server-authoritative (shared) queued prompts to match `ordered_ids`. Routed as `x.ai/queue/reorder`.
+    /// Reorder the server-authoritative (shared) queued prompts to match `ordered_ids`. Routed as `friday/queue/reorder`.
     QueueReorderShared {
         ordered_ids: Vec<String>,
     },
     /// Clear the caller's server-authoritative (shared) queued prompts.
-    /// Routed as `x.ai/queue/clear`.
+    /// Routed as `friday/queue/clear`.
     QueueClearShared,
     /// Replace the text of a server-authoritative (shared) queued prompt.
-    /// Routed to the agent as `x.ai/queue/edit`; the rebroadcast of `x.ai/queue/changed` is the source of truth.
+    /// Routed to the agent as `friday/queue/edit`; the rebroadcast of `friday/queue/changed` is the source of truth.
     /// Last write wins via the session actor's serialized mailbox; no client-side conflict resolution.
     QueueEditShared {
         id: String,
@@ -264,7 +264,7 @@ pub enum Action {
         local_id: u64,
         /// `Some` for a server-authoritative row.
         /// `None` covers both a local row and a server row that vanished from the mirror before Enter.
-        /// With nothing to remove, no versioned `x.ai/queue/remove` request is sent.
+        /// With nothing to remove, no versioned `friday/queue/remove` request is sent.
         server: Option<SharedQueueTarget>,
         submission: crate::views::prompt_widget::StashedPrompt,
     },
@@ -429,7 +429,7 @@ pub enum Action {
     CancelScheduledTask(String),
     /// Demote the currently running execute tool to a background task.
     DemoteToBackground,
-    /// Request current bundle cache status via `x.ai/bundle/status`.
+    /// Request current bundle cache status via `friday/bundle/status`.
     RequestBundleStatus,
     /// Hide the announcements banner.
     AnnouncementsHide,
@@ -553,7 +553,7 @@ pub enum Action {
     SetContextualHintWordSelect(bool),
     SetContextualHintExportCopy(bool),
     SetContextualHintSshWrap(bool),
-    /// Commit the active theme (canonical name, e.g. `"groknight"`, `"auto"`).
+    /// Commit the active theme (canonical name, e.g. `"fridaynight"`, `"auto"`).
     SetTheme(String),
     /// Commit the theme used when the OS is in dark mode.
     /// Only updates the live display when `theme = "auto"` AND system is in dark mode.
@@ -974,7 +974,7 @@ pub struct SharedQueueTarget {
 }
 /// Persist-and-notify behavior for [`Effect::PersistPermissionMode`].
 /// Both variants write to `~/.friday/config.toml` and route ACP
-/// `x.ai/yolo_mode_changed` notifications.
+/// `friday/yolo_mode_changed` notifications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PermissionModePersist {
     /// Typed-setter path: on disk-write failure, revert in-memory state to the prior canonical (`&'static str`).
@@ -1486,14 +1486,14 @@ pub enum Effect {
         cwd_override: Option<std::path::PathBuf>,
         /// Live generation of the requesting picker at dispatch time.
         generation: u64,
-        /// Text search pushed down to `x.ai/session/list` as `query` (chat mode: forwarded to the backend conversations search).
+        /// Text search pushed down to `friday/session/list` as `query` (chat mode: forwarded to the backend conversations search).
         /// `None` fetches the unfiltered list.
         query: Option<String>,
         /// Snapshot of [`crate::app::app_view::AppView::session_picker_list_seq`].
         /// The response is dropped when no longer current, so out-of-order completions can't clobber newer results.
         seq: u64,
         /// Optional unified-list `kind` facet filter (`"chat"` / `"build"`).
-        /// When set, stamped as `_meta["x.ai/facetFilters"].kind`.
+        /// When set, stamped as `_meta["friday/facetFilters"].kind`.
         /// The shell then honors multi-source history under `--chat` instead of forcing chat-only.
         kind_filter: Option<Vec<String>>,
         /// Server-side `session_kind=headless` policy: `Only` while the picker is on the Headless page, `Exclude` everywhere else.
@@ -1509,10 +1509,10 @@ pub enum Effect {
         query: String,
         seq: u64,
     },
-    /// Fetch the leader session roster (FleetView dashboard) via `x.ai/sessions/list`.
+    /// Fetch the leader session roster (FleetView dashboard) via `friday/sessions/list`.
     /// Only issued in leader mode while the dashboard is open.
     FetchRoster,
-    /// Fetch the local on-disk session list (dormant/idle sessions) for the dashboard via `x.ai/session/list`.
+    /// Fetch the local on-disk session list (dormant/idle sessions) for the dashboard via `friday/session/list`.
     /// This is the non-leader fallback for the FleetView roster.
     /// Issued while the dashboard is open and NOT in leader mode so the dashboard shows idle sessions instead of being empty.
     FetchDashboardSessions,
@@ -1599,7 +1599,7 @@ pub enum Effect {
         task_id: String,
         source: xai_grok_shell::extensions::task::TaskKillSource,
     },
-    /// Cancel a subagent via `x.ai/subagent/cancel`.
+    /// Cancel a subagent via `friday/subagent/cancel`.
     KillSubagent {
         session_id: acp::SessionId,
         subagent_id: String,
@@ -1709,34 +1709,34 @@ pub enum Effect {
     },
     /// Toggle plan mode: fire-and-forget signal to the shell.
     TogglePlanMode { session_id: acp::SessionId },
-    /// Remove a server-owned queued prompt: fire-and-forget `x.ai/queue/remove`.
+    /// Remove a server-owned queued prompt: fire-and-forget `friday/queue/remove`.
     /// The agent re-broadcasts the authoritative queue.
     QueueRemove {
         session_id: acp::SessionId,
         id: String,
         expected_version: u64,
     },
-    /// Reorder server-owned queued prompts: fire-and-forget `x.ai/queue/reorder`.
+    /// Reorder server-owned queued prompts: fire-and-forget `friday/queue/reorder`.
     QueueReorder {
         session_id: acp::SessionId,
         ordered_ids: Vec<String>,
     },
-    /// Clear the caller's server-owned queued prompts: fire-and-forget `x.ai/queue/clear`.
+    /// Clear the caller's server-owned queued prompts: fire-and-forget `friday/queue/clear`.
     QueueClear { session_id: acp::SessionId },
-    /// Replace the text of a server-owned queued prompt in place: fire-and-forget `x.ai/queue/edit`.
+    /// Replace the text of a server-owned queued prompt in place: fire-and-forget `friday/queue/edit`.
     /// The session actor's serialized mailbox makes this last-writer-wins for concurrent edits.
-    /// The rebroadcast of `x.ai/queue/changed` is the truth signal.
+    /// The rebroadcast of `friday/queue/changed` is the truth signal.
     QueueEdit {
         session_id: acp::SessionId,
         id: String,
         new_text: String,
     },
-    /// Hold a server-owned row out of combine-on-promote while the composer edits it: fire-and-forget `x.ai/queue/hold_edit`.
+    /// Hold a server-owned row out of combine-on-promote while the composer edits it: fire-and-forget `friday/queue/hold_edit`.
     QueueHoldEdit {
         session_id: acp::SessionId,
         id: String,
     },
-    /// Release a previous [`Self::QueueHoldEdit`]: `x.ai/queue/release_edit`.
+    /// Release a previous [`Self::QueueHoldEdit`]: `friday/queue/release_edit`.
     QueueReleaseEdit {
         session_id: acp::SessionId,
         id: String,
@@ -1774,7 +1774,7 @@ pub enum Effect {
         cwd: std::path::PathBuf,
         session_id: String,
     },
-    /// Resolve the running agent name for a session (`x.ai/session/info`).
+    /// Resolve the running agent name for a session (`friday/session/info`).
     FetchSessionAgentName {
         agent_id: AgentId,
         session_id: acp::SessionId,
@@ -1899,21 +1899,21 @@ pub enum Effect {
         session_id: acp::SessionId,
         action: xai_hooks_plugins_types::MarketplaceAction,
     },
-    /// Install a plugin from the inline CTA via `x.ai/marketplace/action`, reported back via `TaskResult::CtaPluginInstallDone`.
+    /// Install a plugin from the inline CTA via `friday/marketplace/action`, reported back via `TaskResult::CtaPluginInstallDone`.
     InstallPluginFromCta {
         agent_id: AgentId,
         session_id: acp::SessionId,
         source_url_or_path: String,
         plugin_relative_path: String,
     },
-    /// Reload plugins after a CTA install via `x.ai/plugins/action` (`PluginsAction::Reload`), reported back via `TaskResult::CtaPluginReloadDone`.
+    /// Reload plugins after a CTA install via `friday/plugins/action` (`PluginsAction::Reload`), reported back via `TaskResult::CtaPluginReloadDone`.
     /// Modal-independent.
     ReloadPluginsForCta {
         agent_id: AgentId,
         session_id: acp::SessionId,
         plugin_name: String,
     },
-    /// Read the MCP server list after a CTA install via `x.ai/mcp/list`, reported back via `TaskResult::PluginCtaMcpsLoaded`.
+    /// Read the MCP server list after a CTA install via `friday/mcp/list`, reported back via `TaskResult::PluginCtaMcpsLoaded`.
     /// Modal-independent.
     FetchPluginCtaMcps {
         agent_id: AgentId,
@@ -1921,7 +1921,7 @@ pub enum Effect {
         plugin_name: String,
     },
     /// Re-probe the MCP server list after a short delay while waiting for a just-installed plugin's servers to finish initializing.
-    /// Sleeps, then runs the same `x.ai/mcp/list` fetch as `FetchPluginCtaMcps`, reported back via `TaskResult::PluginCtaMcpsLoaded`.
+    /// Sleeps, then runs the same `friday/mcp/list` fetch as `FetchPluginCtaMcps`, reported back via `TaskResult::PluginCtaMcpsLoaded`.
     RetryPluginCtaMcps {
         agent_id: AgentId,
         session_id: acp::SessionId,
@@ -1981,7 +1981,7 @@ pub enum Effect {
         /// Usage-modal fetch generation; echoed back on the task result.
         nonce: u64,
     },
-    /// Fetch current bundle cache status via `x.ai/bundle/status`.
+    /// Fetch current bundle cache status via `friday/bundle/status`.
     FetchBundleStatus,
     /// Send feedback about the current session (fire-and-forget POST).
     /// `origin` rides through to the completion so a modal send's parked consent can be matched or dropped.
@@ -2062,22 +2062,22 @@ pub enum Effect {
         agent_id: AgentId,
         session_id: acp::SessionId,
         text: String,
-        /// Client-minted id echoed back on the `x.ai/session/interjection` broadcast so the originator can dedup its optimistic local block.
+        /// Client-minted id echoed back on the `friday/session/interjection` broadcast so the originator can dedup its optimistic local block.
         interjection_id: String,
         /// Structured text and image content blocks.
         /// `None` for text-only interjections; the wire shape stays byte-identical to legacy.
         blocks: Option<Vec<acp::ContentBlock>>,
     },
-    /// Log out via `x.ai/auth/logout` (shell clears auth.json and in-memory state).
+    /// Log out via `friday/auth/logout` (shell clears auth.json and in-memory state).
     Logout,
-    /// Cancel an in-flight interactive auth on the shell (`x.ai/auth/cancel`).
+    /// Cancel an in-flight interactive auth on the shell (`friday/auth/cancel`).
     /// Used when the user abandons mid-session `/login` so the device-code poll stops instead of running until the code expires.
     /// `request_seq` scopes the cancel so a delayed RPC cannot tear down a successor login.
     CancelAuth { request_seq: u64 },
-    /// Re-check subscription status via `x.ai/auth/check_subscription`.
+    /// Re-check subscription status via `friday/auth/check_subscription`.
     /// `verify` scopes the result to a deferred-gate verification (see [`crate::app::subscription`]); `None` for generic checks.
     CheckSubscription { verify: Option<u64> },
-    /// `x.ai/auth/hydrate_team_capability` for `identity`; the answer is dropped if the account changed meanwhile.
+    /// `friday/auth/hydrate_team_capability` for `identity`; the answer is dropped if the account changed meanwhile.
     HydrateTeamCapability {
         identity: crate::app::app_view::AuthIdentity,
     },
@@ -2133,7 +2133,7 @@ pub enum Effect {
         previous_display_name: Option<String>,
         previous_generated_title: Option<String>,
     },
-    /// Delete a session's stored data (local and remote) via `x.ai/session/delete`.
+    /// Delete a session's stored data (local and remote) via `friday/session/delete`.
     DeleteSession {
         source: String,
         session_id: String,
@@ -2152,7 +2152,7 @@ pub enum Effect {
         /// Unresolved index rows are omitted from both classified views.
         headless_policy: xai_grok_shell::session::unified_list::HeadlessPolicy,
     },
-    /// Call `x.ai/session/fork` to create a peer session that resumes from `parent_session_id` in the same cwd (no worktree).
+    /// Call `friday/session/fork` to create a peer session that resumes from `parent_session_id` in the same cwd (no worktree).
     /// Mirror of the worktree branch of [`Effect::CreateWorktreeSession`].
     /// The worktree-fork path reuses `CreateWorktreeSession { load_session_id }` directly so we get worktree creation and code restore for free.
     ForkSession {
@@ -2190,7 +2190,7 @@ pub enum Effect {
         session_id: acp::SessionId,
         target_prompt_index: usize,
     },
-    /// Fetch billing/credit usage from the agent's `x.ai/billing` extension.
+    /// Fetch billing/credit usage from the agent's `friday/billing` extension.
     /// When `silent` is true the result updates `credit_balance` without pushing a system message into scrollback.
     /// The silent form is used for automatic refreshes on session init and after each turn.
     FetchBilling {
@@ -2205,7 +2205,7 @@ pub enum Effect {
         /// Usage-modal fetch generation (`0` means a background refresh that settles no modal).
         nonce: u64,
     },
-    /// Fetch per-session token/cost via `x.ai/session/usage` (auth-agnostic).
+    /// Fetch per-session token/cost via `friday/session/usage` (auth-agnostic).
     FetchSessionUsage {
         agent_id: AgentId,
         session_id: acp::SessionId,
@@ -2219,7 +2219,7 @@ pub enum Effect {
     DebounceSuggestions { agent_id: AgentId, generation: u64 },
     /// Spawn a debounce sleep task for plugin-CTA keyword matching.
     DebouncePluginCta { agent_id: AgentId, generation: u64 },
-    /// Send an ACP `x.ai/suggest` request to the shell.
+    /// Send an ACP `friday/suggest` request to the shell.
     /// `agent_id` is echoed on the result so the response routes to the agent that fetched, not whatever view is active when it lands.
     FetchShellSuggestions {
         agent_id: AgentId,
@@ -2234,7 +2234,7 @@ pub enum Effect {
         /// Deterministic Tab fetches run only the shell's token providers (path/file); the as-you-type pipeline keeps all of them.
         token_only: bool,
     },
-    /// Send an ACP `x.ai/suggestPrompt` request to the shell.
+    /// Send an ACP `friday/suggestPrompt` request to the shell.
     /// It predicts the user's likely next prompt after a completed turn (tab autocomplete ghost text).
     FetchPromptSuggestion {
         agent_id: AgentId,
@@ -2274,7 +2274,7 @@ pub enum Effect {
         plan: Box<crate::diagnostics::FixPlan>,
     },
 }
-/// Wire params for `x.ai/session/rename`.
+/// Wire params for `friday/session/rename`.
 /// Shared with the effect executor so dispatch tests can pin the exact camelCase payload.
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2313,7 +2313,7 @@ impl RenameSessionRequest {
         }
     }
 }
-/// Outcome of an `x.ai/subagent/cancel` request, telling dispatch whether the pager must finalize the subagent row itself.
+/// Outcome of an `friday/subagent/cancel` request, telling dispatch whether the pager must finalize the subagent row itself.
 #[derive(Debug)]
 pub enum SubagentKillOutcome {
     /// Shell stopped a live subagent; a real `SubagentFinished` is coming.
@@ -2456,7 +2456,7 @@ pub enum TaskResult {
         code_restored: bool,
         restore_summary: Option<String>,
         restore_degree: Option<xai_grok_workspace::session::git::RestoreDegree>,
-        /// The session's in-flight running prompt id (from the load response `_meta["x.ai/runningPromptId"]`).
+        /// The session's in-flight running prompt id (from the load response `_meta["friday/runningPromptId"]`).
         /// Present only when the session was loaded MID-turn (another client is driving).
         /// The loader adopts it to pass the live `session/update` gate without re-rendering the user block (replay already rendered it).
         running_prompt_id: Option<String>,
@@ -2485,9 +2485,9 @@ pub enum TaskResult {
         /// Echo of [`Effect::FetchSessionList::generation`]; results for a superseded picker incarnation are dropped.
         generation: u64,
         sessions: Vec<crate::app::app_view::SessionPickerEntry>,
-        /// A degraded conversations lane (`_meta["x.ai/partial"]`), shown as an actionable picker notice instead of a silent empty list.
+        /// A degraded conversations lane (`_meta["friday/partial"]`), shown as an actionable picker notice instead of a silent empty list.
         partial: Option<crate::app::effects::ConversationsPartial>,
-        /// Directory scope `sessions` were drawn from (`x.ai/listScope`).
+        /// Directory scope `sessions` were drawn from (`friday/listScope`).
         scope: xai_grok_shell::session::unified_list::ListScope,
         /// Echo of [`Effect::FetchSessionList::seq`]; stale results are dropped.
         seq: u64,
@@ -2536,7 +2536,7 @@ pub enum TaskResult {
         query: String,
         seq: u64,
     },
-    /// Leader session roster loaded via `x.ai/sessions/list`.
+    /// Leader session roster loaded via `friday/sessions/list`.
     RosterLoaded {
         sessions: Vec<crate::app::roster::RosterEntry>,
     },
@@ -2647,7 +2647,7 @@ pub enum TaskResult {
     ConsentPersistFailed {
         error: String,
     },
-    /// Response to `x.ai/subagent/cancel`; see [`SubagentKillOutcome`].
+    /// Response to `friday/subagent/cancel`; see [`SubagentKillOutcome`].
     KillSubagentComplete {
         session_id: acp::SessionId,
         subagent_id: String,
@@ -2719,7 +2719,7 @@ pub enum TaskResult {
         /// Deprecated: superseded by `mode` (authoritative).
         /// Kept only as a back-compat fallback for older agents that don't send `mode`.
         external: bool,
-        /// Presentation mode from `x.ai/auth/get_url`; `None` on older agents.
+        /// Presentation mode from `friday/auth/get_url`; `None` on older agents.
         mode: Option<String>,
     },
     /// Auth code was submitted (fire-and-forget).
@@ -3042,7 +3042,7 @@ pub enum TaskResult {
         /// Attachments whose bytes could not be loaded; reported by display number.
         skipped_image_numbers: Vec<usize>,
     },
-    /// `x.ai/recap` request acknowledged (fire-and-forget).
+    /// `friday/recap` request acknowledged (fire-and-forget).
     /// The recap itself arrives separately as a `SessionRecap` notification; this only carries a transport error, if any, for logging.
     RecapRequested {
         /// Session the recap was requested for; lets the handler find the agent whose manual loading spinner must be cleared on failure.
@@ -3076,9 +3076,9 @@ pub enum TaskResult {
     },
     /// Shell acknowledged logout (auth cleared).
     LogoutComplete,
-    /// Best-effort `x.ai/auth/cancel` finished (no UI update; state already left Authenticating).
+    /// Best-effort `friday/auth/cancel` finished (no UI update; state already left Authenticating).
     AuthCancelComplete,
-    /// Shell responded to `x.ai/auth/check_subscription`.
+    /// Shell responded to `friday/auth/check_subscription`.
     /// `verify` echoes the generation from `Effect::CheckSubscription` for deferred-gate verifications.
     CheckSubscriptionComplete {
         verify: Option<u64>,
@@ -3113,7 +3113,7 @@ pub enum TaskResult {
         results: Vec<xai_grok_shell::extensions::session_search::SearchSessionHit>,
         seq: u64,
     },
-    /// `x.ai/session/fork` completed (no-worktree path).
+    /// `friday/session/fork` completed (no-worktree path).
     /// The pager adopts the new session id and emits [`Effect::LoadSession`] to start the replay.
     /// Mirrors [`TaskResult::WorktreeForked`] in shape.
     ForkSessionReady {
@@ -3123,7 +3123,7 @@ pub enum TaskResult {
         /// Parent session id the fork was taken from (to retarget the one-shot restore-code suppression).
         parent_session_id: acp::SessionId,
     },
-    /// `x.ai/session/fork` failed.
+    /// `friday/session/fork` failed.
     /// The placeholder agent stays in `app.agents` with no `session_id` so the user can switch away.
     ForkSessionFailed {
         agent_id: AgentId,
@@ -3194,7 +3194,7 @@ pub enum TaskResult {
         agent_id: AgentId,
         generation: u64,
     },
-    /// Shell suggestions loaded from ACP `x.ai/suggest`.
+    /// Shell suggestions loaded from ACP `friday/suggest`.
     /// `request_text` / `request_cursor` echo what the request was built from, paired atomically with the items.
     /// They are the anchor the items' `replaceRange` offsets index into and the position Tab targets.
     ShellSuggestionsLoaded {
@@ -3203,7 +3203,7 @@ pub enum TaskResult {
         request_text: String,
         request_cursor: usize,
     },
-    /// Predicted next prompt loaded from ACP `x.ai/suggestPrompt`.
+    /// Predicted next prompt loaded from ACP `friday/suggestPrompt`.
     /// `suggestion` is `None` when the shell had nothing to suggest.
     PromptSuggestionLoaded {
         agent_id: AgentId,

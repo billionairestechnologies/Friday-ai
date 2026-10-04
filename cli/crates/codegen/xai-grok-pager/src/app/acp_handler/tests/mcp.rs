@@ -378,7 +378,7 @@
             // Deliberately no `status`
         });
         let raw = serde_json::value::to_raw_value(&payload).unwrap();
-        let notif = acp::ExtNotification::new("x.ai/mcp/server_status", raw.into());
+        let notif = acp::ExtNotification::new("friday/mcp/server_status", raw.into());
         let redraw = handle_mcp_server_status(&notif, &mut app);
         assert!(!redraw, "malformed payload must not request a redraw");
 

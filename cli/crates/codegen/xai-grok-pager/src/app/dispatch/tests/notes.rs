@@ -1856,7 +1856,7 @@ fn plan_approval_ingress_displaces_feedback_modal() {
     let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
     crate::app::acp_handler::handle(
         AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-            request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+            request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
             response_tx: tx,
         }),
         &mut app,
@@ -1887,7 +1887,7 @@ fn mcp_elicitation_ingress_displaces_feedback_modal() {
     .unwrap();
     crate::app::acp_handler::handle(
         AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-            request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+            request: acp::ExtRequest::new("friday/mcp/elicit", raw.into()),
             response_tx: tx,
         }),
         &mut app,
@@ -2395,7 +2395,7 @@ fn composer_image() -> crate::prompt_images::PastedImage {
         preview: crate::prompt_images::PromptImagePreview::default(),
     }
 }
-/// `/btw` is a model call. Composer images must ride on `x.ai/btw`, not be deleted with the other slash actions.
+/// `/btw` is a model call. Composer images must ride on `friday/btw`, not be deleted with the other slash actions.
 #[test]
 fn btw_submit_sends_composer_images() {
     let mut app = test_app_with_agent();

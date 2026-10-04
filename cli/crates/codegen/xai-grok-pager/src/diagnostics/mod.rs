@@ -2420,6 +2420,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
     fn voice_missing_finding_has_stable_id_and_manual_remediation() {
         let finding = voice_missing_finding(
             "no microphone recorder found on PATH: install pipewire (pw-record)".to_owned(),

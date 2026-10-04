@@ -142,7 +142,7 @@ pub(crate) fn build_screen_mode_relaunch_args(
             continue;
         }
 
-        // Bare positional prompt (e.g. `grok "fix the bug"`), which must not re-fire on resume.
+        // Bare positional prompt (e.g. `friday "fix the bug"`), which must not re-fire on resume.
         // Clap positionals never start with `-`
         // Values for earlier flags were already consumed above, so any remaining bare word here is the prompt
         continue;
@@ -183,7 +183,7 @@ pub(crate) fn screen_mode_relaunch_resume_hint(session_id: &str, want_minimal: b
     } else {
         "--fullscreen"
     };
-    format!("{FRIDAY_SCREEN_MODE_ENV}={mode} grok {flag} --resume {session_id}")
+    format!("{FRIDAY_SCREEN_MODE_ENV}={mode} friday {flag} --resume {session_id}")
 }
 
 /// Replace the current process with a relaunch into the requested screen mode.

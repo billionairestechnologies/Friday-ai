@@ -19,8 +19,8 @@ fn load_filtered_marketplace_sources() -> Vec<xai_grok_plugin_marketplace::Marke
 
 pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     match args.method.as_ref() {
-        "x.ai/marketplace/list" => handle_list().await,
-        "x.ai/marketplace/action" => handle_action(agent, args).await,
+        "friday/marketplace/list" => handle_list().await,
+        "friday/marketplace/action" => handle_action(agent, args).await,
         _ => Err(acp::Error::method_not_found()),
     }
 }
@@ -1455,6 +1455,7 @@ mod official_source_tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn pre_existing_official_source_in_known_marketplaces_skips_append() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path();
@@ -1483,6 +1484,7 @@ mod official_source_tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn pre_existing_official_source_in_extra_known_marketplaces_skips_append() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path();

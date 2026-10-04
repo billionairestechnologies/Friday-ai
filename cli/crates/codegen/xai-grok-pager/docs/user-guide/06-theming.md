@@ -10,8 +10,8 @@ Friday X includes six built-in themes, plus an `auto` option that follows your s
 
 | Theme | Config Names | Description | Truecolor Required |
 |-------|-------------|-------------|--------------------|
-| **GrokNight** | `groknight`, `grok-night`, `dark` | Neutral dark base with a magenta accent. Default theme. Survives quantization cleanly on 256-color and 16-color terminals. | No |
-| **GrokDay** | `grokday`, `grok-day`, `light`, `day` | Light theme for bright terminal backgrounds. | No |
+| **GrokNight** | `fridaynight`, `grok-night`, `dark` | Neutral dark base with a magenta accent. Default theme. Survives quantization cleanly on 256-color and 16-color terminals. | No |
+| **GrokDay** | `fridayday`, `grok-day`, `light`, `day` | Light theme for bright terminal backgrounds. | No |
 | **TokyoNight** | `tokyonight`, `tokyo-night`, `tokyo` | Dark, blue-tinted backgrounds from the Tokyo Night palette. Loses its character when quantized. | Yes |
 | **RosePineMoon** | `rosepine`, `rose-pine`, `rosepine-moon`, `rose-pine-moon` | Muted dark palette with mauve accents, from the Rosé Pine family. | Yes |
 | **OscuraMidnight** | `oscura`, `oscura-midnight` | Deep dark base with purple accents. | Yes |
@@ -82,7 +82,7 @@ By default, dark mode maps to **GrokNight** and light mode maps to **GrokDay**. 
 [ui]
 theme = "auto"
 auto_dark_theme = "tokyonight"
-auto_light_theme = "grokday"
+auto_light_theme = "fridayday"
 ```
 
 `theme = "system"` is an alias for `theme = "auto"`.
@@ -94,11 +94,11 @@ auto_light_theme = "grokday"
 | **macOS** | Reads `AppleInterfaceStyle` system preference |
 | **Linux** | Queries XDG Desktop Portal (`org.freedesktop.appearance.color-scheme`) |
 | **Windows** | Reads the system personalization registry |
-| **SSH / tmux / headless** | `FRIDAY_APPEARANCE` or `LC_GROK_APPEARANCE` (`dark`/`light`), then `COLORFGBG`, then a startup OSC 11 background query. `friday wrap ssh …` stamps `LC_GROK_APPEARANCE` from the local OS theme so it survives SSH into the login shell. New tmux sessions inherit it only if the tmux server/session was created with that env (or `update-environment` includes it). OSC 11 is DCS-wrapped for tmux ≥ 3.3 when tmux is the immediate terminal (not an editor `:terminal`); reaching the outer emulator also needs `allow-passthrough`, and replies are best-effort. |
+| **SSH / tmux / headless** | `FRIDAY_APPEARANCE` or `LC_FRIDAY_APPEARANCE` (`dark`/`light`), then `COLORFGBG`, then a startup OSC 11 background query. `friday wrap ssh …` stamps `LC_FRIDAY_APPEARANCE` from the local OS theme so it survives SSH into the login shell. New tmux sessions inherit it only if the tmux server/session was created with that env (or `update-environment` includes it). OSC 11 is DCS-wrapped for tmux ≥ 3.3 when tmux is the immediate terminal (not an editor `:terminal`); reaching the outer emulator also needs `allow-passthrough`, and replies are best-effort. |
 
 Once running, Friday X polls desktop APIs and env hints every 5 seconds. Toggling your OS between light and dark mode on a local desktop takes effect within seconds without restarting. Over SSH the wrap-stamped env is fixed for that hop.
 
-You can also set `FRIDAY_THEME` (or `LC_GROK_THEME`) to force a theme or `auto` without editing `config.toml`.
+You can also set `FRIDAY_THEME` (or `LC_FRIDAY_THEME`) to force a theme or `auto` without editing `config.toml`.
 
 ### Via the Settings Pane
 

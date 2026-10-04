@@ -12,7 +12,7 @@
 **Head commit:** `6168a05` — *feat: complete Google sign-in and remaining connectors*  
 **Base:** `main`
 
-**Downloadable diagrams (PNG / SVG / PDF via HTML):** see [`docs/diagrams/`](../diagrams/README.md) and the boss pack [`docs/diagrams/BOSS_COPY.md`](../diagrams/BOSS_COPY.md).
+**Downloadable diagrams (PNG / SVG / PDF via HTML):** see [`docs/diagrams/`](../diagrams/README.md) and the one-file leadership pack [`BOSS_PACK.html`](../diagrams/BOSS_PACK.html).
 
 ---
 

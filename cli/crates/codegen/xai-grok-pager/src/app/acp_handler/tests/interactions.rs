@@ -187,7 +187,7 @@
         }))
         .unwrap();
         let msg = AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-            request: acp::ExtRequest::new("x.ai/ask_user_question", raw.into()),
+            request: acp::ExtRequest::new("friday/ask_user_question", raw.into()),
             response_tx: tx,
         });
 
@@ -231,7 +231,7 @@
         }))
         .unwrap();
         let msg = AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-            request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+            request: acp::ExtRequest::new("friday/mcp/elicit", raw.into()),
             response_tx: tx,
         });
 
@@ -265,7 +265,7 @@
             .unwrap();
             handle(
                 AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                    request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+                    request: acp::ExtRequest::new("friday/mcp/elicit", raw.into()),
                     response_tx: tx,
                 }),
                 app,
@@ -317,7 +317,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw1.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw1.into()),
                 response_tx: tx1,
             }),
             &mut app,
@@ -347,7 +347,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw2.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw2.into()),
                 response_tx: tx2,
             }),
             &mut app,
@@ -400,7 +400,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -463,7 +463,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -511,7 +511,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw1.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw1.into()),
                 response_tx: tx1,
             }),
             &mut app,
@@ -540,7 +540,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw2.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw2.into()),
                 response_tx: tx2,
             }),
             &mut app,
@@ -585,7 +585,7 @@
         .unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+                request: acp::ExtRequest::new("friday/mcp/elicit", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -613,7 +613,7 @@
         let changed = handle(
             AcpClientMessage::ExtNotification(xai_acp_lib::AcpArgs {
                 request: acp::ExtNotification::new(
-                    "x.ai/mcp/elicit_complete",
+                    "friday/mcp/elicit_complete",
                     complete("evil-mcp").into(),
                 ),
                 response_tx: tx_bad,
@@ -631,7 +631,7 @@
         let changed = handle(
             AcpClientMessage::ExtNotification(xai_acp_lib::AcpArgs {
                 request: acp::ExtNotification::new(
-                    "x.ai/mcp/elicit_complete",
+                    "friday/mcp/elicit_complete",
                     complete("demo-mcp").into(),
                 ),
                 response_tx: tx_ok,
@@ -661,7 +661,7 @@
         }))
         .unwrap();
         let msg = AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-            request: acp::ExtRequest::new("x.ai/ask_user_question", raw.into()),
+            request: acp::ExtRequest::new("friday/ask_user_question", raw.into()),
             response_tx: tx,
         });
 
@@ -760,7 +760,7 @@
         let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -806,7 +806,7 @@
         let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -845,7 +845,7 @@
         let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -904,7 +904,7 @@
             meta: None,
         };
         let raw = serde_json::value::to_raw_value(&notif).unwrap();
-        let ext = acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw));
+        let ext = acp::ExtNotification::new("friday/session_notification", std::sync::Arc::from(raw));
         handle_session_notification(&ext, app)
     }
 
@@ -984,7 +984,7 @@
         let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -1033,7 +1033,7 @@
         let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
                 response_tx: tx,
             }),
             &mut app,
@@ -1087,7 +1087,7 @@
         let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
         handle(
             AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
-                request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                request: acp::ExtRequest::new("friday/exit_plan_mode", raw.into()),
                 response_tx: tx,
             }),
             &mut app,

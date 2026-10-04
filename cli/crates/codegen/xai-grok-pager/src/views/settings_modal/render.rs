@@ -428,7 +428,7 @@ pub(super) fn render_row_list_with_search_bar(
 
 pub(super) fn render_docs_footer(buf: &mut Buffer, area: Rect, theme: &Theme) {
     const LONG: &str =
-        "Tip · Ask Friday X: \"change theme to grokday\" or \"what does compact mode do?\"";
+        "Tip · Ask Friday X: \"change theme to fridayday\" or \"what does compact mode do?\"";
     const SHORT: &str = "Tip · Ask Friday X to change a setting";
     let text = modal_window::fit_tip_line(&[LONG, SHORT], area.width as usize);
     modal_window::render_centered_tip_footer(buf, area, theme, text.as_ref());

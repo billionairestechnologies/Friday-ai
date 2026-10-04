@@ -644,8 +644,8 @@ pub struct PagerArgs {
         hide = true
     )]
     pub no_memory: bool,
-    /// Run a memory flush after the headless turn (or instead of a prompt when resuming). Calls `x.ai/memory/flush` and waits for the flush LLM.
-    /// resuming). Calls `x.ai/memory/flush` and waits for the flush LLM.
+    /// Run a memory flush after the headless turn (or instead of a prompt when resuming). Calls `friday/memory/flush` and waits for the flush LLM.
+    /// resuming). Calls `friday/memory/flush` and waits for the flush LLM.
     /// Headless only: `/flush` as `-p` text is not a reliable flush trigger.
     #[arg(long = "memory-flush", hide = true)]
     pub memory_flush: bool,

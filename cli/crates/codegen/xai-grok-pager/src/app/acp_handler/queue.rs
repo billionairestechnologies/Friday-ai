@@ -17,7 +17,7 @@ pub(crate) struct PendingRunningAdoption {
     pub turn_ended: bool,
 }
 
-/// Wire payload of `x.ai/session/prompt_complete`, emitted by `MvpAgent::prompt()` on the shell after every turn.
+/// Wire payload of `friday/session/prompt_complete`, emitted by `MvpAgent::prompt()` on the shell after every turn.
 /// `Serialize` is derived so tests construct payloads through the same type they are parsed into (shape drift fails at compile time, not at runtime).
 /// Every field except `sessionId` is optional for wire compatibility with older shells; `promptId` only exists on shells with the lost-response fix.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

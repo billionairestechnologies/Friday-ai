@@ -1431,7 +1431,7 @@ pub fn apply_sandbox(
                     eprintln!(
                         "error: sandbox reports bwrap but required hook write-deny \
                          mounts are missing or writable ({e}); refusing to start \
-                         (possible __GROK_INSIDE_BWRAP spoof)"
+                         (possible __FRIDAY_INSIDE_BWRAP spoof)"
                     );
                     std::process::exit(1);
                 }
@@ -1442,7 +1442,7 @@ pub fn apply_sandbox(
                     eprintln!(
                         "error: sandbox reports bwrap but required read-deny mounts \
                          are not in effect ({e}); refusing to start \
-                         (possible __GROK_INSIDE_BWRAP spoof)"
+                         (possible __FRIDAY_INSIDE_BWRAP spoof)"
                     );
                     std::process::exit(1);
                 }
@@ -1455,7 +1455,7 @@ pub fn apply_sandbox(
                     eprintln!(
                         "error: sandbox reports bwrap but the required /data write-deny \
                          mount is not in effect ({e}); refusing to start \
-                         (possible __GROK_INSIDE_BWRAP spoof)"
+                         (possible __FRIDAY_INSIDE_BWRAP spoof)"
                     );
                     std::process::exit(1);
                 }

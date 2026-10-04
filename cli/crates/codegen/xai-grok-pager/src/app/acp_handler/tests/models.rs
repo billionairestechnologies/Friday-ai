@@ -5,7 +5,7 @@
     use crate::app::actions::{Action, ModelChoice, TaskResult};
     use crate::app::dispatch::dispatch;
 
-    /// Regression: a machine-wide `x.ai/models/update` broadcast carries each model's static catalog-default effort (`high`).
+    /// Regression: a machine-wide `friday/models/update` broadcast carries each model's static catalog-default effort (`high`).
     /// It does not carry the session's chosen `xhigh` and must not clobber that per-session choice.
     #[test]
     fn models_update_preserves_user_reasoning_effort() {
@@ -187,7 +187,7 @@
             meta: None,
         };
         let raw = serde_json::value::to_raw_value(&payload).unwrap();
-        let notif = acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw));
+        let notif = acp::ExtNotification::new("friday/session_notification", std::sync::Arc::from(raw));
         assert!(handle_ext_notification(&notif, &mut app), "the footer changed");
 
         let agent = app.agents.get_mut(&AgentId(0)).unwrap();
@@ -363,7 +363,7 @@
     }
 
     /// `reasoning_effort` round-trips through the broadcast: the follower applies it alongside the model id.
-    /// The prompt header and status bar then show the right effort without waiting for a later `x.ai/models/update`.
+    /// The prompt header and status bar then show the right effort without waiting for a later `friday/models/update`.
     #[test]
     fn model_changed_applies_reasoning_effort_on_follower() {
         use xai_grok_shell::sampling::types::ReasoningEffort;
@@ -475,7 +475,7 @@
         );
         let state = acp::SessionModelState::new(acp_fixtures::model_id("grok-4"), vec![listed]);
 
-        handle_ext_notification(&acp_fixtures::ext_notification("x.ai/models/update", &state), &mut app);
+        handle_ext_notification(&acp_fixtures::ext_notification("friday/models/update", &state), &mut app);
 
         let agent = app.agents.get(&AgentId(0)).expect("agent under test");
         let context = agent.context_state.as_ref().expect("context state");

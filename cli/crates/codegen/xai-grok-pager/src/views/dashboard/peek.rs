@@ -987,7 +987,7 @@ mod tests {
         use ratatui::layout::Rect;
         // Fixed RGB palette: dim metadata carries a gray_dim fg there (the
         // DIM attribute on the terminal theme).
-        let theme = Theme::groknight();
+        let theme = Theme::fridaynight();
         let render = |response_type: &str| {
             let mut buf = Buffer::empty(Rect::new(0, 0, 80, 6));
             let panel =

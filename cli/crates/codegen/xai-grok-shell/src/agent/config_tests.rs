@@ -377,6 +377,7 @@ fn resolved_memory_config_uses_isolated_v2_namespace() {
     assert_eq!(memory.mode, crate::config::MemoryMode::V2);
 }
 #[test]
+#[ignore = "vendor-hosted media/search tools are off in Friday X"]
 fn resolve_runtime_fields_propagates_disable_web_search() {
     fn ctx(raw: &toml::Value, disable_web_search: bool) -> RuntimeResolutionContext<'_> {
         RuntimeResolutionContext {
@@ -4571,6 +4572,7 @@ fn resolve_trace_upload_disabled_when_telemetry_off_despite_remote_flag() {
 }
 #[test]
 #[serial]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 fn resolve_trace_upload_explicit_config_wins_over_telemetry_off() {
     unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
     unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
@@ -4615,6 +4617,7 @@ fn trace_upload_stays_off_under_a_requirements_pin_when_the_distribution_withhol
 }
 #[test]
 #[serial]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 fn trace_upload_decision_debug_reports_winning_source() {
     unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
     unsafe { std::env::remove_var("FRIDAY_TELEMETRY_TRACE_UPLOAD") };
@@ -4662,6 +4665,7 @@ fn trace_upload_decision_debug_reports_winning_source() {
 }
 #[test]
 #[serial]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 fn resolve_trace_upload_honors_config_when_telemetry_on() {
     unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
@@ -4876,6 +4880,7 @@ fn imagine_tools_disabled_gates_image_edit() {
 }
 #[test]
 #[serial]
+#[ignore = "vendor-hosted media/search tools are off in Friday X"]
 fn resolve_image_gen_gates() {
     unsafe { std::env::remove_var("FRIDAY_IMAGE_GEN") };
     assert!(Config::default().resolve_image_gen().value);
@@ -4916,6 +4921,7 @@ fn resolve_image_gen_gates() {
 }
 #[test]
 #[serial]
+#[ignore = "vendor-hosted media/search tools are off in Friday X"]
 fn resolve_video_gen_gates() {
     unsafe { std::env::remove_var("FRIDAY_VIDEO_GEN") };
     assert!(Config::default().resolve_video_gen().value);
@@ -7024,6 +7030,7 @@ telemetry = "garbage"
 }
 #[test]
 #[serial]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 fn is_telemetry_explicitly_disabled_sync_env_signals() {
     unsafe { std::env::set_var("FRIDAY_TELEMETRY_ENABLED", "0") };
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
@@ -7037,6 +7044,7 @@ fn is_telemetry_explicitly_disabled_sync_env_signals() {
 }
 #[test]
 #[serial]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 fn resolve_telemetry_mode_disable_env_beats_opt_in_but_not_requirements_pin() {
     let home = tempfile::tempdir().unwrap();
     let _home = EnvGuard::set("FRIDAY_HOME", home.path());
@@ -7071,6 +7079,7 @@ fn resolve_telemetry_mode_disable_env_beats_opt_in_but_not_requirements_pin() {
 }
 #[test]
 #[serial]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 fn requirements_telemetry_pin_beats_user_config() {
     unsafe { std::env::remove_var("DISABLE_TELEMETRY") };
     unsafe { std::env::remove_var("FRIDAY_TELEMETRY_ENABLED") };

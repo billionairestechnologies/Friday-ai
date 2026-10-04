@@ -2070,7 +2070,7 @@ pub(crate) fn spawn_progress_publisher(
             }
             if let Some(params) = params {
                 let ext_notification =
-                    acp::ExtNotification::new("x.ai/session_notification", params.into());
+                    acp::ExtNotification::new("friday/session_notification", params.into());
                 gateway.forward_fire_and_forget(ext_notification);
             }
         }

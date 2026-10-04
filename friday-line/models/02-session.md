@@ -12,7 +12,8 @@ A phone session is a Friday session with a voice transport. Chat history, memory
 - `started_at`, `ended_at`
 - `held_seconds` — time the line was actually up
 - `language`
-- `transcript` — written when the call ends, attached to this session so the app can show it
+- `transcript` — written when the call ends, on this session, keyed to `user_id`
+- `summary` — last job, last delivery channel, open loops, for the next call's capped recap
 
 ## Turn rule
 
@@ -23,7 +24,7 @@ The session is a discussion.
 3. The answer is spoken.
 4. The session waits. It does not produce another assistant turn until the user speaks again.
 
-A clarifying question is an assistant turn. After it, the session waits. It does not stack questions.
+A clarifying question is an assistant turn. After it, the session waits. It does not stack questions. The spoken shape of the turn is the [persona](07-persona.md). The capped account recap, if any, is already in context. See [memory](08-memory.md).
 
 ## Authorize, then talk
 

@@ -806,6 +806,7 @@ mod forbidden_tests {
     }
 
     #[tokio::test]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
     async fn send_json_bails_on_403_with_clear_message() {
         let router = Router::new().route(
             "/v1/feedback/config",

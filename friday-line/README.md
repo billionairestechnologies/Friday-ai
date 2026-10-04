@@ -7,10 +7,11 @@ A call is a full Friday session. Tools, skills, agent loops, always-on agents, t
 ## Read this order
 
 1. [PLAN.md](PLAN.md) — what it is, what a call does, and the build order
-2. [TODO.md](TODO.md) — the work list, not started
-3. [models/](models/README.md) — the records the runtime keeps
-4. [flows/](flows/README.md) — discussion, hold-or-release, making a job, delivery, co-working
-5. [diagrams/](diagrams/README.md) — Mermaid sources, plus SVG and PNG
+2. [UPGRADES.md](UPGRADES.md) — persona, memory, cost guard, human in the loop
+3. [TODO.md](TODO.md) — the work list, not started
+4. [models/](models/README.md) — the records the runtime keeps
+5. [flows/](flows/README.md) — discussion, hold-or-release, making a job, delivery, co-working
+6. [diagrams/](diagrams/README.md) — Mermaid sources, plus SVG and PNG
 
 ## Where this sits
 
@@ -34,3 +35,4 @@ Web, mobile, CLI, Telegram, WhatsApp, and email do not each grow their own Frida
 - Long work (deep research, build, sandbox, loops) starts on the call and finishes off it.
 - The person chooses delivery: spoken, the app, Telegram, WhatsApp, or email.
 - The call is a discussion. They speak, Friday answers, Friday waits.
+- Persona and memory are upgrades on that session. They do not replace the runtime or the delivery channels.

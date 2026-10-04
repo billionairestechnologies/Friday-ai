@@ -1,4 +1,4 @@
-//! Decodes the shell's `x.ai/*` extension notifications into the headless [`ExtEvent`] the orchestrator dispatches.
+//! Decodes the shell's `friday/*` extension notifications into the headless [`ExtEvent`] the orchestrator dispatches.
 //! Also answers reverse `ext_method` requests with policy replies.
 //! This module owns the wire envelope shapes and the method-to-event mapping, kept out of `headless.rs`.
 
@@ -24,13 +24,13 @@ pub(crate) fn reply_headless_ext_method(args: AcpArgsBox<acp::ExtRequest>) {
     // Known methods are answered without parsing params: even a malformed request gets the policy reply rather than a dropped channel
     let response = match method {
         // The model sees the tool's NO_OPERATOR_TEXT (headless sessions are non-interactive), not the interactive "user declined" cancel text
-        "x.ai/ask_user_question" => ext_response_from(&AskUserQuestionExtResponse::Cancelled),
-        "x.ai/mcp/elicit" => {
+        "friday/ask_user_question" => ext_response_from(&AskUserQuestionExtResponse::Cancelled),
+        "friday/mcp/elicit" => {
             use xai_grok_tools::mcp_elicitation::McpElicitExtResponse;
             ext_response_from(&McpElicitExtResponse::Cancel)
         }
         // The model sees "Your plan has been approved. You can now start coding.".
-        "x.ai/exit_plan_mode" => ext_response_from(&ExitPlanModeExtResponse {
+        "friday/exit_plan_mode" => ext_response_from(&ExitPlanModeExtResponse {
             outcome: "approved".to_string(),
             feedback: None,
         }),
@@ -104,12 +104,12 @@ pub(crate) fn handle_ext_notification(
         return decode_session_notification(method, params);
     }
     match method {
-        "x.ai/task_backgrounded" => decode_task_backgrounded(method, params),
-        "x.ai/task_completed" => decode_task_completed(method, params),
-        "x.ai/monitor_event" => ExtEvent::MonitorEvent,
-        "x.ai/leader/version_mismatch" => {
+        "friday/task_backgrounded" => decode_task_backgrounded(method, params),
+        "friday/task_completed" => decode_task_completed(method, params),
+        "friday/monitor_event" => ExtEvent::MonitorEvent,
+        "friday/leader/version_mismatch" => {
             match crate::acp::version_mismatch_banner(params) {
-                Some(banner) => tracing::warn!(%banner, "x.ai/leader/version_mismatch"),
+                Some(banner) => tracing::warn!(%banner, "friday/leader/version_mismatch"),
                 None => {
                     tracing::warn!("ignoring x.ai/leader/version_mismatch without usable versions")
                 }

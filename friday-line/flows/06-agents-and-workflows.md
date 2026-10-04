@@ -9,6 +9,7 @@ Loops and schedules are Friday jobs. The phone creates and controls them. It doe
 3. On yes, the agent runtime starts the loop and the call ends.
 4. Later they call and ask "where is that?" That status read is a short job and is spoken.
 5. "Pause it" or "change it" is another short or long job on the same agent, with a yes when the change is destructive.
+6. One word, "rukho" or "stop", pauses the loop immediately. The job moves to `paused`. The loop stays in the agent runtime. The line does not keep hosting it.
 
 ## Workflow
 

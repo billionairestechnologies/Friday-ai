@@ -7,7 +7,7 @@
 //!
 //! `FRIDAY_FPS` ownership: in debug/dev builds the env feeds `FrameMetrics` and this HUD stays toggle-only (no double overlay).
 //! On release binaries, where that overlay does not exist, the same env enables this HUD from startup.
-//! `FRIDAY_FPS=1` is therefore never a silent no-op ([`HONORS_GROK_FPS_ENV`]).
+//! `FRIDAY_FPS=1` is therefore never a silent no-op ([`HONORS_FRIDAY_FPS_ENV`]).
 //!
 //! "fps" here is render throughput (1 / mean frame cost), not paint frequency: the pager draws on demand.
 //! The second stats line reports measured paints and ticks per second over a sliding window; it refreshes on paint, so an idle screen keeps its last pre-idle rates.
@@ -28,9 +28,9 @@ const RATE_WINDOW: Duration = Duration::from_secs(2);
 const PANEL_WIDTH: u16 = 32;
 /// Whether this HUD owns the `FRIDAY_FPS` env gate: only where the dev `FrameMetrics` overlay is compiled out.
 /// In debug/dev builds the env keeps feeding that overlay alone.
-const HONORS_GROK_FPS_ENV: bool = true;
+const HONORS_FRIDAY_FPS_ENV: bool = true;
 /// Runtime state for the FPS HUD.
-/// `FRIDAY_FPS` enables it at startup on release binaries ([`HONORS_GROK_FPS_ENV`]); `/debug fps` toggles it live everywhere.
+/// `FRIDAY_FPS` enables it at startup on release binaries ([`HONORS_FRIDAY_FPS_ENV`]); `/debug fps` toggles it live everywhere.
 /// Deliberately NOT a settings-registry entry: it is a diagnostic, not a preference to persist.
 pub struct FpsHud {
     samples: VecDeque<Duration>,
@@ -57,7 +57,7 @@ impl FpsHud {
     }
     /// `env` is the raw `FRIDAY_FPS` value; the truthiness rule (nonempty and not `"0"`) matches `FrameMetrics` and `FRIDAY_SCROLL_DEBUG`.
     fn with_env(env: Option<String>) -> Self {
-        let env_on = HONORS_GROK_FPS_ENV && env.is_some_and(|v| !v.is_empty() && v != "0");
+        let env_on = HONORS_FRIDAY_FPS_ENV && env.is_some_and(|v| !v.is_empty() && v != "0");
         Self {
             samples: VecDeque::with_capacity(SAMPLE_CAP),
             paints: VecDeque::new(),
@@ -243,7 +243,7 @@ mod tests {
         for truthy in ["1", "full", " "] {
             assert_eq!(
                 FpsHud::with_env(Some(truthy.into())).enabled(),
-                HONORS_GROK_FPS_ENV,
+                HONORS_FRIDAY_FPS_ENV,
                 "FRIDAY_FPS={truthy:?} must track the env-gate owner"
             );
         }

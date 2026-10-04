@@ -1,4 +1,4 @@
-//! Reads the `x.ai/skills/list` and `x.ai/skills/toggle` answers the Skills tab shows.
+//! Reads the `friday/skills/list` and `friday/skills/toggle` answers the Skills tab shows.
 
 use xai_grok_shell::extensions::skills::SkillsListResponse;
 

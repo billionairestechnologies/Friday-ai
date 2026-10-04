@@ -88,10 +88,10 @@ pub(crate) struct SkillsToggleRequest {
     pub cwd: Option<String>,
 }
 
-pub const SKILLS_LIST_METHOD: &str = "x.ai/skills/list";
-pub const SKILLS_TOGGLE_METHOD: &str = "x.ai/skills/toggle";
+pub const SKILLS_LIST_METHOD: &str = "friday/skills/list";
+pub const SKILLS_TOGGLE_METHOD: &str = "friday/skills/toggle";
 
-/// Wire DTO for the `x.ai/skills/list` ext request. `pub` with both serde directions so ACP
+/// Wire DTO for the `friday/skills/list` ext request. `pub` with both serde directions so ACP
 /// clients (xai-grok-pager) build the request from the same type the agent parses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,7 +112,7 @@ struct WorkflowsListRequest {
     session_id: acp::SessionId,
 }
 
-/// Wire DTO for the `x.ai/skills/list` and `x.ai/skills/toggle` answers, in both serde directions
+/// Wire DTO for the `friday/skills/list` and `friday/skills/toggle` answers, in both serde directions
 /// for the same reason as [`SkillsListRequest`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -363,7 +363,7 @@ pub async fn handle(
     compat: CompatConfig,
 ) -> ExtResult {
     match args.method.as_ref() {
-        "x.ai/skills/add" => {
+        "friday/skills/add" => {
             let req: SkillsAddRequest = serde_json::from_str(args.params.get())?;
             let cwd = req.cwd.as_deref().unwrap_or(".");
 
@@ -424,7 +424,7 @@ pub async fn handle(
             }))
         }
 
-        "x.ai/skills/remove" => {
+        "friday/skills/remove" => {
             let req: SkillsRemoveRequest = serde_json::from_str(args.params.get())?;
             let cwd = req.cwd.as_deref().unwrap_or(".");
 
@@ -467,7 +467,7 @@ pub async fn handle(
             }))
         }
 
-        "x.ai/skills/reset" => {
+        "friday/skills/reset" => {
             let params: CwdParams =
                 serde_json::from_str(args.params.get()).unwrap_or(CwdParams { cwd: None });
             let cwd = params.cwd.as_deref().unwrap_or(".");
@@ -497,7 +497,7 @@ pub async fn handle(
             super::to_ext_response(Ok(SkillsListResponse::from(skills)))
         }
 
-        "x.ai/workflows/list" => {
+        "friday/workflows/list" => {
             let req: WorkflowsListRequest = serde_json::from_str(args.params.get())?;
             let Some(handle) = agent.session_handle_waiting_for_load(&req.session_id).await else {
                 return super::to_ext_response(Err::<serde_json::Value, _>(anyhow::anyhow!(
@@ -516,7 +516,7 @@ pub async fn handle(
             super::to_ext_response(Ok(serde_json::json!({ "workflows": workflows })))
         }
 
-        "x.ai/skills/config" => {
+        "friday/skills/config" => {
             let params: CwdParams =
                 serde_json::from_str(args.params.get()).unwrap_or(CwdParams { cwd: None });
             let cwd = params.cwd.as_deref().unwrap_or(".");
@@ -634,7 +634,7 @@ mod tests {
     fn request_cwd_reads_the_field_from_any_request_shape() {
         let req = |json: &str| {
             acp::ExtRequest::new(
-                "x.ai/skills/list",
+                "friday/skills/list",
                 serde_json::value::to_raw_value(
                     &serde_json::from_str::<serde_json::Value>(json).unwrap(),
                 )

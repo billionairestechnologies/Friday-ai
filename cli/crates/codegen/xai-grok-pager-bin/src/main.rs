@@ -851,7 +851,7 @@ struct StdioReplayState {
     /// Folded into `sessions` when the response carrying the assigned session id arrives.
     /// Never replayed while unconfirmed (the id is unknown; the client's own request died with the old leader and is its to retry).
     pending_new: Option<CachedSession>,
-    /// Most recently created/loaded session id, reported in `x.ai/leader_reconnected` as the primary restored session.
+    /// Most recently created/loaded session id, reported in `friday/leader_reconnected` as the primary restored session.
     last_session_id: Option<String>,
 }
 impl StdioReplayState {
@@ -908,8 +908,8 @@ const CACHED_METHODS: &[&str] = &[
     "\"session/load\"",
     "\"session/resume\"",
     "\"session/close\"",
-    "\"x.ai/session/close\"",
-    "\"_x.ai/session/close\"",
+    "\"friday/session/close\"",
+    "\"_friday/session/close\"",
 ];
 fn cache_outgoing_acp_state(msg: &str, state: &std::sync::Mutex<StdioReplayState>) {
     if !CACHED_METHODS.iter().any(|m| msg.contains(m)) {
@@ -963,7 +963,7 @@ fn cache_outgoing_acp_state(msg: &str, state: &std::sync::Mutex<StdioReplayState
                     .and_then(|m| serde_json::to_string(m).ok()),
             });
         }
-        "session/close" | "x.ai/session/close" | "_x.ai/session/close" => {
+        "session/close" | "friday/session/close" | "_friday/session/close" => {
             if let Some(sid) = json
                 .get("params")
                 .and_then(|p| p.get("sessionId").or_else(|| p.get("session_id")))
@@ -994,7 +994,7 @@ fn cache_incoming_session_id(msg: &str, state: &std::sync::Mutex<StdioReplayStat
 }
 /// Synthetic JSON-RPC id for the `session/load` the bridge constructs itself (when the external client only ever sent `session/new`).
 /// A string id can never collide with a numeric id the external client may have in flight.
-const REPLAY_LOAD_REQUEST_ID: &str = "x.ai/leader-replay/session-load";
+const REPLAY_LOAD_REQUEST_ID: &str = "friday/leader-replay/session-load";
 /// Max silence between two messages from the leader during a replayed request.
 /// A `session/load` streams replay notifications continuously once it starts.
 /// The phase before the replay (MCP resolution, session file reads) can be quiet for a while on large sessions.
@@ -1538,7 +1538,7 @@ async fn run_agent_command(
                                             None => "{}".to_string(),
                                         };
                                         let notification = format!(
-                                            r#"{{"jsonrpc":"2.0","method":"x.ai/leader_reconnected","params":{params}}}"#
+                                            r#"{{"jsonrpc":"2.0","method":"friday/leader_reconnected","params":{params}}}"#
                                         );
                                         let _ = stdout.write_all(notification.as_bytes()).await;
                                         let _ = stdout.write_all(b"\n").await;
@@ -3315,14 +3315,14 @@ mod tests {
             &state,
         );
         cache_outgoing_acp_state(
-            r#"{"jsonrpc":"2.0","id":3,"method":"_x.ai/session/close","params":{"sessionId":"s1"}}"#,
+            r#"{"jsonrpc":"2.0","id":3,"method":"_friday/session/close","params":{"sessionId":"s1"}}"#,
             &state,
         );
         let s = state.lock().unwrap();
         assert!(s.sessions.is_empty(), "closed session must not be replayed");
         assert!(s.last_session_id.is_none());
     }
-    /// The standard close spelling must stop the replay exactly like the `x.ai/` extension spelling.
+    /// The standard close spelling must stop the replay exactly like the `friday/` extension spelling.
     /// Adopting `session/close` without teaching the cache would resurrect closed sessions on every leader reconnect.
     #[test]
     fn cache_standard_session_close_stops_replaying_it() {
@@ -3639,7 +3639,7 @@ mod tests {
             let _init = leader_rx.recv().await.unwrap();
             response_tx
                 .send(
-                    r#"{"jsonrpc":"2.0","method":"x.ai/leader/version_mismatch","params":{}}"#
+                    r#"{"jsonrpc":"2.0","method":"friday/leader/version_mismatch","params":{}}"#
                         .to_string(),
                 )
                 .unwrap();
@@ -3687,7 +3687,7 @@ mod tests {
         responder.await.unwrap();
     }
     /// A `session/load` rejected by the new leader (error response) must surface as a failed replay (`None`).
-    /// The bridge then emits `x.ai/leader_reconnected` with empty params and the external client knows to re-establish state itself.
+    /// The bridge then emits `friday/leader_reconnected` with empty params and the external client knows to re-establish state itself.
     #[tokio::test]
     async fn replay_returns_none_when_load_is_rejected() {
         let (leader_tx, mut leader_rx) = tokio::sync::mpsc::unbounded_channel();

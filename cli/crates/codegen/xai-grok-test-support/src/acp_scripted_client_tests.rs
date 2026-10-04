@@ -123,14 +123,14 @@ async fn other_extension_requests_are_answered_null_and_recorded() {
     let params = json!({ "sessionId": "s1", "toolCallId": "tc2" });
 
     let reply = client
-        .ext_method(ext_request("x.ai/exit_plan_mode", &params))
+        .ext_method(ext_request("friday/exit_plan_mode", &params))
         .await
         .expect("null reply");
 
     assert_eq!(Value::Null, parse(&reply));
     assert_eq!(
         vec![TranscriptEntry::ExtRequest {
-            method: "x.ai/exit_plan_mode".to_owned(),
+            method: "friday/exit_plan_mode".to_owned(),
             params,
             reply: Value::Null,
         }],
@@ -149,7 +149,7 @@ async fn hook_run_request_gets_the_client_hook_reply() {
 
     let reply = client
         .ext_method(ext_request(
-            "x.ai/hooks/run",
+            "friday/hooks/run",
             &json!({ "hookCallbackId": "cb" }),
         ))
         .await

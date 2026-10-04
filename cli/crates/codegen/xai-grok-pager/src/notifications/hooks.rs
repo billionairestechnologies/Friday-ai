@@ -134,7 +134,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("env.txt");
         let command = format!(
-            "printf 'FRIDAY_EVENT=%s\\nGROK_MESSAGE=%s\\nGROK_SESSION_ID=%s\\n' \
+            "printf 'FRIDAY_EVENT=%s\\nFRIDAY_MESSAGE=%s\\nFRIDAY_SESSION_ID=%s\\n' \
              \"$FRIDAY_EVENT\" \"$FRIDAY_MESSAGE\" \"$FRIDAY_SESSION_ID\" > {}",
             out.display()
         );
@@ -285,7 +285,7 @@ mod tests {
         let out = dir.path().join("env.txt");
         let hook = NotificationHook {
             command: format!(
-                "printf 'FRIDAY_EVENT=%s\\nGROK_MESSAGE=%s\\nGROK_SESSION_ID=%s\\n' \
+                "printf 'FRIDAY_EVENT=%s\\nFRIDAY_MESSAGE=%s\\nFRIDAY_SESSION_ID=%s\\n' \
                  \"$FRIDAY_EVENT\" \"$FRIDAY_MESSAGE\" \"$FRIDAY_SESSION_ID\" > {}",
                 out.display()
             ),

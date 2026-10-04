@@ -2792,7 +2792,7 @@ pub struct ResumeSessionInWorktreeRequest {
     pub git_ref: Option<String>,
 }
 
-/// Response from `x.ai/git/worktree/resume_session`.
+/// Response from `friday/git/worktree/resume_session`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResumeSessionInWorktreeResponse {
@@ -2836,7 +2836,7 @@ pub struct RehydrateSessionRequest {
     pub worktree_path: Option<String>,
 }
 
-/// Response from `x.ai/session/rehydrate`.
+/// Response from `friday/session/rehydrate`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RehydrateSessionResponse {

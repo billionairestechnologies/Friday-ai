@@ -439,7 +439,7 @@ pub fn load_claude_env_with_project(cwd: &Path, project_trusted: bool) -> HashMa
 pub fn is_claude_import_marked() -> bool {
     // Test escape hatch: shell tests call `refresh_marker_cache(true)`, which lives in xai-grok-shell (inaccessible from here at runtime)
     // They also set this env var so the gate in this crate honours the override without a cross-crate dependency
-    if std::env::var("_GROK_CLAUDE_MARKER_OVERRIDE").as_deref() == Ok("1") {
+    if std::env::var("_FRIDAY_CLAUDE_MARKER_OVERRIDE").as_deref() == Ok("1") {
         return true;
     }
     xai_grok_config::user_grok_home()

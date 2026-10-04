@@ -1,4 +1,4 @@
-//! `x.ai/review/*` extension handlers: record inline code review events to cloud storage.
+//! `friday/review/*` extension handlers: record inline code review events to cloud storage.
 
 use std::sync::Arc;
 
@@ -14,10 +14,10 @@ use xai_file_utils::gcs::upload_bytes;
 use xai_grok_telemetry::id::agent_id;
 
 /// Record inline code review events.
-/// Methods: `x.ai/review/comment`: record a new inline code comment to cloud storage `x.ai/review/comment/delete`: record a tombstone event for a deleted comment
+/// Methods: `friday/review/comment`: record a new inline code comment to cloud storage `friday/review/comment/delete`: record a tombstone event for a deleted comment
 pub(super) async fn handle_review(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     match args.method.as_ref() {
-        "x.ai/review/comment" => {
+        "friday/review/comment" => {
             let request: CommentRequest = parse_params(args)?;
 
             let comment_id = uuid::Uuid::now_v7().to_string();
@@ -84,7 +84,7 @@ pub(super) async fn handle_review(agent: &MvpAgent, args: &acp::ExtRequest) -> E
             .expect("to work");
             Ok(acp::ExtResponse::new(value))
         }
-        "x.ai/review/comment/delete" => {
+        "friday/review/comment/delete" => {
             let request: CommentDeleteRequest = parse_params(args)?;
 
             tracing::info!(

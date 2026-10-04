@@ -1,4 +1,4 @@
-//! E2E: a gateway-connector enable via `x.ai/mcp/toggle` must propagate a failed
+//! E2E: a gateway-connector enable via `friday/mcp/toggle` must propagate a failed
 //! `disabled_mcp_servers` clear as an error, like the local-server sibling (PersistFailed).
 
 mod acp_harness;
@@ -33,7 +33,7 @@ fn gateway_toggle_propagates_failed_enable_persist() {
         .expect("serialize mcp/toggle params");
         let err = tokio::time::timeout(
             RPC_TIMEOUT,
-            conn.ext_method(acp::ExtRequest::new("x.ai/mcp/toggle", Arc::from(params))),
+            conn.ext_method(acp::ExtRequest::new("friday/mcp/toggle", Arc::from(params))),
         )
         .await
         .expect("mcp/toggle timed out")

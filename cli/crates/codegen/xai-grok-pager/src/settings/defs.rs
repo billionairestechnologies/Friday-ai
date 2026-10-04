@@ -34,12 +34,12 @@ const THEME_CHOICES: &[EnumChoice] = &[
         description: "Follow system dark/light appearance.",
     },
     EnumChoice {
-        canonical: "groknight",
+        canonical: "fridaynight",
         display: "Friday X Night",
         description: "Neutral dark with magenta accent.",
     },
     EnumChoice {
-        canonical: "grokday",
+        canonical: "fridayday",
         display: "Friday X Day",
         description: "Light theme for bright environments.",
     },
@@ -422,12 +422,12 @@ const VOICE_STT_LANGUAGE_CHOICES: &[EnumChoice] = &[
 /// There is no dark/light filtering: the user can pair any theme with any system-appearance bucket.
 const CONCRETE_THEME_CHOICES: &[EnumChoice] = &[
     EnumChoice {
-        canonical: "groknight",
+        canonical: "fridaynight",
         display: "Friday X Night",
         description: "Neutral dark with magenta accent.",
     },
     EnumChoice {
-        canonical: "grokday",
+        canonical: "fridayday",
         display: "Friday X Day",
         description: "Light theme for bright environments.",
     },
@@ -700,8 +700,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "light",
             ],
             kind: SettingKind::Enum {
-                // `Option<String>`: `None` resolves to "groknight"
-                default: "groknight",
+                // `Option<String>`: `None` resolves to "fridaynight"
+                default: "fridaynight",
                 choices: THEME_CHOICES,
                 supports_preview: true,
             },
@@ -716,8 +716,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             description: "Theme to use when the system is in dark mode (only with theme=auto).",
             keywords: &["auto", "dark", "theme", "system", "appearance", "night"],
             kind: SettingKind::Enum {
-                // `Option<String>`: `None` falls back to "groknight"
-                default: "groknight",
+                // `Option<String>`: `None` falls back to "fridaynight"
+                default: "fridaynight",
                 choices: CONCRETE_THEME_CHOICES,
                 supports_preview: true,
             },
@@ -732,8 +732,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             description: "Theme to use when the system is in light mode (only with theme=auto).",
             keywords: &["auto", "light", "theme", "system", "appearance", "day"],
             kind: SettingKind::Enum {
-                // `Option<String>`: `None` falls back to "grokday"
-                default: "grokday",
+                // `Option<String>`: `None` falls back to "fridayday"
+                default: "fridayday",
                 choices: CONCRETE_THEME_CHOICES,
                 supports_preview: true,
             },

@@ -1444,7 +1444,7 @@ mod tests {
         if !crate::theme::color_support::detect().has_color() {
             return;
         }
-        let theme = Theme::groknight();
+        let theme = Theme::fridaynight();
         let mut entry = ScrollbackEntry::new(RenderBlock::agent_message("```\nZZZZ\n```\n"));
         // The code block's only content row is the first content row, which is also where the timestamp overlay lands.
         // Drop `created_at` so the overlay is skipped. It would otherwise paint the right-aligned clock into the gutter
@@ -1725,7 +1725,7 @@ mod tests {
         // `BlockBackground::None` and shade per line.
         use crate::scrollback::block::StubBlock;
 
-        let theme = Theme::groknight();
+        let theme = Theme::fridaynight();
         let entry = ScrollbackEntry::new(RenderBlock::Stub(
             StubBlock::new("alpha\nbravo", Color::Blue).with_line_bg(LINE_BG, true),
         ));
@@ -1751,7 +1751,7 @@ mod tests {
         // They carry meaning, unlike the decorative tool-preview panels
         use crate::scrollback::block::StubBlock;
 
-        let theme = Theme::groknight();
+        let theme = Theme::fridaynight();
         let entry = ScrollbackEntry::new(RenderBlock::Stub(
             StubBlock::new("alpha\nbravo", Color::Blue).with_line_bg(LINE_BG, false),
         ));

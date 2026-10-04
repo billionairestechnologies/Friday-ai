@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 const SCENARIO_ENV: &str = "SANDBOX_E2E_SCENARIO";
 const WORKSPACE_ENV: &str = "SANDBOX_E2E_WORKSPACE";
-const FRIDAY_HOME_ENV: &str = "SANDBOX_E2E_GROK_HOME";
+const FRIDAY_HOME_ENV: &str = "SANDBOX_E2E_FRIDAY_HOME";
 const HOME_ENV: &str = "SANDBOX_E2E_HOME";
 const PROFILE_ENV: &str = "SANDBOX_E2E_PROFILE";
 const TARGETS_ENV: &str = "SANDBOX_E2E_TARGETS";
@@ -441,7 +441,7 @@ fn subprocess_hook_write_deny_marker_spoof(_grok_home: &Path) {
     #[cfg(target_os = "linux")]
     {
         unsafe {
-            std::env::set_var("__GROK_INSIDE_BWRAP", "1");
+            std::env::set_var("__FRIDAY_INSIDE_BWRAP", "1");
         }
         match xai_grok_sandbox::verify_hook_write_deny_enforced() {
             Ok(()) => {
@@ -476,7 +476,7 @@ fn subprocess_read_deny_marker_spoof(workspace: &Path) {
     #[cfg(target_os = "linux")]
     {
         unsafe {
-            std::env::set_var("__GROK_INSIDE_BWRAP", "1");
+            std::env::set_var("__FRIDAY_INSIDE_BWRAP", "1");
         }
         let profile = profile_from_env();
         match xai_grok_sandbox::verify_read_deny_enforced(&profile, workspace) {
@@ -976,7 +976,7 @@ fn deny_globs_block_read_write_rename() {
         &["late.pem"],
     );
 }
-/// Spoofing `__GROK_INSIDE_BWRAP` must not pass read-deny verification while a denied path is readable.
+/// Spoofing `__FRIDAY_INSIDE_BWRAP` must not pass read-deny verification while a denied path is readable.
 /// Uses a devbox-extending restrict-network profile, the shape hook write-deny verification does not cover.
 #[test]
 #[cfg(target_os = "linux")]
@@ -1035,7 +1035,7 @@ fn read_deny_forged_mounts_are_refused() {
     let output = cmd
         .env(SCENARIO_ENV, "read_deny_forged_mounts")
         .env(PROFILE_ENV, "forged")
-        .env("__GROK_INSIDE_BWRAP", "1")
+        .env("__FRIDAY_INSIDE_BWRAP", "1")
         .args(["--bind", "/", "/"])
         .arg("--ro-bind")
         .arg(&sentinel)
@@ -1108,7 +1108,7 @@ fn devbox_marker_spoof_does_not_skip_enforcement() {
     let mut cmd = Command::new("bwrap");
     apply_fixture_env(&mut cmd, &home, &grok, &workspace);
     cmd.env(SCENARIO_ENV, "devbox_marker_spoof")
-        .env("__GROK_INSIDE_BWRAP", "1")
+        .env("__FRIDAY_INSIDE_BWRAP", "1")
         .args(["--bind", "/", "/"])
         .args(["--bind", &fake_sys_s, "/sys"]);
     if stage_data {

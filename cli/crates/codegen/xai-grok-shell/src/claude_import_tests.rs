@@ -36,7 +36,7 @@ struct MarkerGuard;
 impl Drop for MarkerGuard {
     fn drop(&mut self) {
         reset_marker_cache_for_test();
-        unsafe { std::env::remove_var("_GROK_CLAUDE_MARKER_OVERRIDE") };
+        unsafe { std::env::remove_var("_FRIDAY_CLAUDE_MARKER_OVERRIDE") };
     }
 }
 
@@ -303,7 +303,7 @@ fn gate_mcp_server_sources_report_imported_when_marker_set() {
 async fn gate_resolve_permissions_with_provenance_skips_claude_when_marker_set() {
     let _g = MarkerGuard;
     refresh_marker_cache(true);
-    unsafe { std::env::set_var("_GROK_CLAUDE_MARKER_OVERRIDE", "1") };
+    unsafe { std::env::set_var("_FRIDAY_CLAUDE_MARKER_OVERRIDE", "1") };
     let dir = tempfile::tempdir().unwrap();
     let claude_dir = dir.path().join(".claude");
     std::fs::create_dir_all(&claude_dir).unwrap();

@@ -417,6 +417,7 @@ fn assert_tmp(
 
 #[serial_test::serial(tool_call_telemetry)]
 #[tokio::test(flavor = "current_thread")]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 async fn execute_tool_calls_records_the_product_row_and_execution_span() {
     tokio::task::LocalSet::new()
         .run_until(async {

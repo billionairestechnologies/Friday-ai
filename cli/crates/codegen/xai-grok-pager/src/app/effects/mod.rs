@@ -47,7 +47,7 @@ use xai_grok_shell::sampling::types::{
     CONTEXT_WINDOW_META_KEY, context_window_meta_value,
 };
 use xai_grok_shell::session::{ExtMethodResult, SessionInfoResponse};
-/// The shell's `x.ai/feedback/upload-trace` params. `intent` is omitted (not null) when absent, so a legacy upload's request stays byte-identical to the pre-intent shape.
+/// The shell's `friday/feedback/upload-trace` params. `intent` is omitted (not null) when absent, so a legacy upload's request stays byte-identical to the pre-intent shape.
 /// absent, so a legacy upload's request stays byte-identical to the pre-intent shape.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -498,7 +498,7 @@ pub(crate) fn execute(
             finalize_chat_session_meta(&mut meta, is_chat_path, session_flags);
             if let Some(rc) = session_flags.restore_code {
                 meta.get_or_insert_with(acp::Meta::new)
-                    .insert("x.ai/restore_code".into(), serde_json::Value::Bool(rc));
+                    .insert("friday/restore_code".into(), serde_json::Value::Bool(rc));
             }
             let cwd = session_cwd.unwrap_or_else(|| cwd.to_path_buf());
             let acp_session_id = acp::SessionId::new(session_id);
@@ -719,7 +719,7 @@ pub(crate) fn execute(
                             obj.insert(
                                 "_meta".into(),
                                 serde_json::json!({
-                                "x.ai/facetFilters": { "kind": kinds },
+                                "friday/facetFilters": { "kind": kinds },
                             }),
                             );
                             tracing::info!(
@@ -735,7 +735,7 @@ pub(crate) fn execute(
                         }
                     }
                     let request = acp::ExtRequest::new(
-                        "x.ai/session/list",
+                        "friday/session/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize session list params")
                             .into(),
@@ -818,7 +818,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/sessions/list",
+                        "friday/sessions/list",
                         serde_json::value::to_raw_value(&serde_json::json!({}))
                             .expect("serialize roster list params")
                             .into(),
@@ -862,7 +862,7 @@ pub(crate) fn execute(
                         .as_wire_str(),
                 });
                     let request = acp::ExtRequest::new(
-                        "x.ai/session/list",
+                        "friday/session/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize session list params")
                             .into(),
@@ -1527,7 +1527,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/toggle_plan_mode",
+                        "friday/toggle_plan_mode",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize toggle_plan_mode params")
                             .into(),
@@ -1548,7 +1548,7 @@ pub(crate) fn execute(
                     "expectedVersion": expected_version,
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/remove",
+                        "friday/queue/remove",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/remove params")
                             .into(),
@@ -1568,7 +1568,7 @@ pub(crate) fn execute(
                     "orderedIds": ordered_ids,
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/reorder",
+                        "friday/queue/reorder",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/reorder params")
                             .into(),
@@ -1587,7 +1587,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/clear",
+                        "friday/queue/clear",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/clear params")
                             .into(),
@@ -1608,7 +1608,7 @@ pub(crate) fn execute(
                     "newText": new_text,
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/edit",
+                        "friday/queue/edit",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/edit params")
                             .into(),
@@ -1628,7 +1628,7 @@ pub(crate) fn execute(
                     "id": id,
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/hold_edit",
+                        "friday/queue/hold_edit",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/hold_edit params")
                             .into(),
@@ -1648,7 +1648,7 @@ pub(crate) fn execute(
                     "id": id,
                 });
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/release_edit",
+                        "friday/queue/release_edit",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/release_edit params")
                             .into(),
@@ -1677,7 +1677,7 @@ pub(crate) fn execute(
                         );
                     }
                     let notification = acp::ExtNotification::new(
-                        "x.ai/queue/interject",
+                        "friday/queue/interject",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize queue/interject params")
                             .into(),
@@ -1758,7 +1758,7 @@ pub(crate) fn execute(
                 .spawn(async move {
                     let params = serde_json::json!({ "sessionId": session_id.0.to_string() });
                     let req = acp::ExtRequest::new(
-                        "x.ai/compact_conversation",
+                        "friday/compact_conversation",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize compact params")
                             .into(),
@@ -1779,7 +1779,7 @@ pub(crate) fn execute(
                     "filter_session_id": session_id,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/prompt_history",
+                        "friday/prompt_history",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize prompt_history params")
                             .into(),
@@ -1828,7 +1828,7 @@ pub(crate) fn execute(
                         source,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/task/kill",
+                        "friday/task/kill",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize kill params")
                             .into(),
@@ -1861,7 +1861,7 @@ pub(crate) fn execute(
                     "subagentId": &subagent_id,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/subagent/cancel",
+                        "friday/subagent/cancel",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize cancel params")
                             .into(),
@@ -1890,7 +1890,7 @@ pub(crate) fn execute(
                     "taskId": task_id,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/scheduler/delete",
+                        "friday/scheduler/delete",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize scheduler delete params")
                             .into(),
@@ -1910,7 +1910,7 @@ pub(crate) fn execute(
                     "terminalId": tool_call_id,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/terminal/background",
+                        "friday/terminal/background",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize background params")
                             .into(),
@@ -2186,7 +2186,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/consent/record",
+                        "friday/consent/record",
                         serde_json::value::to_raw_value(
                                 &serde_json::json!({
                         "noticeId": notice_id,
@@ -2342,7 +2342,7 @@ pub(crate) fn execute(
                         }
                         let params = serde_json::json!({});
                         let req = acp::ExtRequest::new(
-                            "x.ai/auth/get_url",
+                            "friday/auth/get_url",
                             serde_json::value::to_raw_value(&params)
                                 .expect("serialize auth_url params")
                                 .into(),
@@ -2382,7 +2382,7 @@ pub(crate) fn execute(
                 .spawn(async move {
                     let params = serde_json::json!({ "code": code });
                     let req = acp::ExtRequest::new(
-                        "x.ai/auth/submit_code",
+                        "friday/auth/submit_code",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize auth code params")
                             .into(),
@@ -2417,7 +2417,7 @@ pub(crate) fn execute(
                     "cache": cache,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/list",
+                        "friday/mcp/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize mcp/list params")
                             .into(),
@@ -2460,7 +2460,7 @@ pub(crate) fn execute(
                     "server_name": server_name,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/auth_trigger",
+                        "friday/mcp/auth_trigger",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize mcp/auth_trigger params")
                             .into(),
@@ -2527,7 +2527,7 @@ pub(crate) fn execute(
                     "values": values,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/setup",
+                        "friday/mcp/setup",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize mcp/setup params")
                             .into(),
@@ -2571,7 +2571,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/hooks/list",
+                        "friday/hooks/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize hooks/list params")
                             .into(),
@@ -2608,7 +2608,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/plugins/list",
+                        "friday/plugins/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize plugins/list params")
                             .into(),
@@ -2793,7 +2793,7 @@ pub(crate) fn execute(
                         action,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/hooks/action",
+                        "friday/hooks/action",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize hooks/action params")
                             .into(),
@@ -2835,7 +2835,7 @@ pub(crate) fn execute(
                         action,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/plugins/action",
+                        "friday/plugins/action",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize plugins/action params")
                             .into(),
@@ -2876,7 +2876,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/marketplace/list",
+                        "friday/marketplace/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize marketplace/list params")
                             .into(),
@@ -2917,7 +2917,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/marketplace/list",
+                        "friday/marketplace/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize marketplace/list params")
                             .into(),
@@ -2999,7 +2999,7 @@ pub(crate) fn execute(
                     "sessionId": session_id
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/workflows/list",
+                        "friday/workflows/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize workflows/list params")
                             .into(),
@@ -3059,7 +3059,7 @@ pub(crate) fn execute(
                                 });
                             if parsed.is_ok() {
                                 let refresh = acp::ExtRequest::new(
-                                    "x.ai/skills/refresh-baseline",
+                                    "friday/skills/refresh-baseline",
                                     serde_json::value::to_raw_value(&serde_json::json!({}))
                                         .expect("serialize empty params")
                                         .into(),
@@ -3095,7 +3095,7 @@ pub(crate) fn execute(
                     "sessionId": session_id.0.to_string(),
                 });
                     let list_req = acp::ExtRequest::new(
-                        "x.ai/marketplace/list",
+                        "friday/marketplace/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize marketplace/list params")
                             .into(),
@@ -3156,7 +3156,7 @@ pub(crate) fn execute(
                             action,
                         };
                         let update_req = acp::ExtRequest::new(
-                            "x.ai/marketplace/action",
+                            "friday/marketplace/action",
                             serde_json::value::to_raw_value(&req_body)
                                 .expect("serialize marketplace/action params")
                                 .into(),
@@ -3187,7 +3187,7 @@ pub(crate) fn execute(
                         "updates": succeeded,
                     });
                         let notify_req = acp::ExtRequest::new(
-                            "x.ai/plugins/notify-updates",
+                            "friday/plugins/notify-updates",
                             serde_json::value::to_raw_value(&notify_params)
                                 .expect("serialize notify-updates params")
                                 .into(),
@@ -3209,7 +3209,7 @@ pub(crate) fn execute(
                         action,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/marketplace/action",
+                        "friday/marketplace/action",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize marketplace/action params")
                             .into(),
@@ -3268,7 +3268,7 @@ pub(crate) fn execute(
                         action,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/marketplace/action",
+                        "friday/marketplace/action",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize marketplace/action params")
                             .into(),
@@ -3314,7 +3314,7 @@ pub(crate) fn execute(
                         action: xai_hooks_plugins_types::PluginsAction::Reload,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/plugins/action",
+                        "friday/plugins/action",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize plugins/action params")
                             .into(),
@@ -3394,7 +3394,7 @@ pub(crate) fn execute(
                         config: *config,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/upsert",
+                        "friday/mcp/upsert",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize mcp/upsert params")
                             .into(),
@@ -3423,7 +3423,7 @@ pub(crate) fn execute(
                         server_name,
                     };
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/delete",
+                        "friday/mcp/delete",
                         serde_json::value::to_raw_value(&req_body)
                             .expect("serialize mcp/delete params")
                             .into(),
@@ -3453,7 +3453,7 @@ pub(crate) fn execute(
                     "enabled": enabled,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/toggle",
+                        "friday/mcp/toggle",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize mcp/toggle params")
                             .into(),
@@ -3485,7 +3485,7 @@ pub(crate) fn execute(
                     "enabled": enabled,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/mcp/toggle_tool",
+                        "friday/mcp/toggle_tool",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize mcp/toggle_tool params")
                             .into(),
@@ -3510,7 +3510,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/share_session",
+                        "friday/share_session",
                         serde_json::value::to_raw_value(
                                 &ShareSessionRequest {
                                     session_id: session_id.0.to_string(),
@@ -3705,7 +3705,7 @@ pub(crate) fn execute(
                         cwd: String,
                     }
                     let request = acp::ExtRequest::new(
-                        "x.ai/session/delete",
+                        "friday/session/delete",
                         serde_json::value::to_raw_value(
                                 &DeleteRequest {
                                     session_id: session_id.clone(),
@@ -3758,7 +3758,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/privacy/setCodingDataRetention",
+                        "friday/privacy/setCodingDataRetention",
                         serde_json::value::to_raw_value(
                                 &serde_json::json!({ "codingDataRetentionOptOut": !opted_in }),
                             )
@@ -3941,7 +3941,7 @@ pub(crate) fn execute(
                         }
                     };
                     let request = acp::ExtRequest::new(
-                        "x.ai/feedback",
+                        "friday/feedback",
                         raw_params.into(),
                     );
                     const FEEDBACK_SEND_ACP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
@@ -4057,7 +4057,7 @@ pub(crate) fn execute(
                                 }
                             };
                             let request = acp::ExtRequest::new(
-                                "x.ai/feedback/drafts/list",
+                                "friday/feedback/drafts/list",
                                 raw_params.into(),
                             );
                             let result = match tokio::time::timeout(
@@ -4116,7 +4116,7 @@ pub(crate) fn execute(
                                 }
                             };
                             let request = acp::ExtRequest::new(
-                                "x.ai/feedback/drafts/get",
+                                "friday/feedback/drafts/get",
                                 raw_params.into(),
                             );
                             let result = match tokio::time::timeout(
@@ -4174,7 +4174,7 @@ pub(crate) fn execute(
                                 }
                             };
                             let request = acp::ExtRequest::new(
-                                "x.ai/feedback/drafts/delete",
+                                "friday/feedback/drafts/delete",
                                 raw_params.into(),
                             );
                             let result = match tokio::time::timeout(
@@ -4230,7 +4230,7 @@ pub(crate) fn execute(
                                 }
                             };
                             let request = acp::ExtRequest::new(
-                                "x.ai/feedback/drafts/update",
+                                "friday/feedback/drafts/update",
                                 raw_params.into(),
                             );
                             let result = match tokio::time::timeout(
@@ -4289,7 +4289,7 @@ pub(crate) fn execute(
                         }
                     };
                     let request = acp::ExtRequest::new(
-                        "x.ai/feedback/upload-trace",
+                        "friday/feedback/upload-trace",
                         raw_params.into(),
                     );
                     match tokio::time::timeout(
@@ -4466,7 +4466,7 @@ pub(crate) fn execute(
                             (raw, notice, Vec::new())
                         });
                     let (raw, image_notice, skipped_image_numbers) = prepared;
-                    let request = acp::ExtRequest::new("x.ai/btw", raw.into());
+                    let request = acp::ExtRequest::new("friday/btw", raw.into());
                     match acp_send(request, &tx).await {
                         Ok(resp) => {
                             let parsed: serde_json::Value = serde_json::from_str(
@@ -4504,7 +4504,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/recap",
+                        "friday/recap",
                         serde_json::value::to_raw_value(
                                 &serde_json::json!({
                         "sessionId": session_id.0.to_string(),
@@ -4552,7 +4552,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/bundle/status",
+                        "friday/bundle/status",
                         serde_json::value::to_raw_value(&serde_json::json!({}))
                             .expect("serialize bundle/status params")
                             .into(),
@@ -4611,7 +4611,7 @@ pub(crate) fn execute(
                 .spawn(async move {
                     let params = serde_json::json!({ "sessionId": session_id });
                     let req = acp::ExtRequest::new(
-                        "x.ai/commands/list",
+                        "friday/commands/list",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize commands/list params")
                             .into(),
@@ -4663,7 +4663,7 @@ pub(crate) fn execute(
             tasks
                 .spawn(async move {
                     let request = acp::ExtRequest::new(
-                        "x.ai/rewind/execute",
+                        "friday/rewind/execute",
                         serde_json::value::to_raw_value(
                                 &rewind_execute_params(
                                     session_id.0.as_ref(),
@@ -4725,7 +4725,7 @@ pub(crate) fn execute(
                         "headless": headless_policy.as_wire_str(),
                     });
                         let request = acp::ExtRequest::new(
-                            "x.ai/session/search",
+                            "friday/session/search",
                             serde_json::value::to_raw_value(&params)
                                 .expect("serialize deep search params")
                                 .into(),
@@ -4812,7 +4812,7 @@ pub(crate) fn execute(
                         parent_is_worktree,
                     );
                     let req = acp::ExtRequest::new(
-                        "x.ai/session/fork",
+                        "friday/session/fork",
                         serde_json::value::to_raw_value(&payload)
                             .expect("serialize fork params")
                             .into(),
@@ -4904,7 +4904,7 @@ pub(crate) fn execute(
                 .spawn(async move {
                     use xai_grok_shell::extensions::billing::BillingConfigResponse;
                     let req = acp::ExtRequest::new(
-                        "x.ai/billing",
+                        "friday/billing",
                         serde_json::value::to_raw_value(&serde_json::json!({}))
                             .expect("serialize billing params")
                             .into(),
@@ -5000,7 +5000,7 @@ pub(crate) fn execute(
                 .spawn(async move {
                     use xai_grok_shell::extensions::billing::BillingConfigResponse;
                     let req = acp::ExtRequest::new(
-                        "x.ai/billing",
+                        "friday/billing",
                         serde_json::value::to_raw_value(&serde_json::json!({}))
                             .expect("serialize billing params")
                             .into(),
@@ -5089,7 +5089,7 @@ pub(crate) fn execute(
                     "tokenOnly": token_only,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/suggest",
+                        "friday/suggest",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize suggest params")
                             .into(),
@@ -5129,7 +5129,7 @@ pub(crate) fn execute(
                     "sessionId": session_id,
                 });
                     let req = acp::ExtRequest::new(
-                        "x.ai/suggestPrompt",
+                        "friday/suggestPrompt",
                         serde_json::value::to_raw_value(&params)
                             .expect("serialize suggestPrompt params")
                             .into(),
@@ -5156,13 +5156,13 @@ pub(crate) fn execute(
     }
     (false, meta)
 }
-/// Fetch session info from ACP via `x.ai/session/info`.
+/// Fetch session info from ACP via `friday/session/info`.
 async fn fetch_session_info(
     session_id: &acp::SessionId,
     tx: &AcpAgentTx,
 ) -> Result<SessionInfoResponse, String> {
     let request = acp::ExtRequest::new(
-        "x.ai/session/info",
+        "friday/session/info",
         serde_json::value::to_raw_value(
                 &serde_json::json!({
             "sessionId": session_id.0.to_string()
@@ -5187,13 +5187,13 @@ async fn fetch_session_info(
     }
     envelope.result.ok_or_else(|| "session info response missing result".to_string())
 }
-/// Fetch [`PromptUsage`] via `x.ai/session/usage` (bare response, no envelope).
+/// Fetch [`PromptUsage`] via `friday/session/usage` (bare response, no envelope).
 async fn fetch_session_usage(
     session_id: &acp::SessionId,
     tx: &AcpAgentTx,
 ) -> Result<xai_grok_shell::extensions::notification::PromptUsage, String> {
     let request = acp::ExtRequest::new(
-        "x.ai/session/usage",
+        "friday/session/usage",
         serde_json::value::to_raw_value(
                 &serde_json::json!({
             "sessionId": session_id.0.to_string()
@@ -5220,7 +5220,7 @@ fn unsupported_or_sanitized(e: acp::Error) -> String {
         sanitize_user_error(&e.to_string())
     }
 }
-/// Shared `x.ai/session/rename` RPC for rename and `/rename --auto`.
+/// Shared `friday/session/rename` RPC for rename and `/rename --auto`.
 async fn session_rename_rpc(
     tx: &AcpAgentTx,
     request: actions::RenameSessionRequest,
@@ -5231,7 +5231,7 @@ async fn session_rename_rpc(
         "rename session"
     };
     let ext = acp::ExtRequest::new(
-        "x.ai/session/rename",
+        "friday/session/rename",
         serde_json::value::to_raw_value(&request)
             .expect("serialize rename params")
             .into(),
@@ -5253,7 +5253,7 @@ async fn session_rename_rpc(
     }
 }
 /// Session title from local persistence: loads only this session's summary, never the all-sessions list.
-/// `cwd` comes from the `x.ai/session/info` response.
+/// `cwd` comes from the `friday/session/info` response.
 async fn lookup_session_title(session_id: &acp::SessionId, cwd: &str) -> Option<String> {
     lookup_session_title_in(
             xai_grok_shell::util::grok_home::grok_home(),
@@ -5438,7 +5438,7 @@ async fn fetch_rewind_points(
     session_id: acp::SessionId,
 ) -> TaskResult {
     let request = acp::ExtRequest::new(
-        "x.ai/rewind/points",
+        "friday/rewind/points",
         serde_json::value::to_raw_value(
                 &serde_json::json!({
             "sessionId": session_id.0.to_string()
@@ -5612,7 +5612,7 @@ fn btw_cap_omission_notice(omitted_by_cap: usize, attached: usize) -> Option<Str
         },
     )
 }
-/// Build the `x.ai/btw` params.
+/// Build the `friday/btw` params.
 /// `content` is omitted when `None` so a text-only side question stays byte-identical on the wire.
 #[expect(
     clippy::expect_used,
@@ -5656,7 +5656,7 @@ pub(crate) fn spawn_ordered_interjects(
                     blocks.as_deref(),
                 );
                 let request = acp::ExtRequest::new(
-                    "x.ai/interject",
+                    "friday/interject",
                     serde_json::value::to_raw_value(&params)
                         .expect("serialize interject params")
                         .into(),
@@ -5709,7 +5709,7 @@ pub(crate) fn take_coalesced_interjects(
     spawn_ordered_interjects(tasks, acp_tx, agent_id, session_id, items);
     None
 }
-/// Build the `x.ai/interject` params.
+/// Build the `friday/interject` params.
 /// The optional structured `content` (text and images) is omitted ENTIRELY when `None` so the legacy wire shape stays byte-identical.
 /// Extracted from the spawn for testability.
 fn build_interject_params(

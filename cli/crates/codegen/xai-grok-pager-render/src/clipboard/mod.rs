@@ -33,12 +33,12 @@ fn is_container_no_display() -> bool {
 }
 
 /// `friday wrap` intercepts OSC 52 onto the local clipboard and advertises it. Over SSH only `TERM` propagates, so brands look incapable.
-/// `LC_GROK_OSC52_SINK` survives default OpenSSH `SendEnv`/`AcceptEnv` of `LC_*`.
+/// `LC_FRIDAY_OSC52_SINK` survives default OpenSSH `SendEnv`/`AcceptEnv` of `LC_*`.
 pub fn osc52_sink_active() -> bool {
     static SINK: OnceLock<bool> = OnceLock::new();
     *SINK.get_or_init(|| {
         std::env::var_os("FRIDAY_OSC52_SINK").is_some()
-            || std::env::var_os("LC_GROK_OSC52_SINK").is_some()
+            || std::env::var_os("LC_FRIDAY_OSC52_SINK").is_some()
     })
 }
 

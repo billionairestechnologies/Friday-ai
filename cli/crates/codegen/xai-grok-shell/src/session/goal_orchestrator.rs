@@ -95,7 +95,7 @@ impl GoalNotifySender {
         }
         if let Some(raw) = raw {
             let ext = agent_client_protocol::ExtNotification::new(
-                "x.ai/session_notification",
+                "friday/session_notification",
                 raw.into(),
             );
             self.gateway.forward_fire_and_forget(ext);

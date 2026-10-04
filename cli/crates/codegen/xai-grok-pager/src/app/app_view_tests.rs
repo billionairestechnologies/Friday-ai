@@ -2137,6 +2137,7 @@ fn apply_auth_meta_clears_api_key_flag_and_restores_billing_on_personal_login() 
     assert!(app.usage_visible);
 }
 #[test]
+#[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
 fn apply_auth_meta_api_key_enables_voice_and_skips_tier_gate() {
     let mut app = test_app();
     advertise_media_tools(&mut app);

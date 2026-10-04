@@ -569,14 +569,14 @@ impl acp::Agent for MvpAgent {
                         .load_session(true)
                         .meta(
                             serde_json::json!({
-                    "x.ai/fs_notify": true,
+                    "friday/fs_notify": true,
                     // Advertised so SDKs can warn when a registration depends on hook behavior this agent doesn't honor
-                    "x.ai/hooks": {
+                    "friday/hooks": {
                         "blockingEvents": crate::extensions::hooks::ADVERTISED_BLOCKING_EVENTS,
                         "decisions": crate::extensions::hooks::ADVERTISED_DECISIONS,
                         "stopSignals": crate::extensions::hooks::ADVERTISED_STOP_SIGNALS,
                     },
-                    "x.ai/capabilities": {
+                    "friday/capabilities": {
                         "toolOverrides": tool_overrides_capability(),
                     },
                 })
@@ -600,7 +600,7 @@ impl acp::Agent for MvpAgent {
                     "grokShell": true,
                     // Re-deriving this precedence client-side has regressed OIDC refresh, so clients consume the agent's choice from here
                     "defaultAuthMethodId": default_auth_method_id_wire,
-                    // The agent can drive in-process SDK MCP servers over the ACP reverse channel (`x.ai/mcp/sdk_call`)
+                    // The agent can drive in-process SDK MCP servers over the ACP reverse channel (`friday/mcp/sdk_call`)
                     // The SDK reads this to enable transport="acp"
                     (xai_grok_mcp::wire::MCP_SDK): true,
                     // `session/new` / `session/load` accept per-session plugin roots in `_meta.pluginDirs`
@@ -622,7 +622,7 @@ impl acp::Agent for MvpAgent {
                         .is_feature_enabled(crate::agent::config::Feature::CancelRewind),
                     // Resolved session-recap state (remote settings / config / env; default ON)
                     // The client gates BOTH its automatic away-recap poll and the manual `/recap` on this
-                    // A disabled feature produces zero `x.ai/recap` traffic
+                    // A disabled feature produces zero `friday/recap` traffic
                     "sessionRecap": self.cfg.borrow().is_session_recap_enabled(),
                     "feedbackTraceOffer": self.feedback_trace_offer(),
                     "voiceMode": self.cfg.borrow().is_voice_mode_enabled(),
@@ -1560,7 +1560,7 @@ impl acp::Agent for MvpAgent {
                 self.gateway
                     .forward_fire_and_forget(
                         acp::ExtNotification::new(
-                            "x.ai/session/prompt_complete",
+                            "friday/session/prompt_complete",
                             params.into(),
                         ),
                     );
@@ -1995,53 +1995,53 @@ impl acp::Agent for MvpAgent {
         let mut backend_no_bridge_err: Option<acp::Error> = None;
         let method = args.method.clone();
         let result = match method.as_ref() {
-            "x.ai/getApiKey" | "x.ai/setApiKey" => {
+            "friday/getApiKey" | "friday/setApiKey" => {
                 crate::extensions::auth::handle(self, &args).await
             }
-            "x.ai/session/info" | "x.ai/session/close" | "x.ai/session/list"
-            | "x.ai/sessions/list" => {
+            "friday/session/info" | "friday/session/close" | "friday/session/list"
+            | "friday/sessions/list" => {
                 crate::agent::handlers::session::handle(self, &args).await
             }
-            "x.ai/workspaces/list" => {
+            "friday/workspaces/list" => {
                 crate::agent::handlers::workspaces::handle(self, &args).await
             }
-            "x.ai/models/list" => {
+            "friday/models/list" => {
                 crate::agent::handlers::models::handle(self, &args).await
             }
-            "x.ai/session/updates" => {
+            "friday/session/updates" => {
                 crate::extensions::session_updates::handle(&args, &self.gateway).await
             }
-            "x.ai/session/state" => {
+            "friday/session/state" => {
                 crate::extensions::session_state::handle_state(&args).await
             }
-            "x.ai/session/import" => {
+            "friday/session/import" => {
                 crate::extensions::session_state::handle_import(&args).await
             }
-            "x.ai/session/load_history" => {
+            "friday/session/load_history" => {
                 crate::extensions::chat_conversation_history::handle(self, &args).await
             }
-            "x.ai/session/search" => {
+            "friday/session/search" => {
                 crate::extensions::session_search::handle(self, &args).await
             }
-            "x.ai/session/resolve_local_for_worktree_resume"
-            | "x.ai/session/rehydrate" => {
+            "friday/session/resolve_local_for_worktree_resume"
+            | "friday/session/rehydrate" => {
                 let ops = self.resolve_workspace_ops()?;
                 crate::extensions::worktree::handle(self, &ops, &args).await
             }
             #[cfg(feature = "local-workspace")]
-            "x.ai/session/add_local_workspace" => {
+            "friday/session/add_local_workspace" => {
                 crate::extensions::session_admin::handle(self, &args).await
             }
-            "x.ai/session/rename" | "x.ai/session/delete"
-            | "x.ai/session/update_mcp_servers" | "x.ai/session/fork"
-            | "x.ai/plugins/reload" | "x.ai/commands/list" => {
+            "friday/session/rename" | "friday/session/delete"
+            | "friday/session/update_mcp_servers" | "friday/session/fork"
+            | "friday/plugins/reload" | "friday/commands/list" => {
                 crate::extensions::session_admin::handle(self, &args).await
             }
             m if InternalMethod::from_name(m).is_some() => {
                 crate::extensions::session_admin::handle(self, &args).await
             }
-            "x.ai/session/repair" => crate::extensions::repair::handle(self, &args).await,
-            "x.ai/session/usage" => crate::extensions::usage::handle(self, &args).await,
+            "friday/session/repair" => crate::extensions::repair::handle(self, &args).await,
+            "friday/session/usage" => crate::extensions::usage::handle(self, &args).await,
             crate::extensions::memory::MEMORY_FLUSH_METHOD
             | crate::extensions::memory::MEMORY_DREAM_METHOD
             | crate::extensions::memory::MEMORY_REWRITE_METHOD
@@ -2050,19 +2050,19 @@ impl acp::Agent for MvpAgent {
             | crate::extensions::memory::MEMORY_FORGET_METHOD => {
                 crate::extensions::memory::handle(self, &args).await
             }
-            "x.ai/skills/refresh-baseline" => {
+            "friday/skills/refresh-baseline" => {
                 self.refresh_skill_baseline_for_all_sessions();
                 crate::extensions::to_ext_response(
                     Ok(serde_json::json!({"ok": true})),
                 )
             }
-            "x.ai/interject" => crate::extensions::interject::handle(self, &args).await,
-            "x.ai/feedback" | "x.ai/feedback/dismiss" | "x.ai/feedback/drafts/list"
-            | "x.ai/feedback/drafts/get" | "x.ai/feedback/drafts/delete"
-            | "x.ai/feedback/drafts/update" | "x.ai/feedback/upload-trace"
-            | "x.ai/btw" => crate::extensions::feedback::handle(self, &args).await,
-            "x.ai/recap" => crate::extensions::recap::handle(self, &args).await,
-            "x.ai/cloud/terminate" => {
+            "friday/interject" => crate::extensions::interject::handle(self, &args).await,
+            "friday/feedback" | "friday/feedback/dismiss" | "friday/feedback/drafts/list"
+            | "friday/feedback/drafts/get" | "friday/feedback/drafts/delete"
+            | "friday/feedback/drafts/update" | "friday/feedback/upload-trace"
+            | "friday/btw" => crate::extensions::feedback::handle(self, &args).await,
+            "friday/recap" => crate::extensions::recap::handle(self, &args).await,
+            "friday/cloud/terminate" => {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
@@ -2094,7 +2094,7 @@ impl acp::Agent for MvpAgent {
                     })?;
                 crate::extensions::to_raw_response(&serde_json::json!({ "ok": true }))
             }
-            "x.ai/cloud/env/list" => {
+            "friday/cloud/env/list" => {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
@@ -2119,7 +2119,7 @@ impl acp::Agent for MvpAgent {
                 }),
                 )
             }
-            "x.ai/cloud/env/create" => {
+            "friday/cloud/env/create" => {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
@@ -2176,7 +2176,7 @@ impl acp::Agent for MvpAgent {
                 }),
                 )
             }
-            "x.ai/cloud/env/update" => {
+            "friday/cloud/env/update" => {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
@@ -2236,7 +2236,7 @@ impl acp::Agent for MvpAgent {
                 }),
                 )
             }
-            "x.ai/cloud/env/delete" => {
+            "friday/cloud/env/delete" => {
                 crate::extensions::auth_gate::require_xai_auth(
                     &self.auth_manager,
                     "Authentication required",
@@ -2263,87 +2263,87 @@ impl acp::Agent for MvpAgent {
                     })?;
                 crate::extensions::to_raw_response(&serde_json::json!({ "ok": true }))
             }
-            "x.ai/billing" => crate::extensions::billing::handle(self, &args).await,
-            "x.ai/auto-topup-rule" => {
+            "friday/billing" => crate::extensions::billing::handle(self, &args).await,
+            "friday/auto-topup-rule" => {
                 crate::extensions::billing::handle(self, &args).await
             }
-            "x.ai/share_session" => crate::extensions::share::handle(self, &args).await,
-            "x.ai/privacy/setCodingDataRetention" => {
+            "friday/share_session" => crate::extensions::share::handle(self, &args).await,
+            "friday/privacy/setCodingDataRetention" => {
                 crate::extensions::privacy::handle(self, &args).await
             }
-            "x.ai/consent/record" => {
+            "friday/consent/record" => {
                 crate::extensions::consent::handle(self, &args).await
             }
-            "x.ai/rollout/survey" => {
+            "friday/rollout/survey" => {
                 crate::extensions::rollout::handle(self, &args).await
             }
-            "x.ai/prompt_history" => {
+            "friday/prompt_history" => {
                 crate::extensions::prompt_history::handle(self, &args).await
             }
-            "x.ai/suggest" => crate::extensions::suggest::handle(self, &args).await,
-            "x.ai/suggestPrompt" => crate::extensions::suggest::handle(self, &args).await,
-            s if s.starts_with("x.ai/auth/") => {
+            "friday/suggest" => crate::extensions::suggest::handle(self, &args).await,
+            "friday/suggestPrompt" => crate::extensions::suggest::handle(self, &args).await,
+            s if s.starts_with("friday/auth/") => {
                 crate::extensions::auth::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/session_summaries/") => {
+            s if s.starts_with("friday/session_summaries/") => {
                 crate::agent::handlers::session::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/git/worktree/") => {
+            s if s.starts_with("friday/git/worktree/") => {
                 let ops = self.resolve_workspace_ops()?;
                 crate::extensions::worktree::handle(self, &ops, &args).await
             }
-            s if s.starts_with("x.ai/git/") => {
+            s if s.starts_with("friday/git/") => {
                 let ops = self.resolve_workspace_ops()?;
                 crate::extensions::git::handle(self, &ops, &args).await
             }
-            s if s.starts_with("x.ai/compact_conversation") => {
+            s if s.starts_with("friday/compact_conversation") => {
                 crate::extensions::memory::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/plugins/") => {
+            s if s.starts_with("friday/plugins/") => {
                 crate::extensions::plugins::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/marketplace/") => {
+            s if s.starts_with("friday/marketplace/") => {
                 crate::extensions::marketplace::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/hooks/") => {
+            s if s.starts_with("friday/hooks/") => {
                 crate::extensions::hooks::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/hunk-tracker/") => {
+            s if s.starts_with("friday/hunk-tracker/") => {
                 let ops = self.resolve_workspace_ops()?;
                 crate::extensions::hunk_tracker::handle(self, &ops, &args).await
             }
-            s if s.starts_with("x.ai/pr/") => {
+            s if s.starts_with("friday/pr/") => {
                 crate::extensions::pr::handle(self, &args).await
             }
             s if s.starts_with(crate::extensions::mcp::mcp_methods::PREFIX) => {
                 crate::extensions::mcp::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/task/") => {
+            s if s.starts_with("friday/task/") => {
                 crate::extensions::task::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/scheduler/") => {
+            s if s.starts_with("friday/scheduler/") => {
                 crate::extensions::task::handle_scheduler(self, &args).await
             }
-            s if s.starts_with("x.ai/subagent/") => {
+            s if s.starts_with("friday/subagent/") => {
                 crate::extensions::task::handle_subagent(self, &args).await
             }
-            s if s.starts_with("x.ai/terminal/") => {
+            s if s.starts_with("friday/terminal/") => {
                 crate::extensions::terminal::handle(self, &args).await
             }
             s if crate::extensions::fs::is_fs_method(s) => {
                 crate::extensions::fs::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/search/") => {
+            s if s.starts_with("friday/search/") => {
                 crate::extensions::search::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/bundle/") => {
+            s if s.starts_with("friday/bundle/") => {
                 crate::extensions::bundle::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/code/") => {
+            s if s.starts_with("friday/code/") => {
                 let ops = self.resolve_workspace_ops()?;
                 crate::extensions::code_nav::handle(self, &ops, &args).await
             }
-            s if s.starts_with("x.ai/skills/") || s == "x.ai/workflows/list" => {
+            s if s.starts_with("friday/skills/") || s == "friday/workflows/list" => {
                 let compat = self.cfg.borrow().compat_resolved;
                 let cwd = crate::extensions::skills::request_cwd(&args);
                 let registry = self.plugin_registry_for_cwd(cwd.as_deref()).await;
@@ -2355,13 +2355,13 @@ impl acp::Agent for MvpAgent {
                     )
                     .await
             }
-            s if s.starts_with("x.ai/review") => {
+            s if s.starts_with("friday/review") => {
                 crate::extensions::feedback::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/debug/") => {
+            s if s.starts_with("friday/debug/") => {
                 crate::extensions::debug::handle(self, &args).await
             }
-            s if s.starts_with("x.ai/rewind") => {
+            s if s.starts_with("friday/rewind") => {
                 crate::extensions::rewind::handle(self, &args).await
             }
             other => {
@@ -2383,7 +2383,7 @@ impl acp::Agent for MvpAgent {
         args: acp::ExtNotification,
     ) -> Result<(), acp::Error> {
         tracing::info!("Received extension notification: method={}", args.method);
-        if args.method.as_ref() == "x.ai/yolo_mode_changed"
+        if args.method.as_ref() == "friday/yolo_mode_changed"
             && let Ok(params) = serde_json::from_str::<
                 serde_json::Value,
             >(args.params.get())
@@ -2446,7 +2446,7 @@ impl acp::Agent for MvpAgent {
                 );
             }
         }
-        if args.method.as_ref() == "x.ai/permissions/reset" {
+        if args.method.as_ref() == "friday/permissions/reset" {
             let mut updated = 0;
             self.session_registry
                 .for_each_resident(|_, h| {
@@ -2467,7 +2467,7 @@ impl acp::Agent for MvpAgent {
         if args.method.as_ref() == InternalMethod::EvictSessions.name() {
             self.handle_evict_sessions(&args.params).await;
         }
-        if args.method.as_ref() == "x.ai/toggle_plan_mode"
+        if args.method.as_ref() == "friday/toggle_plan_mode"
             && let Ok(params) = serde_json::from_str::<
                 serde_json::Value,
             >(args.params.get())
@@ -2504,7 +2504,7 @@ impl acp::Agent for MvpAgent {
                 );
             }
         }
-        if args.method.as_ref().starts_with("x.ai/queue/")
+        if args.method.as_ref().starts_with("friday/queue/")
             && let Ok(params) = serde_json::from_str::<
                 serde_json::Value,
             >(args.params.get())
@@ -2542,14 +2542,14 @@ impl acp::Agent for MvpAgent {
                 }
             }
         }
-        if args.method.as_ref() == "x.ai/terminal/pty/input"
+        if args.method.as_ref() == "friday/terminal/pty/input"
             && let Ok(params) = serde_json::from_str::<
                 serde_json::Value,
             >(args.params.get())
         {
             crate::extensions::terminal::handle_pty_input(&params).await;
         }
-        if args.method.as_ref() == "_x.ai/session/update" {
+        if args.method.as_ref() == "_friday/session/update" {
             if let Ok(notification) = serde_json::from_str::<
                 SessionNotification,
             >(args.params.get()) {
@@ -2573,7 +2573,7 @@ impl acp::Agent for MvpAgent {
                 tracing::warn!("Failed to parse xAI session notification params");
             }
         }
-        if args.method.as_ref() == "x.ai/telemetry/non_git_decision" {
+        if args.method.as_ref() == "friday/telemetry/non_git_decision" {
             #[derive(serde::Deserialize)]
             struct NonGitDecisionParams {
                 decision: String,
@@ -2599,7 +2599,7 @@ impl acp::Agent for MvpAgent {
                 tracing::warn!("Failed to parse non_git_decision telemetry params");
             }
         }
-        if args.method.as_ref() == "x.ai/telemetry/multi_agent_followup" {
+        if args.method.as_ref() == "friday/telemetry/multi_agent_followup" {
             #[derive(serde::Deserialize)]
             struct MultiAgentFollowupParams {
                 preferred_agent_label: char,
@@ -2635,7 +2635,7 @@ impl acp::Agent for MvpAgent {
                 tracing::warn!("Failed to parse multi-agent followup telemetry params");
             }
         }
-        if args.method.as_ref() == "x.ai/telemetry/multi_agent_apply" {
+        if args.method.as_ref() == "friday/telemetry/multi_agent_apply" {
             #[derive(serde::Deserialize)]
             struct MultiAgentApplyParams {
                 applied_agent_label: char,
@@ -2671,7 +2671,7 @@ impl acp::Agent for MvpAgent {
                 tracing::warn!("Failed to parse multi-agent apply telemetry params");
             }
         }
-        if args.method.as_ref() == "x.ai/telemetry/multi_agent_discard" {
+        if args.method.as_ref() == "friday/telemetry/multi_agent_discard" {
             #[derive(serde::Deserialize)]
             struct MultiAgentDiscardParams {
                 /// (label, session_id, model_id)

@@ -19,7 +19,7 @@ use tokio::io::AsyncReadExt;
 
 pub use xai_grok_config::shell::UnixShellKind;
 
-const INIT_MARKER: &str = "__GROK_STATIC_SHELL_MARKER__";
+const INIT_MARKER: &str = "__FRIDAY_STATIC_SHELL_MARKER__";
 const INIT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// A fixed snapshot of rc-defined functions and aliases, captured once.

@@ -351,9 +351,9 @@ pub(crate) fn cached_token_auth_method() -> acp::AuthMethod {
     )
 }
 
-pub const FRIDAY_COM_METHOD_ID: &str = "grok.com";
+pub const FRIDAY_COM_METHOD_ID: &str = "friday";
 
-/// xAI OAuth2/OIDC auth. Method id `"grok.com"` kept for ACP wire compatibility.
+/// xAI OAuth2/OIDC auth. Method id `"friday"` kept for ACP wire compatibility.
 pub(crate) fn grok_com_auth_method(
     label: Option<&str>,
     has_auth_provider_command: bool,

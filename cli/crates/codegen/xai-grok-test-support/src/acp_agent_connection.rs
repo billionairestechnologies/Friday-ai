@@ -55,10 +55,10 @@ fn select_auth_method(methods: &[acp::AuthMethod]) -> Option<acp::AuthMethodId> 
         .or_else(external_provider)
 }
 
-/// The `client_capabilities.meta` that advertises `x.ai/folderTrust.interactive`, so the agent knows
+/// The `client_capabilities.meta` that advertises `friday/folderTrust.interactive`, so the agent knows
 /// this client can answer an interactive folder-trust prompt.
 fn interactive_trust_capability() -> serde_json::Map<String, serde_json::Value> {
-    serde_json::json!({ "x.ai/folderTrust": { "interactive": true } })
+    serde_json::json!({ "friday/folderTrust": { "interactive": true } })
         .as_object()
         .cloned()
         .expect("object literal is a JSON object")

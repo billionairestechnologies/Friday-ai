@@ -71,10 +71,10 @@ at runtime. Which tools are embedded in a given build depends on what the
 release pipeline supplies at build time:
 
 - **ripgrep** is embedded in every release build (downloaded from the
-  official GitHub release, or supplied via `GROK_TOOLS_BUNDLE_RG_PATH`).
+  official GitHub release, or supplied via `FRIDAY_TOOLS_BUNDLE_RG_PATH`).
 - **ugrep** and **bfs** are embedded only when the release pipeline supplies
-  static binaries via `GROK_TOOLS_BUNDLE_UGREP_PATH` /
-  `GROK_TOOLS_BUNDLE_BFS_PATH`. When those are unset the tools are not
+  static binaries via `FRIDAY_TOOLS_BUNDLE_UGREP_PATH` /
+  `FRIDAY_TOOLS_BUNDLE_BFS_PATH`. When those are unset the tools are not
   bundled, and the runtime instead resolves them from `~/.grok/vendor/` or
   `$PATH` if the user has installed them. Their license terms are included
   below so that any build that does bundle them is covered.

@@ -9,8 +9,8 @@ Use this when the work should finish in about 5–10 seconds.
 1. Friday says she is getting the details.
 2. The tool, skill, or status read runs.
 3. She speaks the result.
-4. She asks, only if they have not already said, whether they also want it on the app, Telegram, WhatsApp, or email.
-5. The call stays open. She waits.
+4. If they did not name a channel, Friday settings decide. She does not add a delivery question on top of the answer.
+5. One curious beat, when the job allows it, then she waits. The call stays open.
 
 If the work passes `phone.max_held_seconds`, she says she is continuing it off the line. The job flips to long. Delivery follows their choice or their settings.
 

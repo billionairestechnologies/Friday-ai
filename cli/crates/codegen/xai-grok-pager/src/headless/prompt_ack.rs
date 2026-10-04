@@ -12,7 +12,7 @@ use xai_grok_telemetry::events::{
 use crate::app::prompt_ack::{AckSignal, PromptAckDeadlines, queue_changed_acks};
 use crate::app::{CancelMeta, cancel_notification_meta};
 
-/// Bounds the rewind cancel and the final `x.ai/log` flush after an unacknowledged prompt: a wedged in-process
+/// Bounds the rewind cancel and the final `friday/log` flush after an unacknowledged prompt: a wedged in-process
 /// shell holds the dispatch lock its `cancel()` also needs (see `test_hooks::park_forever_if_blackholed`).
 pub(super) const HEADLESS_ABORT_SEND_TIMEOUT: Duration = Duration::from_secs(2);
 

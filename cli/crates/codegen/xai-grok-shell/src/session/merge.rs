@@ -1,6 +1,6 @@
 //! Merged session listing: combines local and remote session data.
 //!
-//! Used by both the ACP `x.ai/session/list` handler and the `friday sessions` CLI command.
+//! Used by both the ACP `friday/session/list` handler and the `friday sessions` CLI command.
 //! Deduplicates by session ID (remote wins) and filters local results by query.
 //! Sorts by the same key the picker UI displays (`last_active_at` falling back to `updated_at`) descending.
 

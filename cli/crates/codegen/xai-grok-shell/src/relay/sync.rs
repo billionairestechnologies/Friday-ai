@@ -540,7 +540,7 @@ fn handle_relay_message(
                 // Register session with relay via the WebSocket connection.
                 let upsert = json!({
                     "jsonrpc": "2.0",
-                    "method": "_x.ai/session/upsert",
+                    "method": "_friday/session/upsert",
                     "params": {
                         "sessionId": session_id,
                         "cwd": cwd,
@@ -555,7 +555,7 @@ fn handle_relay_message(
                 tprintln!("📡 Session syncing to relay. View at: {}", share_url);
             }
         }
-        Some("_x.ai/relay/initialized") => {
+        Some("_friday/relay/initialized") => {
             tracing::debug!(session_id = %session_id, "RelaySync: relay confirmed TUI sync mode");
         }
         Some(other) => {
@@ -783,12 +783,14 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
     fn test_build_share_url_default() {
         let url = build_share_url("test-session-123");
         assert_eq!(url, "https://grok.com/build/test-session-123");
     }
 
     #[test]
+    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
     fn test_build_share_url_with_uuid() {
         let url = build_share_url("01937d8a-1234-7abc-9def-0123456789ab");
         assert_eq!(

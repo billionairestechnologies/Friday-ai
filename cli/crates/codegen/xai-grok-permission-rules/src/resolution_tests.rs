@@ -1471,7 +1471,7 @@ pub(crate) fn isolated_home() -> IsolatedHome {
         EnvVarGuard::set("HOME", home.path()),
         EnvVarGuard::set("USERPROFILE", home.path()),
         EnvVarGuard::set("FRIDAY_HOME", &home.path().join(".friday")),
-        EnvVarGuard::unset("_GROK_CLAUDE_MARKER_OVERRIDE"),
+        EnvVarGuard::unset("_FRIDAY_CLAUDE_MARKER_OVERRIDE"),
     ];
     IsolatedHome {
         _env: env,
@@ -2969,7 +2969,7 @@ fn explicit_default_mode_blocks_permission_mode_hint() {
         std::fs::write(claude_dir.join("settings.json"), settings).unwrap();
         let _home = EnvVarGuard::set("HOME", tmp.path());
         let _grok_home = EnvVarGuard::set("FRIDAY_HOME", &tmp.path().join(".friday"));
-        let _marker = EnvVarGuard::unset("_GROK_CLAUDE_MARKER_OVERRIDE");
+        let _marker = EnvVarGuard::unset("_FRIDAY_CLAUDE_MARKER_OVERRIDE");
 
         let resolved = rt
             .block_on(resolve_permissions_with_provenance_inner(

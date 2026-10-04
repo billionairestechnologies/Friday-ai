@@ -57,7 +57,20 @@ Nothing here is started. This is the list to pick up after the research pass. Do
 
 - [ ] Spoken yes before create, send, delete, or pay
 - [ ] Voice PIN when the action leaves the account
+- [ ] "rukho" or "stop" pauses an auto-loop or always-on agent
 - [ ] Audit log: call, tool, job, delivery, minute charge
+
+## 8. Persona and memory
+
+These sit on the session above. They do not replace it.
+
+- [ ] Persona block in the phone system prompt: short spoken turns, one question, one curious beat, then wait
+- [ ] Barge-in stops mid-sentence. No tool narration beyond one "getting it" line
+- [ ] On end, store the transcript and a session summary on the verified account
+- [ ] Next call injects a capped recap: last job, last delivery channel, open loops
+- [ ] Vector store over session summaries only. No full history in the voice context
+- [ ] Recap is context, not an opening speech. Curious beat may use one line of it
+- [ ] Memory cannot grant send, delete, or pay
 
 ## Later, not this pass
 

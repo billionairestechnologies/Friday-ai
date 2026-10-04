@@ -22,7 +22,7 @@ Same set as the app on that plan, unless admin narrows it.
 
 ## What the voice vendor is allowed to do
 
-Sarvam hears, speaks, and detects whose turn it is. It does not own memory, the tool catalog, or the plan. Each user turn is a request to the runtime. The spoken line that comes back is the runtime's reply, rendered as audio.
+Sarvam hears, speaks, and detects whose turn it is. It does not own the persona, the memory, the tool catalog, or the plan. The persona is in Friday's system prompt. Each user turn is a request to the runtime. The spoken line that comes back is the runtime's reply, rendered as audio.
 
 ## What a turn returns
 

@@ -75,7 +75,7 @@ static SANDBOX: OnceLock<GlobalSandboxState> = OnceLock::new();
 static CONFIGURED_PROFILE: OnceLock<String> = OnceLock::new();
 static CONFINEMENT_ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
 static AUTO_ALLOW_BASH: AtomicBool = AtomicBool::new(false);
-const BWRAP_ENV_VAR: &str = "__GROK_INSIDE_BWRAP";
+const BWRAP_ENV_VAR: &str = "__FRIDAY_INSIDE_BWRAP";
 pub fn is_inside_bwrap() -> bool {
     std::env::var(BWRAP_ENV_VAR).is_ok()
 }

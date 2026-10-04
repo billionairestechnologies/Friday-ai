@@ -1,4 +1,4 @@
-//! `x.ai/billing` extension handler.
+//! `friday/billing` extension handler.
 //!
 //! Fetches the authenticated user's Friday X billing configuration (credit limit, usage, on-demand cap, billing period, history) from the backend.
 //! The pager and desktop use it to display credits and usage.
@@ -132,11 +132,11 @@ pub struct GetAutoTopupRuleResponse {
 #[tracing::instrument(skip_all, fields(method = %args.method))]
 pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     match args.method.as_ref() {
-        "x.ai/billing" => {
+        "friday/billing" => {
             tracing::info!("handling billing config request");
             handle_get_billing(agent).await
         }
-        "x.ai/auto-topup-rule" => {
+        "friday/auto-topup-rule" => {
             tracing::info!("handling auto top-up rule request");
             handle_get_auto_topup_rule(agent).await
         }
@@ -258,7 +258,7 @@ async fn handle_get_billing(agent: &MvpAgent) -> ExtResult {
             .or_else(|| rs.subscription_tier.clone())
     });
 
-    // Every prompt, `/usage`, and poll path hits `x.ai/billing`
+    // Every prompt, `/usage`, and poll path hits `friday/billing`
     // Log the fetched credits snapshot so support can correlate the limit UI with real balances
     xai_grok_telemetry::unified_log::info(
         "billing: fetched credits config",
@@ -566,7 +566,7 @@ mod tests {
                 "prepaidBalance": {"val": 1250},
                 "isUnifiedBillingUser": true,
                 "productUsage": [
-                    {"product": "PRODUCT_GROK_BUILD", "usagePercent": 61.2}
+                    {"product": "PRODUCT_FRIDAY_BUILD", "usagePercent": 61.2}
                 ],
                 "history": [
                     {

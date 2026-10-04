@@ -345,9 +345,9 @@ impl InitProgress {
     }
 }
 
-/// One in-process SDK MCP server registration: its tool-namespace name and the SDK-side id echoed back in `x.ai/mcp/sdk_call`.
+/// One in-process SDK MCP server registration: its tool-namespace name and the SDK-side id echoed back in `friday/mcp/sdk_call`.
 /// A named struct (rather than a `(String, String)` tuple) so callers can't transpose the two strings.
-/// `Deserialize`d from a `_meta["x.ai/mcp/servers"]` entry, so the `serverId` wire field name is declared (and serde-checked) exactly once here.
+/// `Deserialize`d from a `_meta["friday/mcp/servers"]` entry, so the `serverId` wire field name is declared (and serde-checked) exactly once here.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct AcpServerEntry {
     pub name: McpServerName,
@@ -355,12 +355,12 @@ pub struct AcpServerEntry {
     pub server_id: String,
 }
 
-/// The session's in-process SDK MCP servers (declared via `_meta["x.ai/mcp/servers"]`), bundled with the shared reverse-RPC invoker.
+/// The session's in-process SDK MCP servers (declared via `_meta["friday/mcp/servers"]`), bundled with the shared reverse-RPC invoker.
 /// The registry survives `update_configs` clears; config reloads only touch `configs`/`owned_clients`.
 struct AcpMcpRegistry {
     /// Registered servers (`name -> serverId`).
     servers: Vec<AcpServerEntry>,
-    /// Shared reverse-RPC invoker all these servers' tools are called through (emits `x.ai/mcp/sdk_call` over the ACP connection).
+    /// Shared reverse-RPC invoker all these servers' tools are called through (emits `friday/mcp/sdk_call` over the ACP connection).
     invoker: Arc<dyn crate::acp_transport::AcpReverseInvoker>,
 }
 
@@ -921,7 +921,7 @@ impl McpState {
     }
 
     /// Minimum wait between spawn attempts for an unreachable server.
-    /// Retry triggers (tool batches, `x.ai/mcp/list` refreshes) cannot dogpile the OAuth-discovery and probe timeout budget while a server is down.
+    /// Retry triggers (tool batches, `friday/mcp/list` refreshes) cannot dogpile the OAuth-discovery and probe timeout budget while a server is down.
     pub const UNREACHABLE_RETRY_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(60);
 
     /// Upper bound on an attempt's exclusivity (see [`UnreachableRetry`]).
@@ -1464,7 +1464,7 @@ pub struct McpTool {
 }
 
 /// Data needed to register an MCP tool via `register_erased()`.
-/// **Model-visible** (default, or `["model", "app"]`): registered in `ToolBridge` so the LLM can invoke them during a conversation; **App-visible only** (`["app"]`): not registered in `ToolBridge`, so the LLM never sees them. These are UI-only actions surfaced to the frontend via `x.ai/mcp/tools_changed` notifications. They are callable via `x.ai/mcp/call`.
+/// **Model-visible** (default, or `["model", "app"]`): registered in `ToolBridge` so the LLM can invoke them during a conversation; **App-visible only** (`["app"]`): not registered in `ToolBridge`, so the LLM never sees them. These are UI-only actions surfaced to the frontend via `friday/mcp/tools_changed` notifications. They are callable via `friday/mcp/call`.
 pub struct McpToolRegistration {
     pub name: String,
     pub description: String,
@@ -2926,7 +2926,7 @@ enum PendingTransport {
         config: HttpConfig,
         auth_manager: Arc<tokio::sync::Mutex<rmcp::transport::auth::AuthorizationManager>>,
     },
-    /// In-process SDK MCP server reached over the ACP reverse channel (`x.ai/mcp/sdk_call`).
+    /// In-process SDK MCP server reached over the ACP reverse channel (`friday/mcp/sdk_call`).
     /// Rebuildable from its `server_id` and invoker, so handshake failures restore like Http (unlike the consumed Stdio child).
     Acp {
         server_id: String,
@@ -2986,7 +2986,7 @@ pub enum LivenessCheck {
 
 /// Events emitted by a live MCP client to its session-side dispatcher.
 /// [`crate::liveness::spawn_transport_liveness`], when an `is_healthy` poll observes the rmcp service loop shut down (`TransportClosed`); [`GrokClientHandler`] when the server pushes a notification we care about. Currently `notifications/tools/list_changed` and `notifications/resources/list_changed`; The session/managed-config layer when a server is added, removed, or successfully (re-)initialized.
-/// Consumers fan these out to ACP `x.ai/mcp/server_status` after 50 ms of tumbling-window coalescing keyed by `(server, kind)`.
+/// Consumers fan these out to ACP `friday/mcp/server_status` after 50 ms of tumbling-window coalescing keyed by `(server, kind)`.
 #[derive(Debug, Clone)]
 pub enum McpClientEvent {
     /// The rmcp service loop has terminated; the client is no longer usable for tool calls and must be torn down (or restarted).
@@ -3560,7 +3560,7 @@ impl McpClient {
     }
 
     /// Build a client for an in-process SDK MCP server reached over the ACP reverse channel.
-    /// `server_id` is the id the agent echoes back in `x.ai/mcp/sdk_call`; the `invoker` performs the reverse request.
+    /// `server_id` is the id the agent echoes back in `friday/mcp/sdk_call`; the `invoker` performs the reverse request.
     /// Same downstream path as HTTP/stdio.
     pub fn new_acp(
         server_name: String,
@@ -4029,7 +4029,7 @@ impl McpClient {
         server_id: String,
         invoker: &Arc<dyn crate::acp_transport::AcpReverseInvoker>,
     ) -> crate::acp_transport::AcpBridgeTransport {
-        // Per-reverse-call backstop on `x.ai/mcp/sdk_call`: the larger of the startup and tool timeouts
+        // Per-reverse-call backstop on `friday/mcp/sdk_call`: the larger of the startup and tool timeouts
         // It never undercuts the real outer bound: the handshake is bounded per phase in `try_handshake`
         let invoke_timeout =
             std::time::Duration::from_secs(self.startup_timeout_sec.max(self.tool_timeout_sec));

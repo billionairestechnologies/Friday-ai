@@ -229,7 +229,7 @@ pub(super) fn interjection_broadcast(
     text: &str,
 ) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/session/interjection",
+        "friday/session/interjection",
         &serde_json::json!({
                 "sessionId": session_id,
                 "text": text,
@@ -288,7 +288,7 @@ pub(super) fn follow_ups_ext(
             "response_id": response_id,
             "suggestions": suggestions,
         });
-    acp_fixtures::ext_notification("x.ai/follow_ups", &params)
+    acp_fixtures::ext_notification("friday/follow_ups", &params)
 }
 pub(super) fn follow_ups_ext_with_prompt(
     response_id: &str,
@@ -304,17 +304,17 @@ pub(super) fn follow_ups_ext_with_prompt(
             "promptId": prompt_id,
             "suggestions": suggestions,
         });
-    acp_fixtures::ext_notification("x.ai/follow_ups", &params)
+    acp_fixtures::ext_notification("friday/follow_ups", &params)
 }
 pub(super) fn voice_settings_update(enabled: bool) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/settings/update",
+        "friday/settings/update",
         &serde_json::json!({ "voice_mode_enabled": enabled }),
     )
 }
 pub(super) fn tier_settings_update(tier: &str) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/settings/update",
+        "friday/settings/update",
         &serde_json::json!({
                 "subscription_tier_display": tier
             }),
@@ -327,7 +327,7 @@ pub(super) fn group_tool_verbs_settings_update(
         Some(v) => serde_json::json!({ "group_tool_verbs": v }),
         None => serde_json::json!({}),
     };
-    acp_fixtures::ext_notification("x.ai/settings/update", &params)
+    acp_fixtures::ext_notification("friday/settings/update", &params)
 }
 pub(super) fn collapsed_edit_blocks_settings_update(
     value: Option<bool>,
@@ -336,7 +336,7 @@ pub(super) fn collapsed_edit_blocks_settings_update(
         Some(v) => serde_json::json!({ "collapsed_edit_blocks": v }),
         None => serde_json::json!({}),
     };
-    acp_fixtures::ext_notification("x.ai/settings/update", &params)
+    acp_fixtures::ext_notification("friday/settings/update", &params)
 }
 pub(super) fn subagent_notification_with_event_id(
     session_id: &str,
@@ -348,7 +348,7 @@ pub(super) fn subagent_notification_with_event_id(
         update,
         meta: event_id.map(|event_id| serde_json::json!({ "eventId": event_id })),
     };
-    acp_fixtures::ext_notification("x.ai/session_notification", &payload)
+    acp_fixtures::ext_notification("friday/session_notification", &payload)
 }
 pub(super) fn subagent_notification_with_seq(
     session_id: &str,
@@ -371,7 +371,7 @@ pub(super) fn subagent_ext_replay(
             "update": update,
             "_meta": { "isReplay": true, "eventId": event_id },
         });
-    acp_fixtures::ext_notification("x.ai/session/update", &params)
+    acp_fixtures::ext_notification("friday/session/update", &params)
 }
 pub(super) fn make_exit_plan_ext(
     plan_content: Option<&str>,
@@ -389,7 +389,7 @@ pub(super) fn make_exit_plan_ext_with_tool_call_id(
     tokio::sync::oneshot::Receiver<xai_acp_lib::AcpResult<acp::ExtResponse>>,
 ) {
     let request = acp_fixtures::ext_request(
-        "x.ai/exit_plan_mode",
+        "friday/exit_plan_mode",
         &serde_json::json!({
                 "sessionId": "sess-1",
                 "toolCallId": tool_call_id,
@@ -440,9 +440,9 @@ pub(super) fn queue_changed_ext(session_id: &str, ids: &[&str]) -> acp::ExtNotif
         })
         .collect();
     let params = serde_json::json!({ "sessionId": session_id, "entries": entries });
-    acp_fixtures::ext_notification("x.ai/queue/changed", &params)
+    acp_fixtures::ext_notification("friday/queue/changed", &params)
 }
-/// Build a `x.ai/queue/changed` notification carrying `runningPromptId`.
+/// Build a `friday/queue/changed` notification carrying `runningPromptId`.
 pub(super) fn queue_changed_running(
     session_id: &str,
     ids: &[&str],
@@ -489,7 +489,7 @@ pub(super) fn queue_changed_running_ex(
     if let Some(segs) = running_combined_texts {
         json_set(&mut params, "runningCombinedTexts", serde_json::json!(segs));
     }
-    acp_fixtures::ext_notification("x.ai/queue/changed", &params)
+    acp_fixtures::ext_notification("friday/queue/changed", &params)
 }
 /// Fixture: p1 runs locally; promoted queued bash b1's adoption is stashed.
 pub(super) fn app_with_running_p1_and_stashed_b1() -> AppView {
@@ -585,7 +585,7 @@ pub(super) fn make_fired_notif(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/scheduled_task_fired", &notif)
+    acp_fixtures::ext_notification("friday/scheduled_task_fired", &notif)
 }
 pub(super) fn make_fired_notif_with_subagent(
     session_id: &str,
@@ -603,7 +603,7 @@ pub(super) fn make_fired_notif_with_subagent(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/scheduled_task_fired", &notif)
+    acp_fixtures::ext_notification("friday/scheduled_task_fired", &notif)
 }
 /// Set up an app with two agents; the active view points to agent 1, but agent 0 owns the scheduled task.
 /// Handlers that gate on `active_view` will mutate the wrong agent (or silently no-op).
@@ -645,7 +645,7 @@ pub(super) fn announcements_update_notif(
     announcements: &[xai_grok_announcements::RemoteAnnouncement],
 ) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/announcements/update",
+        "friday/announcements/update",
         &serde_json::json!({ "gen": r#gen, "announcements": announcements }),
     )
 }
@@ -674,7 +674,7 @@ pub(super) fn make_created_ext_notif(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/scheduled_task_created", &notif)
+    acp_fixtures::ext_notification("friday/scheduled_task_created", &notif)
 }
 pub(super) fn make_deleted_ext_notif(
     session_id: &str,
@@ -701,7 +701,7 @@ pub(super) fn make_deleted_ext_notif_with_reason(
         },
         meta: is_replay.then(crate::acp::meta::ReplayMetaStamp::replayed),
     };
-    acp_fixtures::ext_notification("x.ai/scheduled_task_deleted", &notif)
+    acp_fixtures::ext_notification("friday/scheduled_task_deleted", &notif)
 }
 pub(super) fn make_token_notification_message(
     session_id: &str,
@@ -847,7 +847,7 @@ pub(super) fn xai_model_switch_notif(
         },
         meta: Some(serde_json::json!({ "eventId": event_id })),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 pub(super) fn xai_unhandled_notif(
     session_id: &str,
@@ -858,7 +858,7 @@ pub(super) fn xai_unhandled_notif(
         update: XaiSessionUpdate::MemoryFlushStarted,
         meta: Some(serde_json::json!({ "eventId": event_id })),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 /// Build an `agent_message_chunk` notification carrying both `totalTokens` and an explicit `eventId`, for context/dedup interaction tests.
 pub(super) fn make_token_notification_with_event(
@@ -886,10 +886,10 @@ pub(super) fn make_token_notification_with_event(
         response_tx: tx,
     })
 }
-/// Build an `x.ai/session/prompt_complete` ext-notification for `session_id`.
+/// Build an `friday/session/prompt_complete` ext-notification for `session_id`.
 pub(super) fn prompt_complete_ext(session_id: &str) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/session/prompt_complete",
+        "friday/session/prompt_complete",
         &serde_json::json!({
                 "sessionId": session_id,
                 "stopReason": "end_turn",
@@ -900,7 +900,7 @@ pub(super) fn prompt_complete_ext(session_id: &str) -> acp::ExtNotification {
 pub(super) fn insert_agent(app: &mut AppView, id: AgentId, session_id: Option<&str>) {
     app.agents.insert(id, make_agent(session_id));
 }
-/// Build an `x.ai/session/prompt_complete` ext-notification with an explicit `stopReason` and optional `agentResult`.
+/// Build an `friday/session/prompt_complete` ext-notification with an explicit `stopReason` and optional `agentResult`.
 pub(super) fn prompt_complete_ext_with_reason(
     session_id: &str,
     stop_reason: &str,
@@ -913,9 +913,9 @@ pub(super) fn prompt_complete_ext_with_reason(
     if let Some(r) = agent_result {
         json_set(&mut payload, "agentResult", serde_json::json!(r));
     }
-    acp_fixtures::ext_notification("x.ai/session/prompt_complete", &payload)
+    acp_fixtures::ext_notification("friday/session/prompt_complete", &payload)
 }
-/// Failed `x.ai/session/prompt_complete` carrying the typed `errorKind`.
+/// Failed `friday/session/prompt_complete` carrying the typed `errorKind`.
 /// Built through the typed [`PromptCompletePayload`] so the test wire shape can never drift from what `handle_prompt_complete` parses.
 /// A rail test therefore fails if its typed-kind read is deleted; the text fallback cannot mask it.
 pub(super) fn prompt_complete_ext_failed_with_error_kind(
@@ -924,7 +924,7 @@ pub(super) fn prompt_complete_ext_failed_with_error_kind(
     error_kind: &str,
 ) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/session/prompt_complete",
+        "friday/session/prompt_complete",
         &PromptCompletePayload {
             session_id: session_id.to_string(),
             stop_reason: Some("error".to_string()),
@@ -938,7 +938,7 @@ pub(super) fn prompt_complete_ext_failed_with_error_kind(
         },
     )
 }
-/// Build an `x.ai/session/prompt_complete` ext-notification carrying a `promptId` (shells with the lost-response fix).
+/// Build an `friday/session/prompt_complete` ext-notification carrying a `promptId` (shells with the lost-response fix).
 /// Built through the typed [`PromptCompletePayload`] so the test wire shape can never drift from what `handle_prompt_complete` parses.
 pub(super) fn prompt_complete_ext_with_prompt_id(
     session_id: &str,
@@ -946,7 +946,7 @@ pub(super) fn prompt_complete_ext_with_prompt_id(
     stop_reason: &str,
 ) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/session/prompt_complete",
+        "friday/session/prompt_complete",
         &PromptCompletePayload {
             session_id: session_id.to_string(),
             stop_reason: Some(stop_reason.to_string()),
@@ -1088,7 +1088,7 @@ pub(super) fn send_replay_bash_tool_call(
         app,
     );
 }
-/// Build a durable `TurnCompleted` update on the `x.ai/session/update` rail, optionally stamped `isReplay`.
+/// Build a durable `TurnCompleted` update on the `friday/session/update` rail, optionally stamped `isReplay`.
 /// Built through the typed `SessionNotification` so the wire shape can't drift from what the dispatch parses.
 pub(super) fn xai_turn_completed_notif(
     session_id: &str,
@@ -1108,7 +1108,7 @@ pub(super) fn xai_turn_completed_notif(
         },
         meta: Some(serde_json::json!({ "isReplay": is_replay })),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 /// Replay `TurnCompleted` with optional elapsed, agent_result, and extra `_meta`.
 pub(super) fn xai_turn_completed_replay(
@@ -1137,7 +1137,7 @@ pub(super) fn xai_turn_completed_replay(
         },
         meta: Some(meta),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 /// Failed `TurnCompleted` carrying `agent_result` plus the typed `error_kind` field.
 /// Callers pass an `agent_result` with no canonical truncation text.
@@ -1161,7 +1161,7 @@ pub(super) fn xai_turn_completed_failed_with_error_kind(
         },
         meta: Some(serde_json::json!({ "isReplay": is_replay })),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 /// Live `TurnCompleted` stamped with `_meta.cancelTrigger` (send-now / ctrl_c).
 pub(super) fn xai_turn_completed_notif_with_cancel_trigger(
@@ -1187,7 +1187,7 @@ pub(super) fn xai_turn_completed_notif_with_cancel_trigger(
             }),
         ),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 /// A live durable `TurnCompleted`, optionally stamped with the shell completion clock (`agentTimestampMs`) the wake marker's elapsed reads.
 pub(super) fn xai_wake_turn_completed_notif(
@@ -1211,9 +1211,9 @@ pub(super) fn xai_wake_turn_completed_notif(
         },
         meta: Some(meta),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
-/// Build a `HookExecution` update (one successful run) on the `x.ai/session/update` rail, optionally stamped `isReplay`.
+/// Build a `HookExecution` update (one successful run) on the `friday/session/update` rail, optionally stamped `isReplay`.
 /// `prompt_id == None` models pre-attribution shells.
 pub(super) fn xai_hook_execution_notif_for_prompt(
     session_id: &str,
@@ -1251,7 +1251,7 @@ pub(super) fn xai_hook_execution_notif_with_runs(
         },
         meta: Some(serde_json::json!({ "isReplay": is_replay })),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &payload)
+    acp_fixtures::ext_notification("friday/session/update", &payload)
 }
 /// Work-only status lines ("N … still running") pushed as system rows.
 /// Never pushed in production; tests assert emptiness.
@@ -1276,11 +1276,11 @@ pub(super) fn seed_two_bg_tasks(app: &mut AppView, session_id: &str) {
         app,
     );
 }
-/// Build an `x.ai/session/interjection` ext-notification (no id).
+/// Build an `friday/session/interjection` ext-notification (no id).
 pub(super) fn interjection_ext(session_id: &str, text: &str) -> acp::ExtNotification {
     interjection_ext_with_id(session_id, text, None)
 }
-/// Build an `x.ai/session/interjection` ext-notification with an optional `interjectionId` (the originator-dedup key).
+/// Build an `friday/session/interjection` ext-notification with an optional `interjectionId` (the originator-dedup key).
 pub(super) fn interjection_ext_with_id(
     session_id: &str,
     text: &str,
@@ -1290,7 +1290,7 @@ pub(super) fn interjection_ext_with_id(
     if let Some(id) = interjection_id {
         json_set(&mut payload, "interjectionId", serde_json::json!(id));
     }
-    acp_fixtures::ext_notification("x.ai/session/interjection", &payload)
+    acp_fixtures::ext_notification("friday/session/interjection", &payload)
 }
 /// Text of the most recent user prompt block in scrollback, if any.
 /// Interjections render as standard user prompt blocks.
@@ -1394,14 +1394,14 @@ pub(super) fn make_bash_stdout_message(
         response_tx: tx,
     })
 }
-/// Build an `ExtNotification` envelope for `x.ai/session_notification`.
+/// Build an `ExtNotification` envelope for `friday/session_notification`.
 pub(super) fn make_ext_session_notification(
     session_id: &str,
     update: XaiSessionUpdate,
 ) -> AcpClientMessage {
     make_ext_session_notification_with_method(
         session_id,
-        "x.ai/session_notification",
+        "friday/session_notification",
         update,
     )
 }
@@ -1749,7 +1749,7 @@ pub(super) fn spawn_subagent_with_optional_updates(
     let _ = handle(
         make_ext_session_notification_with_method(
             "sess-parent",
-            "x.ai/session/update",
+            "friday/session/update",
             test_subagent_spawned("sess-parent", child_sid),
         ),
         app,
@@ -1787,7 +1787,7 @@ pub(super) fn dispatch_goal_update(
     handle(
         AcpClientMessage::ExtNotification(xai_acp_lib::AcpArgs {
             request: acp_fixtures::ext_notification(
-                "x.ai/session_notification",
+                "friday/session_notification",
                 &raw_payload,
             ),
             response_tx: tx,
@@ -1831,7 +1831,7 @@ pub(super) fn make_permission_message(
     });
     (msg, rx)
 }
-/// Build an `x.ai/session_notification` carrying `InteractionResolved{tool_call_id}`.
+/// Build an `friday/session_notification` carrying `InteractionResolved{tool_call_id}`.
 /// This is the first-answer-wins broadcast that tells every other pane to retract its shared interaction modal.
 pub(super) fn interaction_resolved_ext(
     session_id: &str,
@@ -1844,7 +1844,7 @@ pub(super) fn interaction_resolved_ext(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/session_notification", &notif)
+    acp_fixtures::ext_notification("friday/session_notification", &notif)
 }
 pub(super) fn make_git_head_changed_notif(
     session_id: &str,
@@ -1858,7 +1858,7 @@ pub(super) fn make_git_head_changed_notif(
         is_worktree,
         main_repo: main_repo.map(str::to_string),
     };
-    acp_fixtures::ext_notification("x.ai/git_head_changed", &payload)
+    acp_fixtures::ext_notification("friday/git_head_changed", &payload)
 }
 pub(super) fn make_task_backgrounded_notif(
     session_id: &str,
@@ -1879,7 +1879,7 @@ pub(super) fn make_task_backgrounded_notif(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/task_backgrounded", &notif)
+    acp_fixtures::ext_notification("friday/task_backgrounded", &notif)
 }
 /// Like [`make_task_backgrounded_notif`] but stamped `_meta.isReplay: true` via the typed [`ReplayMetaStamp`](crate::acp::meta::ReplayMetaStamp).
 /// Mirrors the `session/load` replay envelope.
@@ -1902,7 +1902,7 @@ pub(super) fn make_replayed_task_backgrounded_notif(
         },
         meta: Some(crate::acp::meta::ReplayMetaStamp::replayed()),
     };
-    acp_fixtures::ext_notification("x.ai/session/update", &notif)
+    acp_fixtures::ext_notification("friday/session/update", &notif)
 }
 /// Register a pending Execute tool call in the tracker and send an InProgress update to create the scrollback entry.
 /// Returns the agent for further use.
@@ -2035,7 +2035,7 @@ pub(super) fn task_completed_notif(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/task_completed", &notif)
+    acp_fixtures::ext_notification("friday/task_completed", &notif)
 }
 pub(super) fn make_monitor_event_notif(
     session_id: &str,
@@ -2051,7 +2051,7 @@ pub(super) fn make_monitor_event_notif(
         },
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/monitor_event", &notif)
+    acp_fixtures::ext_notification("friday/monitor_event", &notif)
 }
 pub(super) fn make_model_info(id: &str) -> acp::ModelInfo {
     acp_fixtures::model_info(id, id)
@@ -2068,9 +2068,9 @@ pub(super) fn make_models_update_notif(
         acp_fixtures::model_id(current_model_id),
         models,
     );
-    acp_fixtures::ext_notification("x.ai/models/update", &state)
+    acp_fixtures::ext_notification("friday/models/update", &state)
 }
-/// `x.ai/models/update` carrying a single reasoning-capable model whose catalog-default effort is `default_effort`.
+/// `friday/models/update` carrying a single reasoning-capable model whose catalog-default effort is `default_effort`.
 /// The broadcast reports that catalog default for every client, never the per-session selection.
 pub(super) fn make_reasoning_models_update_notif(
     current_model_id: &str,
@@ -2088,7 +2088,7 @@ pub(super) fn make_reasoning_models_update_notif(
         acp_fixtures::model_id(current_model_id),
         vec![info],
     );
-    acp_fixtures::ext_notification("x.ai/models/update", &state)
+    acp_fixtures::ext_notification("friday/models/update", &state)
 }
 /// Adds model `id` with `default` as `totalContextTokens` and `windows` as `contextWindows`.
 pub(super) fn seed_windowed_model(
@@ -2131,7 +2131,7 @@ pub(super) fn model_changed_ext(
         ),
         meta: None,
     };
-    acp_fixtures::ext_notification("x.ai/session_notification", &payload)
+    acp_fixtures::ext_notification("friday/session_notification", &payload)
 }
 pub(super) fn model_changed_ext_with_event(
     session_id: &str,
@@ -2143,7 +2143,7 @@ pub(super) fn model_changed_ext_with_event(
         update: XaiSessionUpdate::model_changed(model_id, None, None),
         meta: Some(serde_json::json!({ "eventId": event_id })),
     };
-    acp_fixtures::ext_notification("x.ai/session_notification", &payload)
+    acp_fixtures::ext_notification("friday/session_notification", &payload)
 }
 pub(super) fn make_tool_call_update(title: &str) -> acp::SessionUpdate {
     acp::SessionUpdate::ToolCallUpdate(
@@ -2169,13 +2169,13 @@ pub(super) fn make_current_mode_update(mode_id: &str) -> acp::SessionUpdate {
         acp::CurrentModeUpdate::new(acp::SessionModeId::new(mode_id)),
     )
 }
-/// Helper: build an `x.ai/mcp/init_progress` notification.
+/// Helper: build an `friday/mcp/init_progress` notification.
 pub(super) fn make_mcp_init_progress_notif(
     total: u32,
     connected: u32,
 ) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/mcp/init_progress",
+        "friday/mcp/init_progress",
         &serde_json::json!({
                 "total": total,
                 "connected": connected,
@@ -2237,13 +2237,13 @@ pub(super) fn make_server_status_notif(
         detail: None,
         tools,
     };
-    acp_fixtures::ext_notification("x.ai/mcp/server_status", &payload)
+    acp_fixtures::ext_notification("friday/mcp/server_status", &payload)
 }
 /// `mcp/servers_updated` real wire shape: `{ mcpServers: [...] }` with NO `sessionId`.
 /// Regression guard: anything that tries to extract a session id here must fail and fall through to the broadcast path.
 pub(super) fn make_servers_updated_notif() -> acp::ExtNotification {
     let payload = serde_json::json!({ "mcpServers": [] });
-    acp_fixtures::ext_notification("x.ai/mcp/servers_updated", &payload)
+    acp_fixtures::ext_notification("friday/mcp/servers_updated", &payload)
 }
 /// Real post-handshake / auth-recovery wire shape: `McpToolsChanged { sessionId, serverName, tools }`.
 pub(super) fn make_tools_changed_notif_post_h2(
@@ -2254,13 +2254,13 @@ pub(super) fn make_tools_changed_notif_post_h2(
         server_name: "grok_com_linear".to_string(),
         tools: Vec::new(),
     };
-    acp_fixtures::ext_notification("x.ai/mcp/tools_changed", &payload)
+    acp_fixtures::ext_notification("friday/mcp/tools_changed", &payload)
 }
 /// Legacy / forward-compat wire shape: older shells emit `{ serverName, tools }` with NO sessionId.
 /// The pager must fall back to active_view for this shape.
 pub(super) fn make_tools_changed_notif_pre_h2() -> acp::ExtNotification {
     let payload = serde_json::json!({ "serverName": "grok_com_linear", "tools": [] });
-    acp_fixtures::ext_notification("x.ai/mcp/tools_changed", &payload)
+    acp_fixtures::ext_notification("friday/mcp/tools_changed", &payload)
 }
 /// Real `mcp_initialized` wire shape: `{ sessionId, mcpToolCount, elapsedMs }`.
 pub(super) fn make_mcp_initialized_notif(session_id: &str) -> acp::ExtNotification {
@@ -2269,7 +2269,7 @@ pub(super) fn make_mcp_initialized_notif(session_id: &str) -> acp::ExtNotificati
             "mcpToolCount": 12_u64,
             "elapsedMs": 250_u64,
         });
-    acp_fixtures::ext_notification("x.ai/mcp_initialized", &payload)
+    acp_fixtures::ext_notification("friday/mcp_initialized", &payload)
 }
 /// Helper: `init_progress` notification carrying an explicit sessionId.
 pub(super) fn make_mcp_init_progress_notif_for(
@@ -2278,7 +2278,7 @@ pub(super) fn make_mcp_init_progress_notif_for(
     session_id: &str,
 ) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/mcp/init_progress",
+        "friday/mcp/init_progress",
         &serde_json::json!({
                 "total": total,
                 "connected": connected,
@@ -2289,7 +2289,7 @@ pub(super) fn make_mcp_init_progress_notif_for(
 /// Helper: `mcp_initialized` notification for a specific sessionId.
 pub(super) fn make_mcp_initialized_notif_for(session_id: &str) -> acp::ExtNotification {
     acp_fixtures::ext_notification(
-        "x.ai/mcp_initialized",
+        "friday/mcp_initialized",
         &serde_json::json!({
                 "sessionId": session_id,
                 "mcpToolCount": 0,

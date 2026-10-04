@@ -49,7 +49,7 @@ use tokio::sync::{mpsc, watch};
 /// - Version 1: ConversationItem format (used for new sessions)
 pub const CHAT_FORMAT_VERSION: u8 = 1;
 
-/// Maximum Unicode scalars in a session title (`/rename`, dashboard editor, and the `x.ai/session/rename` ext boundary).
+/// Maximum Unicode scalars in a session title (`/rename`, dashboard editor, and the `friday/session/rename` ext boundary).
 /// Counted after control-strip and trim.
 pub const MAX_TITLE_SCALARS: usize = 100;
 
@@ -94,7 +94,7 @@ pub enum ValidatedRenameTitle {
     ResetToAuto,
 }
 
-/// Applies the shared `x.ai/session/rename` title boundary.
+/// Applies the shared `friday/session/rename` title boundary.
 pub fn validate_rename_title(
     title: &str,
     reset_to_auto: bool,
@@ -314,7 +314,7 @@ pub enum PersistenceMsg {
     },
     Signals(SessionSignals),
     /// Persist this turn's session usage, then ack. Callers that publish turn-end
-    /// (and `x.ai/session/state`) wait so `usage.json` is visible before the turn resolves.
+    /// (and `friday/session/state`) wait so `usage.json` is visible before the turn resolves.
     UsageTurn {
         turn_number: u32,
         live: crate::session::usage_file::UsageSummary,
@@ -1813,7 +1813,7 @@ impl SessionPersistence {
         };
         if let Ok(params) = serde_json::value::to_raw_value(&notification) {
             gateway.forward_fire_and_forget(acp::ExtNotification::new(
-                "x.ai/session_notification",
+                "friday/session_notification",
                 params.into(),
             ));
         }

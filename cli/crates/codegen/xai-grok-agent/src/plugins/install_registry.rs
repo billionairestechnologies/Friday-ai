@@ -157,7 +157,7 @@ impl InstallRegistry {
         let content = serde_json::to_string_pretty(self).map_err(|e| InstallError::Json {
             detail: e.to_string(),
         })?;
-        if std::env::var_os("XAI_GROK_TEST_FAIL_REGISTRY_SAVE_AFTER_SERIALIZE").is_some() {
+        if std::env::var_os("XAI_FRIDAY_TEST_FAIL_REGISTRY_SAVE_AFTER_SERIALIZE").is_some() {
             return Err(InstallError::InstallFailed {
                 detail: "test-injected registry save failure".into(),
             });

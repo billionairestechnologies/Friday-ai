@@ -366,7 +366,7 @@ fn notify_model_changed(
         agent
             .gateway
             .forward_fire_and_forget(acp::ExtNotification::new(
-                "x.ai/session_notification",
+                "friday/session_notification",
                 params.into(),
             ));
     }

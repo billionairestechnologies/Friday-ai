@@ -1416,7 +1416,7 @@
             meta: Some(serde_json::json!({ "isReplay": true })),
         };
         let raw = serde_json::value::to_raw_value(&payload).unwrap();
-        let request = acp::ExtNotification::new("x.ai/session_notification", raw.into());
+        let request = acp::ExtNotification::new("friday/session_notification", raw.into());
         let changed = handle(
             AcpClientMessage::ExtNotification(xai_acp_lib::AcpArgs {
                 request,
@@ -1496,7 +1496,7 @@
             meta,
         };
         let raw = serde_json::value::to_raw_value(&notif).unwrap();
-        acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw))
+        acp::ExtNotification::new("friday/session_notification", std::sync::Arc::from(raw))
     }
 
     #[test]
@@ -1583,10 +1583,10 @@
             update: XaiSessionUpdate::SessionSummaryGenerated {
                 session_summary: String::new(),
             },
-            meta: Some(serde_json::json!({ "x.ai/titleIsManual": false })),
+            meta: Some(serde_json::json!({ "friday/titleIsManual": false })),
         };
         let raw = serde_json::value::to_raw_value(&n).unwrap();
-        let notif = acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw));
+        let notif = acp::ExtNotification::new("friday/session_notification", std::sync::Arc::from(raw));
         assert!(handle_session_notification(&notif, &mut app));
         let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert!(
@@ -1610,10 +1610,10 @@
             update: XaiSessionUpdate::SessionSummaryGenerated {
                 session_summary: String::new(),
             },
-            meta: Some(serde_json::json!({ "x.ai/titleIsManual": false })),
+            meta: Some(serde_json::json!({ "friday/titleIsManual": false })),
         };
         let raw = serde_json::value::to_raw_value(&n).unwrap();
-        let notif = acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw));
+        let notif = acp::ExtNotification::new("friday/session_notification", std::sync::Arc::from(raw));
         assert!(handle_session_notification(&notif, &mut app));
         let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert!(
@@ -1693,7 +1693,7 @@
             meta: None,
         };
         let raw = serde_json::value::to_raw_value(&notif).unwrap();
-        acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw))
+        acp::ExtNotification::new("friday/session_notification", std::sync::Arc::from(raw))
     }
 
     fn push_hook(name: &str, source_dir: &str) -> xai_hooks_plugins_types::HookInfo {

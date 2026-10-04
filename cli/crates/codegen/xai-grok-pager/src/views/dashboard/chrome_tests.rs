@@ -145,7 +145,7 @@ fn header_location_renders_from_staged_cwd() {
 /// The hint's `Choose` label takes the dim row-secondary colour; its key is a shade fainter still, so the path reads first.
 #[test]
 fn header_paints_cwd_then_choose_hint_with_design_colours() {
-    let theme = Theme::groknight();
+    let theme = Theme::fridaynight();
     let area = Rect::new(0, 0, 200, 1);
     let mut state = DashboardState::new();
     state.cwd = std::path::PathBuf::from("/grok-choose-hint-marker");
@@ -338,7 +338,7 @@ fn actions_row_drops_right_items_when_narrow() {
 /// so no `│` is left dangling. A cursor parked on the dropped button falls back to `+ New Agent` in the same frame, painted focused.
 #[test]
 fn actions_row_keeps_worktree_and_drops_open_previous_with_divider() {
-    let theme = Theme::groknight();
+    let theme = Theme::fridaynight();
     let mut state = DashboardState::new();
     state.focus_open_session_button();
     let area = Rect::new(0, 0, 40, 1);
@@ -430,7 +430,7 @@ fn actions_row_right_items_follow_strict_priority_at_every_width() {
 /// The glyph carries the state colour and the `{count} {label}` text keeps each chip readable without colour.
 #[test]
 fn render_header_paints_label_and_state_chips() {
-    let theme = Theme::groknight();
+    let theme = Theme::fridaynight();
     let area = Rect::new(0, 0, 400, 1);
     let mut buf = Buffer::empty(area);
     let mut state = DashboardState::new();
@@ -484,7 +484,7 @@ fn render_header_paints_label_and_state_chips() {
 /// Every state in the chip table renders when present, in priority order, with its own glyph colour and the shared gray count label.
 #[test]
 fn render_header_paints_every_state_chip_in_its_colour() {
-    let theme = Theme::groknight();
+    let theme = Theme::fridaynight();
     let area = Rect::new(0, 0, 400, 1);
     let mut buf = Buffer::empty(area);
     let mut state = DashboardState::new();

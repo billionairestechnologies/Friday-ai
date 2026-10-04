@@ -2182,6 +2182,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn plan_install_bare_name_official_priority_selects_official_and_sets_note() {
         let sources = [
             git_source("Third Party", "https://github.com/acme/x.git"),
@@ -2242,6 +2243,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn plan_install_bare_name_official_match_proceeds_despite_skip() {
         let sources = [
             git_source("xAI Official", OFFICIAL_URL),

@@ -2,7 +2,7 @@
 //!
 //! Detection chain (each step only runs when the previous returns nothing):
 //! 1. `dark-light` desktop APIs: macOS `AppleInterfaceStyle`, Linux XDG portal `org.freedesktop.appearance.color-scheme`, Windows registry
-//! 2. Explicit env stamps, `FRIDAY_APPEARANCE` / `LC_GROK_APPEARANCE` (SSH with tmux, wrap, headless).
+//! 2. Explicit env stamps, `FRIDAY_APPEARANCE` / `LC_FRIDAY_APPEARANCE` (SSH with tmux, wrap, headless).
 //!    See [`super::env_appearance`].
 //! 3. OSC 11 terminal background query, **startup-only**; see [`detect_with_osc11_fallback`].
 //!    The result is cached so runtime `detect()` / `resolve_auto` cannot be overwritten by stale `COLORFGBG`.
@@ -264,13 +264,13 @@ mod tests {
     }
 
     #[test]
-    fn to_theme_kind_dark_defaults_to_groknight() {
+    fn to_theme_kind_dark_defaults_to_fridaynight() {
         let result = to_theme_kind(SystemAppearance::Dark, None, None);
         assert_eq!(result, ThemeKind::GrokNight);
     }
 
     #[test]
-    fn to_theme_kind_light_defaults_to_grokday() {
+    fn to_theme_kind_light_defaults_to_fridayday() {
         let result = to_theme_kind(SystemAppearance::Light, None, None);
         assert_eq!(result, ThemeKind::GrokDay);
     }

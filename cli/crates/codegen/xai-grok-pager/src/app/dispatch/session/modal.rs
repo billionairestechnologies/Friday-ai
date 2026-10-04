@@ -126,7 +126,7 @@ pub(in crate::app::dispatch) fn dispatch_rename_session(
         kind: agent.rename_kind(),
     }]
 }
-/// Unpin the current session title via `x.ai/session/rename` with `resetToAuto`.
+/// Unpin the current session title via `friday/session/rename` with `resetToAuto`.
 ///
 /// Chat-kind sessions have no local `SummaryGenerator` to restore, so they are refused here (no optimistic clear, no ext request).
 pub(in crate::app::dispatch) fn dispatch_reset_session_title(app: &mut AppView) -> Vec<Effect> {

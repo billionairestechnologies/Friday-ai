@@ -197,7 +197,7 @@ fn apply_mcp_server_policy(
         .collect()
 }
 
-/// Without this gate `x.ai/mcp/call` would spawn policy-blocked servers from the session-less pool.
+/// Without this gate `friday/mcp/call` would spawn policy-blocked servers from the session-less pool.
 pub(crate) fn filter_policy_blocked_agent_mcp(
     servers: Vec<acp::McpServer>,
     cwd: &std::path::Path,

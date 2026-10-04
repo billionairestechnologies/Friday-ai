@@ -385,7 +385,7 @@ pub fn convert_list_response(resp: McpsListResponse) -> Vec<McpServerInfo> {
     servers
 }
 
-/// Patch a single server row in-place from an `x.ai/mcp/server_status` push. When duplicate names
+/// Patch a single server row in-place from an `friday/mcp/server_status` push. When duplicate names
 /// exist, only the first occurrence is mutated.
 pub fn patch_server_row(
     servers: &mut [McpServerInfo],
@@ -512,6 +512,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
     fn section_description_lines_managed_includes_connectors_url() {
         let lines = section_description_lines(&McpSectionId::Managed, None);
         let [first, second] = lines.as_slice() else {
@@ -536,6 +537,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
     fn managed_connectors_url_display_strips_scheme() {
         assert_eq!(managed_connectors_url_display(None), "grok.com/connectors");
         assert_eq!(

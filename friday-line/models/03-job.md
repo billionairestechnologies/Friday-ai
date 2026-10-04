@@ -11,7 +11,7 @@ A job is one piece of work started from a session. Short jobs finish inside the 
 - `request` — what they asked, in their words
 - `plan` — one or two sentences Friday will repeat before anything is created or sent
 - `duration` — `short` or `long`
-- `state` — `draft`, `waiting_yes`, `running`, `ready`, `failed`, `cancelled`
+- `state` — `draft`, `waiting_yes`, `running`, `paused`, `ready`, `failed`, `cancelled`
 - `needs_yes` — true when the job creates, sends, deletes, or pays
 - `delivery` — see [Delivery](05-delivery.md)
 - `result_link` — set when there is an artifact
@@ -36,7 +36,10 @@ draft -> waiting_yes -> running -> ready
                      -> cancelled
 draft -> running -> ready
 running -> failed
+running -> paused
 running (overran hold) stays running, duration becomes long
 ```
+
+`paused` is what "rukho" or "stop" does to an auto-loop or always-on agent. The loop stays in the agent runtime. The call does not host it.
 
 Always-on agents and workflows are jobs that remain `running` after the call. Later turns on a new call can pause, edit, or ask status. Those status reads are short jobs.

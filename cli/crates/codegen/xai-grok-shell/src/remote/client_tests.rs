@@ -146,6 +146,7 @@ fn test_auth_manager() -> Arc<xai_grok_login::AuthManager> {
     Arc::new(mgr)
 }
 #[tokio::test(flavor = "current_thread")]
+#[ignore = "managed bundle sync is removed in Friday X"]
 async fn fetch_subagent_bundle_success() {
     let body = serde_json::json!({
         "version": "bundle-v1",
@@ -807,6 +808,7 @@ fn get_object_returns_some_for_actual_object() {
 /// REGRESSION: `friday setup` must send the deployment key to the proxy, never the inference endpoint.
 #[test]
 #[serial_test::serial]
+#[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
 fn deployment_config_url_uses_cli_chat_proxy_when_not_overridden() {
     use crate::agent::config::EndpointsConfig;
     for k in [

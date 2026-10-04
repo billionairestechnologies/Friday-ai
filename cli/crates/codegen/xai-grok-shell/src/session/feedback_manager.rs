@@ -579,7 +579,7 @@ impl FeedbackManager {
         None
     }
 
-    /// Engineers developing clients can call this via the `x.ai/debug/trigger_feedback` ACP extension method.
+    /// Engineers developing clients can call this via the `friday/debug/trigger_feedback` ACP extension method.
     /// When a `feedback_client` is configured, the request is also recorded via the feedback API, exactly like a real trigger.
     /// The subsequent `complete_request` / `dismiss_request` round-trip from the client then works end-to-end.
     #[tracing::instrument(name = "feedback.force_feedback_request", skip_all, fields(
@@ -1557,6 +1557,7 @@ mod tests {
     /// A hung analytics endpoint must not hold process exit for the full HTTP client timeout when the session *does* have reportable activity.
     /// `shutdown` wraps the final force-sync in `SHUTDOWN_SIGNAL_SYNC_TIMEOUT` (2s).
     #[tokio::test]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
     async fn test_shutdown_force_sync_is_timeout_capped() {
         use crate::agent::feedback_client::FeedbackClient;
         use std::time::Instant;

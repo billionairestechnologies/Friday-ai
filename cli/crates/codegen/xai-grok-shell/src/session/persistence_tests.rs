@@ -1377,6 +1377,7 @@ async fn probe_writable(handle: &PersistenceHandle) -> io::Result<()> {
 /// Seeds `RemoteSync` with a pre-rename title (the cache at init), drives `PersistenceMsg::ManualTitleRenamed`, then queues an update and flushes.
 /// The flush's `save_session_data` payload must carry the manual title.
 #[tokio::test]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 async fn manual_rename_next_flush_does_not_revert_backend_title() {
     use std::sync::Arc;
 
@@ -1570,6 +1571,7 @@ async fn wait_for_save_session_titles(
 }
 
 #[tokio::test]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
 async fn manual_after_auto_last_flush_is_manual() {
     use std::sync::Arc;
 

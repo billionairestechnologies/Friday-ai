@@ -165,7 +165,7 @@ fn test_app() -> AppView {
         agent_override: None,
         bootstrap_acp_commands: Vec::new(),
         auth_methods: vec![acp::AuthMethod::Agent(acp::AuthMethodAgent::new(
-            acp::AuthMethodId::new("grok.com"),
+            acp::AuthMethodId::new("friday"),
             "Friday X".to_string(),
         ))],
         auth_state: AuthState::Done,
@@ -707,7 +707,7 @@ fn fork_test_app() -> AppView {
     app.agents.get_mut(&AgentId(0)).unwrap().current_branch = Some("main".into());
     app
 }
-/// Build a minimal `AcpArgs<acp::ExtRequest>` for an `x.ai/ask_user_question` ext-method request.
+/// Build a minimal `AcpArgs<acp::ExtRequest>` for an `friday/ask_user_question` ext-method request.
 /// Returns the args and the receiver half of the response oneshot so the test can assert the handler completes the ACP roundtrip.
 fn make_ask_user_question_args(
     tool_call_id: &str,
@@ -736,7 +736,7 @@ fn make_ask_user_question_args(
     };
     let (tx, rx) = tokio::sync::oneshot::channel();
     let ext = acp::ExtRequest::new(
-        "x.ai/ask_user_question",
+        "friday/ask_user_question",
         serde_json::value::to_raw_value(&req)
             .expect("serialize AskUserQuestionExtRequest")
             .into(),

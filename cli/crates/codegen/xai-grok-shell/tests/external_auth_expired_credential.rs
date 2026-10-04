@@ -35,7 +35,7 @@ const FRESH_TOKEN: &str = "fresh-token-the-provider-cannot-mint";
 const STALE_TOKEN: &str = "stale-external-token";
 const PROVIDER_LABEL: &str = "Acme SSO";
 
-/// Records `x.ai/session/update` payloads so a phase can read the terminal `retryState`.
+/// Records `friday/session/update` payloads so a phase can read the terminal `retryState`.
 #[derive(Clone, Default)]
 struct Capture {
     updates: std::rc::Rc<std::cell::RefCell<Vec<serde_json::Value>>>,
@@ -309,7 +309,7 @@ fn expired_external_credential_routes_to_the_provider_login_flow() {
         let methods = advertised(&init);
         assert_eq!(
             methods.first().map(|(id, _)| id.as_str()),
-            Some("grok.com"),
+            Some("friday"),
             "an expired credential the provider cannot renew must advertise the \
              login method first, not `cached_token`; got {methods:?}"
         );

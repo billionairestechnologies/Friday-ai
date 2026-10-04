@@ -5,13 +5,13 @@ use super::*;
 use crate::extensions::code_nav::CodeNavEligibility;
 
 impl MvpAgent {
-    /// Parse the `x.ai/codeNavigation.enabled` capability from an initialize request.
+    /// Parse the `friday/codeNavigation.enabled` capability from an initialize request.
     /// Returns `false` if the field is absent or not `true`.
     pub(crate) fn parse_code_nav_capability(init: &acp::InitializeRequest) -> bool {
         init.client_capabilities
             .meta
             .as_ref()
-            .and_then(|m| m.get("x.ai/codeNavigation"))
+            .and_then(|m| m.get("friday/codeNavigation"))
             .and_then(|v| v.get("enabled"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false)

@@ -750,7 +750,7 @@ mod tests {
     // -- theme mapping and cache filename -------------------------------------
 
     #[test]
-    fn theme_is_dark_maps_grokday_to_light_only() {
+    fn theme_is_dark_maps_fridayday_to_light_only() {
         assert!(
             !theme_is_dark(ThemeKind::GrokDay),
             "GrokDay is the light theme"

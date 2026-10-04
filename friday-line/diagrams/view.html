@@ -191,5 +191,21 @@ flowchart TB
   loop --> out[Delivery when there is a result]
   flow --> out
 </pre>
+<h2>Persona and memory</h2>
+<pre class="mermaid">
+flowchart TB
+  prompt[System prompt persona]
+  recap[Capped account recap]
+  turn[User turn]
+  friday[Friday answers]
+  beat[One curious beat]
+  wait[She waits]
+  memory[(Session summary on the account)]
+  turn --> friday
+  prompt --> friday
+  recap --> friday
+  friday --> beat --> wait
+  wait --> memory
+</pre>
 </body>
 </html>

@@ -388,7 +388,7 @@ impl MvpAgent {
     /// Inputs for a registry build scoped to `cwd`: a fresh real-remote trust verdict, then
     /// `[plugins]` from disk. Self-free so callers can run it on a blocking thread.
     /// `cfg.plugins` is boot-time state that `config.toml` edits never refresh, so a snapshot built
-    /// from it reports stale `enabled` flags to session-less `x.ai/plugins/list` / `x.ai/skills/list`.
+    /// from it reports stale `enabled` flags to session-less `friday/plugins/list` / `friday/skills/list`.
     /// The disk read gates project paths on this verdict, never on the folder-trust gate's cold-key
     /// backstop, which resolves remote-less and records a durable verdict that would make an org
     /// kill-switch unliftable for the process.
@@ -422,7 +422,7 @@ impl MvpAgent {
     /// [`Self::ensure_plugin_registry`] for async callers: the trust gather, config read and
     /// discovery walk run on a blocking thread so a pre-session pull never stalls the runtime. The
     /// result is published back on the runtime, and only if nothing else (a concurrent explicit
-    /// `x.ai/plugins/reload`) initialized the registry meanwhile — the newer build wins.
+    /// `friday/plugins/reload`) initialized the registry meanwhile — the newer build wins.
     pub(crate) async fn ensure_plugin_registry_async(&self) {
         if self.plugin_registry_initialized.get() {
             return;
@@ -453,7 +453,7 @@ impl MvpAgent {
             }
         }
     }
-    /// Plugin registry for a pre-session pull (`x.ai/skills/*`, `x.ai/commands/list`) scoped to
+    /// Plugin registry for a pre-session pull (`friday/skills/*`, `friday/commands/list`) scoped to
     /// `cwd`: a fresh, non-shared build for that cwd when one is given — the launch dir is unrelated
     /// to the user's workspace in desktop-to-docker and ssh setups — else the shared launch-dir
     /// snapshot, built on demand. Trust is resolved before the disk read either way, and the walks
@@ -705,7 +705,7 @@ impl MvpAgent {
     pub(crate) fn workspaces_client(&self) -> crate::remote::WorkspacesClient {
         crate::remote::WorkspacesClient::new(self.auth_manager.clone())
     }
-    /// Pre-session command availability snapshot. Used by the `x.ai/commands/list` ext method and the `InitializeResponse._meta` path (`builtin_commands()`). Both fire before any session exists.
+    /// Pre-session command availability snapshot. Used by the `friday/commands/list` ext method and the `InitializeResponse._meta` path (`builtin_commands()`). Both fire before any session exists.
     /// The eventual agent's toolset is unknown (it depends on the model the user picks). So runtime/tool-dependent gates (`/flush`, `/loop`, `/memory`, …) fail closed.
     /// The session-scoped `available_commands_update` in `acp_session.rs` fills in the real per-model gating as soon as a session starts.
     pub(crate) fn command_availability(
@@ -1109,7 +1109,7 @@ impl MvpAgent {
                     .data(
                         serde_json::json!({
                 "code": "local_workspace_intent_missing",
-                "message": "x.ai/local_workspace intent required for mid-session add",
+                "message": "friday/local_workspace intent required for mid-session add",
             }),
                     ),
             );
@@ -1326,7 +1326,7 @@ impl MvpAgent {
     }
     #[cfg(feature = "local-workspace")]
     /// After chat+local stamp, wait for handshake success.
-    /// Only fail-closed for `x.ai/local_workspace` intent (not generic GatewayAttach).
+    /// Only fail-closed for `friday/local_workspace` intent (not generic GatewayAttach).
     /// Handshake errors propagate; the session and bridge are reaped on failure / timeout.
     pub(crate) async fn await_existing_workspace_handshake(
         &self,
@@ -1508,7 +1508,7 @@ impl MvpAgent {
     pub(crate) fn deployment_key(&self) -> Option<String> {
         self.cfg.borrow().endpoints.deployment_key.clone()
     }
-    /// Apply settings side effects and push `x.ai/settings/update` to clients.
+    /// Apply settings side effects and push `friday/settings/update` to clients.
     /// Shared tail for every settings-arrival site.
     pub(super) fn on_remote_settings_changed(&self) {
         self.sync_memory_config_from_agent_config();
@@ -1685,7 +1685,7 @@ impl MvpAgent {
         self.store_remote_settings(settings);
         self.on_remote_settings_changed();
     }
-    /// Re-fetch remote settings, re-init the telemetry client, apply side effects, and push `x.ai/settings/update` to clients. Called from both auth handlers (first install and reauth/account switch).
+    /// Re-fetch remote settings, re-init the telemetry client, apply side effects, and push `friday/settings/update` to clients. Called from both auth handlers (first install and reauth/account switch).
     /// Agent-level fields resolved at startup (`worktree_type`, `restore_code`) are NOT re-resolved here. That requires a broader refactor of the init path.
     pub(super) async fn refresh_remote_settings(&self, auth: &xai_grok_login::GrokAuth) {
         if !crate::util::config::resolve_remote_fetch_enabled() {
@@ -1842,7 +1842,7 @@ impl MvpAgent {
         }
     }
     /// Resolve post-auth remote settings in the background. A slow or hung `/settings` then can't gate `authenticate` (and thus the client's first draw).
-    /// The external-OTEL gate stays fail-closed until this resolves; the result reaches clients via `x.ai/settings/update`. Its own guard keeps an in-flight reapply from coalescing away the authenticated identity.
+    /// The external-OTEL gate stays fail-closed until this resolves; the result reaches clients via `friday/settings/update`. Its own guard keeps an in-flight reapply from coalescing away the authenticated identity.
     pub(super) fn spawn_post_auth_settings(&self, auth: xai_grok_login::GrokAuth) {
         let agent_ref = LocalRef::new(self);
         let _spawned = self
@@ -1929,7 +1929,7 @@ impl MvpAgent {
             &stored.accept_request_encodings,
         );
     }
-    /// The single announcements push gate: every `remote_settings` writer funnels through here. Emits `x.ai/announcements/update` and advances the last-emitted baseline per [`announcements_push_payload`].
+    /// The single announcements push gate: every `remote_settings` writer funnels through here. Emits `friday/announcements/update` and advances the last-emitted baseline per [`announcements_push_payload`].
     /// `mode` decides when an unchanged list still pushes. The baseline advances only once the gateway accepts the send. A failed enqueue leaves it untouched so the next gate call re-diffs and re-pushes.
     /// Synchronous by design: the decide, send, advance sequence cannot interleave with another gate call on the LocalSet.
     pub(super) fn emit_announcements(&self, mode: AnnouncementsPushMode) {
@@ -1956,7 +1956,7 @@ impl MvpAgent {
         let accepted = self
             .gateway
             .forward_fire_and_forget(
-                acp::ExtNotification::new("x.ai/announcements/update", params.into()),
+                acp::ExtNotification::new("friday/announcements/update", params.into()),
             );
         if !accepted {
             return;
@@ -1968,7 +1968,7 @@ impl MvpAgent {
             "pushing announcements update to clients"
         );
     }
-    /// Next generation for an `x.ai/announcements/update` push.
+    /// Next generation for an `friday/announcements/update` push.
     /// Strictly increasing within the process, and seeded from unix-epoch seconds.
     /// So a restarted leader's pushes still clear pager watermarks that survived re-election (`AppView.announcements_last_gen` outlives the agent).
     pub(super) fn next_announcements_gen(&self) -> u64 {
@@ -2028,7 +2028,7 @@ impl MvpAgent {
             let _ = self
                 .gateway
                 .ext_notification(
-                    acp::ExtNotification::new("x.ai/session_notification", params.into()),
+                    acp::ExtNotification::new("friday/session_notification", params.into()),
                 )
                 .await;
         }
@@ -2845,7 +2845,7 @@ impl MvpAgent {
             Err("session not found".to_string())
         }
     }
-    /// Cancel a subagent by id, returning a typed outcome that backs the pager's `x.ai/subagent/cancel`.
+    /// Cancel a subagent by id, returning a typed outcome that backs the pager's `friday/subagent/cancel`.
     /// Active/pending becomes cancelled (a finish follows); already-finished returns its terminal status; an unknown id returns `NotFound`.
     pub(crate) async fn cancel_subagent(
         &self,
@@ -3038,7 +3038,7 @@ impl MvpAgent {
                 };
                 if let Ok(params) = serde_json::value::to_raw_value(&notification) {
                     let ext_notification = acp::ExtNotification::new(
-                        "x.ai/session_notification",
+                        "friday/session_notification",
                         params.into(),
                     );
                     let _ = gateway.ext_notification(ext_notification).await;
@@ -3059,7 +3059,7 @@ impl MvpAgent {
     ) -> Option<crate::session::SessionHandle> {
         self.resident_handle(session_id)
     }
-    /// Get hooks list for a session (for `x.ai/hooks/list` extension).
+    /// Get hooks list for a session (for `friday/hooks/list` extension).
     pub(crate) async fn list_hooks(
         &self,
         session_id: &acp::SessionId,
@@ -3067,7 +3067,7 @@ impl MvpAgent {
         let handle = self.get_session_handle(session_id)?;
         handle.get_hooks_list().await
     }
-    /// Execute a hooks management action (for `x.ai/hooks/action`).
+    /// Execute a hooks management action (for `friday/hooks/action`).
     pub(crate) async fn execute_hooks_action(
         &self,
         session_id: &acp::SessionId,
@@ -3083,7 +3083,7 @@ impl MvpAgent {
         let handle = self.get_session_handle(session_id)?;
         handle.execute_hooks_action(action).await
     }
-    /// Execute a plugins management action (for `x.ai/plugins/action`).
+    /// Execute a plugins management action (for `friday/plugins/action`).
     pub(crate) async fn execute_plugins_action(
         &self,
         session_id: &acp::SessionId,
@@ -3101,7 +3101,7 @@ impl MvpAgent {
         }
         outcome
     }
-    /// Get a snapshot of the shared plugin registry (for `x.ai/plugins/list`).
+    /// Get a snapshot of the shared plugin registry (for `friday/plugins/list`).
     pub(crate) fn plugin_registry_snapshot(
         &self,
     ) -> Option<std::sync::Arc<xai_grok_agent::plugins::PluginRegistry>> {
@@ -3444,8 +3444,8 @@ impl MvpAgent {
         }
     }
     /// Insert the per-session `_meta` keys shared by `new_session` and `load_session`.
-    /// The keys are `x.ai/sessionConfig`, `x.ai/sessionDetail`,
-    /// and `x.ai/memoryMode`.
+    /// The keys are `friday/sessionConfig`, `friday/sessionDetail`,
+    /// and `friday/memoryMode`.
     /// Keeping both response paths on this one builder stops them drifting.
     pub(super) fn insert_session_config_meta(
         &self,
@@ -3463,10 +3463,10 @@ impl MvpAgent {
             title,
         );
         meta.insert(
-            "x.ai/sessionConfig".to_string(),
+            "friday/sessionConfig".to_string(),
             serde_json::json!({ "options": config_options }),
         );
-        meta.insert("x.ai/sessionDetail".to_string(), serde_json::json!(detail));
+        meta.insert("friday/sessionDetail".to_string(), serde_json::json!(detail));
         if let Some(memory_mode) = self
             .resident_handle(session_id)
             .and_then(|handle| handle.spawn_snapshot.memory_mode)
@@ -4199,7 +4199,7 @@ impl MvpAgent {
             .client_capabilities
             .meta
             .as_ref()
-            .and_then(|m| m.get("x.ai/fs_notify"))
+            .and_then(|m| m.get("friday/fs_notify"))
             .and_then(|v| {
                 use crate::session::{ClientFsConfig, ClientFsMode};
                 use xai_fsnotify::FsConfig;
@@ -4265,7 +4265,7 @@ impl MvpAgent {
                 .client_capabilities
                 .meta
                 .as_ref()
-                .and_then(|m| m.get("x.ai/hunkTracker"))
+                .and_then(|m| m.get("friday/hunkTracker"))
                 .and_then(|v| v.get("mode"))
                 .and_then(|v| v.as_str()),
         );
@@ -4273,14 +4273,14 @@ impl MvpAgent {
             .client_capabilities
             .meta
             .as_ref()
-            .and_then(|m| m.get("x.ai/incrementalBashOutput"))
+            .and_then(|m| m.get("friday/incrementalBashOutput"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         let no_color = init
             .client_capabilities
             .meta
             .as_ref()
-            .and_then(|m| m.get("x.ai/bashOutputNoColor"))
+            .and_then(|m| m.get("friday/bashOutputNoColor"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         let hunk_tracking_enabled = hunk_plan.enabled();
@@ -4845,7 +4845,7 @@ impl MvpAgent {
                 .client_capabilities
                 .meta
                 .as_ref()
-                .and_then(|m| m.get("x.ai/gitHeadChanged"))
+                .and_then(|m| m.get("friday/gitHeadChanged"))
                 .and_then(|v| v.as_bool());
             let client_caps = crate::session::notifications::SessionClientCaps::new(
                 Self::resolve_status_line_capability(session_meta, init),

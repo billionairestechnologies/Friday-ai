@@ -164,7 +164,7 @@ pub(crate) struct ClientHookResponse {
 pub(crate) fn parse_client_hooks(meta: Option<&acp::Meta>) -> ClientHooks {
     let mut hooks = ClientHooks::new();
     let Some(map) = meta
-        .and_then(|m| m.get("x.ai/hooks"))
+        .and_then(|m| m.get("friday/hooks"))
         .and_then(|h| h.as_object())
     else {
         return hooks;
@@ -176,7 +176,7 @@ pub(crate) fn parse_client_hooks(meta: Option<&acp::Meta>) -> ClientHooks {
             continue;
         };
         let Some(array) = value.as_array() else {
-            tracing::warn!(event = %event_name, "x.ai/hooks event value is not an array; skipping");
+            tracing::warn!(event = %event_name, "friday/hooks event value is not an array; skipping");
             continue;
         };
         let groups: Vec<ClientHookGroup> = array
@@ -191,7 +191,7 @@ pub(crate) fn parse_client_hooks(meta: Option<&acp::Meta>) -> ClientHooks {
 }
 
 pub(crate) fn reconnect_client_hooks(meta: Option<&acp::Meta>) -> Option<ClientHooks> {
-    meta.and_then(|m| m.get("x.ai/hooks"))
+    meta.and_then(|m| m.get("friday/hooks"))
         .map(|_| parse_client_hooks(meta))
 }
 
@@ -244,7 +244,7 @@ fn parse_hook_group(event: HookEventName, value: &serde_json::Value) -> Option<C
 
 pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
     match args.method.as_ref() {
-        "x.ai/hooks/list" => {
+        "friday/hooks/list" => {
             let req: ListRequest = super::parse_params(args)?;
             let sid = acp::SessionId::new(req.session_id);
 
@@ -254,7 +254,7 @@ pub async fn handle(agent: &MvpAgent, args: &acp::ExtRequest) -> ExtResult {
                 .ok_or_else(|| anyhow::anyhow!("session not found"));
             super::to_ext_response(result)
         }
-        "x.ai/hooks/action" => {
+        "friday/hooks/action" => {
             let req: xai_hooks_plugins_types::HooksActionRequest = super::parse_params(args)?;
             let sid = acp::SessionId::new(req.session_id);
 
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn parse_client_hooks_parses_valid_groups() {
         let meta = serde_json::json!({
-            "x.ai/hooks": {
+            "friday/hooks": {
                 "PreToolUse": [
                     { "matcher": "run_terminal_command", "hookCallbackIds": ["cb_0"] },
                     { "matcher": null, "hookCallbackIds": ["cb_1"] },
@@ -465,7 +465,7 @@ mod tests {
 
         let meta = serde_json::json!({
             "NotARealEvent": [{ "hookCallbackIds": ["x"] }],
-            "x.ai/hooks": {
+            "friday/hooks": {
                 "PreToolUse": [
                     { "matcher": "[invalid", "hookCallbackIds": ["bad_regex"] },
                     { "matcher": "run_terminal_command", "hookCallbackIds": [] },
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn parse_client_hooks_reads_group_timeout() {
         let meta = serde_json::json!({
-            "x.ai/hooks": {
+            "friday/hooks": {
                 "PreToolUse": [
                     { "hookCallbackIds": ["a"], "timeout": 5.0 },
                     { "hookCallbackIds": ["b"], "timeout": 0 },
@@ -512,7 +512,7 @@ mod tests {
     #[test]
     fn parse_client_hooks_canonicalizes_subagent_alias() {
         let meta = serde_json::json!({
-            "x.ai/hooks": { "SubagentEnd": [{ "hookCallbackIds": ["cb"] }] }
+            "friday/hooks": { "SubagentEnd": [{ "hookCallbackIds": ["cb"] }] }
         });
         let hooks = parse_client_hooks(meta.as_object());
         assert!(hooks.contains_key(&HookEventName::SubagentStop));
@@ -524,12 +524,12 @@ mod tests {
         assert!(reconnect_client_hooks(None).is_none());
         assert!(reconnect_client_hooks(serde_json::json!({ "other": true }).as_object()).is_none());
 
-        let cleared = reconnect_client_hooks(serde_json::json!({ "x.ai/hooks": {} }).as_object());
+        let cleared = reconnect_client_hooks(serde_json::json!({ "friday/hooks": {} }).as_object());
         assert!(cleared.is_some_and(|h| h.is_empty()));
 
         let set = reconnect_client_hooks(
             serde_json::json!({
-                "x.ai/hooks": { "PreToolUse": [{ "hookCallbackIds": ["cb"] }] }
+                "friday/hooks": { "PreToolUse": [{ "hookCallbackIds": ["cb"] }] }
             })
             .as_object(),
         );

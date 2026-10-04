@@ -9,7 +9,7 @@ pub(super) struct SendNowOutcome {
     pub(super) mutated: bool,
 }
 
-/// Running-turn display fields for `x.ai/queue/changed` (clients paint turn-start UI).
+/// Running-turn display fields for `friday/queue/changed` (clients paint turn-start UI).
 pub(super) struct RunningPromptDisplay {
     pub id: String,
     pub text: String,

@@ -17,7 +17,7 @@ pub(crate) use version_mismatch::{is_version_mismatch_banner, version_mismatch_b
 /// TUI dispatch, headless dispatch, and the session-load ACP barrier all share this list.
 /// A new method thus cannot be handled in one path and classified `Unrelated` in another.
 pub(crate) fn is_session_update_ext_method(method: &str) -> bool {
-    matches!(method, "x.ai/session_notification" | "x.ai/session/update")
+    matches!(method, "friday/session_notification" | "friday/session/update")
 }
 use crate::client_identity::{HEADLESS_CLIENT_TYPE, PAGER_CLIENT_TYPE, PAGER_CLIENT_VERSION};
 use agent_client_protocol as acp;
@@ -102,7 +102,7 @@ pub struct AcpConnection {
     /// Seeded into every new `AgentSession` so autocomplete has shell builtins and skills immediately, before any `AvailableCommandsUpdate` arrives.
     pub available_commands: Vec<acp::AvailableCommand>,
     pub needs_login: bool,
-    /// Login button label from `AuthMethod.name` (e.g., "grok.com", "Acme Corp").
+    /// Login button label from `AuthMethod.name` (e.g., "friday", "Acme Corp").
     pub login_label: Option<String>,
     /// The auth method ID to use for login (copied from the first advertised method).
     pub login_method_id: Option<acp::AuthMethodId>,
@@ -116,7 +116,7 @@ pub struct AcpConnection {
     /// Whether cancel-rewind is enabled (resolved by shell from config layers).
     pub cancel_rewind_enabled: bool,
     /// Whether the session-recap feature is rolled out for this connection. The client gates its automatic away-recap
-    /// poll and the manual `/recap` on this so a disabled feature produces zero `x.ai/recap` traffic.
+    /// poll and the manual `/recap` on this so a disabled feature produces zero `friday/recap` traffic.
     pub session_recap_available: bool,
     /// Shell-side feedback trace-offer eligibility (see `feedbackTraceOffer`).
     pub feedback_trace_offer: bool,
@@ -142,7 +142,7 @@ pub struct ConnectFlags {
     pub laziness_debug_log: Option<std::path::PathBuf>,
     /// Storage mode override.
     pub storage_mode: Option<String>,
-    /// Whether this client will draw a status row, advertised as `x.ai/statusLine` so the agent can skip an unpainted payload.
+    /// Whether this client will draw a status row, advertised as `friday/statusLine` so the agent can skip an unpainted payload.
     pub status_line: bool,
     /// Client identifier for ACP Initialize metadata.
     pub client_identifier: Option<String>,
@@ -446,10 +446,10 @@ fn client_capabilities_meta(flags: &ConnectFlags) -> serde_json::Value {
     let hunk_mode =
         crate::settings::canonical_hunk_tracker_mode(flags.hunk_tracker_mode.as_deref());
     let mut meta = serde_json::json!({
-        "x.ai/incrementalBashOutput": true,
-        "x.ai/hunkTracker": { "mode": hunk_mode },
-        "x.ai/bashOutputNoColor": true,
-        "x.ai/gitHeadChanged": true,
+        "friday/incrementalBashOutput": true,
+        "friday/hunkTracker": { "mode": hunk_mode },
+        "friday/bashOutputNoColor": true,
+        "friday/gitHeadChanged": true,
     });
     if let Some(obj) = meta.as_object_mut() {
         obj.insert(
@@ -757,9 +757,9 @@ mod tests {
     use super::*;
     #[test]
     fn is_session_update_ext_method_covers_both_carriers() {
-        assert!(is_session_update_ext_method("x.ai/session_notification"));
-        assert!(is_session_update_ext_method("x.ai/session/update"));
-        assert!(!is_session_update_ext_method("x.ai/task_completed"));
+        assert!(is_session_update_ext_method("friday/session_notification"));
+        assert!(is_session_update_ext_method("friday/session/update"));
+        assert!(!is_session_update_ext_method("friday/task_completed"));
         assert!(!is_session_update_ext_method("session/update"));
     }
     #[test]
@@ -844,21 +844,21 @@ mod tests {
     }
     #[test]
     fn startup_auth_grok_com_no_provider_needs_login_pending() {
-        let methods = vec![make_auth_method("grok.com", "grok.com", None)];
+        let methods = vec![make_auth_method("friday", "friday", None)];
         let (needs, label, method_id, mode) = startup_auth_metadata(&methods);
         assert!(needs);
-        assert_eq!(label.as_deref(), Some("grok.com"));
-        assert_eq!(method_id.as_ref().unwrap().0.as_ref(), "grok.com");
+        assert_eq!(label.as_deref(), Some("friday"));
+        assert_eq!(method_id.as_ref().unwrap().0.as_ref(), "friday");
         assert_eq!(mode, AuthStartMode::Pending);
     }
     #[test]
     fn startup_auth_grok_com_with_external_provider_command() {
         let meta = serde_json::json!({ "external_provider": true });
-        let methods = vec![make_auth_method("grok.com", "Acme Corp", Some(meta))];
+        let methods = vec![make_auth_method("friday", "Acme Corp", Some(meta))];
         let (needs, label, method_id, mode) = startup_auth_metadata(&methods);
         assert!(needs);
         assert_eq!(label.as_deref(), Some("Acme Corp"));
-        assert_eq!(method_id.as_ref().unwrap().0.as_ref(), "grok.com");
+        assert_eq!(method_id.as_ref().unwrap().0.as_ref(), "friday");
         assert_eq!(mode, AuthStartMode::Command);
     }
     #[test]
@@ -916,7 +916,7 @@ mod tests {
     }
     #[test]
     fn startup_auth_method_id_is_copied_not_synthesized() {
-        let methods = vec![make_auth_method("grok.com", "My Login", None)];
+        let methods = vec![make_auth_method("friday", "My Login", None)];
         let (_, _, method_id, _) = startup_auth_metadata(&methods);
         let Some(first) = methods.first() else {
             panic!("expected an auth method");
@@ -926,7 +926,7 @@ mod tests {
     #[test]
     fn startup_auth_external_provider_false_is_pending() {
         let meta = serde_json::json!({ "external_provider": false });
-        let methods = vec![make_auth_method("grok.com", "grok.com", Some(meta))];
+        let methods = vec![make_auth_method("friday", "friday", Some(meta))];
         let (_, _, _, mode) = startup_auth_metadata(&methods);
         assert_eq!(mode, AuthStartMode::Pending);
     }
@@ -1018,7 +1018,7 @@ mod tests {
         let absent = client_capabilities_meta(&ConnectFlags::default());
         assert_eq!(
             absent
-                .get("x.ai/hunkTracker")
+                .get("friday/hunkTracker")
                 .and_then(|v| v.get("mode"))
                 .and_then(|v| v.as_str()),
             Some("off")
@@ -1029,7 +1029,7 @@ mod tests {
         });
         assert_eq!(
             blank
-                .get("x.ai/hunkTracker")
+                .get("friday/hunkTracker")
                 .and_then(|v| v.get("mode"))
                 .and_then(|v| v.as_str()),
             Some("off")
@@ -1068,7 +1068,7 @@ mod tests {
                 ..Default::default()
             });
             assert_eq!(
-                meta.get("x.ai/hunkTracker")
+                meta.get("friday/hunkTracker")
                     .and_then(|v| v.get("mode"))
                     .and_then(|v| v.as_str()),
                 Some("off"),

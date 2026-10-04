@@ -173,7 +173,7 @@ pub fn invalidate_auto_theme_config() {
 
 // -- Theme resolution --------------------------------------------------------
 
-/// Concrete kind, never `Auto`. Env (`FRIDAY_THEME` / `LC_GROK_THEME`), then `[ui].theme`, then `GrokNight`.
+/// Concrete kind, never `Auto`. Env (`FRIDAY_THEME` / `LC_FRIDAY_THEME`), then `[ui].theme`, then `GrokNight`.
 #[must_use]
 pub fn resolve_initial_theme() -> ThemeKind {
     resolve_initial_theme_from(env_theme_name().as_deref(), load_from_disk(), true)
@@ -190,7 +190,7 @@ fn env_theme_name() -> Option<String> {
 }
 
 fn env_theme_name_from(env: &HashMap<String, String>) -> Option<&str> {
-    for key in ["FRIDAY_THEME", "LC_GROK_THEME"] {
+    for key in ["FRIDAY_THEME", "LC_FRIDAY_THEME"] {
         let Some(raw) = env
             .get(key)
             .map(String::as_str)
@@ -452,7 +452,7 @@ mod tests {
             assert_eq!(theme.accent_user, native.accent_user);
             assert_ne!(
                 theme.text_primary,
-                super::super::Theme::grokday().text_primary,
+                super::super::Theme::fridayday().text_primary,
                 "must not serve the cached (GrokDay) theme"
             );
         });
@@ -531,7 +531,7 @@ mod tests {
             set_terminal_native_lock(true);
             assert!(color_support::detect() <= color_support::ColorLevel::Basic);
             for input in [
-                Color::Rgb(0x26, 0x26, 0x26), // grokday text_primary
+                Color::Rgb(0x26, 0x26, 0x26), // fridayday text_primary
                 Color::Rgb(122, 162, 247),
                 Color::Indexed(141),
             ] {
@@ -596,7 +596,7 @@ mod tests {
     // -- resolve_auto --------------------------------------------------------
 
     #[test]
-    fn resolve_auto_dark_system_returns_groknight() {
+    fn resolve_auto_dark_system_returns_fridaynight() {
         with_test_env(|| {
             system_appearance::set_mock(Some(system_appearance::SystemAppearance::Dark));
             let result = resolve_auto();
@@ -605,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_auto_light_system_returns_grokday() {
+    fn resolve_auto_light_system_returns_fridayday() {
         with_test_env(|| {
             system_appearance::set_mock(Some(system_appearance::SystemAppearance::Light));
             let result = resolve_auto();
@@ -614,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_auto_detection_failure_returns_groknight() {
+    fn resolve_auto_detection_failure_returns_fridaynight() {
         with_test_env(|| {
             system_appearance::set_mock(None);
             let result = resolve_auto();
@@ -645,7 +645,7 @@ mod tests {
     // -- resolve_from_config (resolve_initial_theme inner logic) ---------------
 
     #[test]
-    fn resolve_from_config_no_config_returns_groknight() {
+    fn resolve_from_config_no_config_returns_fridaynight() {
         with_test_env(|| {
             let result = resolve_from_config(None, true);
             assert_eq!(result, ThemeKind::GrokNight);
@@ -699,7 +699,7 @@ mod tests {
     fn env_theme_overrides_config() {
         with_test_env(|| {
             assert_eq!(
-                resolve_initial_theme_from(Some("grokday"), Some(ThemeKind::TokyoNight), false),
+                resolve_initial_theme_from(Some("fridayday"), Some(ThemeKind::TokyoNight), false),
                 ThemeKind::GrokDay
             );
             assert!(!is_auto_mode());
@@ -750,7 +750,7 @@ mod tests {
     #[test]
     fn grok_theme_wins_over_lc_and_config() {
         with_test_env(|| {
-            let env = theme_env(&[("FRIDAY_THEME", "grokday"), ("LC_GROK_THEME", "tokyonight")]);
+            let env = theme_env(&[("FRIDAY_THEME", "fridayday"), ("LC_FRIDAY_THEME", "tokyonight")]);
             assert_eq!(
                 resolve_initial_theme_from(
                     env_theme_name_from(&env),
@@ -778,7 +778,7 @@ mod tests {
                 resolve_initial_theme_from(
                     env_theme_name_from(&theme_env(&[
                         ("FRIDAY_THEME", ""),
-                        ("LC_GROK_THEME", "grokday")
+                        ("LC_FRIDAY_THEME", "fridayday")
                     ])),
                     Some(ThemeKind::TokyoNight),
                     false,
@@ -787,7 +787,7 @@ mod tests {
             );
             assert_eq!(
                 resolve_initial_theme_from(
-                    env_theme_name_from(&theme_env(&[("LC_GROK_THEME", "grokday")])),
+                    env_theme_name_from(&theme_env(&[("LC_FRIDAY_THEME", "fridayday")])),
                     Some(ThemeKind::TokyoNight),
                     true,
                 ),
@@ -803,7 +803,7 @@ mod tests {
                 resolve_initial_theme_from(
                     env_theme_name_from(&theme_env(&[
                         ("FRIDAY_THEME", "not-a-theme"),
-                        ("LC_GROK_THEME", "grokday"),
+                        ("LC_FRIDAY_THEME", "fridayday"),
                     ])),
                     Some(ThemeKind::TokyoNight),
                     false,
@@ -821,7 +821,7 @@ mod tests {
                 resolve_initial_theme_from(
                     env_theme_name_from(&theme_env(&[
                         ("FRIDAY_THEME", "not-a-theme"),
-                        ("LC_GROK_THEME", "")
+                        ("LC_FRIDAY_THEME", "")
                     ])),
                     Some(ThemeKind::GrokDay),
                     false,
@@ -830,7 +830,7 @@ mod tests {
             );
             assert_eq!(
                 resolve_initial_theme_from(
-                    env_theme_name_from(&theme_env(&[("FRIDAY_THEME", ""), ("LC_GROK_THEME", "")])),
+                    env_theme_name_from(&theme_env(&[("FRIDAY_THEME", ""), ("LC_FRIDAY_THEME", "")])),
                     Some(ThemeKind::GrokDay),
                     true,
                 ),
@@ -865,7 +865,7 @@ mod tests {
             system_appearance::set_mock(Some(system_appearance::SystemAppearance::Dark));
             assert_eq!(
                 resolve_initial_theme_from(
-                    env_theme_name_from(&theme_env(&[("LC_GROK_THEME", "auto")])),
+                    env_theme_name_from(&theme_env(&[("LC_FRIDAY_THEME", "auto")])),
                     Some(ThemeKind::TokyoNight),
                     true,
                 ),

@@ -684,7 +684,7 @@
             meta: Some(serde_json::json!({ "isReplay": false })),
         };
         let notif = acp::ExtNotification::new(
-            "x.ai/session/update",
+            "friday/session/update",
             std::sync::Arc::from(serde_json::value::to_raw_value(&payload).unwrap()),
         );
         let _ = handle_ext_notification(&notif, &mut app);
@@ -726,7 +726,7 @@
             meta: Some(serde_json::json!({ "isReplay": false })),
         };
         let notif = acp::ExtNotification::new(
-            "x.ai/session/update",
+            "friday/session/update",
             std::sync::Arc::from(serde_json::value::to_raw_value(&payload).unwrap()),
         );
 
@@ -2005,7 +2005,7 @@
             meta: None,
         };
         acp::ExtNotification::new(
-            "x.ai/session/update",
+            "friday/session/update",
             std::sync::Arc::from(serde_json::value::to_raw_value(&payload).unwrap()),
         )
     }
@@ -2323,7 +2323,7 @@
             meta: Some(meta),
         };
         acp::ExtNotification::new(
-            "x.ai/session/update",
+            "friday/session/update",
             std::sync::Arc::from(serde_json::value::to_raw_value(&payload).unwrap()),
         )
     }
@@ -3069,7 +3069,7 @@
             let _ = handle(
                 make_ext_session_notification_with_method(
                     "sess-parent",
-                    "x.ai/session/update",
+                    "friday/session/update",
                     spawned,
                 ),
                 &mut app,
@@ -3125,7 +3125,7 @@
             let _ = handle(
                 make_ext_session_notification_with_method(
                     "sess-parent",
-                    "x.ai/session/update",
+                    "friday/session/update",
                     spawned,
                 ),
                 &mut app,

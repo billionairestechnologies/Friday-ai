@@ -7070,6 +7070,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn plugin_group_maps_each_origin_variant() {
         use xai_hooks_plugins_types::PluginOrigin;
         for (origin, rank, key, label) in [
@@ -7148,6 +7149,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn plugin_group_fallback_without_origin() {
         let mut project = make_plugin("proj");
         project.scope = xai_hooks_plugins_types::PluginScope::Project;
@@ -7176,6 +7178,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn plugin_group_unknown_origin_uses_scope_fallback() {
         let mut unknown = make_plugin_with_origin(
             "future-tool",
@@ -7511,6 +7514,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
     fn managed_connectors_wait_overlay_covers_list_until_refresh() {
         use crate::views::mcps_modal::McpWireSource;
 
@@ -7838,6 +7842,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "the official plugin marketplace source is removed in Friday X"]
     fn ordered_marketplace_view_pins_official_then_az() {
         let mp = |name: &str, url: &str, err: Option<&str>, plugins: &[&'static str]| {
             xai_hooks_plugins_types::MarketplaceScanResult {

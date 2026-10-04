@@ -117,7 +117,7 @@ fn spawn_exit_capture(
         while let Some(msg) = gateway_rx.recv().await {
             match msg {
                 xai_acp_lib::AcpClientMessage::ExtMethod(args) => {
-                    if args.request.method.as_ref() == "x.ai/exit_plan_mode" {
+                    if args.request.method.as_ref() == "friday/exit_plan_mode" {
                         let req: ExitPlanModeExtRequest =
                             serde_json::from_str(args.request.params.get()).unwrap();
                         *captured_for_task.lock().unwrap() = req.plan_content;
@@ -275,7 +275,7 @@ async fn mixed_permission_cancel_skips_exit_reverse_request() {
                                 )));
                         }
                         xai_acp_lib::AcpClientMessage::ExtMethod(args) => {
-                            if args.request.method.as_ref() == "x.ai/exit_plan_mode" {
+                            if args.request.method.as_ref() == "friday/exit_plan_mode" {
                                 exit_fired_task.store(true, std::sync::atomic::Ordering::SeqCst);
                                 let _ = args
                                     .response_tx

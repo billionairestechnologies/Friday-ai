@@ -2543,7 +2543,7 @@ fn task_ids_from_raw_input(raw: &serde_json::Value) -> Vec<String> {
     out
 }
 /// True when an execute tool call asked to run in the background.
-/// Scrollback skips these; the `x.ai/task_backgrounded` notification adds a `BgTask` block for them.
+/// Scrollback skips these; the `friday/task_backgrounded` notification adds a `BgTask` block for them.
 fn is_bg_tool(tc: &acp::ToolCall) -> bool {
     let looks_like_execute =
         tc.kind == acp::ToolKind::Execute || is_execute_tool_function_name(&tc.title);
