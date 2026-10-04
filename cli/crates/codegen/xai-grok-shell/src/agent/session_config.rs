@@ -190,8 +190,8 @@ mod tests {
     #[test]
     fn options_have_one_selected_model_and_a_mode_per_effort() {
         let models = [
-            model("grok-build", "Friday X"),
-            model("grok-4.5", "Friday X 4.5"),
+            model("grok-build", "FridayX"),
+            model("grok-4.5", "FridayX 4.5"),
         ];
         let current = acp::ModelId::from("grok-build");
         let opts = build_session_config_options(
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn none_effort_is_not_a_user_selectable_mode() {
         assert!(!SELECTABLE_REASONING_EFFORTS.contains(&ReasoningEffort::None));
-        let models = [model("grok-build", "Friday X")];
+        let models = [model("grok-build", "FridayX")];
         let current = acp::ModelId::from("grok-build");
         let opts = build_session_config_options(
             &models,
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn no_mode_options_when_model_lacks_effort_support() {
-        let models = [model("grok-build", "Friday X")];
+        let models = [model("grok-build", "FridayX")];
         let current = acp::ModelId::from("grok-build");
         let opts = build_session_config_options(&models, &current, &[], None);
         assert_eq!(opts.len(), 1);
@@ -262,14 +262,14 @@ mod tests {
         let opt = SessionConfigOption {
             id: "grok-build".to_string(),
             category: "model".to_string(),
-            label: "Friday X".to_string(),
+            label: "FridayX".to_string(),
             description: None,
             selected: true,
         };
         let v = serde_json::to_value(&opt).expect("serialize");
         assert_eq!(v.get("id").and_then(|x| x.as_str()), Some("grok-build"));
         assert_eq!(v.get("category").and_then(|x| x.as_str()), Some("model"));
-        assert_eq!(v.get("label").and_then(|x| x.as_str()), Some("Friday X"));
+        assert_eq!(v.get("label").and_then(|x| x.as_str()), Some("FridayX"));
         assert_eq!(v.get("selected").and_then(|x| x.as_bool()), Some(true));
         assert!(v.get("description").is_none());
     }
@@ -296,8 +296,8 @@ mod tests {
     #[test]
     fn acp_config_options_map_model_and_effort_selectors() {
         let models = [
-            model("grok-build", "Friday X"),
-            model("grok-4.5", "Friday X 4.5"),
+            model("grok-build", "FridayX"),
+            model("grok-4.5", "FridayX 4.5"),
         ];
         let efforts = [ReasoningEffortOption {
             id: "high".to_string(),
@@ -320,8 +320,8 @@ mod tests {
                 "Model",
                 "grok-4.5",
                 vec![
-                    acp::SessionConfigSelectOption::new("grok-build", "Friday X"),
-                    acp::SessionConfigSelectOption::new("grok-4.5", "Friday X 4.5"),
+                    acp::SessionConfigSelectOption::new("grok-build", "FridayX"),
+                    acp::SessionConfigSelectOption::new("grok-4.5", "FridayX 4.5"),
                 ],
             )
             .category(acp::SessionConfigOptionCategory::Model),
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn acp_config_options_effort_current_preserves_unlisted_value() {
-        let models = [model("grok-4.5", "Friday X 4.5")];
+        let models = [model("grok-4.5", "FridayX 4.5")];
         let efforts = [ReasoningEffortOption {
             id: "high".to_string(),
             value: ReasoningEffort::High,
@@ -367,8 +367,8 @@ mod tests {
     #[test]
     fn acp_config_options_model_current_preserves_unlisted_value() {
         let models = [
-            model("grok-build", "Friday X"),
-            model("grok-4.5", "Friday X 4.5"),
+            model("grok-build", "FridayX"),
+            model("grok-4.5", "FridayX 4.5"),
         ];
         let options =
             build_acp_config_options(&models, &acp::ModelId::from("stale-model"), &[], None);

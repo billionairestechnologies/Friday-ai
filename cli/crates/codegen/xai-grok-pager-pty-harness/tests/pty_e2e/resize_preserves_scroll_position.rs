@@ -134,7 +134,7 @@ async fn resize_preserves_scroll_position() {
     content.set_response(scroll_anchor_response());
 
     // Spawn FULLSCREEN (alt-screen). `Viewport::Fullscreen` is autoresized on a terminal resize with NO DSR cursor probe.
-    // Friday X thus re-wraps the scrollback at the new width and the stale `scroll_offset` shows the jump in grok's OWN rendered output
+    // FridayX thus re-wraps the scrollback at the new width and the stale `scroll_offset` shows the jump in grok's OWN rendered output
     // The alt-screen grid is not reflowed by the terminal on resize, so this isolates grok's scroll-anchor logic with no harness confound
     let binary = pager_binary().expect("resolve pager binary");
     let mut harness =

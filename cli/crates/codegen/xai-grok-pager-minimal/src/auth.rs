@@ -190,7 +190,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled("Sign in to Friday X", bold)),
+                Line::from(Span::styled("Sign in to FridayX", bold)),
             );
             y = put_line(buf, area, y, bottom, Line::default());
             match url {
@@ -297,7 +297,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 y,
                 bottom,
                 Line::from(Span::styled(
-                    "Friday X may run or modify contents in this directory,",
+                    "FridayX may run or modify contents in this directory,",
                     gray,
                 )),
             );
@@ -469,7 +469,7 @@ mod tests {
         };
         render_auth(&mut buf, area, &theme, &hint);
         let text = crate::buffer_text(&buf);
-        assert!(text.contains("Sign in to Friday X"), "header: {text:?}");
+        assert!(text.contains("Sign in to FridayX"), "header: {text:?}");
         assert!(text.contains("accounts.x.ai/device"), "url: {text:?}");
         assert!(text.contains("ABCD-EFGH"), "device code: {text:?}");
         assert!(

@@ -17,7 +17,7 @@ import {
 import { cliSettings, contextWindowFor } from "../src/services/cli/gateway.js";
 import { installCmd, installPowerShell, installShell, isPlatform, isVersion } from "../src/services/cli/installScripts.js";
 
-test("Friday X is an admin-editable entitlement, on by default for every plan", () => {
+test("FridayX is an admin-editable entitlement, on by default for every plan", () => {
   assert.ok(ENTITLEMENT_DEFS.some((d) => d.key === "fridayX" && d.type === "boolean"));
   for (const plan of ["free", "pro", "premium", "enterprise"] as const) assert.equal(DEFAULT_ENTITLEMENTS[plan].fridayX, true);
   // An admin turning it off for Free, and a personal grant turning it back on for one user, layer as for any entitlement.

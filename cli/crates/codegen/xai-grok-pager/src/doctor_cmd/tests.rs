@@ -347,7 +347,7 @@ fn human_wayland_error_includes_detail_once() {
     assert_eq!(
         human::format(&report),
         concat!(
-            "Friday X Doctor\n",
+            "FridayX Doctor\n",
             "\n",
             "Environment\n",
             "  · terminal                     Ghostty\n",
@@ -456,7 +456,7 @@ fn human_healthy_fixture_is_exact() {
     assert_eq!(
         human::format(&healthy_report()),
         concat!(
-            "Friday X Doctor\n",
+            "FridayX Doctor\n",
             "\n",
             "Environment\n",
             "  · terminal                     Ghostty\n",
@@ -483,7 +483,7 @@ fn human_mixed_fixture_is_exact() {
     assert_eq!(
         human::format(&mixed_report()),
         concat!(
-            "Friday X Doctor\n",
+            "FridayX Doctor\n",
             "\n",
             "Environment\n",
             "  · terminal                     Ghostty\n",
@@ -520,7 +520,7 @@ fn human_mixed_fixture_is_exact() {
             "  ? tmux.control-mode            error: server unavailable\n",
             "\n",
             "Needs a running session\n",
-            "  Some checks only run in Friday X. Start Friday X and run /doctor.\n",
+            "  Some checks only run in FridayX. Start FridayX and run /doctor.\n",
             "\n",
             "1 issue, 1 recommendation\n",
         )
@@ -643,7 +643,7 @@ fn human_incomplete_fixture_is_exact_without_duplicate_probe_rows() {
     assert_eq!(
         human::format(&report),
         concat!(
-            "Friday X Doctor\n",
+            "FridayX Doctor\n",
             "\n",
             "Environment\n",
             "  · terminal                     Ghostty\n",
@@ -661,7 +661,7 @@ fn human_incomplete_fixture_is_exact_without_duplicate_probe_rows() {
             "  · status                       confirmed\n",
             "\n",
             "Needs a running session\n",
-            "  Some checks only run in Friday X. Start Friday X and run /doctor.\n",
+            "  Some checks only run in FridayX. Start FridayX and run /doctor.\n",
             "\n",
             "0 issues, 0 recommendations\n",
         )
@@ -809,7 +809,7 @@ fn json_contract_is_structural_stable_ordered_and_ansi_free() {
     assert!(issue < recommendation);
     assert!(version < extended && extended < unsupported && unsupported < unavailable);
     assert!(!text.contains("\u{1b}"));
-    assert!(!text.contains("Friday X Doctor"));
+    assert!(!text.contains("FridayX Doctor"));
 }
 
 #[test]

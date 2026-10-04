@@ -1,18 +1,18 @@
 # Authentication
 
-Friday X supports several authentication methods, including interactive browser login, enterprise single sign-on (SSO), and headless CI/CD runners.
+FridayX supports several authentication methods, including interactive browser login, enterprise single sign-on (SSO), and headless CI/CD runners.
 
 ---
 
 ## Browser Login (Default)
 
-On first launch, Friday X opens your browser to authenticate with grok.com:
+On first launch, FridayX opens your browser to authenticate with grok.com:
 
 ```bash
 grok
 ```
 
-Friday X stores credentials in `~/.friday/auth.json` and reuses them across sessions. Friday X refreshes access tokens automatically in the background. When a token can't be refreshed, Friday X prompts you to sign in again. Credentials without a server-provided expiry fall back to a 30-day lifetime.
+FridayX stores credentials in `~/.friday/auth.json` and reuses them across sessions. FridayX refreshes access tokens automatically in the background. When a token can't be refreshed, FridayX prompts you to sign in again. Credentials without a server-provided expiry fall back to a 30-day lifetime.
 
 ### Credential storage
 
@@ -50,7 +50,7 @@ export FRIDAY_X_TOKEN="xai-..."
 grok
 ```
 
-Friday X uses the API key as a fallback when no session token is active. If you have already signed in interactively, the stored session token takes precedence. To fall back to the API key, run `friday logout` or delete `~/.friday/auth.json`.
+FridayX uses the API key as a fallback when no session token is active. If you have already signed in interactively, the stored session token takes precedence. To fall back to the API key, run `friday logout` or delete `~/.friday/auth.json`.
 
 ---
 
@@ -61,7 +61,7 @@ Authenticate developers through your own Identity Provider (IdP) -- such as Okta
 ### 1. Register a public client in your IdP
 
 - Grant type: Authorization Code with PKCE (Proof Key for Code Exchange)
-- Redirect URI: `http://127.0.0.1/callback` -- a loopback address. Friday X binds a random port at sign-in time, and most IdPs treat the loopback redirect as port-agnostic per [RFC 8252](https://tools.ietf.org/html/rfc8252).
+- Redirect URI: `http://127.0.0.1/callback` -- a loopback address. FridayX binds a random port at sign-in time, and most IdPs treat the loopback redirect as port-agnostic per [RFC 8252](https://tools.ietf.org/html/rfc8252).
 - No client secret. PKCE replaces it.
 
 ### 2. Configure the CLI
@@ -109,7 +109,7 @@ When browser-based login isn't possible -- for example, on sandboxed VMs, CI run
 
 ```
 +--------------+     sh -c     +------------------------+
-|     Friday X     |-------------->|  your auth binary      |
+|     FridayX     |-------------->|  your auth binary      |
 |              |               |                        |
 |  reads       |<-- stdout ----|  prints token          |
 |  auth.json   |               |                        |
@@ -117,20 +117,20 @@ When browser-based login isn't possible -- for example, on sandboxed VMs, CI run
 +--------------+               +------------------------+
 ```
 
-1. Friday X runs your command via `sh -c "<command>"`
+1. FridayX runs your command via `sh -c "<command>"`
 2. Your binary runs whatever auth flow it needs (SSO, device code, certificate exchange)
-3. **stderr** carries human-readable output, such as login URLs and status messages. Friday X reads stderr and surfaces it to the user; in the TUI, it turns the first `https://` URL into a clickable sign-in link.
-4. **stdout** is captured by Friday X and saved as the access token
-5. Exit 0 = success; exit non-zero = Friday X falls back to interactive login
+3. **stderr** carries human-readable output, such as login URLs and status messages. FridayX reads stderr and surfaces it to the user; in the TUI, it turns the first `https://` URL into a clickable sign-in link.
+4. **stdout** is captured by FridayX and saved as the access token
+5. Exit 0 = success; exit non-zero = FridayX falls back to interactive login
 
 ### The stdout / stderr Contract
 
 | Stream | What to print | Who sees it |
 |--------|---------------|-------------|
-| **stdout** | The token -- nothing else | Friday X (parsed and stored in auth.json) |
-| **stderr** | Login URLs, status messages, errors | The user (Friday X reads stderr and shows the sign-in URL as a clickable link in the TUI) |
+| **stdout** | The token -- nothing else | FridayX (parsed and stored in auth.json) |
+| **stderr** | Login URLs, status messages, errors | The user (FridayX reads stderr and shows the sign-in URL as a clickable link in the TUI) |
 
-**Do not print anything to stdout except the token.** No progress messages, no debug output. Friday X reads stdout, trims surrounding whitespace, and parses the result as a token.
+**Do not print anything to stdout except the token.** No progress messages, no debug output. FridayX reads stdout, trims surrounding whitespace, and parses the result as a token.
 
 ### stdout Token Format
 
@@ -146,14 +146,14 @@ eyJhbGciOiJSUzI1NiIs...
 {"access_token": "eyJhbGciOi...", "refresh_token": "ref-tok", "expires_in": 3600, "issuer": "https://idp.example.com"}
 ```
 
-Use JSON if your tokens expire and you want Friday X to automatically re-run the binary before expiry.
+Use JSON if your tokens expire and you want FridayX to automatically re-run the binary before expiry.
 
 JSON fields:
 
 | Field | Required | Meaning |
 |-------|----------|---------|
-| `access_token` | yes | Bearer token Friday X sends to the xAI API |
-| `refresh_token` | no | Stored for reference. Friday X refreshes by re-running your binary, not with an OAuth refresh grant |
+| `access_token` | yes | Bearer token FridayX sends to the xAI API |
+| `refresh_token` | no | Stored for reference. FridayX refreshes by re-running your binary, not with an OAuth refresh grant |
 | `expires_in` | no | Token lifetime in seconds; enables proactive refresh before expiry |
 | `issuer` | no | Identifies the token's issuer |
 
@@ -179,17 +179,17 @@ export FRIDAY_AUTH_TOKEN_TTL=3600
 
 ### Token Refresh
 
-Friday X runs your binary on two different contracts, and `FRIDAY_AUTH_EXPIRED` is how
+FridayX runs your binary on two different contracts, and `FRIDAY_AUTH_EXPIRED` is how
 it tells them apart. Each run fully replaces the stored credential, so emit the
 same JSON fields (such as `issuer`) on every invocation, including refreshes.
 
-- **`FRIDAY_AUTH_EXPIRED=1` — a headless refresh.** Friday X is re-minting over a
+- **`FRIDAY_AUTH_EXPIRED=1` — a headless refresh.** FridayX is re-minting over a
   credential it already holds: a near-expiry rotation, or a token the server
   rejected. Nobody is watching. stdin is closed, your stderr is swallowed, and
   the binary is given a few seconds before it is killed. Mint silently or exit
   non-zero — never block.
 - **Unset — a sign-in.** `friday login`, the sign-in screen, or the escalation
-  Friday X performs when a headless run couldn't mint. A user is waiting, your
+  FridayX performs when a headless run couldn't mint. A user is waiting, your
   stderr reaches them, and you have 300 seconds — enough for a browser round
   trip or a device code.
 
@@ -213,7 +213,7 @@ fi
 echo "{\"access_token\": \"$TOKEN\", \"expires_in\": 3600}"
 ```
 
-When the headless run can't produce a token, Friday X stops treating the stored
+When the headless run can't produce a token, FridayX stops treating the stored
 credential as usable and starts the sign-in flow instead — the same one you get
 on a machine that has never signed in, with your binary's stderr shown, so a
 device-code URL or a browser prompt reaches you. Exiting promptly on
@@ -250,7 +250,7 @@ For headless environments (SSH sessions, Docker containers, remote VMs) where no
 friday login --device-auth    # or: friday login --device-code
 ```
 
-This prints a URL and code to the terminal. Open the URL on any device, enter the code, and complete authentication. Friday X polls until the login is confirmed.
+This prints a URL and code to the terminal. Open the URL on any device, enter the code, and complete authentication. FridayX polls until the login is confirmed.
 
 You can also implement the device-code flow through an [External Auth Provider](#external-auth-provider) for full control.
 
@@ -258,11 +258,11 @@ You can also implement the device-code flow through an [External Auth Provider](
 
 ## Automatic Credential Refresh
 
-Friday X automatically refreshes expired credentials:
+FridayX automatically refreshes expired credentials:
 
-- **Before expiry:** If your auth provider returned `expires_in` (JSON output) or you set `auth_token_ttl`, Friday X re-runs the auth binary ~5 minutes before expiry.
-- **On auth error:** If the server returns 401 Unauthorized, Friday X refreshes the credentials and retries the request.
-- **OIDC:** If a `refresh_token` is available, Friday X silently refreshes via your IdP without re-opening the browser.
+- **Before expiry:** If your auth provider returned `expires_in` (JSON output) or you set `auth_token_ttl`, FridayX re-runs the auth binary ~5 minutes before expiry.
+- **On auth error:** If the server returns 401 Unauthorized, FridayX refreshes the credentials and retries the request.
+- **OIDC:** If a `refresh_token` is available, FridayX silently refreshes via your IdP without re-opening the browser.
 
 Tune the refresh buffer:
 
@@ -278,19 +278,19 @@ export FRIDAY_AUTH_EARLY_INVALIDATION_SECS=0
 
 ## Hot Reload
 
-Friday X picks up changes to `~/.friday/auth.json` automatically. If you update credentials externally (for example, with a script that writes new tokens), Friday X uses the new credentials on the next API call without a restart.
+FridayX picks up changes to `~/.friday/auth.json` automatically. If you update credentials externally (for example, with a script that writes new tokens), FridayX uses the new credentials on the next API call without a restart.
 
 ---
 
 ## Auth Precedence
 
-Friday X resolves credentials for each request in this order, highest to lowest:
+FridayX resolves credentials for each request in this order, highest to lowest:
 
 1. **Per-model `api_key` or `env_key`** -- set under `[model.<name>]` in `config.toml`. Wins whenever present.
 2. **Active session token** -- obtained through browser, OIDC/OAuth2, or external-provider login and stored in `~/.friday/auth.json`.
 3. **`FRIDAY_X_TOKEN`** -- fallback when no session token is active.
 
-When more than one login flow is configured, Friday X populates the session token from the first available source, highest to lowest:
+When more than one login flow is configured, FridayX populates the session token from the first available source, highest to lowest:
 
 1. **External auth provider** (`auth_provider_command`)
 2. **Enterprise OIDC** -- when OIDC is configured, through `[grok_com_config.oidc]` in `config.toml` or the `FRIDAY_OIDC_ISSUER` and `FRIDAY_OIDC_CLIENT_ID` environment variables
@@ -354,8 +354,8 @@ RUST_LOG=debug grok -p "hello" 2> /tmp/grok.log
 
 | Log message | What it means |
 |-------------|---------------|
-| `auth: running external auth provider (headless refresh)` / `(interactive login)` | Friday X is running your binary, and on which contract |
-| `auth: external auth provider returned fresh token` | Friday X parsed and stored the token |
+| `auth: running external auth provider (headless refresh)` / `(interactive login)` | FridayX is running your binary, and on which contract |
+| `auth: external auth provider returned fresh token` | FridayX parsed and stored the token |
 | `auth: external auth provider failed` | Binary exited non-zero or stdout was empty |
 | `auth: external auth provider timed out (likely needs interactive auth), killing` | Binary did not exit before the timeout and was killed |
 | `auth: failed to start external auth provider` | Command could not be spawned (binary not found) |

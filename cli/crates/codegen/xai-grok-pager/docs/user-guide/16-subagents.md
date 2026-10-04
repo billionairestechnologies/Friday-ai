@@ -84,7 +84,7 @@ instructions = "You are a thorough researcher. Always cite specific file paths."
 description = "Deep investigator."
 ```
 
-Friday X discovers file-based personas from these locations, in priority order:
+FridayX discovers file-based personas from these locations, in priority order:
 
 - `.friday/personas/*.toml` (project)
 - `~/.friday/personas/*.toml` (user)
@@ -94,7 +94,7 @@ Each file defines one persona, and the file name (without the extension) becomes
 
 Manage personas in the Personas tab of the agents modal (`/personas`). Bundled personas are read-only; personas you define are editable.
 
-> **Note:** Friday X applies personas through subagent resolution and roles, not through a `spawn_subagent` parameter. The main agent does not pass a persona name when it spawns a child.
+> **Note:** FridayX applies personas through subagent resolution and roles, not through a `spawn_subagent` parameter. The main agent does not pass a persona name when it spawns a child.
 
 ### Persona Fields
 
@@ -130,7 +130,7 @@ Each field has a `name`, an `io_type` (defaults to `file`), a `required` flag, a
 
 ### Persona Resolution
 
-When a persona applies, Friday X resolves the effective model and reasoning effort in this order, highest priority first:
+When a persona applies, FridayX resolves the effective model and reasoning effort in this order, highest priority first:
 
 1. Explicit spawn-time override
 2. Role default
@@ -261,7 +261,7 @@ For tasks that modify files, run a subagent in an isolated git worktree with `is
 - Its changes stay isolated from the parent until you merge them.
 - The subagent's result includes the worktree path.
 
-Friday X manages worktrees through the `friday/git/worktree/*` extension methods, including an apply operation that merges changes back into the main working directory.
+FridayX manages worktrees through the `friday/git/worktree/*` extension methods, including an apply operation that merges changes back into the main working directory.
 
 ---
 
@@ -288,8 +288,8 @@ The `spawn_subagent` tool offers the agent a `model` argument, and its descripti
 
 You can also toggle it from `/settings` → Models → **Subagent model inheritance**:
 
-- On: Friday X cannot set models for subagents
-- Off: Friday X may choose a different model for a subagent. Takes effect after restart.
+- On: FridayX cannot set models for subagents
+- Off: FridayX may choose a different model for a subagent. Takes effect after restart.
 - NOTE: This setting only applies when all models are xAI "model_family". You likely don't need to configure this setting.
 
 The row shows the value that applies after restart. Toggling writes `[features] subagent_model_inheritance = true` or `= false` (an explicit `false` overrides a remote `true`); `d` (reset) deletes the key so `managed_config.toml`, remote settings, or the default apply again. Agents already running keep the mode they started with. When a layer your `config.toml` cannot override decides the value — a `requirements.toml`/MDM pin, the environment variable, the `FRIDAY_CONFIG` overlay, or an active campaign — both the toggle and the reset are refused with a toast that names that layer.
@@ -314,13 +314,13 @@ instructions = "Be concise. No filler words."
 # instructions_file = ".friday/personas/concise.md"  # or load from a file
 ```
 
-Friday X also discovers roles from `.friday/roles/*.toml` and personas from `.friday/personas/*.toml`. Inline `config.toml` definitions take precedence over files.
+FridayX also discovers roles from `.friday/roles/*.toml` and personas from `.friday/personas/*.toml`. Inline `config.toml` definitions take precedence over files.
 
 ---
 
 ## The Tasks Pane (TUI)
 
-Friday X shows running and finished work in side panes on the agent screen:
+FridayX shows running and finished work in side panes on the agent screen:
 
 - Press `Ctrl+G` to toggle the tasks pane, which lists active and completed subagents and background commands with their status.
 - Press `Ctrl+T` to toggle the separate todo pane.
@@ -390,7 +390,7 @@ If a prompt-queue overlay appears, it is a **read-only mirror**. You cannot edit
 
 - `q` or `Esc` from bare scrollback, or click [✗].
 - If scrollback search is open, `q` / `Esc` closes search first. A later press closes the view.
-- `Ctrl+Q` always quits Friday X. It is never swallowed here.
+- `Ctrl+Q` always quits FridayX. It is never swallowed here.
 
 The parent's scrollback keeps showing the subagent's status after you close.
 

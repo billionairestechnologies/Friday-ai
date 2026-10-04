@@ -878,7 +878,7 @@ async fn an_always_answer_is_persisted_for_the_folder_and_skips_the_next_prompt(
         err.detail
     );
 }
-/// Friday X Desktop binds each conversation to its own scratch directory under the folder it serves.
+/// FridayX Desktop binds each conversation to its own scratch directory under the folder it serves.
 /// An "always" answer given in one of them is keyed on the served folder, so a sibling conversation
 /// inherits it; a subdirectory that is a repository of its own keeps its own store, as the CLI's
 /// per-project grants always have.

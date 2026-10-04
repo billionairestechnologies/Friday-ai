@@ -2002,8 +2002,8 @@ mod question_no_freeform_tests {
         Question {
             question: "You hit your free usage limit.".into(),
             options: vec![
-                opt("Upgrade to SuperGrok", "For everyday coding"),
-                opt("Upgrade to SuperGrok Heavy", "Highest usage limits"),
+                opt("Upgrade to Pro", "For everyday coding"),
+                opt("Upgrade to Premium", "Highest usage limits"),
             ],
             multi_select: Some(false),
             id: None,

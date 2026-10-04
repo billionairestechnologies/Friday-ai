@@ -10,7 +10,7 @@ use crate::rmcp::transport::auth::{
     OAuthClientConfig,
 };
 
-const MCP_OAUTH_CLIENT_NAME: &str = "Friday X";
+const MCP_OAUTH_CLIENT_NAME: &str = "FridayX";
 
 #[cfg(debug_assertions)]
 const CONSENT_URL_FILE_ENV: &str = "FRIDAY_TEST_MCP_CONSENT_URL_FILE";

@@ -5,7 +5,7 @@ flowchart TB
     IOS[iOS - SwiftUI]
     Console[Team Console /admin - staff RBAC]
     Public[Public pages - /status /plans /share /p pages]
-    FX[Friday X - terminal CLI, VS Code, JetBrains, Zed]
+    FX[FridayX - terminal CLI, VS Code, JetBrains, Zed]
   end
 
   subgraph api [Friday API - Express TypeScript]
@@ -25,7 +25,7 @@ flowchart TB
     ConnR["/api/connectors /api/mcp /api/memory"]
     OrgR["/api/organizations /usage /projects /voice"]
     PagesR["/api/pages - live docs, sheets, slides"]
-    XR["/api/x - Friday X device login, models, metered gateway"]
+    XR["/api/x - FridayX device login, models, metered gateway"]
     InstR["/x - installers, version, checksums"]
     FinR["Console: Finance (cost vs sell, P&L, profit controls) + Mailbox (mail hosting)"]
   end
@@ -54,7 +54,7 @@ flowchart TB
     Pay[Razorpay checkout + webhook]
     Mail[Resend - OTP, support, campaigns, alerts]
     Mailcow[Mailcow - company domains and mailboxes]
-    Releases[(Release bucket + CDN - Friday X binaries)]
+    Releases[(Release bucket + CDN - FridayX binaries)]
   end
 
   Browser & Android & IOS --> MW

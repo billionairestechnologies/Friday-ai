@@ -3,7 +3,7 @@ import type { ChatImage } from "../providers/types.js";
 import type { TokenUsage } from "../tokenUsage.js";
 
 /**
- * The Friday X gateway speaks the OpenAI chat-completions wire format: the CLI/IDE harness it is built on
+ * The FridayX gateway speaks the OpenAI chat-completions wire format: the CLI/IDE harness it is built on
  * already talks that dialect, and Friday's provider adapters already translate it to Anthropic, Gemini and
  * the rest (toolCalling.ts). This file is only the thin, pure translation between the two — no I/O.
  */

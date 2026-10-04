@@ -1,4 +1,4 @@
-name: Friday X CI
+name: FridayX CI
 
 # The Rust CLI is slow to build, so it only runs when it (or this workflow) changes. The egress audit is
 # static and costs seconds: it fails the build if a vendor host reappears in production code.
@@ -40,7 +40,7 @@ jobs:
       - name: Build the friday binary
         working-directory: cli
         run: cargo check -p xai-grok-pager-bin
-      - name: Unit tests for the crates Friday X changed
+      - name: Unit tests for the crates FridayX changed
         working-directory: cli
         run: >
           cargo test --no-fail-fast

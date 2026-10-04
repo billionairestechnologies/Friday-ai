@@ -70,8 +70,8 @@ impl std::fmt::Display for RunError {
         match self {
             RunError::Spawn(e) => write!(f, "could not start the script: {e}"),
             RunError::Wait(e) => write!(f, "could not wait for the script: {e}"),
-            // Friday X's own bug rather than the script's, so it says whose it is.
-            RunError::Json(e) => write!(f, "could not encode Friday X's payload: {e}"),
+            // FridayX's own bug rather than the script's, so it says whose it is.
+            RunError::Json(e) => write!(f, "could not encode FridayX's payload: {e}"),
             RunError::TimedOut => f.write_str("timed out"),
             RunError::Exit(Some(code)) => write!(f, "exit {code}"),
             RunError::Exit(None) => f.write_str("killed by signal"),

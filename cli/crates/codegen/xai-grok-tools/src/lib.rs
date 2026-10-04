@@ -1,4 +1,4 @@
-//! Friday X tools library.
+//! FridayX tools library.
 
 #![deny(clippy::indexing_slicing)]
 

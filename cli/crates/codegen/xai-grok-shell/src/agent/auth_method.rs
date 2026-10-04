@@ -358,7 +358,7 @@ pub(crate) fn grok_com_auth_method(
     label: Option<&str>,
     has_auth_provider_command: bool,
 ) -> acp::AuthMethod {
-    let name = label.unwrap_or("Friday X");
+    let name = label.unwrap_or("FridayX");
     let meta = if has_auth_provider_command {
         let mut m = acp::Meta::new();
         m.insert("external_provider".to_owned(), serde_json::json!(true));

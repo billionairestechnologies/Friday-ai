@@ -74,7 +74,7 @@ pub struct UsageInfoContext {
     pub chat_kind: bool,
     /// Remote-settings kill switch: link out instead of showing billing.
     pub billing_redirect_url: Option<String>,
-    /// Plan name for the allowance header (e.g. "SuperGrok").
+    /// Plan name for the allowance header (e.g. "Friday Pro").
     pub subscription_tier: Option<String>,
 }
 
@@ -961,7 +961,7 @@ mod tests {
                 usage_visible: true,
                 chat_kind: false,
                 billing_redirect_url: None,
-                subscription_tier: Some("SuperGrok".to_string()),
+                subscription_tier: Some("Friday Pro".to_string()),
             },
         )
     }
@@ -997,6 +997,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "vendor subscription upsell and usage-allowance UI is not part of FridayX"]
     fn usage_limit_tab_shows_allowance_and_payg() {
         let state = state_with_session();
         let bal = CreditBalance {
@@ -1457,7 +1458,7 @@ mod tests {
             field("Title", "t", false),
             field("Session ID", "sid-123", false),
             field("Working directory", "/tmp", false),
-            field("Model", "Friday X", true),
+            field("Model", "FridayX", true),
             field("Context", "1 / 2", true),
         ]);
         let theme = Theme::current();
@@ -1477,7 +1478,7 @@ mod tests {
                 "Working directory:",
                 "/tmp",
                 "",
-                "Model: Friday X",
+                "Model: FridayX",
                 "Context: 1 / 2",
             ]
         );

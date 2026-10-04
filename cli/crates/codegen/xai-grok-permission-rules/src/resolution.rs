@@ -263,7 +263,7 @@ fn managed_config_permissions(
 // Fallback Resolver
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// Resolve permission config, merging native Friday X and Claude sources. Evaluation is deny > ask > allow; merge order is provenance only.
+/// Resolve permission config, merging native FridayX and Claude sources. Evaluation is deny > ask > allow; merge order is provenance only.
 /// Claude `acceptEdits` appends a synthetic `Allow Edit`. `project_trusted` gates project-tier rules; global/user/admin always load. Hub/cloud defaults trusted.
 pub async fn resolve_permission_config_with_fallback(
     cwd: &Path,

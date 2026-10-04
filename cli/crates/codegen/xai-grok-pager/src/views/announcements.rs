@@ -1475,7 +1475,7 @@ mod tests {
             "p",
             "msg",
             Some((
-                "Upgrade to SuperGrok Heavy for the exclusive preview",
+                "Upgrade to Premium for the exclusive preview",
                 "https://x.ai",
             )),
         )];

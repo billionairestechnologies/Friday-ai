@@ -40,7 +40,7 @@ import {
 } from "./openaiCompat.js";
 
 /**
- * The Friday X model gateway: what the CLI / IDE extensions call instead of a model vendor. One request is
+ * The FridayX model gateway: what the CLI / IDE extensions call instead of a model vendor. One request is
  * one model turn (the harness owns the agent loop and the transcript), and it is metered like every other
  * Friday call — same plan windows, same credits, same ledger — so usage in a terminal drains the exact
  * meter the user sees on web and mobile. Provider keys, routing and plan gating all stay server-side.
@@ -56,9 +56,9 @@ const REASON_LABEL: Record<string, string> = {
   member_cap: "You've hit the monthly cap your org admin set for you",
 };
 
-export const FRIDAY_X_NOT_INCLUDED = "Friday X isn't included in your plan. Upgrade your plan, or ask your admin to turn it on, to use it in the terminal and your editor.";
+export const FRIDAY_X_NOT_INCLUDED = "FridayX isn't included in your plan. Upgrade your plan, or ask your admin to turn it on, to use it in the terminal and your editor.";
 
-/** Throws unless this user's plan, package or admin grant includes Friday X. The one gate for the whole surface. */
+/** Throws unless this user's plan, package or admin grant includes FridayX. The one gate for the whole surface. */
 export async function assertFridayX(userId: string): Promise<void> {
   const entitlements = await entitlementsFor(userId);
   if (!entitlements.fridayX) throw new HttpError(403, FRIDAY_X_NOT_INCLUDED);
@@ -89,7 +89,7 @@ export function contextWindowFor(modelId: string): number {
 
 export type CliModel = { id: string; name: string; provider: string; vision: boolean; recommended: boolean; locked: boolean; minTier: string; contextWindow: number };
 
-/** The models this user can pick in Friday X: chat models that can drive tools, with plan-locked ones flagged (not hidden). */
+/** The models this user can pick in FridayX: chat models that can drive tools, with plan-locked ones flagged (not hidden). */
 export async function listCliModels(userId: string): Promise<{ default: string; models: CliModel[] }> {
   const candidates = (await listChatCandidates()).filter((c) => hasTools(c.slug));
   const models: CliModel[] = [];
@@ -173,7 +173,7 @@ export async function cliUser(userId: string): Promise<CliUser> {
     firstName: first,
     lastName: rest.length ? rest.join(" ") : null,
     subscriptionTier: resolved.plan,
-    // Friday X keeps no transcripts of a user's code for training; the client treats this as "opted out".
+    // FridayX keeps no transcripts of a user's code for training; the client treats this as "opted out".
     codingDataRetentionOptOut: true,
   };
 }

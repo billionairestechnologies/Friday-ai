@@ -1557,7 +1557,7 @@ mod tests {
     /// A hung analytics endpoint must not hold process exit for the full HTTP client timeout when the session *does* have reportable activity.
     /// `shutdown` wraps the final force-sync in `SHUTDOWN_SIGNAL_SYNC_TIMEOUT` (2s).
     #[tokio::test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     async fn test_shutdown_force_sync_is_timeout_capped() {
         use crate::agent::feedback_client::FeedbackClient;
         use std::time::Instant;

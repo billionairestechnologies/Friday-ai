@@ -1,20 +1,20 @@
 # Skills
 
-Skills are reusable prompt packages that extend Friday X with task-specific instructions. They let you capture a repeatable procedure once, instead of re-explaining it each session. Startup discovery skips project skills and commands in untrusted folders.
+Skills are reusable prompt packages that extend FridayX with task-specific instructions. They let you capture a repeatable procedure once, instead of re-explaining it each session. Startup discovery skips project skills and commands in untrusted folders.
 
 ---
 
 ## What Are Skills?
 
-A skill is a directory that contains a `SKILL.md` file. Its markdown body tells Friday X how to handle a specific type of task: step-by-step instructions, conventions, and tool-usage patterns.
+A skill is a directory that contains a `SKILL.md` file. Its markdown body tells FridayX how to handle a specific type of task: step-by-step instructions, conventions, and tool-usage patterns.
 
-Use a skill for a repeatable procedure that's too specific for AGENTS.md but too long to retype. Friday X activates a skill only when it applies to your current task.
+Use a skill for a repeatable procedure that's too specific for AGENTS.md but too long to retype. FridayX activates a skill only when it applies to your current task.
 
 ---
 
 ## Skill Locations
 
-Friday X discovers skills from these directories, in priority order:
+FridayX discovers skills from these directories, in priority order:
 
 | Location | Scope | Priority | Notes |
 |----------|-------|----------|-------|
@@ -26,13 +26,13 @@ Friday X discovers skills from these directories, in priority order:
 | `~/.cursor/skills/` | User | Lowest | Cursor compatibility (configurable) |
 | `./.cursor/skills/` | Local / Repo | High | Project Cursor skills (when cursor compat skills are enabled) |
 
-Friday X deduplicates skills by name -- a higher-priority location overrides a lower one. Friday X also scans `.agents/skills/` (and `commands/`) at each tier (alongside `.friday/`) and walks every directory between your working directory and the repo root.
+FridayX deduplicates skills by name -- a higher-priority location overrides a lower one. FridayX also scans `.agents/skills/` (and `commands/`) at each tier (alongside `.friday/`) and walks every directory between your working directory and the repo root.
 
 Flat `*.md` files under a `commands/` directory become user-invocable slash commands (filename stem = command name), matching Claude Code's legacy custom-command layout.
 
 Skill and command discovery does **not** use `.gitignore`. Paths under known skill roots (`.friday/`, `.agents/`, `.claude/`, `.cursor/`) always load when present on disk — teams often ignore `.claude/**` as local-only config while still expecting `/frontend`-style project commands to work. To hide a skill, use `[skills] ignore` in config (not repo ignore rules).
 
-Friday X scans the Claude and Cursor skill directories by default. To stop scanning a vendor, set its `skills` cell to `false` under `[compat.cursor]` or `[compat.claude]` in `~/.friday/config.toml`, or set the `FRIDAY_CURSOR_SKILLS_ENABLED` or `FRIDAY_CLAUDE_SKILLS_ENABLED` environment variable to `false`. See [Configuration](05-configuration.md#harness-compatibility) for details. Friday X always filters out known vendor-shipped default skills (such as Cursor's `shell`, `canvas`, and `statusline`), regardless of these settings.
+FridayX scans the Claude and Cursor skill directories by default. To stop scanning a vendor, set its `skills` cell to `false` under `[compat.cursor]` or `[compat.claude]` in `~/.friday/config.toml`, or set the `FRIDAY_CURSOR_SKILLS_ENABLED` or `FRIDAY_CLAUDE_SKILLS_ENABLED` environment variable to `false`. See [Configuration](05-configuration.md#harness-compatibility) for details. FridayX always filters out known vendor-shipped default skills (such as Cursor's `shell`, `canvas`, and `statusline`), regardless of these settings.
 
 ### Additional Skill Directories
 
@@ -45,7 +45,7 @@ ignore = ["~/my-team-skills/wip"]     # Paths to exclude (hidden entirely)
 disabled = ["wip-skill"]              # Skill names to keep listed but inactive
 ```
 
-Each entry in `paths` is a `SKILL.md` file or a directory that Friday X walks recursively. `ignore` hides a skill completely; `disabled` keeps it in the list but excludes it from the system prompt and from invocation. `paths` and `ignore` take filesystem paths and support `~` expansion; `disabled` takes skill names.
+Each entry in `paths` is a `SKILL.md` file or a directory that FridayX walks recursively. `ignore` hides a skill completely; `disabled` keeps it in the list but excludes it from the system prompt and from invocation. `paths` and `ignore` take filesystem paths and support `~` expansion; `disabled` takes skill names.
 
 `[paths] extra_skill_dirs` is written by `/import-claude`. It does not inject skills. Put extra directories in `[skills] paths`.
 
@@ -93,10 +93,10 @@ Review staged changes and create a commit with a clear, conventional message.
 
 | Field | Description |
 |-------|-------------|
-| `name` | Skill identifier. Use lowercase letters, digits, and hyphens, up to 64 characters. Friday X normalizes spaces and underscores to hyphens. If you omit `name`, Friday X uses the skill's directory name. |
-| `description` | What the skill does and when to use it. Friday X reads this to decide whether to invoke the skill. If you omit it, Friday X uses the first paragraph of the body. |
+| `name` | Skill identifier. Use lowercase letters, digits, and hyphens, up to 64 characters. FridayX normalizes spaces and underscores to hyphens. If you omit `name`, FridayX uses the skill's directory name. |
+| `description` | What the skill does and when to use it. FridayX reads this to decide whether to invoke the skill. If you omit it, FridayX uses the first paragraph of the body. |
 
-Write a specific `description`. It determines when Friday X invokes the skill automatically. Name the trigger phrases and use cases.
+Write a specific `description`. It determines when FridayX invokes the skill automatically. Name the trigger phrases and use cases.
 
 ### Optional Frontmatter Fields
 
@@ -113,38 +113,38 @@ Multi-word frontmatter keys use kebab-case (single-word keys like `model` are wr
 | `effort` | Reasoning-effort override. |
 | `license` | License identifier (for example, `Apache-2.0`). |
 | `compatibility` | Environment requirements (for example, `Requires git, docker, jq`). |
-| `metadata` | Arbitrary string key-value pairs. Friday X promotes `metadata.author` and `metadata.short-description` for display. |
+| `metadata` | Arbitrary string key-value pairs. FridayX promotes `metadata.author` and `metadata.short-description` for display. |
 
 ---
 
 ## Creating Skills with /create-skill
 
-The `/create-skill` command walks you through building a new skill interactively. Friday X asks what you want, drafts the files, and writes them to disk.
+The `/create-skill` command walks you through building a new skill interactively. FridayX asks what you want, drafts the files, and writes them to disk.
 
 ### How It Works
 
-When you run `/create-skill`, Friday X:
+When you run `/create-skill`, FridayX:
 
-1. **Gathers requirements.** Friday X asks for the skill name, the scope to save it under, and a description of the workflow you want to capture. Use a name with lowercase letters, digits, and hyphens (2–64 characters, starting and ending with a letter or digit).
+1. **Gathers requirements.** FridayX asks for the skill name, the scope to save it under, and a description of the workflow you want to capture. Use a name with lowercase letters, digits, and hyphens (2–64 characters, starting and ending with a letter or digit).
 
-2. **Drafts the description.** Friday X writes a `description` that states what the skill does, the phrases that trigger it, and the slash command name. You approve or edit the draft before continuing.
+2. **Drafts the description.** FridayX writes a `description` that states what the skill does, the phrases that trigger it, and the slash command name. You approve or edit the draft before continuing.
 
-3. **Creates the skill directory.** Friday X creates the `<scope>/.friday/skills/<name>/` directory, plus `scripts/` or `references/` subdirectories when the skill needs them.
+3. **Creates the skill directory.** FridayX creates the `<scope>/.friday/skills/<name>/` directory, plus `scripts/` or `references/` subdirectories when the skill needs them.
 
-4. **Writes SKILL.md.** Friday X writes the frontmatter (`name` and `description`) and a markdown body of instructions, along with any supporting files.
+4. **Writes SKILL.md.** FridayX writes the frontmatter (`name` and `description`) and a markdown body of instructions, along with any supporting files.
 
-5. **Verifies and confirms.** Friday X reads the file back, confirms it wrote correctly, and tells you how to run the skill.
+5. **Verifies and confirms.** FridayX reads the file back, confirms it wrote correctly, and tells you how to run the skill.
 
 ### Choosing a Scope
 
-Friday X asks where to save the skill:
+FridayX asks where to save the skill:
 
-- **Project** (`<repo_root>/.friday/skills/<name>/`) -- available only in this repository and shareable with teammates through version control. Friday X recommends this scope inside a git repository.
+- **Project** (`<repo_root>/.friday/skills/<name>/`) -- available only in this repository and shareable with teammates through version control. FridayX recommends this scope inside a git repository.
 - **User** (`~/.friday/skills/<name>/`) -- available across all your projects.
 
 To distribute a skill to a whole team or organization, package it in a plugin and publish it through a marketplace. See [Create your own marketplace](09-plugins.md#create-your-own-marketplace) and [Distribute across an organization](09-plugins.md#distribute-across-an-organization).
 
-The new skill appears in the slash menu within a few seconds, because Friday X reloads skills when files change on disk.
+The new skill appears in the slash menu within a few seconds, because FridayX reloads skills when files change on disk.
 
 ---
 
@@ -165,11 +165,11 @@ Running a skill loads its instructions into the conversation and directs the mod
 /commit fix the build
 ```
 
-To browse your skills, type `/` to open the slash-command menu. Friday X lists every built-in command and skill and filters them as you type. To list skills from the command line instead, run `friday inspect` (see [Viewing Skill Details](#viewing-skill-details)).
+To browse your skills, type `/` to open the slash-command menu. FridayX lists every built-in command and skill and filters them as you type. To list skills from the command line instead, run `friday inspect` (see [Viewing Skill Details](#viewing-skill-details)).
 
 ### Qualified Names
 
-When a skill's name collides with another skill or a built-in command, Friday X keeps **both** invocable. The built-in keeps the bare name (`/login`, `/compact`, …). The skill is advertised under a qualified name prefixed by its scope -- `local:`, `repo:`, `user:`, or the plugin name:
+When a skill's name collides with another skill or a built-in command, FridayX keeps **both** invocable. The built-in keeps the bare name (`/login`, `/compact`, …). The skill is advertised under a qualified name prefixed by its scope -- `local:`, `repo:`, `user:`, or the plugin name:
 
 ```
 /local:commit        # The "commit" skill from ./.friday/skills/
@@ -183,7 +183,7 @@ Typing `/login` in the slash menu shows both rows, with a right-aligned **built-
 
 ### Automatic Invocation
 
-Friday X can invoke a skill on its own when it recognizes a relevant task. Friday X matches your prompt against the skill's `description` and `when-to-use` fields, so write both to describe the triggering situation.
+FridayX can invoke a skill on its own when it recognizes a relevant task. FridayX matches your prompt against the skill's `description` and `when-to-use` fields, so write both to describe the triggering situation.
 
 For example, if a skill's description says "Use when the user wants to commit changes," then saying "commit my changes" can trigger that skill automatically. To require an explicit slash command and prevent automatic invocation, set `disable-model-invocation: true` in the frontmatter.
 
@@ -191,14 +191,14 @@ For example, if a skill's description says "Use when the user wants to commit ch
 
 ## Viewing Skill Details
 
-Run `friday inspect` to see every skill Friday X discovers, along with the rest of your configuration:
+Run `friday inspect` to see every skill FridayX discovers, along with the rest of your configuration:
 
 ```bash
 friday inspect          # Human-readable summary
 friday inspect --json   # Machine-readable report
 ```
 
-In the human-readable output, the Skills section lists each skill's name and its source -- `project`, `user`, `bundled`, `config` (a `[skills].paths` entry), `server` (skills synced from the skill store in managed workspaces), or `plugin: <name>`. Friday X tags any skill disabled via `[skills].disabled` or from a disabled vendor surface with `[disabled]`.
+In the human-readable output, the Skills section lists each skill's name and its source -- `project`, `user`, `bundled`, `config` (a `[skills].paths` entry), `server` (skills synced from the skill store in managed workspaces), or `plugin: <name>`. FridayX tags any skill disabled via `[skills].disabled` or from a disabled vendor surface with `[disabled]`.
 
 The report honors your `[skills]` config the same way a live session does: skills from `paths` are listed, skills under an `ignore` prefix are hidden, and skills named in `disabled` stay listed but tagged `[disabled]`.
 
@@ -208,7 +208,7 @@ The `--json` report includes the full detail for each skill: its `name`, `descri
 
 ## Bundled and Plugin Skills
 
-Friday X distributes platform skills separately from your personal skills. Bundled skills are cached under `~/.friday/bundled/skills/`; Friday X never writes them into `~/.friday/skills/`. A same-named local, repo, or user skill overrides the bundled copy. `friday inspect` labels each definition by its actual source. (A plugin skill of the same name does not override a native skill; it stays available under its qualified `plugin:name` form.)
+FridayX distributes platform skills separately from your personal skills. Bundled skills are cached under `~/.friday/bundled/skills/`; FridayX never writes them into `~/.friday/skills/`. A same-named local, repo, or user skill overrides the bundled copy. `friday inspect` labels each definition by its actual source. (A plugin skill of the same name does not override a native skill; it stays available under its qualified `plugin:name` form.)
 
 Skills can also come from plugins. When you install a plugin that includes skills, they appear alongside your user and project skills. `friday inspect` labels each plugin-provided skill with its source as `plugin: <name>`.
 
@@ -220,7 +220,7 @@ See the [Plugins guide](09-plugins.md) for more on installing plugins that provi
 
 1. **Write specific descriptions.** The description drives automatic invocation. "Create git commits" is too vague; "Create well-formatted git commits following conventional commit standards. Use when the user wants to commit changes or asks for /commit." works better.
 
-2. **Include concrete steps.** Skills work best when they give Friday X a clear, ordered procedure to follow.
+2. **Include concrete steps.** Skills work best when they give FridayX a clear, ordered procedure to follow.
 
 3. **Reference tools by name.** When a skill relies on specific tools (such as `run_terminal_cmd` or `search_replace`), name them so the model knows what to use.
 
@@ -230,4 +230,4 @@ See the [Plugins guide](09-plugins.md) for more on installing plugins that provi
 
 6. **Test by running it.** Invoke `/name` and confirm the skill works before you rely on automatic invocation.
 
-7. **Keep the body under the file-read cap.** Friday X inlines at most the first 25,000 tokens of a skill body (the same cap as `read_file`). Put long reference material in sibling files and tell Friday X to read them with a line offset and limit.
+7. **Keep the body under the file-read cap.** FridayX inlines at most the first 25,000 tokens of a skill body (the same cap as `read_file`). Put long reference material in sibling files and tell FridayX to read them with a line offset and limit.

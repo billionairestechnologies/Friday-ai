@@ -1574,7 +1574,7 @@ fn resolve_exe_for_spawn() -> Result<std::path::PathBuf, ConnectionError> {
 fn resolve_binary_with_home(grok_home: &Path) -> Result<std::path::PathBuf, ConnectionError> {
     resolve_binary_impl(grok_home, std::env::current_exe().ok())
 }
-/// Binary file name for the managed Friday X install (`friday` / `friday.exe`).
+/// Binary file name for the managed FridayX install (`friday` / `friday.exe`).
 fn managed_grok_bin_name() -> &'static str {
     if cfg!(windows) { "friday.exe" } else { "friday" }
 }

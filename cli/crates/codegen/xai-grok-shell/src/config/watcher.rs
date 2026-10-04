@@ -590,7 +590,7 @@ impl ProjectDiscoveryWatcher {
     ) -> Option<(Self, mpsc::UnboundedReceiver<DiscoveryChange>)> {
         let project_root = crate::session::workflow::registry::project_root(cwd);
         let project_grok = project_root.join(".friday");
-        // Friday X home's root sees constant unrelated writes from every grok process
+        // FridayX home's root sees constant unrelated writes from every grok process
         if paths_equal(&project_grok, grok_home) {
             tracing::debug!(
                 project_grok = %project_grok.display(),

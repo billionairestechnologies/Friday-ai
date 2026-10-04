@@ -219,7 +219,7 @@ fn apply_byte_budget(
 }
 /// Harness-compatible negative offset resolution (1-indexed start line). Negatives use the reference `split('\n')` field count plus a phantom
 /// field when the file is non-empty and has no trailing `\n`. Extraction still uses `split_inclusive`, so a start that lands on the
-/// phantom-only field yields an empty window (harness-aligned; not a Friday X-line clamp).
+/// phantom-only field yields an empty window (harness-aligned; not a FridayX-line clamp).
 fn resolve_read_start_line(file_content: &str, offset: Option<i64>) -> usize {
     let offset_raw = offset.unwrap_or(1);
     if offset_raw == 0 {
@@ -3117,7 +3117,7 @@ pub fn verify(req: &HttpRequest) -> Result<Claims, Error> {
         assert_eq!(extracted.content_concise, "2→");
     }
     /// Harness parity: offset=-1 on a file with no trailing `\n` resolves to the
-    /// phantom field only (start past any `split_inclusive` line), so Friday X
+    /// phantom field only (start past any `split_inclusive` line), so FridayX
     /// returns empty content/raw — same as the reference phantom-only window.
     #[test]
     fn extract_file_content_lines_negative_one_no_trailing_newline_stable() {

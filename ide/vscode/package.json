@@ -1,6 +1,6 @@
 {
   "name": "friday-x",
-  "displayName": "Friday X",
+  "displayName": "FridayX",
   "description": "Friday's coding agent in your editor. Uses your Friday account, plan, models and usage meter.",
   "version": "0.1.0",
   "publisher": "billionaires-technologies",
@@ -12,12 +12,12 @@
   "activationEvents": ["onStartupFinished"],
   "contributes": {
     "commands": [
-      { "command": "fridayX.open", "title": "Friday X: Open", "icon": "$(sparkle)" },
-      { "command": "fridayX.sendSelection", "title": "Friday X: Send Selection to Friday X" },
-      { "command": "fridayX.sendFile", "title": "Friday X: Send Current File to Friday X" },
-      { "command": "fridayX.login", "title": "Friday X: Sign In" },
-      { "command": "fridayX.logout", "title": "Friday X: Sign Out" },
-      { "command": "fridayX.install", "title": "Friday X: Install or Update" }
+      { "command": "fridayX.open", "title": "FridayX: Open", "icon": "$(sparkle)" },
+      { "command": "fridayX.sendSelection", "title": "FridayX: Send Selection to FridayX" },
+      { "command": "fridayX.sendFile", "title": "FridayX: Send Current File to FridayX" },
+      { "command": "fridayX.login", "title": "FridayX: Sign In" },
+      { "command": "fridayX.logout", "title": "FridayX: Sign Out" },
+      { "command": "fridayX.install", "title": "FridayX: Install or Update" }
     ],
     "keybindings": [
       { "command": "fridayX.open", "key": "ctrl+alt+f", "mac": "cmd+alt+f" },
@@ -28,12 +28,12 @@
       "editor/context": [{ "command": "fridayX.sendSelection", "when": "editorHasSelection", "group": "friday" }]
     },
     "configuration": {
-      "title": "Friday X",
+      "title": "FridayX",
       "properties": {
         "fridayX.serverUrl": {
           "type": "string",
           "default": "https://friday.billionairestechnologies.com",
-          "description": "The Friday server Friday X signs in to and installs from. Leave the default unless you run your own deployment."
+          "description": "The Friday server FridayX signs in to and installs from. Leave the default unless you run your own deployment."
         },
         "fridayX.executable": {
           "type": "string",
@@ -43,7 +43,7 @@
         "fridayX.openInEditorArea": {
           "type": "boolean",
           "default": true,
-          "description": "Open the Friday X terminal beside your editor instead of in the bottom panel."
+          "description": "Open the FridayX terminal beside your editor instead of in the bottom panel."
         }
       }
     }

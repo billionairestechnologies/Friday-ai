@@ -2182,14 +2182,14 @@ fn feedback_badge_renders_verbatim_in_neutral_color() {
     let theme = Theme::current();
     let mut state = DashboardState::new();
     let check = crate::glyphs::check_mark();
-    state.error_toast = Some(format!("{check} Theme: Friday X Day"));
+    state.error_toast = Some(format!("{check} Theme: FridayX Day"));
     let _ = render_dispatch(&mut buf, Rect::new(0, 0, 80, 3), &theme, &mut state, None);
 
     let top_row: String = (0..80)
         .map(|x| buf_cell(&buf, x, 0).symbol().to_string())
         .collect();
     assert!(
-        top_row.contains(&format!("{check} Theme: Friday X Day")),
+        top_row.contains(&format!("{check} Theme: FridayX Day")),
         "badge must paint the message verbatim, got: {top_row:?}",
     );
     assert!(
@@ -4504,7 +4504,7 @@ fn render_footer_button_focused_with_prompt_shows_send_and_send_open_no_stop() {
 
 /// Multiline compose swaps the submit chord in the footer, matching how Enter and Shift/Alt+Enter swap in the agent view's keybar.
 #[test]
-#[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
+#[ignore = "fixture names an original-product model/connector that FridayX does not ship"]
 fn render_footer_multiline_mode_send_uses_shift_or_alt_enter() {
     let mut buf = Buffer::empty(Rect::new(0, 0, 200, 1));
     let theme = Theme::current();
@@ -4540,7 +4540,7 @@ fn render_footer_multiline_mode_send_uses_shift_or_alt_enter() {
 
 /// Empty draft under multiline: create is on the submit chord, not bare Enter.
 #[test]
-#[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
+#[ignore = "fixture names an original-product model/connector that FridayX does not ship"]
 fn render_footer_multiline_empty_create_uses_shift_or_alt_enter() {
     let mut buf = Buffer::empty(Rect::new(0, 0, 200, 1));
     let theme = Theme::current();

@@ -37,7 +37,7 @@ impl CompactionTarget {
 }
 
 /// Minimal interface the compaction orchestrator needs from the agent's
-/// stream processor. Implemented by Friday X chat's
+/// stream processor. Implemented by FridayX chat's
 /// `StreamProcessor` (`Item = Arc<GrokTurn>`).
 ///
 /// Two read-views are exposed:

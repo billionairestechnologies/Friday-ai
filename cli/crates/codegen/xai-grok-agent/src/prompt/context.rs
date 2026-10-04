@@ -139,8 +139,8 @@ pub struct PromptContext {
     #[serde(default = "default_system_prompt_label")]
     pub system_prompt_label: String,
 }
-/// Default identity (`You are Friday X built by Friday`).
-pub const DEFAULT_SYSTEM_PROMPT_LABEL: &str = "Friday X";
+/// Default identity (`You are FridayX built by Friday`).
+pub const DEFAULT_SYSTEM_PROMPT_LABEL: &str = "FridayX";
 fn default_system_prompt_label() -> String {
     DEFAULT_SYSTEM_PROMPT_LABEL.to_string()
 }
@@ -477,9 +477,9 @@ mod tests {
     #[test]
     fn test_placeholders_system_prompt_label_override() {
         let mut ctx = test_context();
-        ctx.system_prompt_label = "Friday X Internal".into();
+        ctx.system_prompt_label = "FridayX Internal".into();
         let p = ctx.placeholders();
-        assert_eq!(jp(&p, "/system_prompt_label"), "Friday X Internal");
+        assert_eq!(jp(&p, "/system_prompt_label"), "FridayX Internal");
     }
     #[test]
     fn test_missing_system_prompt_label_deserializes_to_default() {

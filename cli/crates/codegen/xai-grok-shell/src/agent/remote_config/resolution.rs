@@ -476,7 +476,7 @@ pub(crate) fn models_endpoint_empty_message(
         )
     } else {
         format!(
-            "No models are available: `[features] remote_fetch = false` stops Friday X from reading {url}. \
+            "No models are available: `[features] remote_fetch = false` stops FridayX from reading {url}. \
              Add a `[model.<id>]` table that names an endpoint id, or turn remote_fetch on."
         )
     }

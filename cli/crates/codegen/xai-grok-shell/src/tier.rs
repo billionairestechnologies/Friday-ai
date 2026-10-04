@@ -7,7 +7,7 @@
 //! That keeps the pager's cosmetic slash-command gate and the shell's capability (toolset) gate from drifting apart.
 //!
 //! "Restricted" tiers are the personal free tier and X Basic, the tiers the server zero-limits on the Imagine and voice endpoints.
-//! Everything else (SuperGrok, SuperGrok Heavy/Lite, X Premium/+, and any unknown future name) is unrestricted (**fail-open**).
+//! Everything else (SuperGrok, Premium/Lite, X Premium/+, and any unknown future name) is unrestricted (**fail-open**).
 
 /// Whether a **known** subscription-tier display name is a gated tier: the free tier or X Basic.
 /// The free tier's CCP display is "Free" or an empty string; X Basic's is "X Basic", with "x_basic" as the JWT-claim fallback spelling.
@@ -35,8 +35,8 @@ mod tests {
 
     #[test]
     fn unrestricted_names() {
-        assert!(!is_restricted_tier_name("SuperGrok"));
-        assert!(!is_restricted_tier_name("SuperGrok Heavy"));
+        assert!(!is_restricted_tier_name("Friday Pro"));
+        assert!(!is_restricted_tier_name("Premium"));
         assert!(!is_restricted_tier_name("supergrok_lite"));
         assert!(!is_restricted_tier_name("X Premium"));
         assert!(!is_restricted_tier_name("x_premium_plus"));

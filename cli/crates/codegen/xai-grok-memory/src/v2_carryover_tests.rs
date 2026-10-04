@@ -315,7 +315,7 @@ fn tombstoned_topic_name_is_not_recreated() {
 fn hand_curated_outline_splits_on_top_level_headings() {
     let fixture = Fixture::new();
     fixture.write_legacy(
-        "# Global Memory\n\n# Identity\n\nI work on the Developer org.\n\n## Role\n\nLead.\n\n# People\n\nThe team lead owns Friday X.\n",
+        "# Global Memory\n\n# Identity\n\nI work on the Developer org.\n\n## Role\n\nLead.\n\n# People\n\nThe team lead owns FridayX.\n",
     );
     assert_eq!(2, fixture.run_imported().topics_created);
     assert_eq!(
@@ -325,7 +325,7 @@ fn hand_curated_outline_splits_on_top_level_headings() {
     assert!(
         fixture
             .topic("people")
-            .starts_with("# People\nThe team lead owns Friday X.\n")
+            .starts_with("# People\nThe team lead owns FridayX.\n")
     );
 }
 

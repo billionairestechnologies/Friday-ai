@@ -1,6 +1,6 @@
 # xai-grok-pager
 
-Terminal UI (TUI) for Friday X. Provides the interactive full-screen interface
+Terminal UI (TUI) for FridayX. Provides the interactive full-screen interface
 including the scrollback view, prompt input, session management, and all modal
 dialogs.
 

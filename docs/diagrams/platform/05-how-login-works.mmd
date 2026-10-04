@@ -5,7 +5,7 @@ sequenceDiagram
   participant Mail as Resend
   participant G as Google
   participant DB as Supabase Auth
-  participant CLI as Friday X (terminal / editor)
+  participant CLI as FridayX (terminal / editor)
 
   alt Email and password
     U->>FE: Email + password
@@ -26,7 +26,7 @@ sequenceDiagram
   else Company SSO
     U->>FE: Continue with Company SSO
     FE->>SSO: SSO_ENTRY_URL
-  else Terminal or editor (Friday X)
+  else Terminal or editor (FridayX)
     U->>CLI: friday login
     CLI->>API: POST /api/x/oauth2/device/code
     CLI->>U: Opens /device, shows a code

@@ -1,6 +1,6 @@
-# Friday X — product and architecture
+# FridayX — product and architecture
 
-Friday X is Friday's coding agent for the **terminal** and your **editor**. Same account, plan, models and usage
+FridayX is Friday's coding agent for the **terminal** and your **editor**. Same account, plan, models and usage
 meter as the web, Android and iOS apps. Diagrams: 19 (architecture), 20 (device login), 21 (gateway and metering),
 22 (install and release) in [`../diagrams`](../diagrams/README.md).
 
@@ -8,7 +8,7 @@ meter as the web, Android and iOS apps. Diagrams: 19 (architecture), 20 (device 
 
 1. **The backend is the single source of truth.** No client holds a plan table, a model list or a limit. The CLI
    fetches `/api/x/v1/models`, `/v1/settings` and `/v1/user` at start; the gateway enforces everything per request.
-   Edit a plan, add or remove a model, flip the Friday X entitlement in the Team Console and every installed
+   Edit a plan, add or remove a model, flip the FridayX entitlement in the Team Console and every installed
    terminal and editor follows, with no update.
 2. **One meter.** A terminal turn is charged through the same credit accounting and 5-hour / weekly / monthly
    windows as a chat turn and appears in the same Usage breakdown (feature `code`). Clients only ever see percent
@@ -18,9 +18,9 @@ meter as the web, Android and iOS apps. Diagrams: 19 (architecture), 20 (device 
    backend and nothing else the forked product's vendor operated. CI enforces it (`cli/scripts/audit-egress.py`),
    and the authenticated HTTP layer refuses any Friday request outside a short allow-list.
 
-## Who gets Friday X (admin control)
+## Who gets FridayX (admin control)
 
-`fridayX` is an entitlement like Build Mode: **Console → Plans → (plan) → Entitlements → Friday X (CLI + IDE)**.
+`fridayX` is an entitlement like Build Mode: **Console → Plans → (plan) → Entitlements → FridayX (CLI + IDE)**.
 It is on for every plan today. To make it Pro-and-up later, switch it off for Free; to give one person access
 anyway, give them a package or access grant that includes it (the personal layer wins). It is checked on **every**
 request, so revoking it cuts off already-signed-in terminals within the entitlement cache TTL (30 s).
@@ -30,7 +30,7 @@ request, so revoking it cuts off already-signed-in terminals within the entitlem
 | Piece | Where |
 |---|---|
 | Device login, tokens, gateway, installers | `backend/src/services/cli/`, `routes/cli.ts`, `routes/install.ts`, migration `0050_friday_x.sql` |
-| Web approval page and device list | `frontend/src/routes/device.tsx`, Settings → Friday X |
+| Web approval page and device list | `frontend/src/routes/device.tsx`, Settings → FridayX |
 | The agent (Rust, Apache-2.0 fork of Grok Build) | `cli/` → binary `friday` |
 | VS Code extension | `ide/vscode/` |
 | JetBrains, Zed, other ACP editors | `friday agent stdio` — see `ide/README.md` |
@@ -44,9 +44,9 @@ request, so revoking it cuts off already-signed-in terminals within the entitlem
 | `POST /auth/device`, `POST /auth/token` | none | the same handshake, JSON |
 | `GET /auth/device/:code`, `POST /auth/device/approve\|deny` | Friday web session | the `/device` page |
 | `GET /sessions`, `DELETE /sessions/:id` | Friday web session | list and sign out devices |
-| `GET /v1/models`, `/models` | Friday X token | plan-filtered list (`friday-x/auto` first); `/models` also flags locked models |
-| `GET /v1/user`, `/v1/settings`, `/me` | Friday X token | account, server-driven client settings, plan and usage percent |
-| `POST /v1/chat/completions` | Friday X token | the metered, OpenAI-compatible model gateway (streaming, tools, images) |
+| `GET /v1/models`, `/models` | FridayX token | plan-filtered list (`friday-x/auto` first); `/models` also flags locked models |
+| `GET /v1/user`, `/v1/settings`, `/me` | FridayX token | account, server-driven client settings, plan and usage percent |
+| `POST /v1/chat/completions` | FridayX token | the metered, OpenAI-compatible model gateway (streaming, tools, images) |
 
 `/x/install.sh|ps1|cmd`, `/x/version`, `/x/download/<platform>`, `/x/sha256/<platform>` are public (outside `/api`).
 

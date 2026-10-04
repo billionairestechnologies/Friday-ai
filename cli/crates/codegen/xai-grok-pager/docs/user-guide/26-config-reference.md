@@ -4,7 +4,7 @@ This file ships with the CLI and is extracted to `~/.friday/docs/user-guide/26-c
 
 ## How to configure
 
-Three files configure Friday X, and they are written by different people.
+Three files configure FridayX, and they are written by different people.
 
 | File | Who writes it | Where it lives | Use it to |
 | --- | --- | --- | --- |
@@ -14,7 +14,7 @@ Three files configure Friday X, and they are written by different people.
 
 Choose `managed_config.toml` for defaults you want people to be able to adjust, and `requirements.toml` for the ones you do not.
 
-Friday X also reads these layers, later rows winning except where a requirements pin or the Managed column says otherwise.
+FridayX also reads these layers, later rows winning except where a requirements pin or the Managed column says otherwise.
 
 1. Compiled defaults.
 2. `/etc/friday/managed_config.toml`, then `$FRIDAY_HOME/managed_config.toml` (fleet defaults; console-synced).
@@ -219,7 +219,7 @@ User-level configuration lives in `$FRIDAY_HOME/config.toml` (default `~/.friday
 | `features.mcp_liveness_watchers` | `boolean` | `yes` | `user` | Poll MCP transports and push server_status updates. Emergency kill switch when false. |
 | `features.mcp_push_server_status` | `boolean` | `yes` | `user` | Pager subscribes to MCP server_status push. Process env FRIDAY_MCP_PUSH_SERVER_STATUS wins at launch. |
 | `features.mcp_recursive_config_watch` | `boolean` | `yes` | `user` | Watch `<cwd>/` and `<cwd>/.friday/` for project MCP config edits. Name is a misnomer; watches are non-recursive. |
-| `features.non_git_warning` | `boolean` | `yes` | `user` | Show a blocking warning when Friday X starts outside a Git repository. |
+| `features.non_git_warning` | `boolean` | `yes` | `user` | Show a blocking warning when FridayX starts outside a Git repository. |
 | `features.remember_mode` | `boolean` | `—` | `—` | Remember the last permission mode across sessions. Read from user `config.toml` only. |
 | `features.remote_fetch` | `boolean` | `pin` | `fleet` | Pin remote model-catalog and asset fetch. Managed wins over the user file when both set. |
 | `features.session_recap` | `boolean` | `pin` | `user` | Enable or disable `session_recap`. Default true. Also `FRIDAY_SESSION_RECAP`. |
@@ -262,7 +262,7 @@ User-level configuration lives in `$FRIDAY_HOME/config.toml` (default `~/.friday
 
 | Key | Type / Values | Requirements | Managed | Details |
 | --- | --- | --- | --- | --- |
-| `grok_com_config` | `table` | `yes` | `user` | Friday X.com websocket and OAuth/OIDC settings. `[auth]` is an alias. |
+| `grok_com_config` | `table` | `yes` | `user` | FridayX.com websocket and OAuth/OIDC settings. `[auth]` is an alias. |
 | `grok_com_config.auth_provider_command` | `string` | `yes` | `user` | External auth binary; stdout is the token. With `endpoints.models_base_url` or `models_list_url` set, that endpoint's list decides which models are offered. Also FRIDAY_AUTH_PROVIDER_COMMAND. |
 | `grok_com_config.auth_provider_label` | `string` | `yes` | `user` | Login button label for an external auth provider. Also FRIDAY_AUTH_PROVIDER_LABEL. |
 | `grok_com_config.auth_token_ttl` | `number` | `yes` | `user` | Token TTL in seconds for providers that return a bare token. Also FRIDAY_AUTH_TOKEN_TTL. |
@@ -419,7 +419,7 @@ User-level configuration lives in `$FRIDAY_HOME/config.toml` (default `~/.friday
 | `model.<id>.stream_tool_calls` | `boolean` | `yes` | `user` | Per-model tool-call streaming request shape. |
 | `model.<id>.subagent_rate_limit_max_attempts` | `number` | `yes` | `user` | Maximum subagent 429 wait-loop attempts when `rate_limit_retry_threshold` is unset; default 8, maximum 32, and `0` disables the wait loop. |
 | `model.<id>.supported_in_api` | `boolean` | `yes` | `user` | Whether this catalog entry is offered as a public API model. |
-| `model.<id>.supports_backend_search` | `boolean` | `yes` | `user` | Whether the endpoint supports Friday X-hosted server-side search tools. |
+| `model.<id>.supports_backend_search` | `boolean` | `yes` | `user` | Whether the endpoint supports FridayX-hosted server-side search tools. |
 | `model.<id>.supports_reasoning_effort` | `boolean` | `yes` | `user` | Deprecated; prefer `reasoning_efforts`. An explicit `false` keeps the model out of any menu it would otherwise inherit from the endpoint or from a same-model catalog entry. |
 | `model.<id>.system_prompt_label` | `string` | `yes` | `user` | Per-model system-prompt identity label. |
 | `model.<id>.temperature` | `number` | `yes` | `user` | Per-model sampling temperature. |
@@ -696,7 +696,7 @@ One exception to that rule:
 | --- | --- |
 | `features.remote_fetch` | The managed value wins over the developer's. |
 
-Friday X reads `/etc/friday/managed_config.toml` first, then `$FRIDAY_HOME/managed_config.toml`, which the console keeps in sync. Values in the second replace values in the first.
+FridayX reads `/etc/friday/managed_config.toml` first, then `$FRIDAY_HOME/managed_config.toml`, which the console keeps in sync. Values in the second replace values in the first.
 
 The **Managed** column on the tables above is the per-key answer: `fleet` means the fleet value stands, `user` means the user's file wins, `—` means this file is ignored.
 
@@ -718,11 +718,11 @@ Policy pins such as `allow_managed_hooks_only` (see [Hooks](10-hooks.md#allow-on
 
 ## What happens when a setting is refused
 
-| Situation | What Friday X does |
+| Situation | What FridayX does |
 | --- | --- |
 | A developer sets a key you pinned | The pinned value applies. `friday inspect` lists the requirements file that contributed. |
 | A developer sets a key you shipped in `managed_config.toml` | Their value applies, except `features.remote_fetch`. Pin the key instead if it must hold. |
-| `requirements.toml` is missing or its signature does not verify | The pins do not apply, and Friday X starts without them. Set `fail_closed = true` to refuse to start instead. |
+| `requirements.toml` is missing or its signature does not verify | The pins do not apply, and FridayX starts without them. Set `fail_closed = true` to refuse to start instead. |
 | A pinned key names a value this version does not recognise | The key is ignored and the rest of the file still applies. |
 
 ## Check what is in effect

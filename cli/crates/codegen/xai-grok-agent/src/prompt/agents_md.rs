@@ -371,7 +371,7 @@ pub fn format_agents_md_section(configs: &[AgentConfigFile]) -> Option<String> {
 pub const LEGACY_AGENTS_MD_REMINDER_PREFIX: &str =
     "\n\n<system-reminder>\nAs you answer the user's questions, you can use the following context";
 
-/// Open/close `system-reminder` (Friday X) or `system_reminder` (Cursor/IDE), case-insensitive.
+/// Open/close `system-reminder` (FridayX) or `system_reminder` (Cursor/IDE), case-insensitive.
 /// Shared with unit tests so CI fails if the pattern is ever invalid or too narrow.
 const SYSTEM_REMINDER_TAG_PATTERN: &str = r"(?i)<(\s*/?\s*system[-_]reminder)";
 
@@ -386,7 +386,7 @@ fn neutralize_reminder_tags(content: &str) -> String {
         .into_owned()
 }
 
-/// The standing instruction that makes FRIDAY.md exist: Friday X's own project memory, same file and same
+/// The standing instruction that makes FRIDAY.md exist: FridayX's own project memory, same file and same
 /// shape as web Build Mode keeps, so a project moves between the two without translation. The model writes it
 /// with its normal file tools; nothing here touches the disk.
 pub const FRIDAY_MEMORY_DIRECTIVE: &str = "Project memory: Friday keeps a FRIDAY.md at the project root (the git root, or the working directory outside a repository) so future sessions start informed. When you do real work on a project (not for a greeting or a quick question): if FRIDAY.md does not exist, create it; if it exists, keep it accurate. Update it before you finish any task that changed the project's structure, commands, stack or decisions. It is a short markdown file (under about 80 lines) with these sections: ## Overview (what it is, for whom), ## Stack (frameworks and key versions), ## Run & test (exact commands, ports), ## Structure (key folders and files and what each does), ## Decisions (important choices and why), ## Status & next steps (what works, known gaps). Never put secrets, tokens or personal data in it. Instruction files written for other tools (AGENTS.md, CLAUDE.md, .cursor/rules) are read as well; treat them as authoritative project conventions and do not rewrite them.";
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn format_agents_md_section_empty_returns_none() {
-        // No instruction files still yields the FRIDAY.md memory directive: Friday X always keeps its own memory file.
+        // No instruction files still yields the FRIDAY.md memory directive: FridayX always keeps its own memory file.
         let section = format_agents_md_section(&[]).expect("memory directive");
         assert!(section.contains("FRIDAY.md"));
         assert!(!section.contains("## From:"));

@@ -1,6 +1,6 @@
-# Friday X
+# FridayX
 
-**Friday X** (`friday`) is Friday's coding agent for the terminal and your editor. It reads your project, edits
+**FridayX** (`friday`) is Friday's coding agent for the terminal and your editor. It reads your project, edits
 files, runs commands and manages long tasks, using your Friday account: the same plan, the same models and the
 same usage meter as the Friday web, Android and iOS apps.
 
@@ -26,13 +26,13 @@ Then run `friday` in any project. The first run opens your browser to sign in wi
 ## How it fits together
 
 - **Login:** a device-code flow. `friday login` shows a short code, you approve it in the signed-in web app
-  (`/device`), and the CLI keeps a revocable token. Sign a device out from the web app: Settings → Friday X.
+  (`/device`), and the CLI keeps a revocable token. Sign a device out from the web app: Settings → FridayX.
 - **Models and limits come from the server.** `friday models` lists what your plan allows; the default,
   `friday-x/auto`, lets the server pick the best coding model. Change a plan, add or remove a model in the
   Team Console and every terminal and editor sees it at its next start. Nothing about plans or models is
   compiled in.
 - **One meter.** Terminal usage drains the same bar as the apps; the CLI shows percent used and reset time only.
-- **Project memory:** Friday X reads `AGENTS.md`, `CLAUDE.md` and Cursor rules, and keeps its own `FRIDAY.md`
+- **Project memory:** FridayX reads `AGENTS.md`, `CLAUDE.md` and Cursor rules, and keeps its own `FRIDAY.md`
   (the same file web Build Mode keeps) so a project moves between the two without translation.
 - **Private by construction:** no telemetry, no analytics, no feedback uploads. The client talks to the Friday
   backend and nothing else the original product's vendor operated. `scripts/audit-egress.py` enforces that
@@ -40,7 +40,7 @@ Then run `friday` in any project. The first run opens your browser to sign in wi
 
 ## Editors
 
-Friday X speaks the Agent Client Protocol (ACP): `friday agent stdio` runs it as an agent for JetBrains IDEs, Zed and any
+FridayX speaks the Agent Client Protocol (ACP): `friday agent stdio` runs it as an agent for JetBrains IDEs, Zed and any
 other ACP editor. A VS Code extension lives in [`../ide/vscode`](../ide/vscode).
 
 ## Building from source

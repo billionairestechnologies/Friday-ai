@@ -415,7 +415,7 @@ impl SkillsClient {
         xai_grok_otel::inject_trace_context_into_request(builder)
     }
 
-    /// Friday X.com product Skills require first-party session auth (the same gate as managed MCP and sibling grok.com clients), not plain BYOK API keys.
+    /// FridayX.com product Skills require first-party session auth (the same gate as managed MCP and sibling grok.com clients), not plain BYOK API keys.
     async fn require_skills_auth(&self) -> Result<xai_grok_login::GrokAuth, SkillsError> {
         let auth = self.auth.auth().await.map_err(|_| SkillsError::NoAuth)?;
         if !auth.is_managed_mcp_eligible() {

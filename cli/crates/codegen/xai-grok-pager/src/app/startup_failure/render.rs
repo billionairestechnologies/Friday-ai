@@ -19,7 +19,7 @@ pub(super) fn render(failure: &StartupFailure) -> String {
             }
             let explanation = fill_indented(&advice.explanation(), "  ", "  ");
             format!(
-                "Couldn't start Friday X: startup timed out after {}.\n\n{explanation}",
+                "Couldn't start FridayX: startup timed out after {}.\n\n{explanation}",
                 whole_seconds(*waited)
             )
         }
@@ -63,7 +63,7 @@ impl Advice {
             let target = agent_name(earlier.target);
             let _ = write!(
                 explanation,
-                " Friday X spent the first {} on the {target}.",
+                " FridayX spent the first {} on the {target}.",
                 whole_seconds(earlier.wait)
             );
         }
@@ -137,10 +137,10 @@ enum NextStep {
 impl NextStep {
     fn text(self) -> &'static str {
         match self {
-            Self::Retry => "Start Friday X again.",
-            Self::CheckNetworkThenRetry => "Check your network connection, then start Friday X again.",
+            Self::Retry => "Start FridayX again.",
+            Self::CheckNetworkThenRetry => "Check your network connection, then start FridayX again.",
             Self::RestartSharedLeader => {
-                "Stop it with the command below, which also stops any other Friday X \
+                "Stop it with the command below, which also stops any other FridayX \
                  session using it, then start Grok again."
             }
         }

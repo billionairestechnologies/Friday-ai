@@ -1,6 +1,6 @@
 //! The protected floor: paths no command may write and no grant may open, rendered after every
 //! allow by every backend. One table, pinned by a test, so the desktop copy
-//! ("Friday X can never write to …"), the grant store's load-time filter and the backends agree on
+//! ("FridayX can never write to …"), the grant store's load-time filter and the backends agree on
 //! the same set. Every entry is spelled canonically ([`canonical_path`]) and every question asked
 //! of the floor canonicalises its path first, so `..`, a firmlink, a symlinked prefix or an APFS
 //! case or normalisation variant never makes one path look like two.
@@ -179,7 +179,7 @@ pub const GIT_DIR_NAME: &str = ".git";
 /// that could write it would switch the sandbox off for every command after it.
 pub const DAEMON_SETTINGS_FILENAME: &str = "workspaced.toml";
 
-/// Friday X-home entries beyond [`TRUST_BOUNDARY_FILENAMES`]: hook sources, the global grant file and
+/// FridayX-home entries beyond [`TRUST_BOUNDARY_FILENAMES`]: hook sources, the global grant file and
 /// its lock sidecar, the daemon's settings file, and everything grok runs, starts or loads into a
 /// prompt from its home: the installed binary (`bin/grok`, a link into `downloads`), the vendored
 /// search tools, plugins (installed, their data and the marketplace clones they install from),
@@ -356,7 +356,7 @@ pub const SECRET_READ_DENY_FILES: &[&str] = &[
     ".git-credentials",
 ];
 
-/// Friday X-home glob prefixes denied for read: the auth material.
+/// FridayX-home glob prefixes denied for read: the auth material.
 pub const FRIDAY_HOME_SECRET_GLOBS: &[&str] = &["auth*", "credentials*"];
 
 /// The temporary directories a command may write by default: `$TMPDIR` (or the platform default)

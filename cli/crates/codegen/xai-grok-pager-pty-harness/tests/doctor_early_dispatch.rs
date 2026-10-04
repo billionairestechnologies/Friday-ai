@@ -43,7 +43,7 @@ fn doctor_json_bypasses_unrelated_startup_state() {
     let json: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("stdout is one JSON document");
     assert_eq!(json["schemaVersion"], "1");
-    assert!(!String::from_utf8_lossy(&output.stdout).contains("Friday X Doctor"));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("FridayX Doctor"));
 
     let after = directory_entries(&grok_home);
     assert_eq!(after, before, "doctor must not create startup artifacts");
@@ -506,7 +506,7 @@ fn doctor_fix_safety_boundaries_are_process_isolated() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("Friday X found an existing SSH alias or function")
+        stderr.contains("FridayX found an existing SSH alias or function")
             && stderr.contains(&conflict.display().to_string()),
         "{stderr}"
     );

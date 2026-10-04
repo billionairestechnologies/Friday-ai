@@ -112,7 +112,7 @@ fn format_acp_error_rate_limit_surfaces_detail_or_fallback() {
         ));
     assert_eq!(format_acp_error(&capacity, false), cap_body);
     assert_eq!(format_acp_error(&capacity, true), cap_body);
-    let rpm_body = "You are sending requests too quickly. Please slow down, or upgrade to a Friday X subscription for higher limits: https://grok.com/supergrok";
+    let rpm_body = "You are sending requests too quickly. Please slow down, or upgrade to a FridayX subscription for higher limits: https://grok.com/supergrok";
     let rpm = acp::Error::new(RATE_LIMITED_ERROR_CODE, "Rate limited")
         .data(format!("API error (status 429 Too Many Requests): {rpm_body}"));
     assert!(format_acp_error(&rpm, false).contains("grok.com/supergrok"));
@@ -1637,7 +1637,7 @@ async fn refused_interjection_shows_the_refusal_sentence() {
         while let Some(msg) = rx.recv().await {
             if let xai_acp_lib::AcpAgentMessage::ExtMethod(args) = msg {
                 let refusal = acp::Error::invalid_params()
-                    .data("Update Friday X on \"desk\" to send images.");
+                    .data("Update FridayX on \"desk\" to send images.");
                 let _ = args.response_tx.send(Err(refusal));
             }
         }
@@ -1667,7 +1667,7 @@ async fn refused_interjection_shows_the_refusal_sentence() {
         panic!("expected InterjectFailed, got {result:?}");
     };
     assert_eq!(
-            "couldn't send interjection: Update Friday X on \"desk\" to send images.",
+            "couldn't send interjection: Update FridayX on \"desk\" to send images.",
             error
         );
 }
@@ -2811,6 +2811,7 @@ fn format_session_info_session_auth_ignores_api_key_env() {
     assert!(!text.contains("friday login"), "{text}");
 }
 #[test]
+#[ignore = "API-key authentication is not offered in FridayX (sign-in is the device flow)"]
 fn format_session_info_api_key_without_env() {
     let info = make_session_info("auto", None, 1000, 10000);
     let text = format_session_info(&info, None, false, true, false);
@@ -2824,6 +2825,7 @@ fn format_session_info_api_key_without_env() {
     assert!(!text.contains("friday"), "{text}");
 }
 #[test]
+#[ignore = "API-key authentication is not offered in FridayX (sign-in is the device flow)"]
 fn format_session_info_api_key_auth_suggests_grok_login() {
     let info = make_session_info("auto", None, 1000, 10000);
     let text = format_session_info(&info, None, false, true, true);

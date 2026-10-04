@@ -583,7 +583,7 @@
             &RetryState::Failed {
                 error_type: "api".into(),
                 message:
-                    "API error (status 402 Payment Required): Friday X usage balance exhausted"
+                    "API error (status 402 Payment Required): FridayX usage balance exhausted"
                         .into(),
             },
             &mut session,

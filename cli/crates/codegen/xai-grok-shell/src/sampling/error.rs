@@ -30,7 +30,7 @@ pub const FREE_USAGE_EXHAUSTED_ERROR_CODE: &str = "subscription:free-usage-exhau
 
 /// User-facing free-usage exhaustion copy (paywall).
 /// Promises no reset duration; the backend config drives the quota window.
-pub const FREE_USAGE_USER_MESSAGE: &str = "You\u{2019}ve reached your free Friday X usage limit for now. Get SuperGrok for much higher limits, or try again later: https://friday.billionairestechnologies.com/supergrok?referrer=grok-build";
+pub const FREE_USAGE_USER_MESSAGE: &str = "You\u{2019}ve reached your free FridayX usage limit for now. Get SuperGrok for much higher limits, or try again later: https://friday.billionairestechnologies.com/supergrok?referrer=grok-build";
 
 /// Whether flattened server detail is free-usage-quota exhaustion (paywall), not transient throttling.
 /// Sniffs the well-known code embedded by `parse_error_bytes`.
@@ -77,11 +77,11 @@ fn strip_sampling_api_error_prefix(detail: &str) -> &str {
     detail.trim()
 }
 
-/// IC sometimes reuses OAuth free-tier upsell copy on 429s ("upgrade to a Friday X subscription" / grok.com/supergrok).
+/// IC sometimes reuses OAuth free-tier upsell copy on 429s ("upgrade to a FridayX subscription" / grok.com/supergrok).
 /// That is wrong for API-key / team auth: higher limits come from credits and spend-based rate-limit tiers, not a personal SuperGrok plan.
 fn pushes_consumer_subscription_upsell(detail: &str) -> bool {
     let d = detail.to_ascii_lowercase();
-    d.contains("grok.com/supergrok") || d.contains("upgrade to a grok subscription")
+    d.contains("grok.com/supergrok") || d.contains("upgrade your Friday plan")
 }
 
 /// User-facing copy for capacity/overload failures (stream `overloaded_error`, HTTP 529, proxy-wrapped 5xx).
@@ -120,7 +120,7 @@ pub(crate) fn map_sampling_err_to_acp(err: SamplingError) -> acp::Error {
             // Examples: content-safety blocks, ZDR-gated operations, remote-settings-blocked users
             // Passing the proxy's message via internal_error keeps the explanation visible without triggering the client's re-auth flow on -32000
             StatusCode::FORBIDDEN => {
-                let message = if message.contains("requires a Friday X subscription")
+                let message = if message.contains("requires a FridayX subscription")
                     && crate::agent::auth_method::has_xai_api_key_env()
                 {
                     format!(
@@ -808,7 +808,7 @@ mod tests {
         with_api_key_env(Some("xai-test"), || {
             let err = SamplingError::Api {
                 status: StatusCode::FORBIDDEN,
-                message: "The model 'grok-build' requires a Friday X subscription.".into(),
+                message: "The model 'grok-build' requires a FridayX subscription.".into(),
                 model_metadata: None,
                 retry_after_secs: None,
                 should_retry: None,
@@ -834,7 +834,7 @@ mod tests {
         with_api_key_env(None, || {
             let err = SamplingError::Api {
                 status: StatusCode::FORBIDDEN,
-                message: "The model 'grok-build' requires a Friday X subscription.".into(),
+                message: "The model 'grok-build' requires a FridayX subscription.".into(),
                 model_metadata: None,
                 retry_after_secs: None,
                 should_retry: None,

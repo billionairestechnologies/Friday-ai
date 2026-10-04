@@ -1,12 +1,12 @@
 # Your First Prompt
 
-Friday X is a conversation with an agent that can read your code, run
+FridayX is a conversation with an agent that can read your code, run
 commands, and edit files — right here in your terminal.
 
-Type what you want and press `Enter`. Friday X streams its work into the
+Type what you want and press `Enter`. FridayX streams its work into the
 **scrollback** above the prompt: responses, shell commands, file edits.
 
-## Keep typing while Friday X works
+## Keep typing while FridayX works
 
 While a turn is running, `Enter` **queues** your next message instead of
 interrupting. Change your mind? Press `Enter` on the empty prompt to stop

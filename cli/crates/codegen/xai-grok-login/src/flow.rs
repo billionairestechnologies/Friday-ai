@@ -1790,7 +1790,7 @@ mod tests {
         };
         assert_eq!(
             extract(
-                "Visit the following link to sign into Friday X: https://auth.example.com/login?code=abc"
+                "Visit the following link to sign into FridayX: https://auth.example.com/login?code=abc"
             ),
             "https://auth.example.com/login?code=abc"
         );

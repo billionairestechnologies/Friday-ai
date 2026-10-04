@@ -423,10 +423,10 @@ impl ProtectedEditReason {
                 "Note: This edit contains changes under `/etc`, which is system configuration and can affect this machine beyond the current project.",
             ),
             Self::GrokConfig => Some(
-                "Note: This edit contains changes to Friday X config, which can alter permissions, tools, and other behavior in later sessions.",
+                "Note: This edit contains changes to FridayX config, which can alter permissions, tools, and other behavior in later sessions.",
             ),
             Self::GrokSandbox => Some(
-                "Note: This edit contains changes to the Friday X sandbox config, which can loosen filesystem and network restrictions on commands.",
+                "Note: This edit contains changes to the FridayX sandbox config, which can loosen filesystem and network restrictions on commands.",
             ),
             Self::ClaudeSettings => Some(
                 "Note: This edit contains changes to Claude-compatible settings, which can install hooks or change permission mode without a separate execution approval.",
@@ -536,7 +536,7 @@ fn protected_edit_reason(path: &Path) -> Option<ProtectedEditReason> {
     None
 }
 
-/// Friday X config files that alter permissions or sandbox restrictions; a silent edit would let the agent loosen its own guardrails.
+/// FridayX config files that alter permissions or sandbox restrictions; a silent edit would let the agent loosen its own guardrails.
 /// Matched directly inside any `.friday` dir (user-global default and workspace overlays) and directly under a custom `$FRIDAY_HOME`.
 /// A custom home has no `.friday` component, so the component match alone cannot see it.
 fn protected_grok_config_file(path: &Path, components: &[&str]) -> Option<ProtectedEditReason> {

@@ -1218,7 +1218,7 @@ fn shell_aliases_expand_to_exact_argv_and_bypass_is_explicit() {
 }
 
 /// An accumulating remedy is additive, so a user's own `terminal-features` lines are not a conflict.
-/// tmux applies Friday X's managed block last and the features merge.
+/// tmux applies FridayX's managed block last and the features merge.
 /// A direct-assignment remedy would refuse to touch the file.
 #[test]
 fn tmux_truecolor_fix_appends_alongside_existing_terminal_features() {

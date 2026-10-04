@@ -27,7 +27,7 @@ pub(crate) fn has_bundle_credentials(
     auth_manager: Option<&std::sync::Arc<xai_grok_login::AuthManager>>,
     deployment_key: Option<&str>,
 ) -> bool {
-    // Friday X has no bundle service (managed subagent/skill archives came from the original vendor's backend),
+    // FridayX has no bundle service (managed subagent/skill archives came from the original vendor's backend),
     // so a sync is never attempted and the client never asks for one.
     let _ = (auth_manager, deployment_key);
     false
@@ -513,7 +513,7 @@ mod tests {
         assert_eq!(status.skills, Vec::<String>::new());
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn sync_success_writes_cache_and_returns_counts() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -538,7 +538,7 @@ mod tests {
         server.abort();
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn sync_force_true_has_same_write_semantics() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -556,7 +556,7 @@ mod tests {
         server.abort();
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn sync_http_failure_surfaces_error() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -736,7 +736,7 @@ mod tests {
         assert_eq!(detail.description, "");
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn sync_with_skills_reports_skills_count() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -801,7 +801,7 @@ mod tests {
         (format!("{base}/v1"), handle)
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn sync_with_archive_endpoint_extracts_and_reports_counts() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -923,7 +923,7 @@ mod tests {
         server.abort();
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn maybe_sync_runs_when_cache_is_stale() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -951,7 +951,7 @@ mod tests {
         server.abort();
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn maybe_sync_force_bypasses_ttl() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");
@@ -978,7 +978,7 @@ mod tests {
         server.abort();
     }
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "managed bundle sync is removed in Friday X"]
+    #[ignore = "managed bundle sync is removed in FridayX"]
     async fn maybe_sync_runs_when_no_manifest_exists() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("bundled");

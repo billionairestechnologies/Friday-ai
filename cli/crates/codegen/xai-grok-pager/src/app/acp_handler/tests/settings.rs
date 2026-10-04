@@ -28,7 +28,7 @@
     }
 
     #[test]
-    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+    #[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
     fn settings_api_key_keeps_voice_despite_remote_false() {
         // Remote false alone must not disable an already API-key session.
         let mut app = make_app_with_agent("sess-api-key");
@@ -61,7 +61,7 @@
     }
 
     #[test]
-    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+    #[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
     fn settings_non_api_key_tier_clears_stale_api_key_flag() {
         let mut app = make_app_with_agent("sess-stale-key");
         assert!(handle_ext_notification(
@@ -91,7 +91,7 @@
         ));
         assert!(app.voice_mode_enabled);
         assert!(handle_ext_notification(
-            &tier_settings_update("SuperGrok"),
+            &tier_settings_update("Friday Pro"),
             &mut app
         ));
         assert!(!app.is_api_key_auth);
@@ -100,7 +100,7 @@
     }
 
     #[test]
-    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+    #[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
     fn voice_remote_true_re_enables_after_kill_switch() {
         let mut app = make_app_with_agent("sess-1");
         app.apply_voice_mode_enabled(false);

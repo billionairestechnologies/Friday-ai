@@ -1,7 +1,7 @@
 //! Doubled-lines regression guard via a simulated out-of-band screen reflow.
 //!
 //! The stack is `tmux -> nvim :terminal -> grok`: nvim/tmux repaint grok's pane out-of-band (no grok PTY resize).
-//! Friday X's diff renderer only re-clears on a real size change, so the rows it doesn't own survive.
+//! FridayX's diff renderer only re-clears on a real size change, so the rows it doesn't own survive.
 //! You get doubled lines at the top/bottom until restart.
 //!
 //! The harness is a single faithful emulator and can't nest a real tmux/nvim.

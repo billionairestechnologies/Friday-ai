@@ -120,7 +120,7 @@ fn plugin_cta_catalog_keeps_official_not_installed_only() {
 }
 
 #[test]
-#[ignore = "the official plugin marketplace source is removed in Friday X"]
+#[ignore = "the official plugin marketplace source is removed in FridayX"]
 fn plugin_cta_default_prefers_url_verified_official_over_impostor() {
     let mut app = test_app_with_agent();
     let id = AgentId(0);

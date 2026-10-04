@@ -1,4 +1,4 @@
-name: Friday X release
+name: FridayX release
 
 # Tag friday-x-vX.Y.Z to ship. Builds every platform, writes a SHA-256 next to each binary, uploads to the
 # releases bucket, and only then publishes latest.json, so a half-uploaded release is never offered.

@@ -200,7 +200,7 @@ const teamRoute = createRoute({
   component: TeamPage,
 });
 
-// Friday X (CLI / IDE) device login: approve the code shown in the terminal.
+// FridayX (CLI / IDE) device login: approve the code shown in the terminal.
 const deviceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/device",

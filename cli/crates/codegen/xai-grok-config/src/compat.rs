@@ -90,7 +90,7 @@ impl CompatCell {
         self.remote_key
     }
 
-    /// Whether Friday X currently implements this compatibility surface. Codex non-session cells remain
+    /// Whether FridayX currently implements this compatibility surface. Codex non-session cells remain
     /// reserved in the registry so their config shape is stable, but runtime discovery does not
     /// consume them.
     pub const fn is_runtime_supported(self) -> bool {
@@ -310,7 +310,7 @@ impl Default for VendorCompat {
 /// Bare file names, no path separators: read_file matches them against `Path::file_name()`; `agent_filenames()` prepends them to the vendor-gated `.claude/` paths.
 pub const INSTRUCTION_FILENAMES: &[&str] = &[
     // Friday's own project memory comes first, then every other agent's convention (AGENTS.md, CLAUDE.md…),
-    // so a repo set up for any of them is understood the moment Friday X opens it.
+    // so a repo set up for any of them is understood the moment FridayX opens it.
     "FRIDAY.md",
     "Friday.md",
     "Agents.md",

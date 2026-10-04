@@ -26,8 +26,8 @@ docs/
 | `backend/` | Express + TypeScript API; also serves `frontend/dist` in production |
 | `frontend/` | React 19 + Vite web app, incl. the Team Console (`/admin`) |
 | `android/` · `ios/` | Native apps (Kotlin/Compose, SwiftUI) |
-| `cli/` | **Friday X CLI** — terminal coding agent (Rust, Apache-2.0 fork; see its own LICENSE/NOTICE) |
-| `ide/` | **Friday X IDE extensions** — VS Code first, then JetBrains and other ACP editors; same Friday login, models and credits as the CLI |
+| `cli/` | **FridayX CLI** — terminal coding agent (Rust, Apache-2.0 fork; see its own LICENSE/NOTICE) |
+| `ide/` | **FridayX IDE extensions** — VS Code first, then JetBrains and other ACP editors; same Friday login, models and credits as the CLI |
 | `supabase/` | SQL migrations, applied in order |
 | `infra/` | AWS CloudFormation + deploy script |
 | `scripts/` | Repo tooling (migration verifier, preview shell generator) |

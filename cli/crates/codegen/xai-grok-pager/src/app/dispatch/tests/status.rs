@@ -617,7 +617,7 @@ fn privacy_banner_ready_app() -> AppView {
 }
 
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn privacy_banner_should_show_respects_gates() {
     let mut app = privacy_banner_ready_app();
     assert!(app.privacy_banner_should_show());
@@ -650,7 +650,7 @@ fn privacy_banner_should_show_respects_gates() {
 /// Team name and role are set on every row so the old heuristic cannot be what passes it.
 /// No row acks: an opt-in ack waits on the server reply, and a rollout-off pick never stamps one.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn capability_tri_state_gates_banner_row_and_write() {
     use crate::settings::CodingDataSharingLock;
     // Each row starts on the opposite side of `pick` so the pick is a real change.
@@ -711,7 +711,7 @@ fn nameless_team_principal_hides_the_banner_while_the_capability_is_unknown() {
 
 /// A User principal's token carries its personal billing team id; that is not team context and `/user` never resolves the capability.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn personal_account_sees_the_banner_without_a_capability() {
     let mut app = privacy_banner_ready_app();
     app.is_team_principal = false;
@@ -866,7 +866,7 @@ fn recheck_keeps_hydrated_capability_only_for_the_same_account() {
 
 /// `[Opt in]` success: ACP confirmation acks the banner.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn privacy_banner_opt_in_success_acks() {
     let mut app = privacy_banner_ready_app();
     let effects = dispatch(Action::PrivacyBannerOptIn, &mut app);
@@ -901,7 +901,7 @@ fn privacy_banner_opt_in_success_acks() {
 
 /// `[Opt in]` failure: no ack; welcome toast carries the error.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn privacy_banner_opt_in_failure_no_ack_sets_welcome_toast() {
     let mut app = privacy_banner_ready_app();
     let effects = dispatch(Action::PrivacyBannerOptIn, &mut app);
@@ -944,7 +944,7 @@ fn privacy_banner_opt_in_failure_no_ack_sets_welcome_toast() {
 /// an eager ack would survive the opt-in-failure rollback and hide the
 /// banner forever.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn privacy_banner_opt_out_noop_while_opt_in_inflight() {
     let mut app = privacy_banner_ready_app();
     let _ = dispatch(Action::PrivacyBannerOptIn, &mut app);
@@ -1024,7 +1024,7 @@ fn stale_mirror_does_not_coalesce_an_opposite_choice() {
 
 /// Already-out opt-out, from the banner or Settings, still writes: the local "out" may be the unconfirmed fail-safe default.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn already_out_opt_out_writes_and_acks_on_success() {
     for from_banner in [true, false] {
         let action = if from_banner {
@@ -1165,7 +1165,7 @@ fn superseded_opt_in_success_is_kept_when_later_opt_out_fails() {
 
 /// A refused opt-out must not dismiss the banner: the server is still retaining, and the user has to see that.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn privacy_banner_opt_out_failure_keeps_banner_and_toasts() {
     let mut app = privacy_banner_ready_app();
     let effects = dispatch(Action::PrivacyBannerOptOut, &mut app);
@@ -1307,7 +1307,7 @@ fn duplicate_settings_opt_out_rides_the_pending_write() {
 /// Re-committing Opt in while the first write is inflight must not ack.
 /// That ack would survive a later ACP failure and hide the banner.
 #[test]
-#[ignore = "the data-sharing banner never appears in Friday X (privacy_banner_should_show is always false)"]
+#[ignore = "the data-sharing banner never appears in FridayX (privacy_banner_should_show is always false)"]
 fn settings_opt_in_recommitted_while_inflight_does_not_ack() {
     let mut app = privacy_banner_ready_app();
     let first = dispatch(Action::SetCodingDataSharing { opted_in: true }, &mut app);

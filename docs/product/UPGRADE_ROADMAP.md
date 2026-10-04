@@ -197,7 +197,7 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 4. **Not verified here** (needs real keys/devices): payments, Resend delivery, provider probes, E2B,
    Android/iOS builds.
 
-## O. Friday X — terminal and editor agent (shipped on branch `feature/friday-x`)
+## O. FridayX — terminal and editor agent (shipped on branch `feature/friday-x`)
 
 | Item | Status |
 |---|---|
@@ -210,4 +210,4 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
 | VS Code extension | Built and packaged (`.vsix`); not published |
 | JetBrains / Zed | Work through ACP (`friday agent stdio`); documented in `ide/README.md` |
 | Live-provider test, real deployment, signed + notarized binaries, marketplace publishing | **Next** (needs credentials and certificates) |
-| Web search, image generation and an official plugin marketplace for Friday X | Later (need Friday-hosted backends) |
+| Web search, image generation and an official plugin marketplace for FridayX | Later (need Friday-hosted backends) |

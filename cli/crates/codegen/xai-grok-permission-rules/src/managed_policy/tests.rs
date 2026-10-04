@@ -1564,7 +1564,7 @@ fn assert_expects(label: &str, ms: &ManagedSettings, expects: Vec<Expect>) {
 }
 
 /// Pins strictest-wins layer resolution: any deny wins, restricted sources intersect, pins only tighten.
-/// Friday X TOML binds native subjects; vendor Claude is advisory. Malformed values degrade per-key and never drop healthy pins.
+/// FridayX TOML binds native subjects; vendor Claude is advisory. Malformed values degrade per-key and never drop healthy pins.
 #[test]
 fn layer_resolution_semantics() {
     assert_expects(

@@ -385,7 +385,7 @@ fn write_refuses_a_root_relinked_to_the_home_folder_after_the_check() {
     assert!(proj.join(".friday/workspaced.toml").exists());
 }
 
-/// On APFS a grok home spelled `.Friday X` that does not exist yet is the home folder's `.friday`.
+/// On APFS a grok home spelled `.FridayX` that does not exist yet is the home folder's `.friday`.
 #[cfg(target_os = "macos")]
 #[test]
 fn write_refuses_the_home_folder_when_the_missing_grok_home_differs_only_in_case() {
@@ -393,7 +393,7 @@ fn write_refuses_the_home_folder_when_the_missing_grok_home_differs_only_in_case
     let home = tmp.path().join("home");
     std::fs::create_dir_all(&home).unwrap();
     let error =
-        super::write_workspace_sandbox_mode_in(&home, &home.join(".Friday X"), SandboxMode::Off)
+        super::write_workspace_sandbox_mode_in(&home, &home.join(".FridayX"), SandboxMode::Off)
             .unwrap_err();
     assert!(
         matches!(error, super::SandboxModeWriteError::UserLayer { .. }),

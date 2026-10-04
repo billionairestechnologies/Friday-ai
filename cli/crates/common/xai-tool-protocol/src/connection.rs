@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 pub enum ConnectionKind {
     Harness,
     ToolServer,
-    /// Friday X-main / X-chat client of the bot-relay subsystem.
+    /// FridayX-main / X-chat client of the bot-relay subsystem.
     BotClient,
 }
 

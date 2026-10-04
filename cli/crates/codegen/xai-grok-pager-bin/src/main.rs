@@ -202,7 +202,7 @@ fn resolve_agent_profile_path(path: &std::path::Path) -> std::path::PathBuf {
 /// Print startup information for the serve command.
 fn print_serve_startup_info(bind_addr: SocketAddr, secret: &str) {
     eprintln!();
-    eprintln!("   Friday X agent server starting...");
+    eprintln!("   FridayX agent server starting...");
     eprintln!();
     eprintln!("   Address:  {}:{}", bind_addr.ip(), bind_addr.port());
     eprintln!("   Secret:   {}", secret);
@@ -285,7 +285,7 @@ async fn run_setup_command(json: bool) {
         eprintln!("  deployment_key = \"<your-key>\"");
         eprintln!();
         eprintln!(
-            "If you don't have a deployment key, contact your organization's Friday X administrator."
+            "If you don't have a deployment key, contact your organization's FridayX administrator."
         );
         std::process::exit(1);
     }
@@ -322,7 +322,7 @@ async fn run_setup_command(json: bool) {
         }
         SetupOutcome::Staged => {
             eprintln!(
-                "Managed configuration update verified; it takes effect the next time Friday X starts."
+                "Managed configuration update verified; it takes effect the next time FridayX starts."
             );
         }
         SetupOutcome::Failed(e) => {
@@ -1271,7 +1271,7 @@ async fn run_agent_command(
     let is_leader = matches!(agent_args.mode, Some(AgentCmd::Leader(_)));
     if !is_stdio && !is_leader {
         eprintln!(
-            "Friday X (pager) - v{}",
+            "FridayX (pager) - v{}",
             xai_grok_version::display_version_with_commit(
                 env!("VERSION_WITH_COMMIT"),
                 xai_grok_update::channel_label(),
@@ -1319,7 +1319,7 @@ async fn run_agent_command(
         None,
     );
     if let Some(warning) = launch_yolo.blocked_warning {
-        eprintln!("grok: {warning}");
+        eprintln!("friday: {warning}");
     }
     agent_config.default_yolo_mode = launch_yolo.yolo;
     agent_config.default_auto_mode = xai_grok_shell::util::config::effective_auto_for_launch(
@@ -2071,10 +2071,10 @@ fn main() {
     xai_grok_pager::memory_trace::start(xai_grok_pager::memory_trace::default_dir());
     raise_fd_limit();
     if let Err(e) = xai_grok_config::validate_requirements() {
-        eprintln!("Couldn't start Friday X: {e}");
+        eprintln!("Couldn't start FridayX: {e}");
         eprintln!();
         eprintln!(
-            "Update Friday X to a version the policy allows, or ask your administrator \
+            "Update FridayX to a version the policy allows, or ask your administrator \
              to fix the managed requirements."
         );
         std::process::exit(2);
@@ -2090,7 +2090,7 @@ fn main() {
     if xai_grok_shell::util::config::load_crash_handler_enabled_sync() {
         let crash_dir = crash_dir_for(&args);
         if let Some(report) = xai_crash_handler::check_previous_crash(&crash_dir) {
-            eprintln!("Friday X crashed during your last session.");
+            eprintln!("FridayX crashed during your last session.");
             eprintln!("  Signal:  {}", report.signal_name);
             eprintln!("  Version: {}", report.app_version);
             eprintln!("  Report:  {}", report.report_path.display());
@@ -2448,7 +2448,7 @@ async fn async_main(mut args: PagerArgs) -> Result<()> {
             None,
         );
         if let Some(warning) = launch_yolo.blocked_warning {
-            eprintln!("grok: {warning}");
+            eprintln!("friday: {warning}");
         }
         let json_schema = args
             .json_schema

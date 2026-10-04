@@ -13,9 +13,9 @@ declare global {
 }
 
 /**
- * Auth for /api/x/* — a Friday X token (`fxt_…`) issued by device login, NOT a Supabase session. A CLI token
+ * Auth for /api/x/* — a FridayX token (`fxt_…`) issued by device login, NOT a Supabase session. A CLI token
  * only ever reaches this router, so a token lifted from a dotfile can't read chats, billing or connectors.
- * The Friday X entitlement is checked on every request, so an admin switching it off (or a plan change)
+ * The FridayX entitlement is checked on every request, so an admin switching it off (or a plan change)
  * takes effect within the entitlement cache TTL instead of at the next login.
  */
 export const requireCliAuth = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {

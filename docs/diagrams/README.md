@@ -52,14 +52,14 @@ diagram. Or take the zip: **[friday-ai-diagrams.zip](./friday-ai-diagrams.zip)**
 | 15 | Team Console (back office) | [png](./company/15-team-console.png) | [svg](./company/15-team-console.svg) | [mmd](./company/15-team-console.mmd) |
 | 17 | Status page, incidents, problem and crash reports | [png](./company/17-status-and-reports.png) | [svg](./company/17-status-and-reports.svg) | [mmd](./company/17-status-and-reports.mmd) |
 
-## Friday X (terminal and editor agent)
+## FridayX (terminal and editor agent)
 
 | # | Diagram | PNG | SVG | Source |
 |---|---|---|---|---|
-| 19 | Friday X architecture | [png](./friday-x/19-friday-x-architecture.png) | [svg](./friday-x/19-friday-x-architecture.svg) | [mmd](./friday-x/19-friday-x-architecture.mmd) |
-| 20 | Friday X sign-in (device code) | [png](./friday-x/20-friday-x-device-login.png) | [svg](./friday-x/20-friday-x-device-login.svg) | [mmd](./friday-x/20-friday-x-device-login.mmd) |
-| 21 | Friday X gateway and metering | [png](./friday-x/21-friday-x-gateway-metering.png) | [svg](./friday-x/21-friday-x-gateway-metering.svg) | [mmd](./friday-x/21-friday-x-gateway-metering.mmd) |
-| 22 | Friday X install and release | [png](./friday-x/22-friday-x-install-release.png) | [svg](./friday-x/22-friday-x-install-release.svg) | [mmd](./friday-x/22-friday-x-install-release.mmd) |
+| 19 | FridayX architecture | [png](./friday-x/19-friday-x-architecture.png) | [svg](./friday-x/19-friday-x-architecture.svg) | [mmd](./friday-x/19-friday-x-architecture.mmd) |
+| 20 | FridayX sign-in (device code) | [png](./friday-x/20-friday-x-device-login.png) | [svg](./friday-x/20-friday-x-device-login.svg) | [mmd](./friday-x/20-friday-x-device-login.mmd) |
+| 21 | FridayX gateway and metering | [png](./friday-x/21-friday-x-gateway-metering.png) | [svg](./friday-x/21-friday-x-gateway-metering.svg) | [mmd](./friday-x/21-friday-x-gateway-metering.mmd) |
+| 22 | FridayX install and release | [png](./friday-x/22-friday-x-install-release.png) | [svg](./friday-x/22-friday-x-install-release.svg) | [mmd](./friday-x/22-friday-x-install-release.mmd) |
 
 ## Regenerating
 
@@ -69,4 +69,4 @@ node scripts/build-diagrams.mjs --all      # re-render everything
 node scripts/build-diagrams.mjs --no-render   # index, pack and zip only (no browser needed)
 ```
 
-Written briefing: [`../architecture/PLATFORM_BRIEFING.md`](../architecture/PLATFORM_BRIEFING.md) · Friday X: [`../product/FRIDAY_X.md`](../product/FRIDAY_X.md) · Roadmap: [`../product/UPGRADE_ROADMAP.md`](../product/UPGRADE_ROADMAP.md)
+Written briefing: [`../architecture/PLATFORM_BRIEFING.md`](../architecture/PLATFORM_BRIEFING.md) · FridayX: [`../product/FRIDAY_X.md`](../product/FRIDAY_X.md) · Roadmap: [`../product/UPGRADE_ROADMAP.md`](../product/UPGRADE_ROADMAP.md)

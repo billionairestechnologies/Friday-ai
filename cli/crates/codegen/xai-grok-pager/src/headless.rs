@@ -841,7 +841,7 @@ pub async fn run_single_turn(
         cli_web_search_model: None,
         cli_session_summary_model: None,
         memory_enabled_override: options.memory_enabled_override,
-        disable_web_search: true, // vendor-hosted search is removed; see Friday X docs
+        disable_web_search: true, // vendor-hosted search is removed; see FridayX docs
         todo_gate: false,
         laziness_debug_log: None,
         storage_mode: None,

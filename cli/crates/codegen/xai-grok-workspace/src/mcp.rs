@@ -1614,7 +1614,7 @@ pub(crate) mod tests {
 
     /// A server stopped until the next bind is configured and not running, like one whose start
     /// failed, but a reload must not start it: the daemon stops the computer-use helper this way
-    /// when Friday X Desktop quits, and the same hang-up's config push converges right after.
+    /// when FridayX Desktop quits, and the same hang-up's config push converges right after.
     #[test]
     fn plan_leaves_a_server_stopped_until_the_next_bind_alone() {
         let plan = plan_convergence(

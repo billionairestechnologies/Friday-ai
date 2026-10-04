@@ -1,20 +1,20 @@
 # Project Rules (AGENTS.md)
 
-Project rules let you configure Friday X per project or directory. By placing an AGENTS.md file in your repository, you can set coding conventions, build instructions, style guides, and any other instructions that Friday X should follow when working in that codebase. Startup loading requires folder trust (`--trust` or an interactive grant).
+Project rules let you configure FridayX per project or directory. By placing an AGENTS.md file in your repository, you can set coding conventions, build instructions, style guides, and any other instructions that FridayX should follow when working in that codebase. Startup loading requires folder trust (`--trust` or an interactive grant).
 
 ---
 
 ## What Are Project Rules?
 
-Project rules are Markdown files that Friday X reads and adds to its context. Friday X follows their content for every interaction in that tree.
+Project rules are Markdown files that FridayX reads and adds to its context. FridayX follows their content for every interaction in that tree.
 
-This is the primary mechanism for teaching Friday X about your project's conventions, so you need not restate them each session.
+This is the primary mechanism for teaching FridayX about your project's conventions, so you need not restate them each session.
 
 ---
 
 ## Supported File Names
 
-Friday X checks for these filenames (in this order) within each directory:
+FridayX checks for these filenames (in this order) within each directory:
 
 - `Agents.md`
 - `Claude.md`
@@ -23,11 +23,11 @@ Friday X checks for these filenames (in this order) within each directory:
 - `AGENT.md`
 - `AGENTS.md`
 
-Friday X loads every matching file in a directory, so a folder that contains both `AGENTS.md` and `CLAUDE.md` contributes both. On case-insensitive filesystems, names that resolve to the same file (such as `Agents.md` and `AGENTS.md`) are deduplicated and counted once. `Claude.md`, `CLAUDE.md`, and `CLAUDE.local.md` are supported for compatibility with Claude Code workflows. When Claude compatibility is enabled (the default), Friday X also scans your home-level `~/.claude/` directory for these filenames and, at each directory level, checks `.claude/CLAUDE.md` and `.claude/CLAUDE.local.md` -- the locations Claude Code uses for project memory. With Cursor compatibility enabled, the home-level `~/.cursor/` directory is scanned the same way.
+FridayX loads every matching file in a directory, so a folder that contains both `AGENTS.md` and `CLAUDE.md` contributes both. On case-insensitive filesystems, names that resolve to the same file (such as `Agents.md` and `AGENTS.md`) are deduplicated and counted once. `Claude.md`, `CLAUDE.md`, and `CLAUDE.local.md` are supported for compatibility with Claude Code workflows. When Claude compatibility is enabled (the default), FridayX also scans your home-level `~/.claude/` directory for these filenames and, at each directory level, checks `.claude/CLAUDE.md` and `.claude/CLAUDE.local.md` -- the locations Claude Code uses for project memory. With Cursor compatibility enabled, the home-level `~/.cursor/` directory is scanned the same way.
 
 ### Rules Directories
 
-In addition to AGENTS.md files, Friday X scans for `*.md` files in rules directories at each level (`<dir>`) from the repo root to the current working directory:
+In addition to AGENTS.md files, FridayX scans for `*.md` files in rules directories at each level (`<dir>`) from the repo root to the current working directory:
 
 | Location | Notes |
 |----------|-------|
@@ -35,7 +35,7 @@ In addition to AGENTS.md files, Friday X scans for `*.md` files in rules directo
 | `<dir>/.claude/rules/` | Claude compatibility (configurable) |
 | `<dir>/.cursor/rules/` | Cursor compatibility (configurable) |
 
-Friday X also scans home-level rules, regardless of where it starts. These roots are already vendor-specific, so rules live directly under `rules/`:
+FridayX also scans home-level rules, regardless of where it starts. These roots are already vendor-specific, so rules live directly under `rules/`:
 
 | Location | Notes |
 |----------|-------|
@@ -57,7 +57,7 @@ Every `*.md` directly inside a listed directory is loaded as a rule (subdirector
 
 ## How Discovery Works
 
-Friday X scans for project rules in this order:
+FridayX scans for project rules in this order:
 
 1. **Home rules**: `$FRIDAY_HOME`, then enabled `~/.claude/` and `~/.cursor/` sources, then `[paths] extra_rule_dirs`
 2. **Repo rules**: If inside a git repo, every directory from the repo root down to the current working directory (inclusive)
@@ -76,16 +76,16 @@ Given this project structure:
       AGENTS.md          # "Use CSS modules for styling."
 ```
 
-When Friday X runs in `~/projects/my-app/src/components/`, it loads all three files. The instructions accumulate, so Friday X sees all of them.
+When FridayX runs in `~/projects/my-app/src/components/`, it loads all three files. The instructions accumulate, so FridayX sees all of them.
 
 ### Deeper Files Take Precedence
 
-Friday X orders the files from the repo root to the current working directory, so files in deeper directories appear later in its context and take precedence when instructions conflict. In the example above, if the root says "Use styled-components" but `components/AGENTS.md` says "Use CSS modules", the CSS modules instruction wins because it appears later.
+FridayX orders the files from the repo root to the current working directory, so files in deeper directories appear later in its context and take precedence when instructions conflict. In the example above, if the root says "Use styled-components" but `components/AGENTS.md` says "Use CSS modules", the CSS modules instruction wins because it appears later.
 
 ### Auto-Loading Behavior
 
-- Friday X loads the files from the repo root to the current working directory automatically at session start.
-- When Friday X reads, lists, or edits files in directories outside that initial set, it detects any project instruction files there, notes their paths, and reads them when they apply to the task.
+- FridayX loads the files from the repo root to the current working directory automatically at session start.
+- When FridayX reads, lists, or edits files in directories outside that initial set, it detects any project instruction files there, notes their paths, and reads them when they apply to the task.
 
 ---
 
@@ -174,15 +174,15 @@ To add rules for a single session without editing files, pass `--rules` (alias `
 friday --rules "Always use TypeScript. Prefer functional components."
 ```
 
-Friday X appends this text to the session's system prompt. Use it for session-specific customization.
+FridayX appends this text to the session's system prompt. Use it for session-specific customization.
 
-To replace the system prompt entirely, pass `--system-prompt-override` (alias `--system-prompt`). Friday X uses the text verbatim and skips both the default system prompt and `--rules`. (Text passed with `--rules`, by contrast, is wrapped in a `<human_rules>` block and appended to the default prompt.)
+To replace the system prompt entirely, pass `--system-prompt-override` (alias `--system-prompt`). FridayX uses the text verbatim and skips both the default system prompt and `--rules`. (Text passed with `--rules`, by contrast, is wrapped in a `<human_rules>` block and appended to the default prompt.)
 
 ---
 
 ## File Size
 
-Friday X loads each project instruction file in full; there is no character cap and no truncation. Even so, keep instructions concise and focused. Shorter, specific rules are easier for Friday X to follow than long ones, and every file you load consumes context.
+FridayX loads each project instruction file in full; there is no character cap and no truncation. Even so, keep instructions concise and focused. Shorter, specific rules are easier for FridayX to follow than long ones, and every file you load consumes context.
 
 ---
 
@@ -195,7 +195,7 @@ Files ignored by `.gitignore` are skipped during discovery. To keep personal ove
 CLAUDE.local.md
 ```
 
-As top-level instruction files, Friday X discovers only the recognized filenames listed under [Supported File Names](#supported-file-names) — not custom names such as `AGENTS.local.md` or `notes.md`. (Inside a rules directory such as `.friday/rules/`, every `*.md` file is loaded regardless of name.)
+As top-level instruction files, FridayX discovers only the recognized filenames listed under [Supported File Names](#supported-file-names) — not custom names such as `AGENTS.local.md` or `notes.md`. (Inside a rules directory such as `.friday/rules/`, every `*.md` file is loaded regardless of name.)
 
 ---
 
@@ -224,7 +224,7 @@ Use `friday inspect` to see all loaded project instructions:
 friday inspect
 ```
 
-This shows each project instruction file it finds, with its path and approximate token count. Use it to confirm Friday X picks up your rules.
+This shows each project instruction file it finds, with its path and approximate token count. Use it to confirm FridayX picks up your rules.
 
 ---
 

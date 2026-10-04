@@ -28,7 +28,7 @@
 //! - [`acp_fixtures`]: Constructors for the ACP values that tests build by hand
 #![deny(clippy::indexing_slicing)]
 /// Multiply a harness timeout by `FRIDAY_TEST_TIMEOUT_SCALE` (positive integer, default 1).
-/// CI lanes on shared runner pools raise it so pool load slows tests instead of failing them (see the Friday X merge CI workflow).
+/// CI lanes on shared runner pools raise it so pool load slows tests instead of failing them (see the FridayX merge CI workflow).
 pub fn scaled(base: std::time::Duration) -> std::time::Duration {
     let scale = std::env::var("FRIDAY_TEST_TIMEOUT_SCALE")
         .ok()

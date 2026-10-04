@@ -94,7 +94,7 @@ pub enum PluginOrigin {
         /// Marketplace name from the `name@marketplace` JSON key, when present.
         marketplace: Option<String>,
     },
-    /// Friday X's install registry (`~/.friday/installed-plugins`).
+    /// FridayX's install registry (`~/.friday/installed-plugins`).
     MarketplaceInstall {
         /// Marketplace source display name (None for direct git/local installs).
         source_name: Option<String>,

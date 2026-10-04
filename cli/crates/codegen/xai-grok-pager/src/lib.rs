@@ -5,7 +5,7 @@
     unreachable_code,
     dead_code
 )]
-//! xai-grok-pager: Friday X TUI.
+//! xai-grok-pager: FridayX TUI.
 //!
 //! A clean-room implementation built on the v3 pager rendering engine.
 #![deny(clippy::indexing_slicing)]

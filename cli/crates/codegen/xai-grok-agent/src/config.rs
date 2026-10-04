@@ -160,7 +160,7 @@ pub fn workspace_grok_build_toolset() -> ToolServerConfig {
         behavior_preset: None,
     }
 }
-/// Fully qualified ids of the workspace tools that call the Friday X API with the workspace server's own credential.
+/// Fully qualified ids of the workspace tools that call the FridayX API with the workspace server's own credential.
 /// A server whose credential only serves the hub cannot run them, so it neither advertises nor serves them.
 pub fn api_backed_tool_ids() -> Vec<String> {
     #[allow(unused_mut)]
@@ -1452,7 +1452,7 @@ impl AgentDefinition {
             tool_config: default_grok_build_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuild,
-                "Friday X agent for software engineering tasks.",
+                "FridayX agent for software engineering tasks.",
             )
         }
     }
@@ -1463,7 +1463,7 @@ impl AgentDefinition {
             agents_md: false,
             ..Self::base(
                 BuiltinAgentName::GrokBuildConcise,
-                "Friday X agent with concise output format.",
+                "FridayX agent with concise output format.",
             )
         }
     }
@@ -1472,7 +1472,7 @@ impl AgentDefinition {
             tool_config: grok_build_plan_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuildPlan,
-                "Friday X agent with plan mode support.",
+                "FridayX agent with plan mode support.",
             )
         }
     }
@@ -1481,7 +1481,7 @@ impl AgentDefinition {
             tool_config: grok_build_plan_no_subagents_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuildPlanNoSubagents,
-                "Friday X agent with plan mode (no subagents).",
+                "FridayX agent with plan mode (no subagents).",
             )
         }
     }
@@ -1490,7 +1490,7 @@ impl AgentDefinition {
             tool_config: grok_build_ask_user_toolset(),
             ..Self::base(
                 BuiltinAgentName::GrokBuildAskUser,
-                "Friday X agent with ask-user-question tool.",
+                "FridayX agent with ask-user-question tool.",
             )
         }
     }

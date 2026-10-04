@@ -1,5 +1,5 @@
 //! Canonical slash-command wording (`/loop`, `/imagine`, `/imagine-video`, `/goal`),
-//! shared by every front-end (Friday X shell/pager and other hosts) so
+//! shared by every front-end (FridayX shell/pager and other hosts) so
 //! expansions cannot drift.
 
 /// Canonical tool name advertised by the scheduler create tool. Gating code

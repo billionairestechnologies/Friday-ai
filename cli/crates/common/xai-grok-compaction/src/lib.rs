@@ -6,7 +6,7 @@
 //! stay in each product host (for example `xai-grok-shell`).
 //!
 //! The crate depends on **neither** a conversation-type crate nor
-//! `xai-grok-sampling-types`. It is decoupled from both Friday X chat and
+//! `xai-grok-sampling-types`. It is decoupled from both FridayX chat and
 //! grok-build hosts through a small set of trait seams:
 //!
 //! - [`CompactionItem`] / [`CompactionRole`] / [`CompactionItemBuilder`] —
@@ -23,8 +23,8 @@
 //!
 //! - [`code_compaction`] — grok-build's whole-session **full-replace**
 //!   subsystem (prompt/summary/failure/config, assemble, orchestration).
-//! - [`intra_compaction`] — Friday X chat's tail-keep, per-step pass.
-//! - [`inter_compaction`] — Friday X chat's chunked, between-turn pass.
+//! - [`intra_compaction`] — FridayX chat's tail-keep, per-step pass.
+//! - [`inter_compaction`] — FridayX chat's chunked, between-turn pass.
 //!
 //! Compaction-type content (parallel subfolders): [`steps`] (the step-level
 //! prompt) and [`history`] (filtering, history prompts, validation +
@@ -34,7 +34,7 @@
 //! [`prompt::CompactionPrompt`], [`select`] (tool-pair-safe tail-keep
 //! selection — shared by the intra `Steps` and `History` targets, so it stays
 //! neutral at the crate root rather than under `steps`), and [`reminder`]
-//! (active-agent-state `<system-reminder>` formatting shared by Friday X chat and
+//! (active-agent-state `<system-reminder>` formatting shared by FridayX chat and
 //! grok-build; hosts still own snapshotting and host-only sections).
 
 pub mod code_compaction;

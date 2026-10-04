@@ -46,7 +46,7 @@ const NAV = [
       { id: "behavior", label: "Behavior", icon: SlidersHorizontal },
       { id: "voice", label: "Voice", icon: AudioLines },
       { id: "notifications", label: "Notifications", icon: Bell },
-      { id: "friday-x", label: "Friday X", icon: Terminal },
+      { id: "friday-x", label: "FridayX", icon: Terminal },
     ],
   },
   {
@@ -655,7 +655,7 @@ function PlanIncludes({ e }: { e: NonNullable<QuotaResponse["entitlements"]> }) 
   const storage = e.libraryStorageMb >= 1024 ? `${+(e.libraryStorageMb / 1024).toFixed(1)} GB` : `${e.libraryStorageMb} MB`;
   const rows: [string, string][] = [
     ["Build Mode", e.buildMode ? `${e.buildMaxRounds} rounds per run` : "Not included"],
-    ["Friday X (terminal + editor)", e.fridayX === false ? "Not included" : "Included"],
+    ["FridayX (terminal + editor)", e.fridayX === false ? "Not included" : "Included"],
     ["Deep Research", e.deepResearchPerDay ? `${e.deepResearchPerDay} per day` : "Not included"],
     ["Documents", `${e.documentsPerDay} per day`],
     ["Custom skills", String(e.customSkills)],
@@ -682,7 +682,7 @@ function PlanIncludes({ e }: { e: NonNullable<QuotaResponse["entitlements"]> }) 
 
 type CliSession = { id: string; name: string; client: string; createdAt: string; lastUsedAt: string | null };
 
-/** Friday X: the one-line install, and the terminals/editors currently signed in (each can be signed out here). */
+/** FridayX: the one-line install, and the terminals/editors currently signed in (each can be signed out here). */
 function FridayXPane() {
   const { user } = useCurrentUserState();
   const signedIn = Boolean(user && !user.isDevFallback);
@@ -726,7 +726,7 @@ function FridayXPane() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h3 className="text-base font-semibold text-foreground">Friday X</h3>
+        <h3 className="text-base font-semibold text-foreground">FridayX</h3>
         <p className="mt-1 text-sm text-muted">Friday's coding agent for your terminal and editor. It uses your Friday plan, models and usage — the same meter as this app.</p>
       </div>
       <div className="flex flex-col gap-3">

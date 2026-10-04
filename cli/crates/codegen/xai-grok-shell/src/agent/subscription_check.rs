@@ -171,8 +171,8 @@ mod tests {
     #[test]
     fn all_paid_tiers_qualify() {
         for tier in &[
-            "SuperGrokPro",
-            "SuperGrokPlus",
+            "Pro",
+            "Pro",
             "GrokPro",
             "SuperGrokLite",
             "XPremiumPlus",

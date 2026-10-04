@@ -1012,7 +1012,7 @@ mod tests {
     /// `parse_list_req` forces the conversations-only `kind` exactly when process chat mode is on; otherwise the client request is untouched.
     #[test]
     #[serial_test::serial]
-    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
+    #[ignore = "remote relay/sync/share services of the original product are removed in FridayX"]
     fn parse_list_req_forces_kind_under_process_chat_mode_only() {
         use crate::agent::chat_modes::FRIDAY_CHAT_MODE_ENV;
         let raw = serde_json::json!({

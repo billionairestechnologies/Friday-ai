@@ -1,13 +1,13 @@
 # Terminal Support and Troubleshooting
 
-Friday X runs as a full-screen TUI. It relies on terminal support for color,
+FridayX runs as a full-screen TUI. It relies on terminal support for color,
 clipboard, keyboard input, mouse input, and full-screen display. Terminals,
 multiplexers, containers, and SSH sessions can handle these features differently.
 
 ## Diagnose and Fix Terminal Problems
 
-Run `/doctor` in Friday X to check the current session and see available fixes. If
-Friday X cannot start, run `friday doctor` in your shell. Use `friday doctor --json`
+Run `/doctor` in FridayX to check the current session and see available fixes. If
+FridayX cannot start, run `friday doctor` in your shell. Use `friday doctor --json`
 for a machine-readable report.
 
 Doctor checks the terminal, multiplexer, color support, keyboard and newline
@@ -36,11 +36,11 @@ Doctor can persist these four tmux options:
 A tmux fix edits only the persistent config on the computer hosting the affected
 tmux server, including remote sessions. Plain tmux uses the real
 `$HOME/.tmux.conf`; Byobu-tmux uses its effective `BYOBU_CONFIG_DIR` and refuses
-to guess if that directory is unavailable or unsafe. Friday X preserves the file's
+to guess if that directory is unavailable or unsafe. FridayX preserves the file's
 line endings and mode, makes a backup when changing an existing file, and
 refuses conflicting or ambiguous direct assignments.
 
-Friday X deliberately does **not** run `tmux source-file` or change the live tmux
+FridayX deliberately does **not** run `tmux source-file` or change the live tmux
 server. Reload with the exact command shown after apply, or detach and reattach,
 then run `/doctor` again. Until reload, the live finding is expected to remain.
 The conservative config scan checks direct global assignments only; review
@@ -50,7 +50,7 @@ sourced files, conditionals, plugins, and generated tmux setup yourself.
 
 ## Detected Terminals
 
-Friday X detects these terminal emulators from environment variables:
+FridayX detects these terminal emulators from environment variables:
 
 - **Apple Terminal**
 - **Ghostty**
@@ -63,13 +63,13 @@ Friday X detects these terminal emulators from environment variables:
 - **foot** (Wayland-native, Linux)
 - **VS Code**, **Cursor**, **Windsurf**, and **Zed** integrated terminals
 - **JetBrains** IDE terminals
-- **Friday X Desktop**
+- **FridayX Desktop**
 - **VTE**-based terminals such as GNOME Terminal, GNOME Console, and Tilix
 - **Windows Terminal**
 
 Detection has these limitations:
 
-- Inside tmux, variables that identify the outer terminal may not reach Friday X.
+- Inside tmux, variables that identify the outer terminal may not reach FridayX.
 - Over SSH, many terminal variables are not forwarded.
 - tmux's global environment reflects the first client attached to the server,
   not necessarily the current terminal.
@@ -83,7 +83,7 @@ Detection has these limitations:
 Run `/doctor`. A fully supported setup shows `color truecolor` and `themes all`.
 If it does not, Doctor shows the detected limitation and the relevant fix.
 
-Inside tmux there are two separate questions: what color Friday X emits, and what
+Inside tmux there are two separate questions: what color FridayX emits, and what
 color survives the multiplexer. The `color` line answers the first. For the
 second, when the attached client is not marked `RGB`, tmux rewrites every
 24-bit color to the nearest color the outer terminal's terminfo advertises,
@@ -95,17 +95,17 @@ step alone changes anything.
 
 ### Clipboard problems
 
-Friday X writes through up to three routes, shown in `/doctor` under **Clipboard**:
+FridayX writes through up to three routes, shown in `/doctor` under **Clipboard**:
 
 - **native** — the local operating-system clipboard.
-- **tmux** — the tmux paste buffer when Friday X runs inside tmux.
+- **tmux** — the tmux paste buffer when FridayX runs inside tmux.
 - **OSC 52** — an escape sequence that can cross tmux, containers, or SSH.
 
 #### Wayland
 
 Modern Wayland compositors can update the clipboard without keeping the
-terminal focused. Older compositors may require Friday X to remain focused until
-the copy message appears. Friday X shows a startup warning when this applies; run
+terminal focused. Older compositors may require FridayX to remain focused until
+the copy message appears. FridayX shows a startup warning when this applies; run
 `/doctor` for the detected status and steps.
 
 `FRIDAY_CLIPBOARD_NO_DATA_CONTROL=1` is an advanced fallback that disables the
@@ -113,9 +113,9 @@ data-control route. Copies then use command-line clipboard tools.
 
 #### OSC 52 kill switch
 
-Friday X emits OSC 52 on Linux and across tmux, SSH, or displayless containers when
+FridayX emits OSC 52 on Linux and across tmux, SSH, or displayless containers when
 that route is enabled. A terminal that does not implement OSC 52 may display the
-encoded payload as text. Set `FRIDAY_CLIPBOARD_NO_OSC52=1` before starting Friday X to
+encoded payload as text. Set `FRIDAY_CLIPBOARD_NO_OSC52=1` before starting FridayX to
 disable that route. `/doctor` then shows `osc 52 off`; native and tmux routes are
 unchanged.
 
@@ -130,11 +130,11 @@ X11 **PRIMARY** and **CLIPBOARD** are separate:
 
 #### SSH and selected text
 
-A remote Friday X process normally cannot read the local terminal's selection. Use
+A remote FridayX process normally cannot read the local terminal's selection. Use
 terminal-native `Shift+Insert`, or hold `Shift` while middle-clicking when the
 terminal uses that gesture to bypass mouse reporting.
 
-When Friday X cannot identify the outer terminal over SSH, it predicts that OSC 52
+When FridayX cannot identify the outer terminal over SSH, it predicts that OSC 52
 will be sent but marks the route as not verified. The copy toast then names the
 backup file so you can retrieve the text. Run `/doctor` for other copy options.
 
@@ -151,7 +151,7 @@ through `friday wrap`, for example `friday wrap ssh user@host`. The same command
 wrap container and pod shells. It also restores terminal modes after a dropped
 connection.
 
-When an SSH session is not using `friday wrap`, Friday X shows the one-time tip
+When an SSH session is not using `friday wrap`, FridayX shows the one-time tip
 “Run `/doctor` for details and fixes.” The tip stops appearing after the session
 is launched through wrap. Turn it off with `/settings` → **Show contextual
 hints** → **SSH wrap**, or set `ssh_wrap = false` under
@@ -173,14 +173,14 @@ check.
 
 ### Fullscreen or alternate screen does not activate
 
-Zellij and tmux control mode can limit the alternate screen. Friday X normally uses
+Zellij and tmux control mode can limit the alternate screen. FridayX normally uses
 inline mode in those environments. Run `/doctor` to see the detected condition.
 You can configure `[terminal] alt_screen` in `~/.friday/pager.toml`, or run
 `friday --no-alt-screen` to confirm inline mode works.
 
-### Zellij keybindings interfere with Friday X
+### Zellij keybindings interfere with FridayX
 
-Zellij can intercept Ctrl/Alt keys before they reach Friday X. On Zellij 0.41 or
+Zellij can intercept Ctrl/Alt keys before they reach FridayX. On Zellij 0.41 or
 later, use the **Unlock-First (non-colliding)** preset:
 
 1. Press `Ctrl+o`, then `c`.
@@ -189,14 +189,14 @@ later, use the **Unlock-First (non-colliding)** preset:
 4. Press `Enter` to apply it.
 
 Press `Ctrl+g` when you need Zellij's own pane or session controls. In minimal
-mode, if `Ctrl+G` still does not reach Friday X, open the command palette and select
+mode, if `Ctrl+G` still does not reach FridayX, open the command palette and select
 **Edit Prompt in External Editor**. This preserves the current draft; typing
 `/edit-prompt` starts an empty editor draft because the command itself occupies
 the composer.
 
 ### Ctrl+Enter does not interject in WezTerm
 
-WezTerm ships with the Kitty keyboard protocol disabled. Run `/doctor` in Friday X.
+WezTerm ships with the Kitty keyboard protocol disabled. Run `/doctor` in FridayX.
 The `terminal.wezterm-kitty` finding shows the setting and restart step. Over
 SSH, Doctor shows only the workaround that can work in the current session.
 Apple Terminal uses `Ctrl+O` for interjection because it cannot distinguish the
@@ -206,14 +206,14 @@ modified Enter chord.
 
 VS Code, Cursor, Windsurf, and Zed terminals use xterm.js, which only partially
 implements the Kitty keyboard protocol and mis-encodes some shifted printable
-keys. Friday X therefore does not negotiate the protocol there, and Shift+Enter can
+keys. FridayX therefore does not negotiate the protocol there, and Shift+Enter can
 arrive as the same `CR` as Enter. This also affects VS Code reached over SSH when
 `TERM_PROGRAM` is not forwarded. Use `Alt+Enter` to insert a newline; `/doctor`
 reports `terminal.newline-fallback` with the detected explanation and workaround.
 
 ### Cmd+Enter is not an advertised send or newline chord
 
-`Cmd+Enter` is not an advertised send or newline chord. Friday X advertises
+`Cmd+Enter` is not an advertised send or newline chord. FridayX advertises
 only `Shift+Enter` and `Alt+Enter` as newline. Many terminals bind
 Cmd+Enter to fullscreen, so `SUPER` is excluded from the newline matcher,
 and a delivered `SUPER+Enter` does not match the agent's bare-Enter send
@@ -232,23 +232,23 @@ session.
 
 ### Mouse scrolling stops working
 
-If Friday X stops receiving mouse input, re-enable mouse reporting in the terminal:
+If FridayX stops receiving mouse input, re-enable mouse reporting in the terminal:
 
 - **Apple Terminal**: **View → Allow Mouse Reporting** (`Cmd+R`).
 - **iTerm2**: **Settings → Profiles → Terminal → Enable mouse reporting**.
 
 ### Voice dictation records nothing
 
-After about 10 seconds without a transcript, Friday X stops capture and shows
+After about 10 seconds without a transcript, FridayX stops capture and shows
 **“No speech was detected. Voice stopped.”** with microphone fix steps. On macOS,
 a denied microphone grant can look the same as silence because permission belongs
-to the terminal hosting Friday X. Open **System Settings → Privacy & Security →
+to the terminal hosting FridayX. Open **System Settings → Privacy & Security →
 Microphone**, enable the terminal, and restart it. If access is already on, check
 the input device and level under **System Settings → Sound → Input** and try
 again.
 
 Run `friday doctor`, or run `/doctor` while voice mode is on. The **Voice** section
-shows the microphone Friday X would use. If no input device is available, Doctor
+shows the microphone FridayX would use. If no input device is available, Doctor
 shows `voice.no-input-device` and the next steps. Doctor cannot detect denied
 macOS microphone access passively when macOS supplies silence.
 
@@ -265,7 +265,7 @@ Byobu on GNU screen has limited support. `/doctor` reports
 ### Arabic and Persian (RTL) text
 
 Many terminals already reorder right-to-left text themselves (VTE-based
-terminals, Terminal.app, Konsole, mlterm, and others). Friday X therefore
+terminals, Terminal.app, Konsole, mlterm, and others). FridayX therefore
 **does not** reorder RTL by default.
 
 If Arabic or Persian in **scrollback** (or list content) reads backwards,

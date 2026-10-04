@@ -1,4 +1,4 @@
-# Friday X — test status (CLI)
+# FridayX — test status (CLI)
 
 Run (needs `protoc`; the shell suite wants a bigger stack):
 
@@ -17,7 +17,7 @@ python3 scripts/audit-egress.py                                       # no vendo
 
 ## Deliberately ignored (`#[ignore = "<reason>"]`, each test carries its reason)
 
-Tests of features Friday X removed: voice dictation, vendor subscription/billing tiers, the official plugin marketplace,
+Tests of features FridayX removed: voice dictation, vendor subscription/billing tiers, the official plugin marketplace,
 trace/feedback upload and session sync, managed bundle sync, the remote relay/share services, vendor-hosted media and
 search tools, the data-sharing banner. They stay in the tree (ignored, not deleted) so what was switched off is visible.
 
@@ -28,7 +28,7 @@ search tools, the data-sharing banner. They stay in the tree (ignored, not delet
 * `xai-grok-login`: 23 tests of the inherited OIDC machinery fail when the crate is built alone, because the JSON-web-token
   library cannot pick a crypto provider for that package subset; they are unrelated to Friday's changes.
 * `xai-grok-shell`: **106 tests** that cover authentication flows (token refresh/401 handling, credential selection) and
-  data-handling flags (what is collected or retained). They encode the original product's behaviour, which Friday X
+  data-handling flags (what is collected or retained). They encode the original product's behaviour, which FridayX
   deliberately replaced (a non-refreshing device token; nothing collected). They were NOT silenced automatically:
   each should be reviewed, then either adapted to Friday's behaviour or ignored with a reason by a person.
 

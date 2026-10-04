@@ -121,7 +121,7 @@ pub struct OAuth2ProviderConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub referrer: Option<String>,
 }
-/// Production Friday X API root, the only OAuth2 issuer this client knows (`FRIDAY_X_URL` moves it, see `xai_oauth2_issuer`).
+/// Production FridayX API root, the only OAuth2 issuer this client knows (`FRIDAY_X_URL` moves it, see `xai_oauth2_issuer`).
 #[cfg(not(test))]
 pub const XAI_OAUTH2_ISSUER: &str = "https://friday.billionairestechnologies.com/api/x";
 /// The inherited login suite is written against the original issuer's fixtures (see `backend::ActiveAuthBackend`).

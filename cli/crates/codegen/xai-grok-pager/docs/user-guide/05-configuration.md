@@ -1,6 +1,6 @@
 # Configuration
 
-Friday X reads settings from config files, environment variables, and CLI flags. This page covers the common options. The field list for `config.toml`, `managed_config.toml`, and `requirements.toml` is [26-config-reference.md](26-config-reference.md) (extracted to `~/.friday/docs/user-guide/` on launch).
+FridayX reads settings from config files, environment variables, and CLI flags. This page covers the common options. The field list for `config.toml`, `managed_config.toml`, and `requirements.toml` is [26-config-reference.md](26-config-reference.md) (extracted to `~/.friday/docs/user-guide/` on launch).
 
 ---
 
@@ -27,7 +27,7 @@ A harness or ACP client that launches `friday agent stdio` can inject settings w
 - **`FRIDAY_CONFIG`**: an inline JSON object overlay.
 - **`FRIDAY_CONFIG_PATH`**: an *additional* file overlay (not a replacement for `config.toml`), a JSON or TOML file read by its extension (`.json` → JSON, else TOML). `FRIDAY_CONFIG` wins if both are set. An empty `FRIDAY_CONFIG` is treated as unset, and a malformed one logs a warning and falls through to `FRIDAY_CONFIG_PATH`.
 
-The overlay is **deep-merged** on top of your `config.toml` (it overrides only the keys it sets), placed above the user/managed layers but **below** `requirements.toml` / MDM so an enterprise pin still wins. A malformed blob is ignored with a warning. This mirrors `CODEX_CONFIG` from the `codex-acp` adapter (a JSON object merged into the session config); Friday X is ACP-native, so the overlay lives in the agent itself. It only affects settings read from the merged config, and it is **not** a permission-escalation path. The overlay is confined, fail-closed, to an **allowlist** of soft settings (`models`, `features`, a narrowed `toolset`, and a `shell_environment_policy` limited to its filter fields, which select among env names the launcher already controls and cannot inject an env value into tool subprocesses); every other table is dropped at the choke point, so the overlay cannot spawn commands, set auth policy, redirect network traffic, elevate trust, or add a discovery source. Even on the allowlisted settings, a specific set of security gates read the raw disk layers rather than the overlay. The `ConfigLayers::env_overlay` rustdoc is the canonical list of what the overlay can and cannot reach and which gates read it overlay-free; see also the [internal environment-variables reference](../internal/22-environment-variables.md). Use `FRIDAY_DEFAULT_SELECTED_PERMISSION` for headless permission control. For example, to set the default reasoning effort:
+The overlay is **deep-merged** on top of your `config.toml` (it overrides only the keys it sets), placed above the user/managed layers but **below** `requirements.toml` / MDM so an enterprise pin still wins. A malformed blob is ignored with a warning. This mirrors `CODEX_CONFIG` from the `codex-acp` adapter (a JSON object merged into the session config); FridayX is ACP-native, so the overlay lives in the agent itself. It only affects settings read from the merged config, and it is **not** a permission-escalation path. The overlay is confined, fail-closed, to an **allowlist** of soft settings (`models`, `features`, a narrowed `toolset`, and a `shell_environment_policy` limited to its filter fields, which select among env names the launcher already controls and cannot inject an env value into tool subprocesses); every other table is dropped at the choke point, so the overlay cannot spawn commands, set auth policy, redirect network traffic, elevate trust, or add a discovery source. Even on the allowlisted settings, a specific set of security gates read the raw disk layers rather than the overlay. The `ConfigLayers::env_overlay` rustdoc is the canonical list of what the overlay can and cannot reach and which gates read it overlay-free; see also the [internal environment-variables reference](../internal/22-environment-variables.md). Use `FRIDAY_DEFAULT_SELECTED_PERMISSION` for headless permission control. For example, to set the default reasoning effort:
 
 ```bash
 FRIDAY_CONFIG='{"models": {"default_reasoning_effort": "high"}}' friday agent stdio
@@ -37,7 +37,7 @@ FRIDAY_CONFIG='{"models": {"default_reasoning_effort": "high"}}' friday agent st
 
 ## config.toml (main configuration)
 
-Location: `~/.friday/config.toml`. If the file is missing, Friday X uses its built-in defaults, so you only need to set the values you want to override.
+Location: `~/.friday/config.toml`. If the file is missing, FridayX uses its built-in defaults, so you only need to set the values you want to override.
 
 ### General settings
 
@@ -127,7 +127,7 @@ name = "my-custom-agent"
 # definition = "/path/to/agent.md"   # path wins over name
 ```
 
-`definition` is a markdown file with YAML frontmatter. `name` is a built-in or discovered agent (`~/.friday/agents/`, `.friday/agents/`). If the named agent is missing, Friday X uses `FRIDAY_AGENT`, then the built-in default. `--agent-profile`, `--plan`, and `--ask-user` still override that session. Field list: [26-config-reference.md](26-config-reference.md).
+`definition` is a markdown file with YAML frontmatter. `name` is a built-in or discovered agent (`~/.friday/agents/`, `.friday/agents/`). If the named agent is missing, FridayX uses `FRIDAY_AGENT`, then the built-in default. `--agent-profile`, `--plan`, and `--ask-user` still override that session. Field list: [26-config-reference.md](26-config-reference.md).
 
 #### Input mode
 
@@ -145,7 +145,7 @@ To switch the prompt to vim-style editing:
 simple_mode = false
 ```
 
-You can also flip it from the settings pane (`/settings` → **Disable vim input mode**); Friday X writes your choice to `[ui] simple_mode`. `simple_mode` and `vim_mode` are independent — one governs the prompt editor, the other governs scrollback navigation. See [Keyboard Shortcuts](03-keyboard-shortcuts.md) for the full binding reference.
+You can also flip it from the settings pane (`/settings` → **Disable vim input mode**); FridayX writes your choice to `[ui] simple_mode`. `simple_mode` and `vim_mode` are independent — one governs the prompt editor, the other governs scrollback navigation. See [Keyboard Shortcuts](03-keyboard-shortcuts.md) for the full binding reference.
 
 #### Default selected permission
 
@@ -178,7 +178,7 @@ You can also override this with `FRIDAY_DEFAULT_SELECTED_PERMISSION`, which is h
 | `false` (default) | Bare-letter and `Shift+letter` keys (`j`/`k`, `h`/`l`, `g`/`G`, `y`/`Y`, `o`/`O`, `r`, `x`, `e`/`E`, `H`/`L`, plus `i`) are suppressed in the scrollback: pressing one focuses the prompt and types the character. Arrows, `Tab`, `Space`, `PageUp`/`PageDown`, and every `Ctrl+letter` shortcut still navigate. `Esc` is **not** a scrollback key — it never cancels a running turn (`Ctrl+C` does), and while idle follows the clear / rewind policy (see [Keyboard Shortcuts](03-keyboard-shortcuts.md#escape)). |
 | `true` | All vim-style scrollback bindings are active, exactly as listed in [Keyboard Shortcuts](03-keyboard-shortcuts.md). Esc behavior is the same in both settings. |
 
-Toggle it at runtime with `/vim-mode`, or from `/settings` → **Vim scrollback navigation**. Friday X writes the change to `[ui] vim_mode` immediately and applies it to every future pager session, including new agents and subagents in the same process. There's no per-session override — `config.toml` is the source of truth on next launch. `vim_mode` is independent of `simple_mode`.
+Toggle it at runtime with `/vim-mode`, or from `/settings` → **Vim scrollback navigation**. FridayX writes the change to `[ui] vim_mode` immediately and applies it to every future pager session, including new agents and subagents in the same process. There's no per-session override — `config.toml` is the source of truth on next launch. `vim_mode` is independent of `simple_mode`.
 
 #### Screen mode
 
@@ -438,7 +438,7 @@ disabled = ["user/a1b2c3d4/noisy-plugin"]
 
 ### Hints
 
-`[hints]` holds small persisted UI preferences: remembered answers and modal layout. Friday X writes these for you as you use the TUI, but you can edit or delete them by hand; removing a key restores the default.
+`[hints]` holds small persisted UI preferences: remembered answers and modal layout. FridayX writes these for you as you use the TUI, but you can edit or delete them by hand; removing a key restores the default.
 
 `[hints]` is read from the **effective config merge**, with the usual precedence: system managed → user `managed_config.toml` → user `config.toml` → user `requirements.toml` → system `requirements.toml`, higher layers winning. The TUI only ever **writes** these to your user `~/.friday/config.toml`.
 
@@ -497,10 +497,10 @@ items = ["action-required", "spinner", "activity", "session-name", "grok"]
 | VS Code | BEL | Yes | No |
 | Apple Terminal | BEL | No | No |
 | VTE (GNOME Terminal) | OSC 777 | Yes | No |
-| Friday X Desktop | None (native) | N/A | N/A |
+| FridayX Desktop | None (native) | N/A | N/A |
 | Unknown | BEL | No | No |
 
-With `method = "auto"`, Friday X detects the terminal brand and picks the best protocol. Set `method` explicitly to override that.
+With `method = "auto"`, FridayX detects the terminal brand and picks the best protocol. Set `method` explicitly to override that.
 
 #### Notification hooks
 
@@ -509,7 +509,7 @@ Run your own commands when events fire. Hooks receive `$FRIDAY_EVENT`, `$FRIDAY_
 ```toml
 # macOS native notification
 [[ui.notifications.hooks]]
-command = "terminal-notifier -title 'Friday X' -message '$FRIDAY_MESSAGE'"
+command = "terminal-notifier -title 'FridayX' -message '$FRIDAY_MESSAGE'"
 events = ["turn_complete", "approval_required"]
 only_unfocused = true
 timeout_secs = 10
@@ -579,7 +579,7 @@ mixpanel_enabled = false                                  # disable Mixpanel pro
 trace_upload = false                                      # disable session/trace uploads (inherits the telemetry toggle when unset)
 ```
 
-Set these only to point telemetry at your own infrastructure or to switch parts off. The built-in endpoint and credentials are managed by Friday X — leave them unset to use the defaults.
+Set these only to point telemetry at your own infrastructure or to switch parts off. The built-in endpoint and credentials are managed by FridayX — leave them unset to use the defaults.
 
 The same `[telemetry]` table also configures the **external OpenTelemetry stream**, an independent opt-in (it doesn't require the telemetry toggle above) that ships a curated, content-free usage schema to your *own* OTLP collector. Collector auth comes from `OTEL_EXPORTER_OTLP_HEADERS` and is never stored on disk. See [Monitoring & Usage](24-monitoring-usage.md) for the full schema, env vars, and privacy model.
 
@@ -658,7 +658,7 @@ default = "company-grok"
 [model.company-grok]
 model = "grok-4.6"
 base_url = "https://grok-proxy.acme.com/"
-name = "Friday X 4.6 (Proxy)"
+name = "FridayX 4.6 (Proxy)"
 context_window = 128000
 
 [features]
@@ -853,7 +853,7 @@ The key ones. See the README for the complete list.
 | `.friday/hooks/` | Project-scoped hooks |
 | `.friday/lsp.json` | LSP server configuration |
 
-### How Friday X saves `config.toml`
+### How FridayX saves `config.toml`
 
 Writes to **`~/.friday/config.toml`** (`/settings`, `/vim-mode`, and other user-config saves) follow a leaf symlink. The atomic rename writes the referent (a file in your dotfiles repo). The link stays a link. If the link is dangling, the write creates the referent as a regular file.
 

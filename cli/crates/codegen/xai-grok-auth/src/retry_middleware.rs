@@ -61,13 +61,13 @@ impl Middleware for AuthRetryMiddleware {
         extensions: &mut http::Extensions,
         next: Next<'_>,
     ) -> Result<Response, Error> {
-        // Friday X only calls a short list of Friday endpoints (see `xai_grok_env::FRIDAY_ALLOWED_API_PATHS`);
+        // FridayX only calls a short list of Friday endpoints (see `xai_grok_env::FRIDAY_ALLOWED_API_PATHS`);
         // a request to any other path on the Friday origin is a leftover from the original product and is
         // refused here, before it is built, stamped or sent.
         if !xai_grok_env::friday_request_allowed(req.url().as_str()) {
-            tracing::debug!(path = %req.url().path(), "refused: not a Friday X endpoint");
+            tracing::debug!(path = %req.url().path(), "refused: not a FridayX endpoint");
             return Err(Error::Middleware(anyhow::anyhow!(
-                "this request is not available in Friday X"
+                "this request is not available in FridayX"
             )));
         }
         if let Some(ref token) = self.credentials.snapshot().token {

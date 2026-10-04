@@ -204,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
+    #[ignore = "remote relay/sync/share services of the original product are removed in FridayX"]
     fn share_works_outside_the_5m_early_invalidation_window() {
         let (mgr, _dir) = make_auth_manager_with_token_expiring_in(Duration::minutes(10));
         assert!(mgr.current().is_some());
@@ -212,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
+    #[ignore = "remote relay/sync/share services of the original product are removed in FridayX"]
     fn share_succeeds_inside_the_5m_early_invalidation_window() {
         let (mgr, _dir) = make_auth_manager_with_token_expiring_in(Duration::seconds(1));
         // The regression state: the token sits inside the early-invalidation buffer

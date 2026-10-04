@@ -512,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
+    #[ignore = "fixture names an original-product model/connector that FridayX does not ship"]
     fn section_description_lines_managed_includes_connectors_url() {
         let lines = section_description_lines(&McpSectionId::Managed, None);
         let [first, second] = lines.as_slice() else {
@@ -537,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
+    #[ignore = "fixture names an original-product model/connector that FridayX does not ship"]
     fn managed_connectors_url_display_strips_scheme() {
         assert_eq!(managed_connectors_url_display(None), "grok.com/connectors");
         assert_eq!(

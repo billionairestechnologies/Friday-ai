@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// Friday X state directory (`$FRIDAY_HOME` or `~/.friday`).
+/// FridayX state directory (`$FRIDAY_HOME` or `~/.friday`).
 pub(crate) fn grok_home() -> PathBuf {
     xai_grok_config::grok_home()
 }

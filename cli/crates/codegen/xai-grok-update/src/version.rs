@@ -10,10 +10,10 @@ use xai_grok_shell::env::GrokBuildEnvironment;
 use xai_grok_shell::util::grok_home::grok_home;
 
 const TTL_SECONDS_BEFORE_AUTO_UPDATE: Duration = Duration::from_secs(60 * 30);
-const NPM_PACKAGE: &str = ""; // Friday X is not distributed through npm
-pub const GH_RELEASE_REPO: &str = ""; // Friday X releases are served by the Friday backend (/x), not GitHub
+const NPM_PACKAGE: &str = ""; // FridayX is not distributed through npm
+pub const GH_RELEASE_REPO: &str = ""; // FridayX releases are served by the Friday backend (/x), not GitHub
 
-/// Friday X updates come from one place: the Friday backend's `/x` surface (`/x/version`, `/x/download/<platform>`,
+/// FridayX updates come from one place: the Friday backend's `/x` surface (`/x/version`, `/x/download/<platform>`,
 /// `/x/sha256/<platform>`), the same one the installers use. The server decides which version is current, so a bad
 /// release is paused there (FRIDAY_X_VERSION_PIN) without touching any installed copy.
 pub(crate) fn friday_cli_base_url() -> String {

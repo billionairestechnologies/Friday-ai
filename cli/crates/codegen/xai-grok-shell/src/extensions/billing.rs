@@ -1,6 +1,6 @@
 //! `friday/billing` extension handler.
 //!
-//! Fetches the authenticated user's Friday X billing configuration (credit limit, usage, on-demand cap, billing period, history) from the backend.
+//! Fetches the authenticated user's FridayX billing configuration (credit limit, usage, on-demand cap, billing period, history) from the backend.
 //! The pager and desktop use it to display credits and usage.
 
 use agent_client_protocol as acp;
@@ -52,7 +52,7 @@ pub struct BillingPeriodUsage {
     pub total_used: Option<Cent>,
 }
 
-/// Current billing configuration for Friday X coding credits. Carries the newer credits-config fields (`credit_usage_percent`, `current_period`).
+/// Current billing configuration for FridayX coding credits. Carries the newer credits-config fields (`credit_usage_percent`, `current_period`).
 /// It also carries the deprecated `GrokBuildBillingConfig` fields (`monthly_limit`, `used`, `billing_period_*`). Consumers should prefer the new fields and fall back to the deprecated ones.
 /// The same struct then works against both the new `GetGrokCreditsConfig` and the legacy `GetGrokBuildBillingConfig` responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,7 +103,7 @@ pub struct BillingConfigResponse {
     /// It comes from `RemoteSettings`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_demand_enabled: Option<bool>,
-    /// User-friendly subscription tier name (e.g. "SuperGrok Heavy").
+    /// User-friendly subscription tier name (e.g. "Premium").
     /// It comes from `RemoteSettings` so the pager can update its cached tier on every billing fetch without an extra request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscription_tier: Option<String>,
@@ -421,7 +421,7 @@ mod tests {
                 ],
             }),
             on_demand_enabled: Some(true),
-            subscription_tier: Some("SuperGrok".into()),
+            subscription_tier: Some("Friday Pro".into()),
         };
         let ctx = billing_unified_log_ctx(&resp);
         assert_eq!(
@@ -430,7 +430,7 @@ mod tests {
         );
         assert_eq!(
             ctx.get("subscriptionTier").and_then(|v| v.as_str()),
-            Some("SuperGrok")
+            Some("Friday Pro")
         );
         let config = ctx
             .get("config")

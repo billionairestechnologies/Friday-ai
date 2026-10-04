@@ -565,7 +565,7 @@ pub async fn apply_post_login_config(
         }
         xai_grok_cloud_config::managed_config::ManagedConfigSync::Staged => {
             eprintln!(
-                "Managed configuration update verified; it takes effect the next time Friday X starts."
+                "Managed configuration update verified; it takes effect the next time FridayX starts."
             );
         }
         _ => {}

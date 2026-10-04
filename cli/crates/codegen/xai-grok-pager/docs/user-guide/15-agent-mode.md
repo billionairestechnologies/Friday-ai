@@ -1,6 +1,6 @@
 # Agent mode (ACP) and IDE integration
 
-Agent mode runs Friday X as a long-lived server that clients talk to over [ACP](https://agentclientprotocol.com) (JSON-RPC). Use it from IDEs, SDKs, eval harnesses, and custom apps. For a one-shot prompt that prints and exits, use `grok -p` instead ([headless mode](14-headless-mode.md)).
+Agent mode runs FridayX as a long-lived server that clients talk to over [ACP](https://agentclientprotocol.com) (JSON-RPC). Use it from IDEs, SDKs, eval harnesses, and custom apps. For a one-shot prompt that prints and exits, use `grok -p` instead ([headless mode](14-headless-mode.md)).
 
 ---
 
@@ -32,7 +32,7 @@ Interactive TUI users typically leave the default ask mode (or use auto). See [P
 
 ## What is ACP?
 
-The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) defines how clients talk to coding agents over JSON-RPC. With Friday X it covers:
+The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) defines how clients talk to coding agents over JSON-RPC. With FridayX it covers:
 
 - Sessions (create, load, resume)
 - Prompts and streamed replies
@@ -79,7 +79,7 @@ friday agent --always-approve serve --bind 127.0.0.1:2419 --secret <token>
 
 Clients connect over WebSocket and authenticate with the secret token. If you omit `--secret`, the agent prints a generated token at startup, or set `FRIDAY_AGENT_SECRET`. The process keeps state across client reconnects. Permissions match other entry points; see [Permissions and safety](22-permissions-and-safety.md).
 
-This is a server you run yourself — Friday X's hosted cloud sandboxes do not run `friday agent serve`.
+This is a server you run yourself — FridayX's hosted cloud sandboxes do not run `friday agent serve`.
 
 ---
 
@@ -141,7 +141,7 @@ Each update names its type, so a client can render distinct panels for reasoning
 
 ## Extension methods
 
-Beyond the base ACP protocol, Friday X defines extension methods under the `friday/` prefix for SpaceXAI-specific functionality. These cover:
+Beyond the base ACP protocol, FridayX defines extension methods under the `friday/` prefix for SpaceXAI-specific functionality. These cover:
 
 | Category                   | Prefix               | Examples                                         |
 | -------------------------- | -------------------- | ------------------------------------------------ |

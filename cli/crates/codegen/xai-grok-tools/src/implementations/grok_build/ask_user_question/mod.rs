@@ -150,7 +150,7 @@ pub struct QuestionOption {
     )]
     pub preview: Option<String>,
 
-    /// Opaque id; hidden from the model. Friday X callers leave it `None`.
+    /// Opaque id; hidden from the model. FridayX callers leave it `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(skip)]
     pub id: Option<String>,

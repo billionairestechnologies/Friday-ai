@@ -1455,7 +1455,7 @@ mod official_source_tests {
     }
 
     #[test]
-    #[ignore = "the official plugin marketplace source is removed in Friday X"]
+    #[ignore = "the official plugin marketplace source is removed in FridayX"]
     fn pre_existing_official_source_in_known_marketplaces_skips_append() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path();
@@ -1484,7 +1484,7 @@ mod official_source_tests {
     }
 
     #[test]
-    #[ignore = "the official plugin marketplace source is removed in Friday X"]
+    #[ignore = "the official plugin marketplace source is removed in FridayX"]
     fn pre_existing_official_source_in_extra_known_marketplaces_skips_append() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path();

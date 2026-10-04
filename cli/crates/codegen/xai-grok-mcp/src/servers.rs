@@ -59,7 +59,7 @@ pub use xai_grok_workspace_types::MCP_TOOL_NAME_DELIMITER;
 
 /// Routing hint for first-party local app MCP endpoints: which agent/session a request belongs to. **Advisory only, never authentication** — any local process can set it, so receivers must not treat it as proof of identity.
 /// Caller-supplied configs cannot smuggle it: the header is stripped from every HTTP/SSE config and re-added only when the spawn context asks for it (mirroring the `FRIDAY_SESSION_ID` env protection on stdio servers).
-pub const FRIDAY_AGENT_ID_HEADER: &str = "X-Friday X-Agent-ID";
+pub const FRIDAY_AGENT_ID_HEADER: &str = "X-FridayX-Agent-ID";
 
 /// Reqwest 0.13 twin of the 0.12 adapters in `xai_grok_extra_ca`.
 fn with_extra_root_certificates(mut builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {

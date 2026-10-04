@@ -1,4 +1,4 @@
-# Friday X in your editor
+# FridayX in your editor
 
 One engine, every editor. The agent, the login and the model access are the same `friday` CLI and the same Friday
 backend everywhere, so VS Code, JetBrains, Zed and the terminal share your account, your plan, the model list and
@@ -8,7 +8,7 @@ next start: no extension update.
 | Editor | How | Status |
 |---|---|---|
 | **VS Code** (and forks: Cursor, Windsurf, VSCodium) | the extension in [`vscode/`](vscode) | built, packages to a `.vsix` |
-| **JetBrains IDEs** (IntelliJ, PyCharm, WebStorm, GoLand, Rider, …) | Agent Client Protocol (ACP): add Friday X as a custom agent | works with the CLI today |
+| **JetBrains IDEs** (IntelliJ, PyCharm, WebStorm, GoLand, Rider, …) | Agent Client Protocol (ACP): add FridayX as a custom agent | works with the CLI today |
 | **Zed** | ACP custom agent | works with the CLI today |
 | **Neovim, Emacs, others with ACP** | ACP custom agent | works with the CLI today |
 
@@ -28,7 +28,7 @@ In the IDE's AI chat, open the agent settings → **Add custom agent**, or edit 
 ```json
 {
   "agent_servers": {
-    "Friday X": {
+    "FridayX": {
       "command": "friday",
       "args": ["agent", "stdio"]
     }
@@ -45,7 +45,7 @@ In `settings.json`:
 ```json
 {
   "agent_servers": {
-    "Friday X": {
+    "FridayX": {
       "command": "friday",
       "args": ["agent", "stdio"]
     }

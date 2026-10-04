@@ -5,14 +5,14 @@ use serde_json::json;
 fn notice_round_trips_through_meta_json() {
     let notice = ModelNotice {
         severity: ModelNoticeSeverity::Warning,
-        text: "Deprecated Oct 15. Switch to Friday X 4.6".to_owned(),
+        text: "Deprecated Oct 15. Switch to FridayX 4.6".to_owned(),
         label: Some("deprecated".to_owned()),
     };
 
     let value = notice.to_meta_value();
 
     assert_eq!(
-        json!({"severity": "warning", "text": "Deprecated Oct 15. Switch to Friday X 4.6", "label": "deprecated"}),
+        json!({"severity": "warning", "text": "Deprecated Oct 15. Switch to FridayX 4.6", "label": "deprecated"}),
         value
     );
     assert_eq!(Some(notice), ModelNotice::from_value(&value));

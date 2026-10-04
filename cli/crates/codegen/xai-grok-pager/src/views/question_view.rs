@@ -2612,7 +2612,7 @@ mod tests {
     #[test]
     fn chrome_height_option_less_question_drops_the_label_gap() {
         // Nothing under the label to separate it from, so the gap goes: vpad(1) + label(1) + gap(1) = 3.
-        let q = make_question("How can we improve Friday X?", &[], false);
+        let q = make_question("How can we improve FridayX?", &[], false);
         assert_eq!(
             chrome_height(
                 &q,

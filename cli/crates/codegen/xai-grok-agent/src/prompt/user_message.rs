@@ -4,7 +4,7 @@
 //! That prefix contains `<user_info>`, an optional workspace overview, and optional rules / skills / MCP listings.
 //!
 //! `UserMessageTemplate` selects the rendering strategy:
-//! - `Default`: the legacy Friday X prefix (built by the shell layer).
+//! - `Default`: the legacy FridayX prefix (built by the shell layer).
 //! - `Custom`: caller-supplied MiniJinja template string (same delimiters as the system prompt templates).
 //!
 //! The shell layer gathers session-scoped inputs (cwd, VCS root, rule files, skill registry, MCP servers).
@@ -104,7 +104,7 @@ pub fn append_rules_section(
         prefix.push('\n');
         prefix.push_str(&block);
     }
-    // Friday X always keeps its own project memory (FRIDAY.md), whether or not the project has any rules.
+    // FridayX always keeps its own project memory (FRIDAY.md), whether or not the project has any rules.
     if !prefix.is_empty() && !prefix.ends_with('\n') {
         prefix.push('\n');
     }
@@ -118,7 +118,7 @@ pub fn append_rules_section(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UserMessageTemplate {
-    /// Legacy Friday X prefix (`<user_info>`), built directly by the shell layer.
+    /// Legacy FridayX prefix (`<user_info>`), built directly by the shell layer.
     /// The renderer returns `None` and the caller uses its own legacy path.
     #[default]
     Default,

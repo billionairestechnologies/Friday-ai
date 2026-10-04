@@ -17,10 +17,10 @@ import {
 import { AUTO_MODEL, assertFridayX, cliSettings, cliStatus, cliUser, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
 
 /**
- * Friday X API (terminal + IDE). Three audiences share one router, each behind its own gate:
+ * FridayX API (terminal + IDE). Three audiences share one router, each behind its own gate:
  *   public   — the device-login handshake the CLI starts before it has any identity
  *   web      — the signed-in browser approving a code and managing its signed-in devices
- *   cli      — everything the harness calls with a Friday X token (/me, /models, the model gateway)
+ *   cli      — everything the harness calls with a FridayX token (/me, /models, the model gateway)
  */
 export const cliRouter = Router();
 
@@ -80,13 +80,13 @@ cliRouter.post(
 // `/oauth2/token`, form-encoded). Serving those names means that login code runs against Friday unchanged;
 // /auth/device + /auth/token above stay for clients that prefer JSON.
 const CLIENT_NAMES: Record<string, string> = {
-  "friday-x-cli": "Friday X (terminal)",
-  "friday-x-vscode": "Friday X for VS Code",
-  "friday-x-jetbrains": "Friday X for JetBrains",
-  "friday-x-zed": "Friday X for Zed",
+  "friday-x-cli": "FridayX (terminal)",
+  "friday-x-vscode": "FridayX for VS Code",
+  "friday-x-jetbrains": "FridayX for JetBrains",
+  "friday-x-zed": "FridayX for Zed",
 };
 const clientNameFor = (clientId: unknown, fallback?: unknown) =>
-  CLIENT_NAMES[String(clientId ?? "")] ?? (typeof fallback === "string" && fallback ? fallback : "Friday X");
+  CLIENT_NAMES[String(clientId ?? "")] ?? (typeof fallback === "string" && fallback ? fallback : "FridayX");
 
 const oauthErrorDescriptions: Record<string, string> = {
   authorization_pending: "The user hasn't approved this sign-in yet.",
@@ -175,7 +175,7 @@ cliRouter.delete(
   }),
 );
 
-// ── cli: everything below needs a Friday X token ───────────────────────────────────────────────
+// ── cli: everything below needs a FridayX token ───────────────────────────────────────────────
 cliRouter.post(
   "/auth/logout",
   requireCliAuth,
@@ -223,7 +223,7 @@ cliRouter.get(
           id: AUTO_MODEL,
           object: "model",
           owned_by: "friday",
-          name: "Friday X (auto)",
+          name: "FridayX (auto)",
           description: "The best coding model your Friday plan allows. The server picks it, so it improves without an update.",
           context_window: 200_000,
           api_backend: "chat_completions",

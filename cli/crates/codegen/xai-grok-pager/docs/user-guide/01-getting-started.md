@@ -1,6 +1,6 @@
 # Getting Started
 
-Friday X is a terminal-based AI coding assistant from SpaceXAI. It runs as a TUI (Terminal User Interface) that understands your codebase, executes shell commands, edits files, searches the web, and manages tasks.
+FridayX is a terminal-based AI coding assistant from SpaceXAI. It runs as a TUI (Terminal User Interface) that understands your codebase, executes shell commands, edits files, searches the web, and manages tasks.
 
 You can use it interactively as a full-screen TUI, run it headlessly for scripting and CI/CD, or integrate it into editors via the Agent Client Protocol (ACP).
 
@@ -46,8 +46,8 @@ Update to the latest version at any time:
 friday update
 ```
 
-If you installed Friday X with WinGet, update it with WinGet instead. Quit
-Friday X first, then run:
+If you installed FridayX with WinGet, update it with WinGet instead. Quit
+FridayX first, then run:
 
 ```powershell
 winget upgrade --id xAI.GrokBuild -e
@@ -76,13 +76,13 @@ and [Configuration reference](26-config-reference.md).
 
 ## First Launch
 
-Start Friday X by running:
+Start FridayX by running:
 
 ```bash
 grok
 ```
 
-On first launch, Friday X opens your browser to authenticate with grok.com. After you sign in, Friday X stores your credentials in `~/.friday/auth.json`, where they persist across sessions. Friday X refreshes your credentials automatically and prompts you to sign in again when they can no longer be renewed.
+On first launch, FridayX opens your browser to authenticate with grok.com. After you sign in, FridayX stores your credentials in `~/.friday/auth.json`, where they persist across sessions. FridayX refreshes your credentials automatically and prompts you to sign in again when they can no longer be renewed.
 
 If you prefer API key authentication (e.g., for CI/CD or environments without a browser), set the `FRIDAY_X_TOKEN` environment variable instead:
 
@@ -97,12 +97,12 @@ See [Authentication](02-authentication.md) for the full set of auth options incl
 
 ## Basic Interaction
 
-Once authenticated, Friday X presents a full-screen TUI with two main areas:
+Once authenticated, FridayX presents a full-screen TUI with two main areas:
 
-- **Scrollback** -- the conversation history showing your prompts, Friday X's responses, tool calls, file edits, and more.
+- **Scrollback** -- the conversation history showing your prompts, FridayX's responses, tool calls, file edits, and more.
 - **Prompt** -- the input area at the bottom where you type messages.
 
-Type a message and press `Enter` to send it. Friday X reads files, runs commands, and edits code as needed. Each tool run streams into the scrollback in real time.
+Type a message and press `Enter` to send it. FridayX reads files, runs commands, and edits code as needed. Each tool run streams into the scrollback in real time.
 
 Press `Tab` to move focus between the prompt and the scrollback. While a turn is running, `Ctrl+C` cancels it once the composer is empty — with a draft, the first press only clears it. `Esc` never cancels a turn; mid-turn it shows a reminder to use `Ctrl+C`. Idle, press `Esc` twice within 800ms to clear a non-empty prompt, or (with an empty prompt and conversation messages) to open rewind — see [Keyboard Shortcuts](03-keyboard-shortcuts.md#escape). With the scrollback focused, use the arrow keys to select entries and to collapse or expand them. To navigate with `j`/`k` and fold with `h`/`l` instead, enable Vim mode.
 
@@ -125,7 +125,7 @@ The `@` operator opens a fuzzy file picker. By default it respects `.gitignore` 
 
 ### Permissions
 
-By default, Friday X asks for permission before executing shell commands or editing files. You can approve individually or toggle always-approve mode:
+By default, FridayX asks for permission before executing shell commands or editing files. You can approve individually or toggle always-approve mode:
 
 - Press `Ctrl+O` to toggle always-approve mode
 - Use the `--yolo` flag at launch: `friday --yolo`
@@ -148,8 +148,8 @@ Every conversation is a **session**. Sessions are automatically saved to `~/.fri
 The scrollback is the main display area. It shows:
 
 - **User prompts** -- your messages, rendered as sticky headers
-- **Agent messages** -- Friday X's responses with full markdown rendering and syntax highlighting
-- **Thinking blocks** -- Friday X's reasoning process (collapsible)
+- **Agent messages** -- FridayX's responses with full markdown rendering and syntax highlighting
+- **Thinking blocks** -- FridayX's reasoning process (collapsible)
 - **Tool calls** -- file edits (with inline diffs), command executions, search results, and more
 - **Task lists** -- TODO items tracking progress
 
@@ -157,7 +157,7 @@ Collapse or expand the selected entry with the `Left`/`Right` arrow keys (or `h`
 
 ### Tools
 
-Friday X has built-in tools for:
+FridayX has built-in tools for:
 
 | Tool | Description |
 |------|-------------|
@@ -235,7 +235,7 @@ grok -p "Explain this codebase"
 
 ## Headless Mode
 
-Run Friday X non-interactively for scripting, CI/CD, and automation:
+Run FridayX non-interactively for scripting, CI/CD, and automation:
 
 ```bash
 grok -p "Your prompt here"
@@ -259,7 +259,7 @@ grok -p "Review changes for bugs" --output-format json --yolo | jq -r '.text'
 
 ## Project Rules (AGENTS.md)
 
-Add per-project instructions by creating an `AGENTS.md` file in your repository. Friday X reads these files and injects their contents as a project-instructions message at the start of the conversation:
+Add per-project instructions by creating an `AGENTS.md` file in your repository. FridayX reads these files and injects their contents as a project-instructions message at the start of the conversation:
 
 ```
 ~/.friday/AGENTS.md           # Global rules (apply to all projects)
@@ -267,7 +267,7 @@ Add per-project instructions by creating an `AGENTS.md` file in your repository.
 <cwd>/AGENTS.md             # Directory-level rules (highest priority)
 ```
 
-Deeper files take precedence. Friday X also reads `CLAUDE.md` files for compatibility.
+Deeper files take precedence. FridayX also reads `CLAUDE.md` files for compatibility.
 
 ---
 

@@ -18,7 +18,7 @@ fn session_less_modal(tab: UsageInfoTab) -> Box<UsageInfoModalState> {
             usage_visible: true,
             chat_kind: false,
             billing_redirect_url: None,
-            subscription_tier: Some("SuperGrok".to_string()),
+            subscription_tier: Some("Friday Pro".to_string()),
         },
     ))
 }
@@ -149,6 +149,7 @@ fn tab_header_click_switches_tab() {
 }
 
 #[test]
+#[ignore = "vendor subscription upsell and usage-allowance UI is not part of FridayX"]
 fn usage_modal_renders_allowance_from_app_balance() {
     let area = Rect::new(0, 0, 100, 30);
     let mut state = DashboardState::new();

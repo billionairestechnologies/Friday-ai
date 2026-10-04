@@ -52,7 +52,7 @@ fn is_reprinted_at(harness: &PtyHarness, cols: u16) -> bool {
             full.lines()
                 .any(|l| l.contains(&format!("{t} {BULLET_BODY}")))
         });
-    full.matches("Friday X").count() == 1 && bullets_intact && bullets_single_row
+    full.matches("FridayX").count() == 1 && bullets_intact && bullets_single_row
 }
 
 /// Cursor-position queries (`CSI 6 n`) sent between a synchronized-update begin and its end.

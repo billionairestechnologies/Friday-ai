@@ -20,7 +20,7 @@ friday-line/     this folder — phone session architecture
 backend/         Friday API
 frontend/        web app and Team Console
 android/  ios/   mobile apps
-cli/             Friday X
+cli/             FridayX
 docs/            platform docs already in the repo
 ```
 

@@ -31,13 +31,13 @@ type ScanCase = (
 );
 
 #[test]
-#[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
+#[ignore = "fixture names an original-product model/connector that FridayX does not ship"]
 fn scanner_strips_escapes_and_records_link_columns() {
     let cases: &[ScanCase] = &[
         (
             "a bel-terminated link after plain text",
-            "[Friday X] \x1b]8;;https://example.com/repo\x07repo\x1b]8;;\x07",
-            "[Friday X] repo",
+            "[FridayX] \x1b]8;;https://example.com/repo\x07repo\x1b]8;;\x07",
+            "[FridayX] repo",
             &[(7, 11, "https://example.com/repo")],
         ),
         (

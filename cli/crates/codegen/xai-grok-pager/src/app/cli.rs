@@ -6,26 +6,26 @@ use std::path::PathBuf;
 /// Top-level commands for the pager binary.
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
-    /// Run Friday X without the interactive UI
+    /// Run FridayX without the interactive UI
     Agent(Box<AgentArgs>),
-    /// Show the configuration Friday X discovers for this directory
+    /// Show the configuration FridayX discovers for this directory
     Inspect {
         /// Emit machine-readable JSON output.
         #[arg(long)]
         json: bool,
     },
-    /// Check terminal, clipboard, color, and input support without starting Friday X
+    /// Check terminal, clipboard, color, and input support without starting FridayX
     Doctor(crate::doctor_cmd::DoctorArgs),
     /// Manage running leader processes
     Leader(LeaderMgmtArgs),
     /// Sign out and clear cached credentials
     Logout,
-    /// Sign in to Friday X
+    /// Sign in to FridayX
     Login {
         /// Ignored (kept for backwards compatibility). OAuth2 is now the only auth method.
         #[arg(long, hide = true)]
         legacy: bool,
-        /// Use Friday X OAuth via auth.x.ai.
+        /// Use FridayX OAuth via auth.x.ai.
         #[arg(long = "oauth", alias = "oidc", conflicts_with_all = ["device_auth"])]
         oauth: bool,
         /// Use device-code authentication for headless/remote environments.
@@ -312,13 +312,13 @@ impl AgentArgs {
                 Ok(canonical) if canonical.is_dir() => Some(canonical),
                 Ok(_) => {
                     eprintln!(
-                        "grok: --plugin-dir {}: not a directory; skipping",
+                        "friday: --plugin-dir {}: not a directory; skipping",
                         p.display()
                     );
                     None
                 }
                 Err(e) => {
-                    eprintln!("grok: --plugin-dir {}: {e}; skipping", p.display());
+                    eprintln!("friday: --plugin-dir {}: {e}; skipping", p.display());
                     None
                 }
             })
@@ -330,7 +330,7 @@ impl AgentArgs {
 pub enum AgentCmd {
     /// Run the agent over stdio
     Stdio,
-    /// Run the agent headlessly over the Friday X WebSocket relay
+    /// Run the agent headlessly over the FridayX WebSocket relay
     Headless(HeadlessArgs),
     /// Run the agent as a WebSocket server
     Serve(ServeArgs),
@@ -396,7 +396,7 @@ pub struct LeaderArgs {
 #[command(
     name = "friday",
     version = xai_grok_version::full_version(),
-    about = "Friday X TUI",
+    about = "FridayX TUI",
     disable_version_flag = true,
     next_display_order = None,
     help_template = "\

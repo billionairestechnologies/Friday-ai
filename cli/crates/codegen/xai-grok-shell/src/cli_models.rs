@@ -220,7 +220,7 @@ mod tests {
     fn models_list_response_round_trips() {
         let state = acp::SessionModelState::new(
             acp::ModelId::new("grok-4"),
-            vec![acp::ModelInfo::new(acp::ModelId::new("grok-4"), "Friday X 4")],
+            vec![acp::ModelInfo::new(acp::ModelId::new("grok-4"), "FridayX 4")],
         );
         let ok = crate::session::ExtMethodResult::success(state)
             .to_ext_response()

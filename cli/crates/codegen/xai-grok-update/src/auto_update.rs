@@ -37,7 +37,7 @@ const MSG_RUN_UPDATE_MANUAL: &str = "Run `friday update` to get the latest versi
 /// install.sh), not `curl`. In `VAR=x curl … | bash` the assignment applies to `curl` only and install.sh would fall back
 /// to stable.
 fn manual_install_cmd(channel: &str) -> String {
-    // Friday X has one release line, so the channel is not part of the command. The installers are served by the
+    // FridayX has one release line, so the channel is not part of the command. The installers are served by the
     // Friday backend at the same origin the client signs in to (`FRIDAY_X_URL` moves it).
     let _ = channel;
     let origin = xai_grok_shell::env::friday_origin();
@@ -165,7 +165,7 @@ pub fn print_update_status(status: &UpdateStatus, json: bool) -> anyhow::Result<
 
     if let Some(error) = status.error.as_deref() {
         println!(
-            "Friday X - v{} [{}]",
+            "FridayX - v{} [{}]",
             status.current_version, status.channel
         );
         println!("Update check failed: {error}");
@@ -177,11 +177,11 @@ pub fn print_update_status(status: &UpdateStatus, json: bool) -> anyhow::Result<
     if status.update_available {
         if let Some(latest_version) = status.latest_version.as_deref() {
             println!(
-                "A new version of Friday X is available: {} -> {}{}",
+                "A new version of FridayX is available: {} -> {}{}",
                 status.current_version, latest_version, channel_label
             );
         } else {
-            println!("A new version of Friday X is available.");
+            println!("A new version of FridayX is available.");
         }
         if status.installer.as_deref() == Some(WINGET) {
             let target = match status.latest_version.as_deref() {
@@ -197,13 +197,13 @@ pub fn print_update_status(status: &UpdateStatus, json: bool) -> anyhow::Result<
 
     if let Some(latest_version) = status.latest_version.as_deref() {
         println!(
-            "Friday X - v{} (latest: {}){}",
+            "FridayX - v{} (latest: {}){}",
             status.current_version, latest_version, channel_label
         );
         return Ok(());
     }
 
-    println!("Friday X - v{}{}", status.current_version, channel_label);
+    println!("FridayX - v{}{}", status.current_version, channel_label);
     Ok(())
 }
 
@@ -759,7 +759,7 @@ pub async fn run_update_if_available(
     }
     if inst == WINGET {
         eprintln!(
-            "A new version of Friday X is available: {current_version} -> {latest_version}"
+            "A new version of FridayX is available: {current_version} -> {latest_version}"
         );
         let target = if has_version_cap(&policy) {
             crate::winget::Target::Exact(&latest_version)
@@ -775,7 +775,7 @@ pub async fn run_update_if_available(
     let channel_label = format!(" [{}]", update_config.channel);
     if auto_update {
         eprintln!(
-            "A new version of Friday X is available: {} -> {}{}",
+            "A new version of FridayX is available: {} -> {}{}",
             current_version, latest_version, channel_label
         );
         if interactive {
@@ -803,7 +803,7 @@ pub async fn run_update_if_available(
             return Ok(false);
         }
         eprintln!(
-            "A new version of Friday X is available: {} -> {}{}",
+            "A new version of FridayX is available: {} -> {}{}",
             current_version, latest_version, channel_label
         );
         if interactive {
@@ -902,7 +902,7 @@ fn resolve_restart_exe() -> Result<std::path::PathBuf> {
     Ok(std::env::current_exe()?)
 }
 
-/// Restart grok with the original command-line arguments to pick up the update.
+/// Restart friday with the original command-line arguments to pick up the update.
 pub fn restart_grok() -> Result<()> {
     let exe = resolve_restart_exe()?;
     let mut cmd = Command::new(exe);
@@ -911,7 +911,7 @@ pub fn restart_grok() -> Result<()> {
     }
     cmd.env_clear();
     cmd.envs(std::env::vars_os().filter(|(k, _)| k != "FRIDAY_AUTO_UPDATE"));
-    eprintln!("Restarting Friday X...");
+    eprintln!("Restarting FridayX...");
 
     // Use exec on Unix to replace the current process, avoiding stdio issues when the parent exits
     // On Windows, fall back to spawn and exit
@@ -1690,7 +1690,7 @@ async fn download_verified_from_base(
     let binary_name = format!("friday-{}-{}", version, platform);
     let binary_path = download_dir.join(&binary_name);
 
-    eprintln!("  Downloading Friday X v{} ({})...", version, platform);
+    eprintln!("  Downloading FridayX v{} ({})...", version, platform);
 
     // The downloaded binary is already +x (see `publish_downloaded_artifact`)
     download_friday_binary(gcs_base_url, &friday_platform(), &version, &binary_path).await?;
@@ -1714,7 +1714,7 @@ async fn download_verified_from_base(
     }
 
     // Best-effort and base-dependent, so it belongs to this phase; a miss never fails the install.
-    // Friday X ships a single binary on every platform; there is no extra Windows payload to fetch.
+    // FridayX ships a single binary on every platform; there is no extra Windows payload to fetch.
     let payload = windows_payload::Payload::default();
 
     Ok(VerifiedDownload {
@@ -2367,7 +2367,7 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
     let tag = format!("v{}", version);
 
     eprintln!(
-        "  Downloading Friday X v{} ({}) from GitHub Releases...",
+        "  Downloading FridayX v{} ({}) from GitHub Releases...",
         version, platform
     );
 
@@ -2476,7 +2476,7 @@ fn warn_if_other_grok_processes_running() {
             .collect();
         if !other_pids.is_empty() {
             eprintln!(
-                "  ⚠ Warning: {} other grok process(es) detected.",
+                "  ⚠ Warning: {} other friday process(es) detected.",
                 other_pids.len()
             );
             eprintln!("    Processes running from the npm vendored binary path may be");
@@ -2662,7 +2662,7 @@ pub async fn run_update(
     // When --version is given, skip the latest-version check and install directly
     if let Some(version) = pinned_version {
         eprintln!(
-            "Installing Friday X {} (current: {})...",
+            "Installing FridayX {} (current: {})...",
             version, current_version
         );
         eprintln!();
@@ -2675,8 +2675,8 @@ pub async fn run_update(
         {
             tracing::warn!("Failed to persist auto_update=false for pinned install: {e}");
         }
-        eprintln!("  ✓ Friday X v{} installed successfully!", version);
-        eprintln!("  Please restart Friday X.");
+        eprintln!("  ✓ FridayX v{} installed successfully!", version);
+        eprintln!("  Please restart FridayX.");
         return Ok(Some(version.to_string()));
     }
 
@@ -2777,12 +2777,12 @@ pub async fn run_update(
         .unwrap_or(true)
     {
         eprintln!(
-            "Forcing reinstall of Friday X {} (already up to date)",
+            "Forcing reinstall of FridayX {} (already up to date)",
             effective_current
         );
         &effective_current
     } else {
-        eprintln!("Updating Friday X {} → {}", effective_current, install_target);
+        eprintln!("Updating FridayX {} → {}", effective_current, install_target);
         &install_target
     };
 
@@ -2793,10 +2793,10 @@ pub async fn run_update(
     let stable_ptr = try_fetch_stable_pointer().await;
     write_version_cache(target_version, stable_ptr.as_deref()).await;
     refresh_deployment_config().await;
-    eprintln!("  ✓ Friday X v{} installed successfully!", target_version);
+    eprintln!("  ✓ FridayX v{} installed successfully!", target_version);
 
     if !force && std::env::var_os("FRIDAY_AUTO_UPDATE").is_none() {
-        eprintln!("  Please restart Friday X.");
+        eprintln!("  Please restart FridayX.");
     }
     Ok(Some(target_version.to_string()))
 }
@@ -2846,7 +2846,7 @@ mod friday_tests {
         let origin = xai_grok_shell::env::friday_origin();
         assert!(cmd.contains(&format!("{origin}/x/install.")), "{cmd}");
         assert!(!cmd.contains("x.ai"), "{cmd}");
-        // the channel is not part of the command: Friday X has one release line
+        // the channel is not part of the command: FridayX has one release line
         assert_eq!(cmd, manual_install_cmd("alpha"));
     }
 

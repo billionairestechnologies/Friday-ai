@@ -796,7 +796,7 @@ fn tick_demand_welcome_is_slow_unless_loading() {
     assert_eq!(app.tick_demand(), TickDemand::Fast);
 }
 /// An open modal session picker that is still fetching keeps fast ticks alive on an otherwise-idle agent (its loading spinner must animate).
-/// That holds even after the fast foreign scan lands rows the default Friday X filter hides; once the native list settles the demand parks again.
+/// That holds even after the fast foreign scan lands rows the default FridayX filter hides; once the native list settles the demand parks again.
 #[test]
 fn tick_demand_fast_while_modal_session_picker_loads() {
     let mut app = test_app_with_agent();
@@ -851,7 +851,7 @@ fn tick_demand_fast_while_modal_session_picker_loads() {
     assert_eq!(
         app.tick_demand(),
         TickDemand::Fast,
-        "foreign rows hidden by the Friday X filter must not end the loading spinner"
+        "foreign rows hidden by the FridayX filter must not end the loading spinner"
     );
     if let Some(crate::views::modal::ActiveModal::SessionPicker { loading, .. }) =
         app.agents.get_mut(&id).unwrap().active_modal.as_mut()
@@ -2137,7 +2137,7 @@ fn apply_auth_meta_clears_api_key_flag_and_restores_billing_on_personal_login() 
     assert!(app.usage_visible);
 }
 #[test]
-#[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+#[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
 fn apply_auth_meta_api_key_enables_voice_and_skips_tier_gate() {
     let mut app = test_app();
     advertise_media_tools(&mut app);
@@ -2243,7 +2243,7 @@ fn apply_auth_meta_lifts_restrictions_for_paid_tiers_and_teams() {
     let mut app = test_app();
     advertise_media_tools(&mut app);
     let meta = xai_grok_login::AuthMeta {
-        subscription_tier: Some("SuperGrok".into()),
+        subscription_tier: Some("Friday Pro".into()),
         ..Default::default()
     };
     app.apply_auth_meta(&meta);
@@ -2253,7 +2253,7 @@ fn apply_auth_meta_lifts_restrictions_for_paid_tiers_and_teams() {
     advertise_media_tools(&mut app);
     app.apply_auth_meta(&xai_grok_login::AuthMeta::default());
     assert!(!app.tier_restricted_commands.is_empty());
-    app.subscription_tier = Some("SuperGrok".into());
+    app.subscription_tier = Some("Friday Pro".into());
     app.apply_tier_restrictions();
     assert!(app.tier_restricted_commands.is_empty());
     assert_tier_restricted_commands_present(&app);
@@ -2273,8 +2273,8 @@ fn is_restricted_tier_classification() {
     assert!(is_restricted_tier(Some("Free")));
     assert!(is_restricted_tier(Some("X Basic")));
     assert!(is_restricted_tier(Some("x_basic")));
-    assert!(!is_restricted_tier(Some("SuperGrok")));
-    assert!(!is_restricted_tier(Some("SuperGrok Heavy")));
+    assert!(!is_restricted_tier(Some("Friday Pro")));
+    assert!(!is_restricted_tier(Some("Premium")));
     assert!(!is_restricted_tier(Some("X Premium")));
     assert!(!is_restricted_tier(Some("X Premium+")));
     assert!(!is_restricted_tier(Some("SomeFutureTier")));
@@ -2286,7 +2286,7 @@ fn is_voice_tier_restricted_tracks_tier() {
     assert!(app.is_voice_tier_restricted());
     let mut app = test_app();
     let meta = xai_grok_login::AuthMeta {
-        subscription_tier: Some("SuperGrok".into()),
+        subscription_tier: Some("Friday Pro".into()),
         ..Default::default()
     };
     app.apply_auth_meta(&meta);
@@ -2296,7 +2296,7 @@ fn is_voice_tier_restricted_tracks_tier() {
 fn apply_auth_meta_clears_gate_on_subscription() {
     let mut app = test_app();
     app.gate = Some(xai_grok_login::GateInfo {
-        message: "Subscribe to use Friday X".into(),
+        message: "Subscribe to use FridayX".into(),
         url: Some("https://grok.com/supergrok?referrer=grok-build".into()),
         label: None,
     });

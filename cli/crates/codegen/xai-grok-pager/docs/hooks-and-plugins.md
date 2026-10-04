@@ -1,6 +1,6 @@
 # Hooks & Plugins Guide
 
-Friday X supports **hooks** (event-driven shell commands) and **plugins** (bundles of skills, agents, hooks, and MCP servers). Both are managed through a unified modal interface.
+FridayX supports **hooks** (event-driven shell commands) and **plugins** (bundles of skills, agents, hooks, and MCP servers). Both are managed through a unified modal interface.
 
 ## Opening the Modal
 

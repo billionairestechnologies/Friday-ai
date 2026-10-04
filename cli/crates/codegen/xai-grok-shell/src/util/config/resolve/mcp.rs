@@ -208,7 +208,7 @@ fn max_mcp_output_bytes_from_toml(v: &toml::Value) -> Option<usize> {
 
 /// Resolve the MCP tool-result inline cap (bytes) on the **global / atomic path**.
 /// No cwd here, so no project tier; see [`resolve_max_mcp_output_bytes_for_cwd`].
-/// Precedence (highest first): requirements.toml `[mcp] max_output_bytes` env `FRIDAY_MAX_MCP_OUTPUT_BYTES` / `MAX_MCP_OUTPUT_BYTES` (Friday X-native wins when both set) effective `config.toml [mcp] max_output_bytes` remote settings `RemoteSettings.max_mcp_output_bytes` [`DEFAULT_MAX_MCP_OUTPUT_BYTES`] (20_000)
+/// Precedence (highest first): requirements.toml `[mcp] max_output_bytes` env `FRIDAY_MAX_MCP_OUTPUT_BYTES` / `MAX_MCP_OUTPUT_BYTES` (FridayX-native wins when both set) effective `config.toml [mcp] max_output_bytes` remote settings `RemoteSettings.max_mcp_output_bytes` [`DEFAULT_MAX_MCP_OUTPUT_BYTES`] (20_000)
 pub(crate) fn resolve_max_mcp_output_bytes(remote: Option<u64>) -> usize {
     let remote_usize = remote
         .and_then(|n| usize::try_from(n).ok())

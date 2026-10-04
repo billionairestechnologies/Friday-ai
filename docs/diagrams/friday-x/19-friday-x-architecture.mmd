@@ -1,5 +1,5 @@
 flowchart TB
-  subgraph clients [Friday X clients - same engine everywhere]
+  subgraph clients [FridayX clients - same engine everywhere]
     CLI["friday - terminal agent (cli/)"]
     VS["VS Code extension (ide/vscode)"]
     JB["JetBrains, Zed and other ACP editors (friday agent stdio)"]
@@ -34,5 +34,5 @@ flowchart TB
 
   Web["Web, Android and iOS apps - same plan, same meter"]
   Meter -. one usage bar .- Web
-  Console["Team Console - edit plans, models, who gets Friday X"] --> Ent
+  Console["Team Console - edit plans, models, who gets FridayX"] --> Ent
   Console --> Models

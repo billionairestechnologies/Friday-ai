@@ -1,4 +1,4 @@
-//! Cross-session memory for Friday X.
+//! Cross-session memory for FridayX.
 //!
 //! Two isolated pipelines. They do not share files, search, flush, or Dream.
 //! See the crate `AGENTS.md` before changing either path.

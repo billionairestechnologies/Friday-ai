@@ -19,8 +19,8 @@ backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist i
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
 supabase/   SQL migrations 0001…0050 (apply in order; RLS on, backend uses service role)
-cli/        Friday X CLI — terminal coding agent `friday` (Rust, Apache-2.0 fork; own LICENSE/NOTICE)
-ide/        Friday X editor integrations: vscode/ extension; JetBrains/Zed use `friday agent stdio` (ACP) — see ide/README.md
+cli/        FridayX CLI — terminal coding agent `friday` (Rust, Apache-2.0 fork; own LICENSE/NOTICE)
+ide/        FridayX editor integrations: vscode/ extension; JetBrains/Zed use `friday agent stdio` (ACP) — see ide/README.md
 docs/       README.md (index) · architecture/ · operations/ · product/ · diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -38,7 +38,7 @@ npm run verify                                             # all of the above in
 cd backend && npm run dev        # API on :4000   |   cd frontend && npm run dev   # Vite on :5173, proxies /api
 ```
 
-Friday X CLI (`cli/`, Rust — needs rustup; `rust-toolchain.toml` pins 1.94.0; `protoc` on PATH or `PROTOC=`):
+FridayX CLI (`cli/`, Rust — needs rustup; `rust-toolchain.toml` pins 1.94.0; `protoc` on PATH or `PROTOC=`):
 
 ```bash
 cd cli && cargo build -p xai-grok-pager-bin          # target/debug/friday
@@ -135,7 +135,7 @@ Gotchas:
   documents and uploads (`libraryService.listLibrary`).
 - `services/skills/` — `catalog.ts` (16 built-in playbooks), `skillService.ts` (user skills + per-user
   toggles, `skillMenu` for the prompt, `activeSkillPrompt` for a composer-picked skill). Tool `use_skill`.
-- **Friday X** (terminal + editor agent; spec in `docs/product/FRIDAY_X.md`): `services/cli/` — `deviceAuth.ts` (RFC 8628 device
+- **FridayX** (terminal + editor agent; spec in `docs/product/FRIDAY_X.md`): `services/cli/` — `deviceAuth.ts` (RFC 8628 device
   login, `fxt_` tokens stored as SHA-256 only, revocable; migration 0050), `gateway.ts` (`/api/x/v1/chat/completions`: OpenAI wire
   format in/out over the existing provider adapters, charged through the SAME credit meter + ledger as chat, feature `code`;
   `listCliModels` / `resolveCliModel` with `friday-x/auto` = best coding model the plan allows; `contextWindowFor`; `cliUser`,
@@ -143,7 +143,7 @@ Gotchas:
   call ids), `installScripts.ts` + `releases.ts` (`/x/install.sh|ps1|cmd`, `/x/version|download|sha256`; binaries live in the
   releases bucket, `FRIDAY_X_RELEASES_URL`, pin with `FRIDAY_X_VERSION_PIN`). Routes: `routes/cli.ts` (public handshake / web approval /
   CLI-token sections), `routes/install.ts`; `middleware/cliAuth.ts` checks token + the `fridayX` entitlement on EVERY request. Web:
-  `routes/device.tsx` (`/device`), Settings → Friday X (install commands, signed-in devices).
+  `routes/device.tsx` (`/device`), Settings → FridayX (install commands, signed-in devices).
   **Rule: no client holds plans, models or limits** — the CLI/editors read everything from `/api/x` at runtime.
 - `services/billingService.ts` — prices from the catalog; `planId: "package"` checkout; webhook applies
   plans, enterprise seats (catalog tokens/seat) or packages (as access grants).
@@ -174,11 +174,11 @@ Gotchas:
 - Legal: `lib/site/legal.ts` — POLICY_VERSION must match backend `policyService.ts`, Android
   `FridayViewModel.POLICY_VERSION` and iOS `FridayViewModel.policyVersion` (bump all four together).
 
-## Friday X (CLI + IDE) — what to know before touching it
+## FridayX (CLI + IDE) — what to know before touching it
 
 - `cli/` is a modified fork of Grok Build (Apache-2.0): the first commit that adds it is the pristine upstream snapshot, every later commit
   is a Friday change (that history is the §4(b) "state your changes" record). Keep `LICENSE`, `NOTICE`, `THIRD-PARTY-NOTICES`.
-- Crates keep their `xai-*` names (upstream merges stay tractable); user-visible names are Friday X: binary `friday`, `~/.friday`,
+- Crates keep their `xai-*` names (upstream merges stay tractable); user-visible names are FridayX: binary `friday`, `~/.friday`,
   `FRIDAY_*` env, `FRIDAY.md`. `FRIDAY_X_URL` moves the whole client to another Friday server.
 - Friday is the "first-party authority": see `xai-grok-login/src/backend/friday.rs`, `xai-grok-env` (`friday_origin`, the allow-list of
   `/api/x` paths), `xai-grok-shell-base/src/util` (which hosts may receive the bearer), `xai-grok-auth/src/retry_middleware.rs`

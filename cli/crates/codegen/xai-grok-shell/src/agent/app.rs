@@ -409,7 +409,7 @@ pub async fn run_headless(
         if !did_browser_flow {
             eprintln!();
             eprintln!(
-                "Open Friday X: {} (press Enter to open in browser)",
+                "Open FridayX: {} (press Enter to open in browser)",
                 grok_code_url
             );
             eprintln!();

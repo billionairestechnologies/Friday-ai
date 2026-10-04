@@ -10,8 +10,8 @@ use crate::config::{AGENT_TASK_CLASSIFIER_RE, short_tool_name, tool_id_eq, tool_
 /// An `Agent` or `Task` allowlist entry keeps the task tool and its lifecycle companions.
 const TASK_DEPS: &[&str] = &["task", "get_task_output", "kill_task", "wait_tasks"];
 
-/// The Friday X [`ToolKind`] a vendor-compat `tools:` allowlist entry resolves to, so a plugin's upstream allowlist still binds.
-/// Backed by the shared vendor-to-Friday X tool registry in `xai-grok-tools` (also used by the hook matcher).
+/// The FridayX [`ToolKind`] a vendor-compat `tools:` allowlist entry resolves to, so a plugin's upstream allowlist still binds.
+/// Backed by the shared vendor-to-FridayX tool registry in `xai-grok-tools` (also used by the hook matcher).
 fn claude_tool_kind(name: &str) -> Option<ToolKind> {
     xai_grok_tools::types::kind_for(name)
 }

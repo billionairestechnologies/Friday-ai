@@ -1,12 +1,12 @@
 # Custom Models
 
-Friday X connects to custom model endpoints for alternative providers, self-hosted models, and overriding built-in settings. This guide explains how to select models, configure endpoints, and integrate third-party providers.
+FridayX connects to custom model endpoints for alternative providers, self-hosted models, and overriding built-in settings. This guide explains how to select models, configure endpoints, and integrate third-party providers.
 
 ---
 
 ## Default Models
 
-By default, Friday X uses models hosted by SpaceXAI, and new sessions start with `grok-4.5`. Default models require no configuration. Authenticate with `friday login` or an API key, then start a session.
+By default, FridayX uses models hosted by SpaceXAI, and new sessions start with `grok-4.5`. Default models require no configuration. Authenticate with `friday login` or an API key, then start a session.
 
 List all available models:
 
@@ -67,7 +67,7 @@ default = "grok-4.5"
 
 ## Supported API Backends
 
-Friday X supports three API backends. Set `api_backend` in your `[model.*]` config to choose which protocol the model uses:
+FridayX supports three API backends. Set `api_backend` in your `[model.*]` config to choose which protocol the model uses:
 
 | Value | API | Default |
 |-------|-----|---------|
@@ -75,9 +75,9 @@ Friday X supports three API backends. Set `api_backend` in your `[model.*]` conf
 | `"responses"` | OpenAI Responses (`/v1/responses`) | |
 | `"messages"` | Anthropic Messages (`/v1/messages`) | |
 
-When you omit `api_backend`, Friday X uses `chat_completions`.
+When you omit `api_backend`, FridayX uses `chat_completions`.
 
-To send provider-specific authentication or version headers -- for example, Anthropic's `x-api-key` -- use the `extra_headers` field described below. Friday X sends those headers verbatim with every request to the endpoint.
+To send provider-specific authentication or version headers -- for example, Anthropic's `x-api-key` -- use the `extra_headers` field described below. FridayX sends those headers verbatim with every request to the endpoint.
 
 ---
 
@@ -106,20 +106,20 @@ env_http_headers = { "X-Tenant" = "TENANT_TOKEN" }    # Headers from env vars, r
 
 ### Credential Resolution
 
-Friday X resolves the API key in this order:
+FridayX resolves the API key in this order:
 
 1. The `api_key` field in the model config
 2. The environment variable(s) named by `env_key` — a single string or an array of names. The first set, non-empty value wins (for example `env_key = ["ANTHROPIC_AUTH_TOKEN", "LC_ANTHROPIC_AUTH_TOKEN"]` for SSH `LC_*` forwarding)
 3. Your signed-in session token (from `friday login`), for a model with no `api_key`/`env_key` of its own
-4. The `FRIDAY_X_TOKEN` environment variable (global fallback; Friday X also accepts `FRIDAY_X_LEGACY_TOKEN` for backward compatibility)
+4. The `FRIDAY_X_TOKEN` environment variable (global fallback; FridayX also accepts `FRIDAY_X_LEGACY_TOKEN` for backward compatibility)
 
 ### Context Window
 
-The `context_window` value tells Friday X when to trigger auto-compaction. When you override a known model, Friday X inherits that model's context window. When you define a new model and omit `context_window`, Friday X defaults to 200,000 tokens, so set it explicitly to match your provider.
+The `context_window` value tells FridayX when to trigger auto-compaction. When you override a known model, FridayX inherits that model's context window. When you define a new model and omit `context_window`, FridayX defaults to 200,000 tokens, so set it explicitly to match your provider.
 
 ### Request Size Limit
 
-`max_request_bytes` is the largest request body your endpoint accepts. Friday X evicts older inline images from the conversation to stay under it, so a session with many screenshots keeps working instead of being rejected. When you omit it, Friday X picks the default for the `api_backend`: 30 MB for `messages`, and 50 MiB for `chat_completions` and `responses`. Set it only when your host enforces a different cap.
+`max_request_bytes` is the largest request body your endpoint accepts. FridayX evicts older inline images from the conversation to stay under it, so a session with many screenshots keeps working instead of being rejected. When you omit it, FridayX picks the default for the `api_backend`: 30 MB for `messages`, and 50 MiB for `chat_completions` and `responses`. Set it only when your host enforces a different cap.
 
 The cap is a property of the endpoint, so it also works on a shared `[model_providers.<id>]` block, where every model pointing at that provider inherits it; a `max_request_bytes` on the model itself overrides the provider's value.
 
@@ -174,7 +174,7 @@ This is a small, fixed set of environment-wide knobs. Settings that identify a s
 
 ### Request Query Parameters
 
-Some gateways route or version on the query string. `query_params` appends percent-encoded query parameters to every request Friday X makes for a model. For example, a gateway that selects an API version this way:
+Some gateways route or version on the query string. `query_params` appends percent-encoded query parameters to every request FridayX makes for a model. For example, a gateway that selects an API version this way:
 
 ```toml
 [model.my-gateway]
@@ -198,7 +198,7 @@ base_url = "https://gateway.example/v1"
 env_http_headers = { "X-Tenant-Token" = "GATEWAY_TENANT_TOKEN" }
 ```
 
-Friday X reads each variable when it builds the client for a session and places the value in the request headers only, never on disk. A header is skipped when its variable is unset or blank, and a resolved value overrides an `extra_headers` entry of the same name. Use `extra_headers` for a static value and `env_http_headers` for one that comes from the environment.
+FridayX reads each variable when it builds the client for a session and places the value in the request headers only, never on disk. A header is skipped when its variable is unset or blank, and a resolved value overrides an `extra_headers` entry of the same name. Use `extra_headers` for a static value and `env_http_headers` for one that comes from the environment.
 
 Both fields also work on a shared `[model_providers.<id>]` block. A model that points at a provider with `model_provider = "<id>"` inherits the provider's `query_params` and `env_http_headers` when it sets none of its own, matching how `extra_headers` is inherited.
 
@@ -232,7 +232,7 @@ temperature = 0.5
 api_key = "sk-custom"
 ```
 
-When you override a built-in model, Friday X starts with the default configuration (including the correct `base_url`), then applies only the fields you specify. Unspecified fields inherit from the default.
+When you override a built-in model, FridayX starts with the default configuration (including the correct `base_url`), then applies only the fields you specify. Unspecified fields inherit from the default.
 
 ### Priority Order
 
@@ -258,7 +258,7 @@ context_window = 200000
 extra_headers = { "x-api-key" = "sk-ant-...", "anthropic-version" = "2023-06-01" }
 ```
 
-The `messages` backend uses the Anthropic Messages protocol. Anthropic authenticates with an `x-api-key` header rather than `Authorization: Bearer`, so pass your key through `extra_headers`, which Friday X sends verbatim.
+The `messages` backend uses the Anthropic Messages protocol. Anthropic authenticates with an `x-api-key` header rather than `Authorization: Bearer`, so pass your key through `extra_headers`, which FridayX sends verbatim.
 
 ### OpenAI (Chat Completions)
 
@@ -285,7 +285,7 @@ api_backend = "responses"
 env_key = "OPENAI_API_KEY"
 ```
 
-On the Responses API, Friday X asks for a `concise` reasoning summary by default; that is what the reasoning text shown in the UI comes from. `reasoning_summary` changes the request: `detailed` or `auto` for a fuller summary, or `none` to omit the field for gateways that reject it.
+On the Responses API, FridayX asks for a `concise` reasoning summary by default; that is what the reasoning text shown in the UI comes from. `reasoning_summary` changes the request: `detailed` or `auto` for a fuller summary, or `none` to omit the field for gateways that reject it.
 
 ### AWS Bedrock (Mantle)
 
@@ -299,7 +299,7 @@ token_ttl_secs = 3600
 [model."bedrock-grok-4.6"]
 model = "xai.grok-4.6"
 base_url = "https://bedrock-mantle.us-west-2.api.aws/openai/v1"
-name = "Friday X 4.6 (Bedrock)"
+name = "FridayX 4.6 (Bedrock)"
 api_backend = "responses"
 reasoning_summary = "none"
 auth_provider = "bedrock"
@@ -345,14 +345,14 @@ temperature = 0.8
 
 ## Custom Models Endpoint
 
-Point Friday X at a custom OpenAI-compatible `/v1/models` endpoint instead of the default. Use this when your models sit behind a corporate gateway or a self-hosted inference service.
+Point FridayX at a custom OpenAI-compatible `/v1/models` endpoint instead of the default. Use this when your models sit behind a corporate gateway or a self-hosted inference service.
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `FRIDAY_MODELS_BASE_URL` | Yes | Base URL for inference. Friday X fetches the model list from `{base_url}/models`. |
-| `FRIDAY_X_TOKEN` | Yes | API key sent as `Authorization: Bearer`. Friday X also accepts `FRIDAY_X_LEGACY_TOKEN`. |
+| `FRIDAY_MODELS_BASE_URL` | Yes | Base URL for inference. FridayX fetches the model list from `{base_url}/models`. |
+| `FRIDAY_X_TOKEN` | Yes | API key sent as `Authorization: Bearer`. FridayX also accepts `FRIDAY_X_LEGACY_TOKEN`. |
 | `FRIDAY_MODELS_LIST_URL` | No | Override the model-list URL when it differs from `{base_url}/models`. |
 
 ### Setup
@@ -374,11 +374,11 @@ models_base_url = "https://api.acme.com/v1"
 api_key = "my-api-key"
 ```
 
-When you use `[endpoints]` with partial model overrides, Friday X inherits the `base_url` from the endpoints config. You do not need to specify it in each `[model.*]` section. `FRIDAY_X_TOKEN` is still required. A per-model `api_key` or `env_key` authenticates inference requests for that model. The startup model-list fetch always uses `FRIDAY_X_TOKEN`.
+When you use `[endpoints]` with partial model overrides, FridayX inherits the `base_url` from the endpoints config. You do not need to specify it in each `[model.*]` section. `FRIDAY_X_TOKEN` is still required. A per-model `api_key` or `env_key` authenticates inference requests for that model. The startup model-list fetch always uses `FRIDAY_X_TOKEN`.
 
 ### Auth Behavior
 
-When you set `models_base_url`, Friday X authenticates the model-list request with `FRIDAY_X_TOKEN` only (`Authorization: Bearer`). That request never uses your `friday login` session. With an external auth provider (`auth_provider_command`) and no `FRIDAY_X_TOKEN`, it sends the provider's token instead. Otherwise, if `FRIDAY_X_TOKEN` is unset, the fetch fails with an error asking you to set it. Inference requests to the custom host authenticate separately. An `api_key` or `env_key` on each model makes those requests use an API key too.
+When you set `models_base_url`, FridayX authenticates the model-list request with `FRIDAY_X_TOKEN` only (`Authorization: Bearer`). That request never uses your `friday login` session. With an external auth provider (`auth_provider_command`) and no `FRIDAY_X_TOKEN`, it sends the provider's token instead. Otherwise, if `FRIDAY_X_TOKEN` is unset, the fetch fails with an error asking you to set it. Inference requests to the custom host authenticate separately. An `api_key` or `env_key` on each model makes those requests use an API key too.
 
 ---
 
@@ -397,7 +397,7 @@ Or via environment variable:
 export FRIDAY_WEB_SEARCH_MODEL="grok-4.5"
 ```
 
-If you point web search at a custom model, you also need a `[model.*]` entry so Friday X can reach it. Server-side ("backend") web search runs only when the model sets `supports_backend_search = true` (and the build enables backend search); it does not depend on `api_backend`:
+If you point web search at a custom model, you also need a `[model.*]` entry so FridayX can reach it. Server-side ("backend") web search runs only when the model sets `supports_backend_search = true` (and the build enables backend search); it does not depend on `api_backend`:
 
 ```toml
 [models]
@@ -448,7 +448,7 @@ default = "company-grok"
 [model.company-grok]
 model = "grok-4.6"
 base_url = "https://grok-proxy.acme.com/"
-name = "Friday X 4.6 (Proxy)"
+name = "FridayX 4.6 (Proxy)"
 context_window = 128000
 
 [features]

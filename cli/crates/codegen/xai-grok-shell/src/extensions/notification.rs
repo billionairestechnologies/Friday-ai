@@ -936,7 +936,7 @@ pub enum SessionUpdate {
     /// The model that answered the current turn when the backend routed it to one other than the requested model.
     /// Display only: the session's selection is unchanged and the next prompt still names the model the user chose.
     ServedModel {
-        /// The served model's display name as the backend reports it (e.g. "Friday X 4.7 Fast"), which may match no catalog row.
+        /// The served model's display name as the backend reports it (e.g. "FridayX 4.7 Fast"), which may match no catalog row.
         display_name: String,
     },
     /// Streaming chunk of a tool call's arguments. Behaves like `acp::SessionUpdate::AgentMessageChunk` / `AgentThoughtChunk`. It flows through the replay buffer and merges with adjacent chunks for the same `tool_call_id`.

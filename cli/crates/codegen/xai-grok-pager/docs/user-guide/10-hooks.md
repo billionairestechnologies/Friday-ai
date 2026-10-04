@@ -1,12 +1,12 @@
 # Hooks
 
-Hooks let you run a script or send an HTTP request at key moments in a Friday X session. Use them to automate tasks, enforce safety checks, log activity, send notifications, and integrate your own tools.
+Hooks let you run a script or send an HTTP request at key moments in a FridayX session. Use them to automate tasks, enforce safety checks, log activity, send notifications, and integrate your own tools.
 
 ---
 
 ## What Are Hooks?
 
-A hook is a shell command or HTTP endpoint that Friday X calls when a specific lifecycle event occurs. Hooks can:
+A hook is a shell command or HTTP endpoint that FridayX calls when a specific lifecycle event occurs. Hooks can:
 
 - **Block actions**: A `PreToolUse` hook can deny a dangerous command before it runs.
 - **Keep the agent working**: A `Stop` hook can block the agent from finishing its turn until a condition holds (e.g. the test suite passes) and feed the reason back to the model.
@@ -43,7 +43,7 @@ A hook is a shell command or HTTP endpoint that Friday X calls when a specific l
        "SessionStart": [
          {
            "hooks": [
-             { "type": "command", "command": "echo 'Friday X session started in '$(pwd)" }
+             { "type": "command", "command": "echo 'FridayX session started in '$(pwd)" }
            ]
          }
        ]
@@ -51,7 +51,7 @@ A hook is a shell command or HTTP endpoint that Friday X calls when a specific l
    }
    ```
 
-3. Start (or restart) a Friday X session. The hook runs automatically on `SessionStart`.
+3. Start (or restart) a FridayX session. The hook runs automatically on `SessionStart`.
 
 4. Press `Ctrl+L` on non–VS Code family terminals (or run `/hooks` anywhere — preferred on VS Code family) and check the Hooks tab to confirm it loaded.
 
@@ -114,7 +114,7 @@ After a block, prompts already queued behind the blocked one do not auto-run: th
 
 ### Cursor Hook Compatibility
 
-Friday X accepts Cursor's camelCase hook event names, so `~/.cursor/hooks.json` loads unchanged:
+FridayX accepts Cursor's camelCase hook event names, so `~/.cursor/hooks.json` loads unchanged:
 
 | Cursor event | Maps to |
 |---|---|
@@ -159,7 +159,7 @@ Each `.json` file can define hooks for multiple events:
 
 ### Key Fields
 
-- **Event name** (top-level key): any event listed in [Hook Events](#hook-events). Friday X skips unrecognized event names so a shared Claude or Cursor settings file still loads.
+- **Event name** (top-level key): any event listed in [Hook Events](#hook-events). FridayX skips unrecognized event names so a shared Claude or Cursor settings file still loads.
 - **matcher** (optional): A regular expression that selects which invocations trigger the hook. What it tests depends on the event: the tool name on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionDenied`), the notification type on `Notification`, the subagent type on `SubagentStart`/`SubagentStop` (e.g. `explore`), the start source on `SessionStart` (`startup`, `resume`, …), the end reason on `SessionEnd`, the compaction trigger on `PreCompact`/`PostCompact` (`manual` or `auto`), the error type on `StopFailure` (`rate_limit`, `authentication_failed`, `invalid_request`, `server_error`, `max_output_tokens`, or `unknown`), and the reason on `StopCancelled` (`user_interrupt`, `permission_rejected`, `permission_cancelled`, `max_turns`, `no_progress`, or `unknown`). A matcher on `Stop` or `UserPromptSubmit` is ignored with a warning (those events always fire). An empty or omitted matcher matches everything. A finish-thinking chime should set `matcher` to `idle_prompt` on `Notification` (any turn end, then sustained idle); `permission_prompt` fires only when a permission UI is actually waiting. The matcher tests the real tool name; MCP calls routed through the internal `use_tool` dispatcher appear as the qualified `server__tool` name (e.g. `linear__save_issue`), so match on that, not the dispatcher name.
 - **type**: `"command"` (run a script or shell one-liner) or `"http"` (POST the event to a URL).
 - **command**: Path to executable (relative to the JSON file) or inline shell command.
@@ -167,7 +167,7 @@ Each `.json` file can define hooks for multiple events:
 
 ### Tool Name Aliases
 
-In a `matcher`, Friday X maps Claude-style tool names to its own so hooks migrated from Claude fire correctly. Common aliases include:
+In a `matcher`, FridayX maps Claude-style tool names to its own so hooks migrated from Claude fire correctly. Common aliases include:
 
 - `Bash` → `run_terminal_command`
 - `Read` → `read_file`
@@ -183,7 +183,7 @@ A matcher keeps its original name too, so `Bash` matches both `Bash` and `run_te
 
 ## How a Hook Resolves
 
-When an event fires, Friday X resolves it in four steps:
+When an event fires, FridayX resolves it in four steps:
 
 1. **Select matching groups.** For that event, each matcher group whose `matcher` matches the event's field runs. The matcher tests the tool name on tool events, the notification type on `Notification`, and so on (see [Key Fields](#key-fields)). An empty or omitted matcher matches everything.
 2. **Run the handlers in order.** Handlers in the selected groups run in config order, each receiving the event as JSON on stdin, until one returns `deny` (which stops the chain). Handlers from different sources (global, project, plugin, config) are merged, and identical handlers are deduplicated. Every handler sees the model's original tool input; a `PreToolUse` `updatedInput` is applied only after all handlers finish, so one handler cannot see another's rewrite (the last rewrite wins).
@@ -194,7 +194,7 @@ When an event fires, Friday X resolves it in four steps:
 
 ## Hooks in Config Files
 
-Hooks can also live directly in your Friday X config, so a team can distribute them with the rest of their configuration instead of shipping separate JSON files. The same `hooks` object is read from three TOML files:
+Hooks can also live directly in your FridayX config, so a team can distribute them with the rest of their configuration instead of shipping separate JSON files. The same `hooks` object is read from three TOML files:
 
 | File | Tier | Who sets it |
 |------|------|-------------|
@@ -506,7 +506,7 @@ For events like `SessionStart` or `Notification`, stdout is ignored. Just exit 0
 
 ### Environment Variables
 
-Friday X sets several environment variables on every hook process. These are useful when writing context-aware or plugin-aware hook scripts.
+FridayX sets several environment variables on every hook process. These are useful when writing context-aware or plugin-aware hook scripts.
 
 #### Runner-injected variables (always available)
 
@@ -516,7 +516,7 @@ These variables are set by the hook runner for **every** hook:
 |-----------------------|-------------|
 | `FRIDAY_HOOK_EVENT`     | The name of the event that triggered the hook (e.g. `pre_tool_use`, `session_start`, `post_tool_use`, `session_end`, `stop`, `notification`). |
 | `FRIDAY_HOOK_NAME`      | The configured name of this specific hook (includes the plugin prefix for plugin-provided hooks). |
-| `FRIDAY_SESSION_ID`     | The unique identifier of the current Friday X session. |
+| `FRIDAY_SESSION_ID`     | The unique identifier of the current FridayX session. |
 | `FRIDAY_WORKSPACE_ROOT` | Absolute path to the root of the current workspace. |
 | `CLAUDE_PROJECT_DIR`  | Absolute path to the workspace root. A Claude Code-compatible alias for `FRIDAY_WORKSPACE_ROOT`, set for every hook. |
 
@@ -524,7 +524,7 @@ These variables are **reserved**. Any values you attempt to set for them via the
 
 #### Plugin hook variables
 
-When a hook originates from a plugin, Friday X additionally injects the following variables:
+When a hook originates from a plugin, FridayX additionally injects the following variables:
 
 | Variable             | Description |
 |----------------------|-------------|
@@ -608,7 +608,7 @@ Enable or disable an individual hook at runtime by pressing `Space` in the Hooks
 
 ### Mid-Session Reload
 
-Press `r` in the Hooks tab to reload all hooks from disk. Friday X re-reads every hook source, so this picks up changes you made to hook files during the session.
+Press `r` in the Hooks tab to reload all hooks from disk. FridayX re-reads every hook source, so this picks up changes you made to hook files during the session.
 
 ---
 

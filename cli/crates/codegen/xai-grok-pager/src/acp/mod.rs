@@ -197,7 +197,7 @@ pub async fn connect(cancel: &CancellationToken, flags: ConnectFlags) -> Result<
                 cli_web_search_model: None,
                 cli_session_summary_model: None,
                 memory_enabled_override: flags.memory_enabled_override,
-                disable_web_search: true, // vendor-hosted search is removed; see Friday X docs
+                disable_web_search: true, // vendor-hosted search is removed; see FridayX docs
                 todo_gate: flags.todo_gate,
                 laziness_debug_log: flags.laziness_debug_log.as_deref(),
                 storage_mode: flags.storage_mode.as_deref(),
@@ -904,7 +904,7 @@ mod tests {
     fn startup_auth_xai_api_key_not_first_still_requires_login() {
         use xai_grok_shell::agent::auth_method::{FRIDAY_COM_METHOD_ID, XAI_API_KEY_METHOD_ID};
         let methods = vec![
-            make_auth_method(FRIDAY_COM_METHOD_ID, "Friday X", None),
+            make_auth_method(FRIDAY_COM_METHOD_ID, "FridayX", None),
             make_auth_method(XAI_API_KEY_METHOD_ID, "xai.api_key", None),
         ];
         let (needs, _, _, _) = startup_auth_metadata(&methods);

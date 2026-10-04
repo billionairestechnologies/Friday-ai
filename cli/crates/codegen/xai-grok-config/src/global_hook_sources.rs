@@ -1,4 +1,4 @@
-//! Friday X-owned direct global hook paths shared by shell discovery and sandbox write-deny.
+//! FridayX-owned direct global hook paths shared by shell discovery and sandbox write-deny.
 //! These are `$FRIDAY_HOME/hooks`, `hooks-paths`, and absolute registry targets.
 //! Relative registry lines, project hooks, and vendor compat are out of scope.
 
@@ -68,17 +68,17 @@ pub enum GlobalHookSourceError {
     HardLinkedHookFile { path: PathBuf, nlink: u64 },
     #[error("hook JSON path is not a regular file: {path}")]
     InvalidHookJsonFile { path: PathBuf },
-    #[error("Friday X hooks directory has wrong type (expected real directory): {path}")]
+    #[error("FridayX hooks directory has wrong type (expected real directory): {path}")]
     InvalidHooksDir { path: PathBuf },
-    #[error("Friday X hooks-paths registry has wrong type (expected real file): {path}")]
+    #[error("FridayX hooks-paths registry has wrong type (expected real file): {path}")]
     InvalidRegistryFile { path: PathBuf },
-    #[error("cannot create Friday X hooks directory {path}: {source}")]
+    #[error("cannot create FridayX hooks directory {path}: {source}")]
     CreateHooksDir {
         path: PathBuf,
         #[source]
         source: io::Error,
     },
-    #[error("cannot create Friday X hooks-paths registry {path}: {source}")]
+    #[error("cannot create FridayX hooks-paths registry {path}: {source}")]
     CreateRegistryFile {
         path: PathBuf,
         #[source]
@@ -451,7 +451,7 @@ fn open_registry_create_new(path: &Path) -> io::Result<std::fs::File> {
     }
 }
 
-/// Resolve Friday X-owned direct global hook sources (`reject_symlinks` for sandbox).
+/// Resolve FridayX-owned direct global hook sources (`reject_symlinks` for sandbox).
 pub fn resolve_global_hook_sources(
     grok_home: Option<&Path>,
     reject_symlinks: bool,

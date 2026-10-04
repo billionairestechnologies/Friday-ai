@@ -108,13 +108,13 @@ pub struct CreditLimitUpsellClicked {
 }
 
 /// Emitted when a previously access-gated user re-authenticates and the gate is lifted, i.e. they subscribed (externally on grok.com) and came back.
-/// This is the actual conversion signal for SuperGrok Heavy subscriptions attributed to Friday X.
-/// The user saw the gate in Friday X, went and paid, then returned with access.
+/// This is the actual conversion signal for Premium subscriptions attributed to FridayX.
+/// The user saw the gate in FridayX, went and paid, then returned with access.
 #[derive(Serialize)]
 pub struct SubscriptionActivated {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_method: Option<String>,
     /// Whether the subscribe CTA was shown in this session before the gate was lifted (`access_gate_shown_logged`).
-    /// When `true`, the conversion is strongly attributable to Friday X's upsell surface.
+    /// When `true`, the conversion is strongly attributable to FridayX's upsell surface.
     pub upsell_shown_this_session: bool,
 }

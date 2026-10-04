@@ -1,10 +1,10 @@
-//! Headless markdown analysis sharing Friday X's exact `pulldown-cmark` config.
+//! Headless markdown analysis sharing FridayX's exact `pulldown-cmark` config.
 //!
 //! This crate depends only on `pulldown-cmark`, so it can be used without pulling in the terminal-rendering stack (syntect, ratatui, two-face).
 //! [`parser_options`] is the single source of truth for the parser feature set.
-//! `xai-grok-markdown` uses the same options, so analysis matches what Friday X renders.
+//! `xai-grok-markdown` uses the same options, so analysis matches what FridayX renders.
 //!
-//! After parsing, Friday X applies [`offset_events`]: only `~~…~~` counts as strikethrough.
+//! After parsing, FridayX applies [`offset_events`]: only `~~…~~` counts as strikethrough.
 //! Single-tilde pairs (`~text~`), which pulldown treats as strike, are demoted to literal `~` text so LLM output like `~**10%**` is not struck.
 
 #![deny(clippy::indexing_slicing)]
@@ -12,7 +12,7 @@
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::ops::Range;
 
-/// The exact `pulldown-cmark` option set Friday X uses to render markdown.
+/// The exact `pulldown-cmark` option set FridayX uses to render markdown.
 /// With `ENABLE_STRIKETHROUGH`, pulldown treats both `~~…~~` and single-`~` pairs as strike.
 /// Callers must consume events via [`offset_events`] so only double-tilde strikethrough is retained.
 pub fn parser_options() -> Options {
@@ -23,7 +23,7 @@ pub fn parser_options() -> Options {
         | Options::ENABLE_TABLES
 }
 
-/// Returns Friday X's parser events with source byte ranges, single-tilde strikethrough already demoted.
+/// Returns FridayX's parser events with source byte ranges, single-tilde strikethrough already demoted.
 ///
 /// Prefer this over `Parser::new_ext(...).into_offset_iter()` so analysis and rendering agree on what counts as strikethrough.
 pub fn offset_events(text: &str) -> impl Iterator<Item = (Event<'_>, Range<usize>)> + '_ {
@@ -269,7 +269,7 @@ fn detect_malformed_tables(
     }
 }
 
-/// Parse `text` with Friday X's options; count elements and flag structural issues.
+/// Parse `text` with FridayX's options; count elements and flag structural issues.
 pub fn analyze(text: &str) -> MarkdownAnalysis {
     let mut stats = MarkdownStats::default();
     let mut issues = Vec::new();
@@ -278,7 +278,7 @@ pub fn analyze(text: &str) -> MarkdownAnalysis {
     let mut parsed_spans: Vec<Range<usize>> = Vec::new();
 
     // The u32 element counters can't overflow: model output is bounded by its token limit, far below `u32::MAX`
-    // `offset_events` attaches byte ranges and demotes single-tilde strike, so counts match what Friday X renders
+    // `offset_events` attaches byte ranges and demotes single-tilde strike, so counts match what FridayX renders
     for (event, range) in offset_events(text) {
         // Structural-issue bookkeeping, tracked alongside the element counting below.
         match &event {

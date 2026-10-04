@@ -70,9 +70,9 @@ The two are separate worlds:
 
 | World | Covers | Commands | Store |
 |-------|--------|----------|-------|
-| Friday X | the model and API | `friday login`, `friday logout` | `~/.friday/auth.json` |
+| FridayX | the model and API | `friday login`, `friday logout` | `~/.friday/auth.json` |
 
-`grok clone` never reads `~/.friday/auth.json` for Git. Signing into Friday X does not
+`grok clone` never reads `~/.friday/auth.json` for Git. Signing into FridayX does not
 give the daemon a credential for the remote, and neither does
 `[clone] enabled = true`: that flag is a **product gate** deciding whether
 `grok clone` runs at all, not authorization for GitHub.

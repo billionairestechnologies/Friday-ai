@@ -6,7 +6,7 @@ import { installCmd, installPowerShell, installShell } from "../services/cli/ins
 import { assetSha256, assetUrl, latestVersion } from "../services/cli/releases.js";
 
 /**
- * /x/* — the public, unauthenticated install surface for Friday X (mounted outside /api so the one-liner
+ * /x/* — the public, unauthenticated install surface for FridayX (mounted outside /api so the one-liner
  * stays short): the three installer scripts plus the plain-text endpoints they call.
  */
 export const installRouter = Router();

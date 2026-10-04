@@ -51,12 +51,12 @@
     },
     {
       "id": "friday-x",
-      "title": "Friday X (terminal and editor agent)",
+      "title": "FridayX (terminal and editor agent)",
       "diagrams": [
-        { "id": "19", "slug": "friday-x-architecture", "title": "Friday X architecture" },
-        { "id": "20", "slug": "friday-x-device-login", "title": "Friday X sign-in (device code)" },
-        { "id": "21", "slug": "friday-x-gateway-metering", "title": "Friday X gateway and metering" },
-        { "id": "22", "slug": "friday-x-install-release", "title": "Friday X install and release" }
+        { "id": "19", "slug": "friday-x-architecture", "title": "FridayX architecture" },
+        { "id": "20", "slug": "friday-x-device-login", "title": "FridayX sign-in (device code)" },
+        { "id": "21", "slug": "friday-x-gateway-metering", "title": "FridayX gateway and metering" },
+        { "id": "22", "slug": "friday-x-install-release", "title": "FridayX install and release" }
       ]
     }
   ]

@@ -414,7 +414,7 @@ fn voice_keybinding_on_paid_tier_not_gated() {
     let mut app = test_app_with_agent();
     app.voice_mode_enabled = true;
     let meta = xai_grok_login::AuthMeta {
-        subscription_tier: Some("SuperGrok".into()),
+        subscription_tier: Some("Friday Pro".into()),
         ..Default::default()
     };
     app.apply_auth_meta(&meta);

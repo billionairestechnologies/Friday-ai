@@ -4331,7 +4331,7 @@ async fn bind_advertises_configured_mcp_per_session() {
 }
 /// Stopping a server drops the session's client and its hub registrations while the publish keeps
 /// naming it. A reload's convergence (`IfChanged`) leaves it stopped, so the daemon can stop the
-/// computer-use helper the moment Friday X Desktop quits and push the app-endpoint drop right after
+/// computer-use helper the moment FridayX Desktop quits and push the app-endpoint drop right after
 /// without the push starting the helper again; the next bind's convergence (`Always`, like every
 /// bind) starts a fresh client.
 #[tokio::test]
@@ -4419,7 +4419,7 @@ async fn a_stopped_server_stays_configured_and_returns_at_the_next_bind() {
     );
     server_task.abort();
 }
-/// Friday X Desktop can quit while a bind's convergence is still starting the helper: the stop then
+/// FridayX Desktop can quit while a bind's convergence is still starting the helper: the stop then
 /// finds nothing running and only marks the server stopped, without waiting for the convergence
 /// (which may hold the session's `update_lock` for the whole discovery window). The start that
 /// completes afterwards must not commit — the client the convergence opened ends, the way a stop
@@ -4891,7 +4891,7 @@ async fn stop_mcp_server_ends_the_client_without_a_hub() {
     server_task.abort();
 }
 /// [`crate::mcp::HubToolRegistry`] whose unregisters are never acknowledged, like the hub once
-/// Friday X Desktop's session is gone: the daemon's config push then waits out its whole budget.
+/// FridayX Desktop's session is gone: the daemon's config push then waits out its whole budget.
 struct HubThatNeverAcksUnregisters {
     inner: FakeHubRegistry,
 }
@@ -4914,7 +4914,7 @@ impl crate::mcp::HubToolRegistry for HubThatNeverAcksUnregisters {
         std::future::pending().await
     }
 }
-/// When Friday X Desktop quits, the daemon stops the helper and, right behind it, pushes the config
+/// When FridayX Desktop quits, the daemon stops the helper and, right behind it, pushes the config
 /// without the app's server; that push's convergence holds the session's `update_lock` and waits
 /// on a hub that never acknowledges the app's unregisters. The stop shares no lock with it across
 /// a hub round trip, so the helper's client is gone within a second while the push is still waiting.
@@ -6900,7 +6900,7 @@ async fn the_configure_path_caps_advertised_tools() {
     );
     server_task.abort();
 }
-/// The legacy client-driven path (`workspace.configure_mcp`, used when `bind_mcp` is None: sandbox, standalone, Friday X) across the full lifecycle: configure → hub unbind teardown → REBIND (which must re-open the `Closed` binding even without a machine-owned config) → configure again succeeds.
+/// The legacy client-driven path (`workspace.configure_mcp`, used when `bind_mcp` is None: sandbox, standalone, FridayX) across the full lifecycle: configure → hub unbind teardown → REBIND (which must re-open the `Closed` binding even without a machine-owned config) → configure again succeeds.
 /// Without the re-open, the drive fails closed on `Closed` forever and the session can never attach servers again.
 #[tokio::test]
 async fn a_rebind_reopens_for_the_client_driven_configure_path() {

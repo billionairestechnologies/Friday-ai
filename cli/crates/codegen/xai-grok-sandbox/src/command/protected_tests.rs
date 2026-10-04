@@ -330,7 +330,7 @@ fn a_case_variant_of_a_missing_floor_entry_is_protected_where_apfs_folds_case() 
         ws.join(".GIT/Hooks/pre-commit"),
         ws.join(".git/CONFIG"),
         ws.join(".git/modules/lib/HOOKS/post-checkout"),
-        ws.join(".Friday X/config.toml"),
+        ws.join(".FridayX/config.toml"),
         home.join(".SSH/config"),
     ] {
         assert_eq!(

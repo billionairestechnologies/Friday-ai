@@ -40,7 +40,7 @@ pub enum DeferredSessionStartup {
         parent_cwd: Option<PathBuf>,
         new_session_id: Option<String>,
     },
-    /// Fresh plain Friday X session whose first prompt resumes a foreign tool session.
+    /// Fresh plain FridayX session whose first prompt resumes a foreign tool session.
     ForeignResume {
         tool: xai_grok_foreign_sessions::ForeignSessionTool,
         native_id: String,

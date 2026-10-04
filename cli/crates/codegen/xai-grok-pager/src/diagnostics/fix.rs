@@ -24,7 +24,7 @@ pub const SSH_WRAP_ONE_OFF: &str = "friday wrap ssh <host>";
 const MANAGED_NAMESPACE: &str = "friday doctor";
 const SSH_WRAP_ALIAS_POSIX: &str = "alias ssh='friday wrap ssh'";
 const SSH_WRAP_ALIAS_FISH: &str = "alias ssh 'friday wrap ssh'";
-const TMUX_SCANNER_CAVEAT: &str = "Friday X checks this file for direct global assignments of this option. Review sourced files, conditionals, plugins, and generated tmux setup yourself.";
+const TMUX_SCANNER_CAVEAT: &str = "FridayX checks this file for direct global assignments of this option. Review sourced files, conditionals, plugins, and generated tmux setup yourself.";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AutomaticRemediation {
@@ -317,7 +317,7 @@ impl std::fmt::Display for FixError {
                 formatter,
                 "Automatic SSH setup is not available on Windows. Run `{SSH_WRAP_ONE_OFF}` when needed."
             ),
-            Self::HomeUnavailable => formatter.write_str("Friday X could not find your home directory."),
+            Self::HomeUnavailable => formatter.write_str("FridayX could not find your home directory."),
             Self::NotApplicable => formatter
                 .write_str("This fix does not apply to VS Code Remote sessions."),
             Self::TmuxNotApplicable => formatter
@@ -329,11 +329,11 @@ impl std::fmt::Display for FixError {
                 "Automatic setup supports Bash, zsh, and fish. For another shell, run `{SSH_WRAP_ONE_OFF}` when needed."
             ),
             Self::ByobuConfigUnavailable => formatter.write_str(
-                "Friday X could not determine Byobu's effective config directory. Keep `BYOBU_CONFIG_DIR` set in this session, then run the fix again.",
+                "FridayX could not determine Byobu's effective config directory. Keep `BYOBU_CONFIG_DIR` set in this session, then run the fix again.",
             ),
             Self::UnsafeDirectory { label, path } => write!(
                 formatter,
-                "Friday X refused unsafe {label} `{}`. Use a non-root absolute directory without control characters, `~`, `.` or `..` components.",
+                "FridayX refused unsafe {label} `{}`. Use a non-root absolute directory without control characters, `~`, `.` or `..` components.",
                 path.display()
             ),
             Self::ExistingCustomization { path, detail }
@@ -342,13 +342,13 @@ impl std::fmt::Display for FixError {
             {
                 write!(
                     formatter,
-                    "Friday X found an existing SSH alias or function in {} and did not change it: {detail}",
+                    "FridayX found an existing SSH alias or function in {} and did not change it: {detail}",
                     path.display()
                 )
             }
             Self::ExistingCustomization { path, detail } => write!(
                 formatter,
-                "Friday X found an existing customization in {} and did not change it: {detail}",
+                "FridayX found an existing customization in {} and did not change it: {detail}",
                 path.display()
             ),
             Self::Managed(error) => write!(
@@ -359,9 +359,9 @@ impl std::fmt::Display for FixError {
                 write!(formatter, "Could not update your tmux configuration: {error}")
             }
             Self::PostconditionFailed => formatter
-                .write_str("The configuration changed, but Friday X could not verify the SSH alias."),
+                .write_str("The configuration changed, but FridayX could not verify the SSH alias."),
             Self::TmuxPostconditionFailed => formatter.write_str(
-                "The configuration changed, but Friday X could not verify the managed tmux option.",
+                "The configuration changed, but FridayX could not verify the managed tmux option.",
             ),
         }
     }
@@ -411,12 +411,12 @@ enum TmuxEvidence {
     ColorPassthrough,
 }
 
-/// How a tmux remedy reaches its healthy state, which decides whether an existing line elsewhere in the config can defeat Friday X's managed block.
+/// How a tmux remedy reaches its healthy state, which decides whether an existing line elsewhere in the config can defeat FridayX's managed block.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TmuxRemedy {
     /// `set -g <option> <value>`: the last assignment wins, so a direct assignment in the user's own config must be classified before writing.
     Assignment,
-    /// `set -as <option> …`: tmux accumulates these and Friday X appends its block at the end of the file.
+    /// `set -as <option> …`: tmux accumulates these and FridayX appends its block at the end of the file.
     /// Earlier lines add to the fix rather than override it and are never a conflict.
     Accumulating,
 }
@@ -609,7 +609,7 @@ pub(crate) fn format_applicable_automatic_fixes(
         output.push_str(&format!("  {handle:<20} {label}\n"));
         match availability {
             AutomaticFixAvailability::Here => output.push_str(&format!(
-                "    Run: friday doctor fix {handle}\n    In Friday X: /doctor fix {handle}\n"
+                "    Run: friday doctor fix {handle}\n    In FridayX: /doctor fix {handle}\n"
             )),
             AutomaticFixAvailability::RunLocally => output.push_str(&format!(
                 "    On your local computer, run: friday doctor fix {handle}\n"
@@ -645,7 +645,7 @@ pub(crate) fn format_fix_preview(plan: &FixPlan) -> String {
         Some(path) => {
             let _ = writeln!(
                 output,
-                "\nBackup will be saved to: {}\nIf that file exists, Friday X will choose a unique name.",
+                "\nBackup will be saved to: {}\nIf that file exists, FridayX will choose a unique name.",
                 preview_path(path)
             );
         }
@@ -666,7 +666,7 @@ pub(crate) fn format_fix_preview(plan: &FixPlan) -> String {
                 tmux_activation_instruction(payload.spec, &plan.change.requested_path);
             let _ = writeln!(
                 output,
-                "\nWhat this changes:\n  Persists `{}`.\n  Friday X does not reload or modify the live tmux server.\n  After applying, {instruction}\n  Run /doctor again to verify the live setting.",
+                "\nWhat this changes:\n  Persists `{}`.\n  FridayX does not reload or modify the live tmux server.\n  After applying, {instruction}\n  Run /doctor again to verify the live setting.",
                 payload.spec.line,
             );
         }
@@ -733,7 +733,7 @@ fn plan_ssh_wrap(
             "Use `command ssh ...` to bypass the alias.",
             "For manually entered `ssh -f`, ControlPersist workflows, or OpenSSH `~^Z` local suspend, use `command ssh ...`. Wrapping does not fully preserve those behaviors.",
             "`friday wrap` starts the SSH process directly, so the alias does not loop.",
-            "Friday X checks this file for direct SSH aliases and functions. Review sourced files, plugins, and generated shell setup yourself.",
+            "FridayX checks this file for direct SSH aliases and functions. Review sourced files, plugins, and generated shell setup yourself.",
         ],
         payload: FixPayload::SshWrap(SshWrapPlan { shell, managed }),
     })

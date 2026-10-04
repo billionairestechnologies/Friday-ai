@@ -180,7 +180,7 @@ fn apply_workspace_transition(
                 ));
             }
             WorkspaceNotice::ReadOnly => {
-                app.show_toast("Dashboard workspace is read-only in this Friday X version");
+                app.show_toast("Dashboard workspace is read-only in this FridayX version");
             }
             WorkspaceNotice::WriterFailed { error } => {
                 tracing::error!(error = %error, "dashboard workspace writer failed");

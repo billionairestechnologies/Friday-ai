@@ -1,10 +1,10 @@
 # Plan Mode & Permissions
 
-Friday X asks before doing anything risky — and can plan before it codes.
+FridayX asks before doing anything risky — and can plan before it codes.
 
 ## Permissions
 
-When Friday X wants to run a risky command or edit a file, it pauses and asks:
+When FridayX wants to run a risky command or edit a file, it pauses and asks:
 allow once, always allow that kind of action, or deny.
 
 Reading is always free: file reads, searches, and safe read-only commands
@@ -15,7 +15,7 @@ Trust the session? `/always-approve` (or `Ctrl+O`) skips the prompts.
 
 ## Plan mode
 
-For bigger or more ambiguous tasks, use **plan mode**: Friday X explores the
+For bigger or more ambiguous tasks, use **plan mode**: FridayX explores the
 codebase read-only, designs an approach, and presents a plan you approve
 *before* any code is written.
 
@@ -25,7 +25,7 @@ codebase read-only, designs an approach, and presents a plan you approve
   one step.
 
 When the plan is ready: `a` approves, `c` comments on a specific line,
-`s` requests changes — Friday X iterates until you're happy, then implements.
+`s` requests changes — FridayX iterates until you're happy, then implements.
 
 A good habit: plan mode for "how should we even do this?", normal mode for
 "just do it".
@@ -33,7 +33,7 @@ A good habit: plan mode for "how should we even do this?", normal mode for
 ## Long-running commands
 
 A build or test run hogging the turn? **`Ctrl+B`** sends it to the
-background — Friday X keeps working and you're notified when it finishes
+background — FridayX keeps working and you're notified when it finishes
 (`Ctrl+G` shows the tasks pane).
 
 *Go deeper: `/docs Plan Mode` or `/docs Permissions and Safety`*

@@ -1,6 +1,6 @@
-# Friday X
+# FridayX
 
-Bring Friday X into your terminal. Fast, flicker-free CLI built for plans, subagents, and parallel work.
+Bring FridayX into your terminal. Fast, flicker-free CLI built for plans, subagents, and parallel work.
 
 **[Homepage](https://x.ai/cli)** | **[Documentation](https://docs.x.ai/build/overview)**
 
@@ -26,7 +26,7 @@ grok
 grok -p "Explain this codebase"
 ```
 
-On first launch, Friday X opens your browser to authenticate. For CI or headless environments, use an API key from [console.x.ai](https://console.x.ai):
+On first launch, FridayX opens your browser to authenticate. For CI or headless environments, use an API key from [console.x.ai](https://console.x.ai):
 
 ```bash
 export FRIDAY_X_TOKEN="xai-..."
@@ -58,4 +58,4 @@ For full documentation including configuration, MCP servers, custom models, head
 
 ## Feedback
 
-Run `/feedback` inside Friday X to report issues or send feedback directly.
+Run `/feedback` inside FridayX to report issues or send feedback directly.

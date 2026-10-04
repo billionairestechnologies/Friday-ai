@@ -120,7 +120,7 @@ fn model_with_windows(windows: serde_json::Value) -> ModelState {
     let id = acp_fixtures::model_id("grok-4.7");
     let info = acp_fixtures::model_info_with_meta(
         "grok-4.7",
-        "Friday X 4.7",
+        "FridayX 4.7",
         serde_json::json!({
             "totalContextTokens": 256_000,
             "contextWindows": windows,

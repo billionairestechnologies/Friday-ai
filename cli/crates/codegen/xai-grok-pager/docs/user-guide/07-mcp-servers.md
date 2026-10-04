@@ -1,12 +1,12 @@
 # MCP Servers
 
-MCP (Model Context Protocol) servers extend Friday X with external tool integrations. They let Friday X interact with any service that implements the MCP standard.
+MCP (Model Context Protocol) servers extend FridayX with external tool integrations. They let FridayX interact with any service that implements the MCP standard.
 
 ---
 
 ## What Are MCP Servers?
 
-An MCP server is a process that exposes tools to Friday X over a standardized protocol. When you configure an MCP server, its tools become available to the model alongside Friday X's built-in tools. The model can discover and call these tools during a session.
+An MCP server is a process that exposes tools to FridayX over a standardized protocol. When you configure an MCP server, its tools become available to the model alongside FridayX's built-in tools. The model can discover and call these tools during a session.
 
 For example, a GitHub MCP server might expose tools like `create_issue`, `list_pull_requests`, and `search_code`. A database server might expose `query`, `list_tables`, and `describe_schema`.
 
@@ -22,7 +22,7 @@ To distribute MCP servers to a team, or to restrict which servers users may run 
 
 ### stdio Transport (Local Process)
 
-Friday X spawns a local process and communicates over stdin/stdout:
+FridayX spawns a local process and communicates over stdin/stdout:
 
 ```toml
 [mcp_servers.my-server]
@@ -46,7 +46,7 @@ tool_timeouts = { slow_op = 120 }     # Per-tool timeout overrides, seconds
 > inline (full payload spilled under the session `mcp/` folder). Default is
 > **20_000 bytes**. Override via:
 >
-> - env `FRIDAY_MAX_MCP_OUTPUT_BYTES` or `MAX_MCP_OUTPUT_BYTES` (bytes; Friday X-native
+> - env `FRIDAY_MAX_MCP_OUTPUT_BYTES` or `MAX_MCP_OUTPUT_BYTES` (bytes; FridayX-native
 >   wins if both set; Claude-style name, but we bound by **bytes** not tokens)
 > - `config.toml` — user-level (`~/.friday/config.toml`) **or repo-level**
 >   (`.friday/config.toml` anywhere on the cwd → git-root chain; the deepest
@@ -72,7 +72,7 @@ headers = { "Authorization" = "Bearer token" }
 ```
 
 MCP data-plane requests (JSON-RPC and SSE) and the anonymous-access probe carry a
-default `User-Agent: grok-cli/<version>` header, where `<version>` is the Friday X binary
+default `User-Agent: grok-cli/<version>` header, where `<version>` is the FridayX binary
 version. OAuth discovery, client registration, and token requests are issued by the
 rmcp OAuth client and keep its own behavior (no default `User-Agent`). A valid
 `User-Agent` entry in the server's `headers` overrides the default; an invalid
@@ -138,7 +138,7 @@ By default `friday mcp add` writes to `~/.friday/config.toml` (`--scope user`). 
 
 `friday mcp enable` / `disable` persist the personal on/off state to user `~/.friday/config.toml` (`disabled_mcp_servers`, and `[mcp_servers.<name>].enabled` when that entry exists). Scope:
 
-- **Known names:** user/project Friday X TOML, names already on the disabled list, compat sources (`.mcp.json`, Claude, Cursor), and **plugin** MCP servers (same discovery as doctor/`/mcps`).
+- **Known names:** user/project FridayX TOML, names already on the disabled list, compat sources (`.mcp.json`, Claude, Cursor), and **plugin** MCP servers (same discovery as doctor/`/mcps`).
 - **Enable only:** if the cwd-nearest project definition has sticky `enabled = false`, that single key is cleared (comments preserved); disable never rewrites project configs.
 - **Not full `/mcps` parity:** gateway connectors (`managed_gateway:…`, stored under `disabled_mcp_tools.__managed_gateway_connectors`) stay Space-only in the TUI. Idempotent; unknown names exit 1.
 
@@ -165,9 +165,9 @@ url = "https://mcp.linear.app/mcp"
 enabled = true
 ```
 
-When a server exposes a native HTTP/SSE endpoint, prefer the `url` form over wrapping it in a stdio proxy such as `npx mcp-remote <url>`. Friday X handles HTTP/SSE and OAuth directly, so the native form avoids an extra subprocess per session. It also registers Friday X's own OAuth client with the provider.
+When a server exposes a native HTTP/SSE endpoint, prefer the `url` form over wrapping it in a stdio proxy such as `npx mcp-remote <url>`. FridayX handles HTTP/SSE and OAuth directly, so the native form avoids an extra subprocess per session. It also registers FridayX's own OAuth client with the provider.
 
-Friday X walks from the current directory up to the git repo root, loading `.friday/config.toml` at each level:
+FridayX walks from the current directory up to the git repo root, loading `.friday/config.toml` at each level:
 
 | Location | Scope | Priority |
 |----------|-------|----------|
@@ -177,7 +177,7 @@ Friday X walks from the current directory up to the git repo root, loading `.fri
 
 If a project defines a server with the same name as a global one, the project version replaces it entirely (fields are not merged).
 
-Project-scoped files contribute `[mcp_servers]`, `[plugins]`, and `[permission]` entries. Friday X reads most other config sections only from `~/.friday/config.toml`.
+Project-scoped files contribute `[mcp_servers]`, `[plugins]`, and `[permission]` entries. FridayX reads most other config sections only from `~/.friday/config.toml`.
 
 ---
 
@@ -189,9 +189,9 @@ MCP tools are namespaced with the server name to avoid collisions. The catalog k
 - Server `github` with tool `create_issue` becomes `github__create_issue`
 - A tool segment may start with a digit: server `auth` with tool `2fa_enable` becomes `auth__2fa_enable`
 
-### What Friday X admits
+### What FridayX admits
 
-Friday X admits a listed tool into the session catalog when all of these hold (`xai-grok-mcp` `qualify_mcp_tool_name`):
+FridayX admits a listed tool into the session catalog when all of these hold (`xai-grok-mcp` `qualify_mcp_tool_name`):
 
 | Part | Rule |
 | --- | --- |
@@ -202,7 +202,7 @@ Friday X admits a listed tool into the session catalog when all of these hold (`
 
 A rejected tool is skipped. The log line is `Skipping MCP tool` with the reason. The rest of that server's tools still load.
 
-The **64-character** cap is a provider **function-name** budget. It applies to the meta-tools `search_tool` and `use_tool` themselves. It does **not** apply to catalog keys. A `server__tool` name longer than 64 characters stays in the catalog. The model still calls it through `use_tool` with that full name. Friday X used to drop those tools at 64 characters. It no longer does.
+The **64-character** cap is a provider **function-name** budget. It applies to the meta-tools `search_tool` and `use_tool` themselves. It does **not** apply to catalog keys. A `server__tool` name longer than 64 characters stays in the catalog. The model still calls it through `use_tool` with that full name. FridayX used to drop those tools at 64 characters. It no longer does.
 
 The server name in `[mcp_servers.<name>]` / `friday mcp add` is the catalog prefix. A name that starts with a digit is a valid TOML key. Catalog admission still rejects it (`InvalidServerName`). Rename the server so it starts with a letter or underscore.
 
@@ -214,7 +214,7 @@ A server name that ends with `_` makes `server__tool` contain `___`. Admission s
 
 ## Toggle Servers at Runtime
 
-You can enable or disable MCP servers without restarting Friday X (TUI `/mcps` or CLI — see [CLI Management](#cli-management)).
+You can enable or disable MCP servers without restarting FridayX (TUI `/mcps` or CLI — see [CLI Management](#cli-management)).
 
 ### The /mcps Modal
 
@@ -278,11 +278,11 @@ ACP client filesystems do not yet support bounded acquisition and reject file mo
 
 ## Compatibility
 
-Friday X loads MCP server configurations from multiple sources for compatibility:
+FridayX loads MCP server configurations from multiple sources for compatibility:
 
 | Source | Format | Location | Configurable |
 |--------|--------|----------|-------------|
-| `config.toml` | Native Friday X config | `~/.friday/config.toml`, `.friday/config.toml` | Always on |
+| `config.toml` | Native FridayX config | `~/.friday/config.toml`, `.friday/config.toml` | Always on |
 | `.claude.json` | Claude Code format | `~/.claude.json` | `[compat.claude] mcps` |
 | `.cursor/mcp.json` | Cursor format | `~/.cursor/mcp.json`, `<project>/.cursor/mcp.json` | `[compat.cursor] mcps` |
 | `.mcp.json` | MCP standard format | Project root (cwd to git root) | Loaded unless you have imported or dismissed the Claude import prompt (the import marker is set) |
@@ -295,7 +295,7 @@ The Claude and Cursor MCP sources are scanned by default. To disable scanning fo
 
 ## MCP OAuth
 
-For MCP servers that require OAuth authentication, Friday X handles the credential flow automatically. When an MCP server requests OAuth credentials, Friday X opens a browser-based authorization flow and stores the resulting tokens for future use.
+For MCP servers that require OAuth authentication, FridayX handles the credential flow automatically. When an MCP server requests OAuth credentials, FridayX opens a browser-based authorization flow and stores the resulting tokens for future use.
 
 ---
 
@@ -305,7 +305,7 @@ Use the `url` form for hosted MCP servers and the `command` / `args` form for lo
 
 ### Native HTTP (hosted services)
 
-You must authenticate OAuth-based MCP servers before you can use them. Friday X stores the resulting tokens under `~/.friday/mcp_credentials.json` as local plaintext with owner-only file permissions (`0600` on Unix). Prefer full-disk encryption on the host. After you edit `config.toml`, press `r` in the `/mcps` modal to refresh the server list.
+You must authenticate OAuth-based MCP servers before you can use them. FridayX stores the resulting tokens under `~/.friday/mcp_credentials.json` as local plaintext with owner-only file permissions (`0600` on Unix). Prefer full-disk encryption on the host. After you edit `config.toml`, press `r` in the `/mcps` modal to refresh the server list.
 
 ```toml
 [mcp_servers.linear]
@@ -332,7 +332,7 @@ enabled = true
 Authorization = "Bearer <token>"
 ```
 
-To avoid putting secrets in the config file, reference an environment variable with `${VAR}` (or `${VAR:-default}`). Friday X expands string fields in `[mcp_servers.*]` — `url`, `command`, `args`, and the values in `env` and `headers` — at load time:
+To avoid putting secrets in the config file, reference an environment variable with `${VAR}` (or `${VAR:-default}`). FridayX expands string fields in `[mcp_servers.*]` — `url`, `command`, `args`, and the values in `env` and `headers` — at load time:
 
 ```toml
 [mcp_servers.internal-tools]
@@ -341,7 +341,7 @@ enabled = true
 headers = { "Authorization" = "Bearer ${INTERNAL_MCP_TOKEN}" }
 ```
 
-When another process keeps a short-lived token in a file (a credential helper, a sidecar, or a cron job), point `bearer_token_file` at it. Friday X reads the file on every request to the server and sends `Authorization: Bearer <contents>`, with surrounding whitespace trimmed, so a rotated token takes effect on the next request without restarting Friday X or reconnecting the server:
+When another process keeps a short-lived token in a file (a credential helper, a sidecar, or a cron job), point `bearer_token_file` at it. FridayX reads the file on every request to the server and sends `Authorization: Bearer <contents>`, with surrounding whitespace trimmed, so a rotated token takes effect on the next request without restarting FridayX or reconnecting the server:
 
 ```toml
 [mcp_servers.internal-tools]
@@ -377,7 +377,7 @@ tool_timeout_sec = 120
 tool_timeouts = { slow_analysis = 300, quick_lookup = 10 }
 ```
 
-On Windows, npm installs launchers like `npx`, `npm`, `pnpm`, and `yarn` as `.cmd` batch shims (there is no `npx.exe`). Friday X resolves a bare `command` such as `npx` to its real launcher path on `PATH` (honoring `PATHEXT`) before spawning, so these work without manually wrapping them in `cmd /c`. A `command` given as an absolute path or one containing a path separator is used as-is.
+On Windows, npm installs launchers like `npx`, `npm`, `pnpm`, and `yarn` as `.cmd` batch shims (there is no `npx.exe`). FridayX resolves a bare `command` such as `npx` to its real launcher path on `PATH` (honoring `PATHEXT`) before spawning, so these work without manually wrapping them in `cmd /c`. A `command` given as an absolute path or one containing a path separator is used as-is.
 
 ---
 
@@ -430,7 +430,7 @@ npx -y @modelcontextprotocol/server-filesystem /path
 startup_timeout_sec = 30
 ```
 
-For stdio servers, Friday X captures the process's standard error to `~/.friday/logs/mcp/<server>.stderr.log`, truncated on each launch. Check this file when a server starts but fails to handshake:
+For stdio servers, FridayX captures the process's standard error to `~/.friday/logs/mcp/<server>.stderr.log`, truncated on each launch. Check this file when a server starts but fails to handshake:
 
 ```bash
 tail -f ~/.friday/logs/mcp/filesystem.stderr.log
@@ -438,7 +438,7 @@ tail -f ~/.friday/logs/mcp/filesystem.stderr.log
 
 ### Blocked by organization policy
 
-If native TOML policy or Claude `managed-settings.json` sets `deniedMcpServers`, a nonempty `allowedMcpServers`, or `allowManagedMcpServersOnly`, Friday X drops non-matching servers at merge time and logs `MCP server blocked by managed settings policy`. Native grok layers bind every server; the Claude file binds foreign-defined servers only. `friday inspect` shows the lists, lockdown scope, and each remaining server. Details and examples: [Restrict which MCP servers can run](09-plugins.md#restrict-which-mcp-servers-can-run).
+If native TOML policy or Claude `managed-settings.json` sets `deniedMcpServers`, a nonempty `allowedMcpServers`, or `allowManagedMcpServersOnly`, FridayX drops non-matching servers at merge time and logs `MCP server blocked by managed settings policy`. Native grok layers bind every server; the Claude file binds foreign-defined servers only. `friday inspect` shows the lists, lockdown scope, and each remaining server. Details and examples: [Restrict which MCP servers can run](09-plugins.md#restrict-which-mcp-servers-can-run).
 
 ### A listed tool never appears
 

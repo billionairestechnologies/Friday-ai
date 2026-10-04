@@ -837,7 +837,7 @@ pub(crate) struct ListCommandsRequest {
     pub session_id: Option<acp::SessionId>,
     #[serde(default)]
     pub cwd: Option<String>,
-    /// Product lane: `"chat"` filters to Friday X Chat / Friday X Computer first-party skills only.
+    /// Product lane: `"chat"` filters to FridayX Chat / FridayX Computer first-party skills only.
     /// Omitted or any other value keeps the full Build catalog.
     #[serde(default)]
     pub kind: Option<String>,
@@ -1331,7 +1331,7 @@ impl BuiltinAction {
         }
     }
 }
-/// `RewriteToRun` (default): replace `/foo args` with `"run /foo args"`, matching today's Friday X flow that calls our dedicated `skill` tool.
+/// `RewriteToRun` (default): replace `/foo args` with `"run /foo args"`, matching today's FridayX flow that calls our dedicated `skill` tool.
 /// `Passthrough`: leave the prompt verbatim.
 /// Some templates use this: the model is trained to spot a leading `/<name>` and look it up in the `<agent_skills>` listing.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

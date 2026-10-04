@@ -5085,6 +5085,7 @@ fn media_gen_ref_skips_uploaded_only_video() {
 /// The media renderer has no file to open, so it must surface the upsell text in the card body (not a bare title).
 /// It must NOT mark the card as an error.
 #[test]
+#[ignore = "vendor subscription upsell and usage-allowance UI is not part of FridayX"]
 fn tier_restricted_media_shows_upsell_text_not_error() {
     let upsell = "Image generation is a SuperGrok feature. Upgrade at \
          https://grok.com/supergrok?referrer=grok-build";
@@ -5115,7 +5116,7 @@ fn tier_restricted_media_shows_upsell_text_not_error() {
             .output
             .as_deref()
             .unwrap_or_default()
-            .contains("SuperGrok"),
+            .contains("Friday Pro"),
         "upsell text must be shown in the card body, got: {:?}",
         block.output
     );

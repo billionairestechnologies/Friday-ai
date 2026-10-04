@@ -8,7 +8,7 @@ use super::common::*;
 const GATE_MSG: &str = "ZZSUBGATEMSG";
 
 /// A tier in the shell's `QUALIFYING_TIERS` list.
-const PAID_TIER: &str = "SuperGrokPro";
+const PAID_TIER: &str = "Pro";
 
 /// Display name delivered via `/settings` `subscription_tier_display`.
 const PAID_TIER_DISPLAY: &str = "SuperGrok Pro";

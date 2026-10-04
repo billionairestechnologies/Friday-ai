@@ -15,7 +15,7 @@ sequenceDiagram
   API-->>W: Which client is asking
   U->>W: Check the code matches, Approve (or Deny)
   W->>API: POST /auth/device/approve
-  API->>API: Friday X entitlement checked
+  API->>API: FridayX entitlement checked
   API->>DB: status = approved (compare-and-set)
   loop every 5 s
     C->>API: POST /oauth2/token (device_code)
@@ -25,4 +25,4 @@ sequenceDiagram
   API->>DB: Claim once, store hash(fxt_ token)
   API-->>C: access_token fxt_...
   C->>C: Save token, then every request carries it
-  Note over U,DB: Settings, Friday X lists every signed-in device. Sign out revokes the token at once.
+  Note over U,DB: Settings, FridayX lists every signed-in device. Sign out revokes the token at once.

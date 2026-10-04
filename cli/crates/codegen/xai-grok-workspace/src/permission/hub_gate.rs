@@ -133,7 +133,7 @@ impl SessionApproval {
 struct FolderGrants {
     cwd: AbsPathBuf,
     /// The store's key: the served folder when the bound cwd is a repo-less directory under it.
-    /// Friday X Desktop binds every conversation to its own scratch directory beneath the folder it
+    /// FridayX Desktop binds every conversation to its own scratch directory beneath the folder it
     /// exposes, and a cwd-keyed store made an "always" answer hold for one chat only. A cwd inside a
     /// repository keeps the repo-root key, so the CLI's per-project grants are unchanged.
     grant_dir: AbsPathBuf,

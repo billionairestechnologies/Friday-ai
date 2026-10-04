@@ -1,4 +1,4 @@
-//! Shared announcement types, persistence, and formatting for Friday X CLI apps.
+//! Shared announcement types, persistence, and formatting for FridayX CLI apps.
 //!
 //! This crate provides the common logic used by `xai-grok-shell` and `xai-grok-pager` for handling announcements (banner notifications).
 

@@ -28,7 +28,7 @@ Not `/config-agents` (alias `/agents`), which manages agent *definitions* and pe
 
 Compress conversation history to reclaim context-window space.
 
-Friday X also auto-compacts once the context window hits 85% (tune it with `[session] auto_compact_threshold_percent`).
+FridayX also auto-compacts once the context window hits 85% (tune it with `[session] auto_compact_threshold_percent`).
 
 ### `/context`
 
@@ -99,7 +99,7 @@ Switch models. Accepts a model ID or display name (case-insensitive). When the m
 
 ```
 /model grok-4.6
-/model Friday X 4.6
+/model FridayX 4.6
 /model Reasoning X high
 /model Reasoning X 500k high
 ```
@@ -152,7 +152,7 @@ Toggle vim-style scrollback keys (`j`/`k`, `h`/`l`, `g`/`G`, `y`/`Y`, and so on)
 
 ### `/edit-prompt`
 
-Open an external editor for the prompt, in either render mode. Friday X resolves `$VISUAL`, then `$EDITOR`, then `vi`; command values may include quoted arguments. Saving replaces the draft without sending it, and saving an empty file clears it. Typing `/edit-prompt` necessarily replaces the composer's contents, so the editor starts from an empty draft; to edit an **existing** draft, choose **Edit Prompt in External Editor** from the command palette (or press `Ctrl+G` in minimal mode), which preserves the text and refuses pasted, file-reference, or image chips without flattening them.
+Open an external editor for the prompt, in either render mode. FridayX resolves `$VISUAL`, then `$EDITOR`, then `vi`; command values may include quoted arguments. Saving replaces the draft without sending it, and saving an empty file clears it. Typing `/edit-prompt` necessarily replaces the composer's contents, so the editor starts from an empty draft; to edit an **existing** draft, choose **Edit Prompt in External Editor** from the command palette (or press `Ctrl+G` in minimal mode), which preserves the text and refuses pasted, file-reference, or image chips without flattening them.
 
 ```
 /edit-prompt
@@ -162,7 +162,7 @@ Open an external editor for the prompt, in either render mode. Friday X resolves
 
 Switch the current session to the other render mode, in place. `/minimal` (offered while you're in fullscreen) switches to the experimental scrollback-native mode; `/fullscreen` (offered while you're in minimal; alias `/full`) switches back to standard fullscreen mode. The switch happens inside the running process — nothing restarts, so a running turn keeps streaming and your composer draft, queued prompts, and permission mode all carry over; a marker (committed line in minimal, toast in fullscreen) reminds you how to switch back. Both are session-scoped — they don't touch `config.toml` — and the `--minimal` / `--fullscreen` CLI flags are session-scoped the same way. To make plain `friday` open in a given mode by default, use `/settings` → **Default screen mode** or set `[ui] screen_mode`. (If the in-place transition misbehaves in an exotic terminal, `FRIDAY_SCREEN_MODE_SWITCH=exec` restores the old behavior of relaunching the pager onto the same session.)
 
-A handful of commands only work in one of the two modes, because the surface they drive doesn't exist in the other: `/find`, `/jump`, `/timeline`, `/theme`, `/tutorial`, and `/dashboard` are fullscreen-only, while `/expand` is minimal-only. (`/workflow runs` is different: it opens the run pane in fullscreen and degrades to a text overview in minimal rather than refusing.) Those are hidden from the command menu and the palette in the mode they can't run in. If you type one out anyway, Friday X says why — and points you at whichever is actually useful. When the other mode is the only way to get it, that's the mode switch: `/theme isn't available in minimal mode (minimal renders with your terminal's own palette). Run /fullscreen to switch this session.` When this mode already does the job another way, it names that instead: `/expand isn't available in fullscreen mode: press Tab to focus the scrollback, then → on the block.` Everything else works in both. Note that `--no-alt-screen` still counts as fullscreen here, so it keeps the fullscreen-only commands.
+A handful of commands only work in one of the two modes, because the surface they drive doesn't exist in the other: `/find`, `/jump`, `/timeline`, `/theme`, `/tutorial`, and `/dashboard` are fullscreen-only, while `/expand` is minimal-only. (`/workflow runs` is different: it opens the run pane in fullscreen and degrades to a text overview in minimal rather than refusing.) Those are hidden from the command menu and the palette in the mode they can't run in. If you type one out anyway, FridayX says why — and points you at whichever is actually useful. When the other mode is the only way to get it, that's the mode switch: `/theme isn't available in minimal mode (minimal renders with your terminal's own palette). Run /fullscreen to switch this session.` When this mode already does the job another way, it names that instead: `/expand isn't available in fullscreen mode: press Tab to focus the scrollback, then → on the block.` Everything else works in both. Note that `--no-alt-screen` still counts as fullscreen here, so it keeps the fullscreen-only commands.
 
 ### `/plan`
 
@@ -263,7 +263,7 @@ Generate a video from a text (or image) description. It plans shots, generates s
 
 ### `/loop [interval] <prompt>`
 
-Run a prompt on a recurring interval. Give the interval as `30m`, `1 hour`, or `every 2 days`; leave it out and Friday X will ask.
+Run a prompt on a recurring interval. Give the interval as `30m`, `1 hour`, or `every 2 days`; leave it out and FridayX will ask.
 
 ```
 /loop 30m check deploy status
@@ -278,7 +278,7 @@ Intervals are `Ns` (seconds, minimum 60), `Nm` (minutes), `Nh` (hours), or `Nd` 
 
 ### `/goal`
 
-Set, manage, or check an autonomous goal. Friday X works across rounds and only marks the goal complete after an independent evidence review confirms the claim; if that review can't reproduce the result or has no usable evidence, the goal stays active or pauses with concrete gaps.
+Set, manage, or check an autonomous goal. FridayX works across rounds and only marks the goal complete after an independent evidence review confirms the claim; if that review can't reproduce the result or has no usable evidence, the goal stays active or pauses with concrete gaps.
 
 ```
 /goal Migrate the auth module to the new API
@@ -326,7 +326,7 @@ A budget-limited run is different: it only resumes through a model/tool resume r
 
 ### `/workflows`
 
-Open the extensions modal on the **Workflows** tab — a browse-only catalog of the saved workflows Friday X discovered (built-ins, project `.friday/workflows/`, and user `~/.friday/workflows/`), with each entry's source, description, and path. The same catalog is listed for the model under the skill listing in the session preamble. Launch one with `/workflow <name>` (or its own slash command), then watch it in `/workflow runs`.
+Open the extensions modal on the **Workflows** tab — a browse-only catalog of the saved workflows FridayX discovered (built-ins, project `.friday/workflows/`, and user `~/.friday/workflows/`), with each entry's source, description, and path. The same catalog is listed for the model under the skill listing in the session preamble. Launch one with `/workflow <name>` (or its own slash command), then watch it in `/workflow runs`.
 
 ---
 

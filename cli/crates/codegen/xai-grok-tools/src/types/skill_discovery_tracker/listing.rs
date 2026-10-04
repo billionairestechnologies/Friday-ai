@@ -524,7 +524,7 @@ pub enum XmlRenderMode {
     /// Verbatim rendering: every skill with its full description; no
     /// budget cap, minimal escaping.
     Verbatim,
-    /// Friday X build harness: budget-capped three-tier rendering with full
+    /// FridayX build harness: budget-capped three-tier rendering with full
     /// XML entity escaping.
     Budgeted {
         /// Character budget for the listing; `None` uses the default.

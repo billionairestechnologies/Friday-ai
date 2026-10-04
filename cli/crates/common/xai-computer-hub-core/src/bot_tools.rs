@@ -1,4 +1,4 @@
-//! Wire names of the hub-synthesized Friday X Bot harness tools.
+//! Wire names of the hub-synthesized FridayX Bot harness tools.
 //!
 //! Single source of truth shared by the hub that registers the tools and
 //! by the clients that gate the tools per agent config.
@@ -21,7 +21,7 @@ pub const FRIDAY_BOT_TOOL_IDS: &[&str] = &[
     "bot_voice_call_tool",
 ];
 
-/// Whether `name` is a hub-synthesized Friday X Bot harness tool.
+/// Whether `name` is a hub-synthesized FridayX Bot harness tool.
 pub fn is_grok_bot_tool(name: &str) -> bool {
     FRIDAY_BOT_TOOL_IDS.contains(&name)
 }
@@ -54,19 +54,19 @@ pub fn is_grok_bot_default_tool(name: &str) -> bool {
 pub const FRIDAY_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
     (
         "bot_create_agent",
-        "Create a Friday X Bot agent. It greets the user itself; send no first \
+        "Create a FridayX Bot agent. It greets the user itself; send no first \
          prompt, never quote its id. Cannot be deleted; check bot_list_agents \
          first. Only when the user asks for a new agent; to reach an existing \
          one use bot_list_agents then bot_send_prompt. One agent per call.",
     ),
     (
         "bot_list_agents",
-        "List all Friday X Bot agents on the user's box with id, name, description, \
+        "List all FridayX Bot agents on the user's box with id, name, description, \
          and status. Wakes the box. Its ids are the only valid agent_id values.",
     ),
     (
         "bot_send_prompt",
-        "Send a prompt to a Friday X Bot agent. Returns once accepted unless mode \
+        "Send a prompt to a FridayX Bot agent. Returns once accepted unless mode \
          waits for the reply. on_busy is supersede (default), reject, or queue. \
          After a timeout or a missing notification, resume with bot_await_turn \
          and the returned handle; never re-send. Empty reply with \
@@ -106,13 +106,13 @@ pub const FRIDAY_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
     ),
     (
         "bot_search_agents",
-        "Find Friday X Bot agents by name or description when you know what you \
+        "Find FridayX Bot agents by name or description when you know what you \
          want. Returns the best matches only; bot_list_agents shows every bot. \
          Wakes the box.",
     ),
     (
         "bot_voice_call_plan",
-        "Plan a voice call with a Friday X Bot agent: its spoken instructions, \
+        "Plan a voice call with a FridayX Bot agent: its spoken instructions, \
          voice-side tools, greeting, and task receipt. For a voice backend at \
          dial time; sends nothing to the agent.",
     ),
@@ -123,7 +123,7 @@ pub const FRIDAY_BOT_TOOL_DESCRIPTIONS: &[(&str, &str)] = &[
     ),
 ];
 
-/// The model-facing description for a Friday X Bot tool id, if known.
+/// The model-facing description for a FridayX Bot tool id, if known.
 pub fn grok_bot_tool_description(name: &str) -> Option<&'static str> {
     FRIDAY_BOT_TOOL_DESCRIPTIONS
         .iter()
@@ -138,7 +138,7 @@ const SEND_AGENT_ID_DESCRIPTION: &str = "Opaque id copied exactly from \
      bot_list_agents or bot_search_agents; never a name, never typed from \
      memory or shortened.";
 
-/// Flattened JSON Schema for a Friday X Bot tool's arguments.
+/// Flattened JSON Schema for a FridayX Bot tool's arguments.
 ///
 /// Same shape the hub advertises via `schema_for_kind`. Pre-bind synthesis
 /// uses this so constrained decoding can emit required fields (`agent_id`,

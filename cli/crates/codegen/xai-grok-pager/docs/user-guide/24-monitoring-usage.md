@@ -4,7 +4,7 @@
 > additive changes may occur without notice, renames/removals will bump the
 > version and be called out in the changelog.
 
-Friday X CLI can export usage **metrics** and **events** to your organization's
+FridayX CLI can export usage **metrics** and **events** to your organization's
 own OpenTelemetry collector, so platform teams can monitor adoption, token
 consumption, tool-permission decisions, and errors across the fleet — without
 any data flowing through SpaceXAI.
@@ -252,7 +252,7 @@ and `session_create` phases appear in the log timeline and the summary
 strings, not in this metric. `stuck_in` on a timeout names the step that had
 not finished. That is often not the step that took the longest, because a step
 that runs without pausing finishes before the timeout is recorded. The error
-message Friday X prints names the longest step instead, so the two can name
+message FridayX prints names the longest step instead, so the two can name
 different steps for the same timeout. Use `phase_duration` to compare them.
 `auth_mode` is `personal`, `team`, `deployment`, or `unknown`:
 startup cost differs by kind, so split by it before comparing.

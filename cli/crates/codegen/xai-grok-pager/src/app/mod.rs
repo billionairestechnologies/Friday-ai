@@ -330,7 +330,7 @@ mod voice_gate_tests {
     use super::{resolve_voice_mode_enabled, resolve_voice_mode_enabled_as};
     use xai_grok_config::Distribution;
     #[test]
-    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+    #[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
     fn a_distribution_without_voice_outranks_every_tier_and_the_api_key_force_on() {
         for remote in [None, Some(false), Some(true)] {
             assert!(!resolve_voice_mode_enabled_as(
@@ -350,7 +350,7 @@ mod voice_gate_tests {
         ));
     }
     #[test]
-    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+    #[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
     fn api_key_force_on_over_remote_kill_only() {
         assert!(resolve_voice_mode_enabled(None, None, Some(false), true));
         assert!(!resolve_voice_mode_enabled(None, None, Some(false), false));
@@ -943,7 +943,7 @@ pub async fn run(
         no_subagents: args.no_subagents,
         memory_enabled_override: args.memory_enabled_override(),
         memory_override_flag: args.memory_override_flag(),
-        disable_web_search: true, // vendor-hosted search is removed; see Friday X docs
+        disable_web_search: true, // vendor-hosted search is removed; see FridayX docs
         todo_gate: args.todo_gate,
         laziness_debug_log: None,
         storage_mode: args.storage_mode.clone(),
@@ -1717,7 +1717,7 @@ pub(crate) fn set_terminal_title(title: &str) {
 fn terminal_title_string(title: &str) -> String {
     let sanitized: String = title.chars().filter(|c| !c.is_control()).collect();
     if sanitized.is_empty() {
-        "grok".into()
+        "friday".into()
     } else {
         let truncated: String = sanitized.chars().take(80 - 6).collect();
         format!("{} - grok", truncated)
@@ -1772,8 +1772,8 @@ mod tests {
             terminal_title_string("evil\x07\x1b]52;c;payload\x07title"),
             "evil]52;c;payloadtitle - grok"
         );
-        assert_eq!(terminal_title_string("\x07\x1b\x00"), "grok");
-        assert_eq!(terminal_title_string(""), "grok");
+        assert_eq!(terminal_title_string("\x07\x1b\x00"), "friday");
+        assert_eq!(terminal_title_string(""), "friday");
         assert_eq!(terminal_title_string("My chat"), "My chat - grok");
     }
     #[test]
@@ -2303,7 +2303,7 @@ mod tests {
         assert_eq!(
             first_5,
             vec![
-                "Friday X TUI",
+                "FridayX TUI",
                 "",
                 "Usage: friday [OPTIONS] [PROMPT] [COMMAND]",
                 "",

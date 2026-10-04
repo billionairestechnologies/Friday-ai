@@ -1,4 +1,4 @@
-# Friday X
+# FridayX
 
 A terminal-based AI coding assistant and agentic harness.
 
@@ -24,7 +24,7 @@ friday agent stdio
 
 - [Installation](#installation)
 - [Authentication](#authentication) — browser login, API key, OIDC, external auth providers
-- **Using Friday X**
+- **Using FridayX**
   - [Interactive TUI](#interactive-tui) — shortcuts, slash commands, file references
   - [Headless Mode](#headless-mode) — scripting, CI/CD, output formats
   - [Agent Mode](#agent-mode) — stdio, ACP integration
@@ -51,7 +51,7 @@ friday agent stdio
   - [File Locations](#file-locations)
   - [Environment Variables](#environment-variables)
   - [Troubleshooting](#troubleshooting)
-- [Building with Friday X](#building-with-grok) — headless API, ACP SDK integration
+- [Building with FridayX](#building-with-grok) — headless API, ACP SDK integration
 
 ---
 
@@ -83,13 +83,13 @@ friday update
 
 ### Browser Login (Default)
 
-On first launch, Friday X opens your browser to authenticate with grok.com:
+On first launch, FridayX opens your browser to authenticate with grok.com:
 
 ```bash
 grok
 ```
 
-Credentials are stored in `~/.friday/auth.json` and persist across sessions. Tokens expire after 7 days; Friday X will prompt you to re-authenticate when needed.
+Credentials are stored in `~/.friday/auth.json` and persist across sessions. Tokens expire after 7 days; FridayX will prompt you to re-authenticate when needed.
 
 ### Re-authenticate
 
@@ -152,13 +152,13 @@ export FRIDAY_CLI_CHAT_PROXY_BASE_URL="https://grok-proxy.acme.com/v1"
 
 For environments where browser-based login isn't possible (sandboxed VMs, CI runners, air-gapped networks), delegate authentication to an external binary or script. This is the recommended approach for enterprise deployments where your company runs its own auth infrastructure (SSO, device code flows, certificate auth, etc.).
 
-Friday X is provider-agnostic — it doesn't know or care how your binary authenticates. It just runs the command, reads a token from stdout, and stores it. Your binary is a black box that handles the entire auth flow.
+FridayX is provider-agnostic — it doesn't know or care how your binary authenticates. It just runs the command, reads a token from stdout, and stores it. Your binary is a black box that handles the entire auth flow.
 
 #### How It Works
 
 ```
 ┌──────────────┐     sh -c     ┌────────────────────────┐
-│     Friday X     │──────────────▶│  your auth binary      │
+│     FridayX     │──────────────▶│  your auth binary      │
 │              │               │                        │
 │  reads       │◀── stdout ────│  prints token          │
 │  auth.json   │               │                        │
@@ -166,11 +166,11 @@ Friday X is provider-agnostic — it doesn't know or care how your binary authen
 └──────────────┘               └────────────────────────┘
 ```
 
-1. Friday X runs your command via `sh -c "<command>"`
+1. FridayX runs your command via `sh -c "<command>"`
 2. Your binary does whatever auth flow it needs (SSO login, device code, cert exchange, etc.)
 3. **stderr** → displayed directly to the user (use for login URLs, status messages, progress)
-4. **stdout** → captured by Friday X and saved to `~/.friday/auth.json` as the access token
-5. exit 0 → success; exit non-zero → Friday X falls through to interactive login
+4. **stdout** → captured by FridayX and saved to `~/.friday/auth.json` as the access token
+5. exit 0 → success; exit non-zero → FridayX falls through to interactive login
 
 #### The stdout / stderr Contract
 
@@ -178,10 +178,10 @@ This is the most important thing to get right:
 
 | Stream | What to print | Who sees it |
 |--------|---------------|-------------|
-| **stdout** | The token — nothing else | Friday X (parsed and stored in `auth.json`) |
+| **stdout** | The token — nothing else | FridayX (parsed and stored in `auth.json`) |
 | **stderr** | Login URLs, status messages, errors, progress | The user (displayed in their terminal) |
 
-**Do not print anything to stdout except the token.** No progress messages, no debug output, no "Login successful!" text. Friday X reads stdout verbatim and tries to parse it as a token. Any extra text will break parsing.
+**Do not print anything to stdout except the token.** No progress messages, no debug output, no "Login successful!" text. FridayX reads stdout verbatim and tries to parse it as a token. Any extra text will break parsing.
 
 #### stdout Token Format
 
@@ -197,7 +197,7 @@ eyJhbGciOiJSUzI1NiIs...
 {"access_token": "eyJhbGciOi...", "refresh_token": "ref-tok", "expires_in": 3600}
 ```
 
-Use JSON if your tokens expire and you want Friday X to automatically re-run the binary before expiry. The `expires_in` field (seconds until expiry) tells Friday X when to proactively refresh. Without it, Friday X assumes tokens last 30 days.
+Use JSON if your tokens expire and you want FridayX to automatically re-run the binary before expiry. The `expires_in` field (seconds until expiry) tells FridayX when to proactively refresh. Without it, FridayX assumes tokens last 30 days.
 
 #### Minimal Example
 
@@ -209,7 +209,7 @@ echo "Visit: https://sso.acme.com/device-login?code=ABCD-1234" >&2
 
 # ... do the auth flow, get a token ...
 
-# Print ONLY the token to stdout (Friday X captures this)
+# Print ONLY the token to stdout (FridayX captures this)
 echo "eyJhbGciOiJSUzI1NiIs..."
 ```
 
@@ -230,11 +230,11 @@ export FRIDAY_AUTH_PROVIDER_LABEL="Acme Corp"   # optional
 export FRIDAY_AUTH_TOKEN_TTL=3600               # optional
 ```
 
-If your binary outputs a bare token string (not JSON with `expires_in`), set `auth_token_ttl` to the token's expected lifetime in seconds. Without it, Friday X cannot detect expiry proactively and will only refresh after a 401.
+If your binary outputs a bare token string (not JSON with `expires_in`), set `auth_token_ttl` to the token's expected lifetime in seconds. Without it, FridayX cannot detect expiry proactively and will only refresh after a 401.
 
 The command runs through the platform shell — `sh -c` on macOS/Linux, `cmd /C` on Windows — so it can be a binary path, a script, or a pipeline.
 
-> **Windows:** write the path as a TOML *literal* string (single quotes) so backslashes survive: `auth_provider_command = 'C:\corp\grok-auth.exe'`. Inside a double-quoted TOML string `\t`, `\n`, `\r`, `\b` and `\f` are escape sequences, so `"C:\temp\auth.exe"` parses into a path containing a tab character and the provider fails to start — after which Friday X falls back to browser login as if the setting were ignored.
+> **Windows:** write the path as a TOML *literal* string (single quotes) so backslashes survive: `auth_provider_command = 'C:\corp\grok-auth.exe'`. Inside a double-quoted TOML string `\t`, `\n`, `\r`, `\b` and `\f` are escape sequences, so `"C:\temp\auth.exe"` parses into a path containing a tab character and the provider fails to start — after which FridayX falls back to browser login as if the setting were ignored.
 
 When `auth_provider_label` is set, the TUI welcome screen shows **"Login with Acme Corp"** instead of "Login with grok.com". In headless mode (`grok -p`), the label has no effect — stderr from your binary is printed directly to the terminal.
 
@@ -268,20 +268,20 @@ echo "{\"access_token\": \"$TOKEN\", \"expires_in\": 3600}"
 
 #### Example: Auth Binary with Refresh Support
 
-Friday X runs your binary on two different contracts, and `FRIDAY_AUTH_EXPIRED` is how it tells them apart:
+FridayX runs your binary on two different contracts, and `FRIDAY_AUTH_EXPIRED` is how it tells them apart:
 
 | | `FRIDAY_AUTH_EXPIRED=1` | unset |
 |---|---|---|
-| **What it is** | A headless refresh over a credential Friday X already holds — near-expiry rotation, or a token the server rejected | A sign-in: `friday login`, the sign-in screen, or the escalation after a headless run couldn't mint |
+| **What it is** | A headless refresh over a credential FridayX already holds — near-expiry rotation, or a token the server rejected | A sign-in: `friday login`, the sign-in screen, or the escalation after a headless run couldn't mint |
 | **Is anyone watching?** | No. stdin is closed and nothing renders your prompts | Yes. A user is waiting, and your stderr reaches them |
-| **Budget** | A few seconds (7s), then Friday X kills the process | 300s — enough for a browser round trip or a device code |
+| **Budget** | A few seconds (7s), then FridayX kills the process | 300s — enough for a browser round trip or a device code |
 | **So your binary should** | Mint silently, or **exit non-zero**. Never block | Do the full SSO flow, and always mint fresh |
 
 ```bash
 #!/bin/sh
 if [ "$FRIDAY_AUTH_EXPIRED" = "1" ]; then
     # Headless: silent refresh only. If that can't work — the SSO session
-    # lapsed, say — exit non-zero rather than block. Friday X then shows the
+    # lapsed, say — exit non-zero rather than block. FridayX then shows the
     # sign-in screen, which re-runs this binary with the variable unset.
     echo "Refreshing token..." >&2
     TOKEN=$(my-company-auth --refresh --silent) || exit 1
@@ -303,32 +303,32 @@ Exiting promptly on `FRIDAY_AUTH_EXPIRED=1` is what makes the handover to the si
 
 One case stays ambiguous, and only in **leader mode** (`--leader`, or `[cli] use_leader = true`; off by default): with no credential at all, the leader makes one extra attempt in the background just after startup, and that run has the variable unset, like a sign-in. A binary that mints without help (service account, keytab, mounted token) succeeds there and the session heals itself. One that must prompt just sits, up to the 300s sign-in ceiling — nothing waits on it, the sign-in screen is already up, and its stderr goes to `~/.friday/leader.log` rather than to the user.
 
-`FRIDAY_AUTH_EXPIRED` is optional — if your binary ignores it, Friday X still works. It just runs the same flow for both login and refresh, and a flow that prompts will be killed on the headless run before it can finish.
+`FRIDAY_AUTH_EXPIRED` is optional — if your binary ignores it, FridayX still works. It just runs the same flow for both login and refresh, and a flow that prompts will be killed on the headless run before it can finish.
 
 ### Automatic Credential Refresh
 
-Friday X supports automatic credential refresh for external auth providers and OIDC. When Friday X detects that your token is expired (either locally based on `expires_in`, or when the server returns a 401), it automatically re-runs your `auth_provider_command` to obtain new credentials before retrying the request.
+FridayX supports automatic credential refresh for external auth providers and OIDC. When FridayX detects that your token is expired (either locally based on `expires_in`, or when the server returns a 401), it automatically re-runs your `auth_provider_command` to obtain new credentials before retrying the request.
 
-This is transparent — you don't need to do anything. Friday X handles it in the background during your session.
+This is transparent — you don't need to do anything. FridayX handles it in the background during your session.
 
 **When does refresh happen?**
 
-- **Before expiry:** If your binary returned `expires_in` in its JSON output, or you set `auth_token_ttl` in config, Friday X re-runs the binary ~5 minutes before the token expires, so you never see an auth error.
-- **On auth error:** If the server rejects a request with 401/403 (e.g. token was revoked or expired), Friday X re-runs the binary and retries the request once.
-- **When the refresh run can't mint:** refreshes are headless (no stdin, short timeout), so a binary that needs you to complete an SSO flow cannot succeed there. Friday X then stops treating the stored credential as usable and runs your binary in its interactive mode instead — at startup that is the same sign-in flow a machine with no credentials gets; mid-session the turn fails with a re-auth prompt and `/login` re-runs the binary.
-- **OIDC:** If you're using OIDC and have a `refresh_token`, Friday X silently refreshes via your IdP without re-opening the browser.
+- **Before expiry:** If your binary returned `expires_in` in its JSON output, or you set `auth_token_ttl` in config, FridayX re-runs the binary ~5 minutes before the token expires, so you never see an auth error.
+- **On auth error:** If the server rejects a request with 401/403 (e.g. token was revoked or expired), FridayX re-runs the binary and retries the request once.
+- **When the refresh run can't mint:** refreshes are headless (no stdin, short timeout), so a binary that needs you to complete an SSO flow cannot succeed there. FridayX then stops treating the stored credential as usable and runs your binary in its interactive mode instead — at startup that is the same sign-in flow a machine with no credentials gets; mid-session the turn fails with a re-auth prompt and `/login` re-runs the binary.
+- **OIDC:** If you're using OIDC and have a `refresh_token`, FridayX silently refreshes via your IdP without re-opening the browser.
 
 **Tuning the refresh buffer:**
 
 ```bash
-# Friday X refreshes tokens 5 minutes before expiry by default.
+# FridayX refreshes tokens 5 minutes before expiry by default.
 # Set to 0 to only refresh on 401. Set higher for very short-lived tokens.
 export FRIDAY_AUTH_EARLY_INVALIDATION_SECS=300
 ```
 
 **Keep in mind:**
-- When using `auth_provider_command`, you don't need to run `friday login` before starting — on first launch Friday X runs your binary on the real terminal (URL and progress on stderr), then opens the UI already signed in. You _can_ run `friday login` to explicitly hydrate `auth.json` ahead of time if you prefer. Mid-session `/login` still uses the in-TUI copy-link overlay.
-- If both OIDC and `auth_provider_command` are configured: at **login** time, Friday X tries OIDC silent refresh first (if a `refresh_token` exists), then the external binary, then browser-based login. During a **session**, whichever method is configured is used exclusively — if `auth_provider_command` is set it handles all mid-session refreshes; otherwise OIDC silent refresh is used.
+- When using `auth_provider_command`, you don't need to run `friday login` before starting — on first launch FridayX runs your binary on the real terminal (URL and progress on stderr), then opens the UI already signed in. You _can_ run `friday login` to explicitly hydrate `auth.json` ahead of time if you prefer. Mid-session `/login` still uses the in-TUI copy-link overlay.
+- If both OIDC and `auth_provider_command` are configured: at **login** time, FridayX tries OIDC silent refresh first (if a `refresh_token` exists), then the external binary, then browser-based login. During a **session**, whichever method is configured is used exclusively — if `auth_provider_command` is set it handles all mid-session refreshes; otherwise OIDC silent refresh is used.
 - Your binary's stderr output is displayed to the user but interactive stdin is not supported. This works well for browser-based SSO flows where the binary displays a URL and you complete authentication in the browser.
 
 #### Troubleshooting Auth
@@ -353,7 +353,7 @@ Common log messages:
 
 ### Per-Model Auth Providers
 
-`auth_provider_command` above replaces Friday X's *session* auth: it mints the token sent to xAI's backend. If you instead want xAI models on normal xAI login while **other models** route through a gateway (LiteLLM, corporate proxy) whose bearer tokens rotate, use a named auth provider — the rotating-token analogue of a per-model `api_key`/`env_key`.
+`auth_provider_command` above replaces FridayX's *session* auth: it mints the token sent to xAI's backend. If you instead want xAI models on normal xAI login while **other models** route through a gateway (LiteLLM, corporate proxy) whose bearer tokens rotate, use a named auth provider — the rotating-token analogue of a per-model `api_key`/`env_key`.
 
 ```toml
 # ~/.friday/config.toml
@@ -374,12 +374,12 @@ auth_provider = "litellm"
 - Without `args`, the command runs via POSIX `sh -c`, so it can be a binary path, a script, or a pipeline. With `args = ["..."]`, the command runs directly with those arguments and no shell: `command` is a program name resolved via `PATH`, or a path. Use `args` to avoid shell quoting, and on Windows, where there is no `sh`.
 - stdout: a bare token, or JSON `{"access_token": "...", "expires_in": 3600}`.
 - stderr: logged when the command fails; exit 0 = success.
-- `FRIDAY_AUTH_EXPIRED=1` is set whenever Friday X re-mints over a token still cached in memory, whether from near-expiry rotation or a rejection. The first mint on a cold cache runs without it.
+- `FRIDAY_AUTH_EXPIRED=1` is set whenever FridayX re-mints over a token still cached in memory, whether from near-expiry rotation or a rejection. The first mint on a cold cache runs without it.
 
 **Token lifecycle:**
 
-- Tokens are cached in memory per provider and shared by every model referencing the provider; nothing is written to disk. The command is a credential helper: it owns durable storage and OAuth2 refresh (keychain, its own dotdir, etc.), exactly like `gcloud auth print-access-token` or a git credential helper. On an in-session re-mint the last credential is handed back via `FRIDAY_AUTH_PROVIDER_ACCESS_TOKEN` (and, when present, `FRIDAY_AUTH_PROVIDER_REFRESH_TOKEN` / `FRIDAY_AUTH_PROVIDER_EXPIRES_AT`), so a refresh-grant command can refresh instead of re-authenticating. The command must be non-interactive and fast; do any interactive login out of band, and Friday X re-runs the command on restart to re-mint.
-- Friday X runs the command before a chat turn when the token is missing or within about a minute of expiring, and once more after the server rejects a token. A token rejected within 30 seconds of being fetched is not refetched again, so a broken helper surfaces one clear error instead of looping.
+- Tokens are cached in memory per provider and shared by every model referencing the provider; nothing is written to disk. The command is a credential helper: it owns durable storage and OAuth2 refresh (keychain, its own dotdir, etc.), exactly like `gcloud auth print-access-token` or a git credential helper. On an in-session re-mint the last credential is handed back via `FRIDAY_AUTH_PROVIDER_ACCESS_TOKEN` (and, when present, `FRIDAY_AUTH_PROVIDER_REFRESH_TOKEN` / `FRIDAY_AUTH_PROVIDER_EXPIRES_AT`), so a refresh-grant command can refresh instead of re-authenticating. The command must be non-interactive and fast; do any interactive login out of band, and FridayX re-runs the command on restart to re-mint.
+- FridayX runs the command before a chat turn when the token is missing or within about a minute of expiring, and once more after the server rejects a token. A token rejected within 30 seconds of being fetched is not refetched again, so a broken helper surfaces one clear error instead of looping.
 - Token lifetime comes from `expires_in` in the command's JSON output, else `token_ttl_secs`, else the token's own JWT expiry claim. With none of these, tokens are only replaced after the server rejects one.
 - Commands run with a `timeout_secs` bound (default 30, clamped to 1..=600) and are killed on timeout. A turn waits on the run, so keep helpers fast and non-interactive.
 - Active sessions pick up edits or removal of a provider table at the next model switch or new session. Once picked up, an edit invalidates the cached token, so the edited command runs at the next use; removal drops the cached token.
@@ -387,7 +387,7 @@ auth_provider = "litellm"
 
 **Interaction with other credentials:** a literal `api_key`/`env_key` on the model wins over its `auth_provider`. Provider-backed models are BYOK: your xAI session token is never sent to their endpoints, and a failing provider command fails the request rather than falling back to the session token.
 
-**Security:** provider commands execute code, so they are honored only from trusted config layers (`~/.friday/config.toml`, managed config, requirements). A project's `.friday/config.toml` can never define one. Whatever layer sets a model's `base_url` decides where that model's minted token is sent, and `base_url` (unlike the provider table) is not stripped from remote or campaign patches, the same as for a static `env_key`. Keep provider tables and the model `base_url` in layers you trust. The command inherits Friday X's environment (so it sees `PATH`, `HOME`, and any other secrets there), but Friday X's own first-party credentials (`FRIDAY_X_TOKEN`, `FRIDAY_DEPLOYMENT_KEY`, and related keys) are removed so a BYOK helper never receives them; write helpers that read only what they need, and prefer the `FRIDAY_AUTH_PROVIDER_*` handback for the prior credential.
+**Security:** provider commands execute code, so they are honored only from trusted config layers (`~/.friday/config.toml`, managed config, requirements). A project's `.friday/config.toml` can never define one. Whatever layer sets a model's `base_url` decides where that model's minted token is sent, and `base_url` (unlike the provider table) is not stripped from remote or campaign patches, the same as for a static `env_key`. Keep provider tables and the model `base_url` in layers you trust. The command inherits FridayX's environment (so it sees `PATH`, `HOME`, and any other secrets there), but FridayX's own first-party credentials (`FRIDAY_X_TOKEN`, `FRIDAY_DEPLOYMENT_KEY`, and related keys) are removed so a BYOK helper never receives them; write helpers that read only what they need, and prefer the `FRIDAY_AUTH_PROVIDER_*` handback for the prior credential.
 
 ### Using auth.json for API Access
 
@@ -552,7 +552,7 @@ The `!` modifier allows you to attach any file in the project regardless of igno
 
 ## Headless Mode
 
-Run Friday X non-interactively from the command line. Use headless mode when you need to:
+Run FridayX non-interactively from the command line. Use headless mode when you need to:
 
 - **Automate tasks** — CI/CD pipelines, pre-commit hooks, cron jobs
 - **Script workflows** — Batch process files, chain with other tools
@@ -778,7 +778,7 @@ grok -p "Review staged changes for obvious bugs. Reply OK if fine, or list issue
 
 ## Agent Mode
 
-Run Friday X as an ACP (Agent Client Protocol) agent for integration with IDEs, editors, and custom tooling.
+Run FridayX as an ACP (Agent Client Protocol) agent for integration with IDEs, editors, and custom tooling.
 
 ### stdio Transport
 
@@ -839,9 +839,9 @@ This runs entirely locally.
 
 ---
 
-## Building with Friday X
+## Building with FridayX
 
-Friday X can be used as an OpenAI-compatible chat completion backend. Choose between two integration modes:
+FridayX can be used as an OpenAI-compatible chat completion backend. Choose between two integration modes:
 
 | Mode         | Use Case                                                           |
 | ------------ | ------------------------------------------------------------------ |
@@ -1276,7 +1276,7 @@ for await (const chunk of await client.create(
 
 ### ACP Protocol Reference
 
-Friday X implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.com), a standard for AI agent communication.
+FridayX implements the [Agent Client Protocol (ACP)](https://agentclientprotocol.com), a standard for AI agent communication.
 
 #### Architecture
 
@@ -1325,7 +1325,7 @@ Friday X implements the [Agent Client Protocol (ACP)](https://agentclientprotoco
 
 ## Configuration
 
-Friday X reads configuration from `~/.friday/config.toml`. If the file doesn't exist, Friday X uses sensible defaults. You only need to specify values you want to override.
+FridayX reads configuration from `~/.friday/config.toml`. If the file doesn't exist, FridayX uses sensible defaults. You only need to specify values you want to override.
 
 Each feature section below documents its own config. This section covers the general-purpose settings that don't have their own top-level section.
 
@@ -1382,18 +1382,18 @@ When building from source, defaults can also be baked into the binary at compile
 
 ### LSP Servers
 
-Friday X can connect to Language Server Protocol (LSP) servers configured in JSON files. LSP integration gives Friday X language-aware code intelligence while it works in your repository.
+FridayX can connect to Language Server Protocol (LSP) servers configured in JSON files. LSP integration gives FridayX language-aware code intelligence while it works in your repository.
 
 LSP support is used in two ways:
 
-- **Passive diagnostics** — after edits, Friday X can surface language-server diagnostics such as errors and warnings.
-- **The `lsp` tool** — Friday X can actively query the language server for `goToDefinition`, `findReferences`, `hover`, `goToImplementation`, `documentSymbol`, and `workspaceSymbol`.
+- **Passive diagnostics** — after edits, FridayX can surface language-server diagnostics such as errors and warnings.
+- **The `lsp` tool** — FridayX can actively query the language server for `goToDefinition`, `findReferences`, `hover`, `goToImplementation`, `documentSymbol`, and `workspaceSymbol`.
 
 Reference: [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
 
 #### Config locations
 
-Friday X looks for server definitions in:
+FridayX looks for server definitions in:
 
 - project config: `<repo>/.friday/lsp.json`
 - user config: `~/.friday/lsp.json`
@@ -1420,7 +1420,7 @@ Or enable it in config:
 lsp_tools = true
 ```
 
-If LSP tools are enabled but no usable server config is found, Friday X emits a non-fatal warning in logs and continues without the `lsp` tool. If config exists but every server fails to start, the tool may still be present and will fail on first use with a startup error.
+If LSP tools are enabled but no usable server config is found, FridayX emits a non-fatal warning in logs and continues without the `lsp` tool. If config exists but every server fails to start, the tool may still be present and will fail on first use with a startup error.
 
 #### Example `lsp.json`
 
@@ -1497,7 +1497,7 @@ verbose than `Warning` makes it stream every internal log line to the client.
 
 #### Installing language servers
 
-Friday X does not bundle language server binaries. You must install the server yourself and make sure the configured `command` is runnable on your machine.
+FridayX does not bundle language server binaries. You must install the server yourself and make sure the configured `command` is runnable on your machine.
 
 Examples:
 
@@ -1534,7 +1534,7 @@ default = "company-grok"
 [model.company-grok]
 model = "grok-build"
 base_url = "https://grok-proxy.acme.com/"
-name = "Friday X Latest (Proxy)"
+name = "FridayX Latest (Proxy)"
 context_window = 256000
 
 [features]
@@ -1551,15 +1551,15 @@ With this config, `friday` runs your auth binary, stores the token, and routes i
 
 ## AGENTS.md
 
-Add project-specific instructions by creating an agent rules file (e.g., `AGENTS.md`). Friday X reads these files and appends their contents to the system prompt.
+Add project-specific instructions by creating an agent rules file (e.g., `AGENTS.md`). FridayX reads these files and appends their contents to the system prompt.
 
-Friday X scans for agent rules in this order:
+FridayX scans for agent rules in this order:
 
 1. `~/.friday/` (global rules)
 2. If inside a git repo: every directory from the repo root → current working directory (inclusive)
 3. If **not** inside a git repo: only the current working directory
 
-Within each directory, Friday X checks for these filenames:
+Within each directory, FridayX checks for these filenames:
 
 - `Agents.md`, `Claude.md`, `AGENT.md`, `AGENTS.md`
 
@@ -1571,11 +1571,11 @@ Ordering matters: files found later (deeper directories) come last, so they effe
 
 ## Skills
 
-Skills are reusable prompt packages that extend Friday X with specialized workflows, domain knowledge, and tool integrations. Use them to encode repeatable procedures that would otherwise require re-explaining each session.
+Skills are reusable prompt packages that extend FridayX with specialized workflows, domain knowledge, and tool integrations. Use them to encode repeatable procedures that would otherwise require re-explaining each session.
 
 ### Skill Locations
 
-Friday X discovers skills from these directories (in priority order):
+FridayX discovers skills from these directories (in priority order):
 
 | Location                    | Scope | Priority |
 | --------------------------- | ----- | -------- |
@@ -1633,7 +1633,7 @@ Review staged changes and create a commit with a clear, conventional message.
 | Field         | Description                                                                  |
 | ------------- | ---------------------------------------------------------------------------- |
 | `name`        | Skill identifier (lowercase, hyphens, max 64 chars)                          |
-| `description` | What the skill does and when to use it—this is how Friday X decides to invoke it |
+| `description` | What the skill does and when to use it—this is how FridayX decides to invoke it |
 
 ### Using Skills
 
@@ -1648,9 +1648,9 @@ Review staged changes and create a commit with a clear, conventional message.
 
 **Slash command shorthand:**
 
-Users can reference skills as `/skill-name` (e.g., `/commit`). When you see this pattern, Friday X invokes the corresponding skill.
+Users can reference skills as `/skill-name` (e.g., `/commit`). When you see this pattern, FridayX invokes the corresponding skill.
 
-> **Tip:** The `description` field is critical — it determines when Friday X automatically invokes the skill. Be specific about trigger phrases and use cases.
+> **Tip:** The `description` field is critical — it determines when FridayX automatically invokes the skill. Be specific about trigger phrases and use cases.
 
 ---
 
@@ -1658,7 +1658,7 @@ Users can reference skills as `/skill-name` (e.g., `/commit`). When you see this
 
 Agent profiles control the system prompt, toolset, and behavior of a session. A profile is a `.md` file with YAML frontmatter, or a named agent discovered from disk.
 
-Friday X discovers agent definitions from `.friday/agents/` (project), `~/.friday/agents/` (user), and built-in agents. Priority (highest wins):
+FridayX discovers agent definitions from `.friday/agents/` (project), `~/.friday/agents/` (user), and built-in agents. Priority (highest wins):
 
 1. `--agent-profile <PATH>` CLI flag
 2. `[agent]` section in `config.toml`
@@ -1736,7 +1736,7 @@ Both are also discovered from `.friday/roles/*.toml` and `.friday/personas/*.tom
 
 ## Plugins
 
-Plugins extend Friday X with additional tools, skills, and MCP servers from external packages.
+Plugins extend FridayX with additional tools, skills, and MCP servers from external packages.
 
 ### Plugin Locations
 
@@ -1763,7 +1763,7 @@ Manage plugins at runtime with `/plugins list`, `/plugins reload`, or `/plugins 
 
 Hooks run project scripts on tool and session lifecycle events (pre/post-tool-use, session start/end). Projects must be explicitly trusted before their hooks execute.
 
-Friday X discovers hooks from `.friday/hooks/` in the project directory. Manage them with:
+FridayX discovers hooks from `.friday/hooks/` in the project directory. Manage them with:
 
 ```
 /hooks-list              # show hooks loaded in this session
@@ -1846,7 +1846,7 @@ context_window = 256000               # Total context window in tokens (for auto
 
 **Credential resolution order:** `api_key` → `env_key` → cached `auth_provider` token (terminal: a cache miss resolves to no credential, never the session token) → session token → `FRIDAY_X_TOKEN`. See [Per-Model Auth Providers](#per-model-auth-providers).
 
-The `context_window` parameter is used to calculate when auto-compact should trigger. If not specified, Friday X falls back to built-in defaults for known models. To offer a choice of windows, set `context_windows = [256000, 500000]`. `context_window` stays the default (the first listed window when unset), and older clients ignore the list.
+The `context_window` parameter is used to calculate when auto-compact should trigger. If not specified, FridayX falls back to built-in defaults for known models. To offer a choice of windows, set `context_windows = [256000, 500000]`. `context_window` stays the default (the first listed window when unset), and older clients ignore the list.
 
 ### Overriding Built-in Models
 
@@ -1863,7 +1863,7 @@ temperature = 0.5
 api_key = "sk-custom"
 ```
 
-**How it works:** When you override a built-in model, Friday X starts with the default configuration (including the correct `base_url` from your `[endpoints]` setting), then applies only the fields you specify. Unspecified fields inherit from the default.
+**How it works:** When you override a built-in model, FridayX starts with the default configuration (including the correct `base_url` from your `[endpoints]` setting), then applies only the fields you specify. Unspecified fields inherit from the default.
 
 **Priority order:**
 1. Your config (`[model.*]`) — highest priority
@@ -1874,14 +1874,14 @@ api_key = "sk-custom"
 
 > **Overriding with a custom model:** Setting `[models] web_search` alone is not
 > enough if the model isn't already in the catalog (built-in defaults or
-> `friday models` output). You also need a `[model.*]` entry so Friday X knows
+> `friday models` output). You also need a `[model.*]` entry so FridayX knows
 > how to reach it. Without both, web search is silently disabled.
 >
 > ```toml
 > [models]
 > web_search = "my-custom-model"       # 1. tell web search which model to use
 >
-> [model.my-custom-model]              # 2. tell Friday X how to reach it
+> [model.my-custom-model]              # 2. tell FridayX how to reach it
 > model = "my-custom-model"
 > api_backend = "responses"            # required — web search uses the Responses API
 > # base_url, api_key, env_key optional — defaults to cli-chat-proxy
@@ -1948,7 +1948,7 @@ default = "my-model"
 
 ### Custom Models Endpoint
 
-Point Friday X at a custom OpenAI-compatible `/v1/models` endpoint instead of the default cli-chat-proxy. Useful when models are served behind a corporate gateway or self-hosted inference stack.
+Point FridayX at a custom OpenAI-compatible `/v1/models` endpoint instead of the default cli-chat-proxy. Useful when models are served behind a corporate gateway or self-hosted inference stack.
 
 **Environment variables:**
 
@@ -1966,7 +1966,7 @@ export FRIDAY_X_TOKEN="xai-..."
 grok
 ```
 
-Friday X fetches the model list from `{FRIDAY_MODELS_BASE_URL}/models` on startup and sends inference requests to `FRIDAY_MODELS_BASE_URL`. This follows the standard OpenAI-compatible convention used by OpenAI, Anthropic, OpenRouter, Groq, Together.ai, and others.
+FridayX fetches the model list from `{FRIDAY_MODELS_BASE_URL}/models` on startup and sends inference requests to `FRIDAY_MODELS_BASE_URL`. This follows the standard OpenAI-compatible convention used by OpenAI, Anthropic, OpenRouter, Groq, Together.ai, and others.
 
 If your model list endpoint differs from `{base_url}/models`, set `FRIDAY_MODELS_LIST_URL` explicitly.
 
@@ -1983,13 +1983,13 @@ api_key = "my-api-key"
 
 Each `[model.*]` section inherits `base_url` from the `[endpoints]` config. `FRIDAY_X_TOKEN` is still required. A per-model `api_key`/`env_key` authenticates that model's inference requests. The startup model-list fetch still uses `FRIDAY_X_TOKEN`.
 
-**Auth behavior:** When `models_base_url` is set, Friday X authenticates the model-list request with `FRIDAY_X_TOKEN` (`Authorization: Bearer`). That request never uses your `friday login` session. With an external auth provider (`auth_provider_command`) and no `FRIDAY_X_TOKEN`, it sends the provider's token instead. Otherwise, if `FRIDAY_X_TOKEN` is unset, the fetch fails with an error asking you to set it. Inference requests to the custom host authenticate with each model's `api_key`/`env_key`.
+**Auth behavior:** When `models_base_url` is set, FridayX authenticates the model-list request with `FRIDAY_X_TOKEN` (`Authorization: Bearer`). That request never uses your `friday login` session. With an external auth provider (`auth_provider_command`) and no `FRIDAY_X_TOKEN`, it sends the provider's token instead. Otherwise, if `FRIDAY_X_TOKEN` is unset, the fetch fails with an error asking you to set it. Inference requests to the custom host authenticate with each model's `api_key`/`env_key`.
 
 ---
 
 ## MCP Servers
 
-Extend Friday X's capabilities with [Model Context Protocol](https://modelcontextprotocol.io) servers.
+Extend FridayX's capabilities with [Model Context Protocol](https://modelcontextprotocol.io) servers.
 
 ### Configuration
 
@@ -2009,7 +2009,7 @@ tool_timeouts = { create_issue = 120, search = 30 }  # Per-tool timeout override
 
 ### Project-Scoped MCP Servers
 
-MCP servers can also be configured per-project in `.friday/config.toml`. Friday X walks from the current directory up to the git repo root, loading `.friday/config.toml` at each level:
+MCP servers can also be configured per-project in `.friday/config.toml`. FridayX walks from the current directory up to the git repo root, loading `.friday/config.toml` at each level:
 
 | Location                        | Scope             | Priority |
 | ------------------------------- | ----------------- | -------- |
@@ -2108,7 +2108,7 @@ See the [MCP Server Registry](https://github.com/modelcontextprotocol/servers) f
 
 > **Experimental:** enable with `FRIDAY_MEMORY=1`, `[memory] enabled = true`, or managed remote settings.
 
-Cross-session memory lets Friday X remember facts, decisions, code patterns, and debugging workflows across separate sessions in the same project.
+Cross-session memory lets FridayX remember facts, decisions, code patterns, and debugging workflows across separate sessions in the same project.
 
 ### How it works
 
@@ -2136,7 +2136,7 @@ enabled = true
 
 ### What gets saved automatically
 
-At the end of each session, Friday X saves a **structured metadata summary** to the daily session log:
+At the end of each session, FridayX saves a **structured metadata summary** to the daily session log:
 - Message counts (user / assistant / tool)
 - Topics — the first few real user prompts from the session
 - Tool-usage breakdown (e.g., `read_file: 4, search_replace: 3`)
@@ -2174,7 +2174,7 @@ Omit `workspace` or `global` and it defaults to workspace scope.
 
 ### Searching memory
 
-Friday X searches memory automatically on the first turn of each session and after compaction. The first-turn injection can be disabled or given its own score threshold under `[memory.initial_injection]`. You can also invoke `memory_search` and `memory_get` directly via the model prompt:
+FridayX searches memory automatically on the first turn of each session and after compaction. The first-turn injection can be disabled or given its own score threshold under `[memory.initial_injection]`. You can also invoke `memory_search` and `memory_get` directly via the model prompt:
 
 ```
 Search memory for "auth middleware patterns"
@@ -2212,7 +2212,7 @@ Key options under `[memory]` in `~/.friday/config.toml`:
 
 ### Observability
 
-When first-turn memory injection runs, Friday X emits the `grok-shell-memory_injection`
+When first-turn memory injection runs, FridayX emits the `grok-shell-memory_injection`
 telemetry event. It includes:
 - whether the greeting fallback query path was used
 - result counts and top score
@@ -2222,7 +2222,7 @@ telemetry event. It includes:
 
 ## Sandbox
 
-Friday X can restrict what the agent process and its spawned commands can access on
+FridayX can restrict what the agent process and its spawned commands can access on
 your filesystem and network using OS-level kernel primitives (Landlock on Linux,
 Seatbelt on macOS). This is off by default.
 
@@ -2295,7 +2295,7 @@ model cannot convince the agent to relax restrictions at runtime.
 
 - **Platform support**: Sandbox enforcement uses Landlock on Linux (kernel ≥ 5.13)
   and Seatbelt on macOS. If the sandbox cannot be applied (e.g., unsupported
-  kernel, missing entitlements), Friday X logs a warning and continues without
+  kernel, missing entitlements), FridayX logs a warning and continues without
   enforcement.
 
 - **Network restrictions are partial**: Profiles with `restrict_network` block
@@ -2313,7 +2313,7 @@ for telemetry and debugging.
 
 ## Introspection
 
-Use `friday inspect` to see everything Friday X discovers in the current directory:
+Use `friday inspect` to see everything FridayX discovers in the current directory:
 
 ```bash
 friday inspect          # human-readable output
@@ -2337,11 +2337,11 @@ Plugin-provided components appear in their respective sections with a `[plugin: 
 
 ## Claude Code Compatibility
 
-Friday X automatically discovers configuration from Claude Code directories alongside native `.friday/` paths. No extra setup is needed.
+FridayX automatically discovers configuration from Claude Code directories alongside native `.friday/` paths. No extra setup is needed.
 
 ### What is picked up
 
-| Component         | Claude Code location                                 | How Friday X uses it                 |
+| Component         | Claude Code location                                 | How FridayX uses it                 |
 | ----------------- | ---------------------------------------------------- | -------------------------------- |
 | **Skills**        | `.claude/skills/`, `~/.claude/skills/`               | Loaded as skills (same as `.friday/skills/`) |
 | **Agents**        | `.claude/agents/`, `~/.claude/agents/`               | Loaded as subagents              |
@@ -2354,13 +2354,13 @@ Friday X automatically discovers configuration from Claude Code directories alon
 
 ### Plugin components
 
-Claude Code plugins can provide skills (`skills/`), commands (`commands/`), agents (`agents/`), hooks (`hooks/hooks.json`), MCP servers (`.mcp.json`), and LSP servers (`.lsp.json`). All component types are discovered and used by Friday X at runtime.
+Claude Code plugins can provide skills (`skills/`), commands (`commands/`), agents (`agents/`), hooks (`hooks/hooks.json`), MCP servers (`.mcp.json`), and LSP servers (`.lsp.json`). All component types are discovered and used by FridayX at runtime.
 
 ---
 
 ## Built-in Tools
 
-Friday X includes these tools by default:
+FridayX includes these tools by default:
 
 | Tool             | Description                                                    |
 | ---------------- | -------------------------------------------------------------- |
@@ -2409,7 +2409,7 @@ When no custom `allowed_domains` is set, the tool permits a default allowlist of
 
 ## Session Persistence
 
-Friday X automatically persists conversations to disk. This works across all modes: TUI, headless, and agent stdio.
+FridayX automatically persists conversations to disk. This works across all modes: TUI, headless, and agent stdio.
 
 ### Storage Layout
 
@@ -2557,7 +2557,7 @@ friday completions bash > ~/.local/share/bash-completion/completions/grok
 
 Reload your shell or run `source ~/.bashrc`.
 
-Alternative (Friday X-managed location):
+Alternative (FridayX-managed location):
 
 ```bash
 mkdir -p ~/.friday/completions/bash
@@ -2587,7 +2587,7 @@ autoload -Uz compinit
 compinit
 ```
 
-Alternative (Friday X-managed location):
+Alternative (FridayX-managed location):
 
 ```bash
 mkdir -p ~/.friday/completions/zsh

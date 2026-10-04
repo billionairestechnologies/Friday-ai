@@ -14,14 +14,14 @@ use xai_grok_telemetry::session_ctx::log_event;
 /// After this, the user can still manually check via the [Refresh] button.
 pub(super) const PAYWALL_AUTO_CHECK_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
-/// Whether the user is at the highest subscription tier (SuperGrok Heavy).
+/// Whether the user is at the highest subscription tier (Premium).
 /// Returns `true` only when `subscription_tier` positively matches a known max-tier identifier.
 /// An unknown (`None`) or unrecognized tier returns `false`, so lower-tier users always get the Q&A modal with the upgrade option.
 pub(super) fn is_max_tier(subscription_tier: Option<&str>) -> bool {
     let Some(t) = subscription_tier else {
         return false; // Unknown: default to Q&A.
     };
-    // Lowercase and replace spaces with underscores to match both JWT-derived keys ("supergrok_heavy") and CCP display names ("SuperGrok Heavy")
+    // Lowercase and replace spaces with underscores to match both JWT-derived keys ("supergrok_heavy") and CCP display names ("Premium")
     t.to_ascii_lowercase().replace(' ', "_") == "supergrok_heavy"
 }
 
@@ -86,7 +86,7 @@ struct CreditLimitCopy {
 
 /// Open the credit-limit upsell Q&A on the given agent.
 /// Non-max-tier: Upgrade tier + buy-credits (or PAYG) + Try Again.
-/// Max-tier (SuperGrok Heavy): buy-credits (or PAYG) + Try Again — no upgrade option. URL options carry the target in `id` so the submit handler is position-independent.
+/// Max-tier (Premium): buy-credits (or PAYG) + Try Again — no upgrade option. URL options carry the target in `id` so the submit handler is position-independent.
 pub(super) fn open_credit_limit_upsell(
     agent: &mut AgentView,
     mode: CreditLimitUpsellMode,
@@ -106,7 +106,7 @@ pub(super) fn open_credit_limit_upsell(
             heading: "You hit your weekly limit.",
             upgrade_tier_desc: "Upgrade to a higher tier for more usage",
             secondary_label: "Buy more credits",
-            secondary_desc: "Purchase credits to keep using Friday X",
+            secondary_desc: "Purchase credits to keep using FridayX",
             second_choice: xai_grok_telemetry::events::CreditLimitChoice::PurchaseCredits,
             payg_telemetry: false,
         },
@@ -246,20 +246,20 @@ fn open_supergrok_upsell(
     // /supergrok lists all plans; every upgrade option lands there.
     let options = vec![
         QuestionOption {
-            label: "Upgrade to SuperGrok".into(),
+            label: "Upgrade to Pro".into(),
             description: "For everyday coding and productivity tasks".into(),
             preview: None,
             id: Some(UPSELL_URL_UPGRADE.into()),
         },
         QuestionOption {
-            label: "Upgrade to SuperGrok Plus".into(),
+            label: "Upgrade to Pro".into(),
             description: "Significantly higher usage and rate limits".into(),
             preview: None,
             id: Some(UPSELL_URL_UPGRADE.into()),
         },
         QuestionOption {
-            label: "Upgrade to SuperGrok Heavy".into(),
-            description: "Get the most out of Friday X. Highest usage limits.".into(),
+            label: "Upgrade to Premium".into(),
+            description: "Get the most out of FridayX. Highest usage limits.".into(),
             preview: None,
             id: Some(UPSELL_URL_UPGRADE.into()),
         },

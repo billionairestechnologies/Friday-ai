@@ -1506,7 +1506,7 @@ fn dashboard_confirm_worktree_without_git_repo_creates_nothing() {
 #[test]
 fn dashboard_confirm_worktree_applies_pending_model_and_plan() {
     let mut app = test_app();
-    seed_model(&mut app, "grok-4.5", "Friday X 4.5");
+    seed_model(&mut app, "grok-4.5", "FridayX 4.5");
     open_dashboard(&mut app);
     app.cwd_has_git_ancestor = true;
     let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4.5"));
@@ -1514,7 +1514,7 @@ fn dashboard_confirm_worktree_applies_pending_model_and_plan() {
         d.pending_model = Some(crate::views::dashboard::PendingDispatchModel {
             id: model_id.clone(),
             effort: Some(xai_grok_shell::sampling::types::ReasoningEffort::High),
-            display: "Friday X 4.5".to_string(),
+            display: "FridayX 4.5".to_string(),
         });
         d.pending_mode = crate::views::dashboard::DashboardDispatchMode::Plan;
         d.dispatch.set_text("do the thing");
@@ -2990,7 +2990,7 @@ fn seed_model(app: &mut AppView, id: &str, name: &str) {
 #[test]
 fn dashboard_slash_model_stages_pending_model() {
     let mut app = test_app();
-    seed_model(&mut app, "grok-4.5", "Friday X 4.5");
+    seed_model(&mut app, "grok-4.5", "FridayX 4.5");
     open_dashboard(&mut app);
     let effects = dispatch_dashboard_dispatch_slash(&mut app, "/model grok-4.5".into());
     assert!(
@@ -3006,7 +3006,7 @@ fn dashboard_slash_model_stages_pending_model() {
         .as_ref()
         .expect("pending_model must be set");
     assert_eq!(pending.id.0.as_ref(), "grok-4.5");
-    assert_eq!(pending.display, "Friday X 4.5");
+    assert_eq!(pending.display, "FridayX 4.5");
     assert!(pending.effort.is_none());
     assert_eq!(
         app.dashboard
@@ -3027,7 +3027,7 @@ fn dashboard_slash_model_with_a_window_stages_the_model_and_explains_the_window(
     let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4.7"));
     app.models.available.insert(
         model_id.clone(),
-        acp::ModelInfo::new(model_id, "Friday X 4.7".to_string()).meta(
+        acp::ModelInfo::new(model_id, "FridayX 4.7".to_string()).meta(
             serde_json::json!({
                 "totalContextTokens": 256_000,
                 "contextWindows": [256_000, 500_000],
@@ -3055,6 +3055,7 @@ fn dashboard_slash_model_with_a_window_stages_the_model_and_explains_the_window(
 /// A tier-restricted command typed into the dashboard dispatch input must upsell via the feedback toast, not execute, and not fall through the unknown-command path, which would spawn a session whose first prompt is the raw slash text.
 #[serial_test::serial(FRIDAY_AGENT_DASHBOARD)]
 #[test]
+#[ignore = "vendor subscription upsell and usage-allowance UI is not part of FridayX"]
 fn dashboard_slash_restricted_command_upsells_via_toast() {
     let mut app = test_app();
     app.tier_restricted_commands = vec!["imagine".to_string()];
@@ -3073,7 +3074,7 @@ fn dashboard_slash_restricted_command_upsells_via_toast() {
         .as_deref()
         .expect("restricted command must set the upsell toast");
     assert!(
-        toast.contains("/imagine") && toast.contains("SuperGrok"),
+        toast.contains("/imagine") && toast.contains("Friday Pro"),
         "toast must carry the upsell: {toast}"
     );
 }
@@ -3082,7 +3083,7 @@ fn dashboard_slash_restricted_command_upsells_via_toast() {
 #[test]
 fn dashboard_slash_command_error_gets_error_glyph_prefix() {
     let mut app = test_app();
-    seed_model(&mut app, "grok-4.5", "Friday X 4.5");
+    seed_model(&mut app, "grok-4.5", "FridayX 4.5");
     open_dashboard(&mut app);
     let effects = dispatch_dashboard_dispatch_slash(&mut app, "/model nonexistent".into());
     assert!(effects.is_empty(), "a failed command must not dispatch");
@@ -3252,7 +3253,7 @@ fn dashboard_slash_usage_hidden_for_external_auth() {
         "must not mis-label /usage as session-scoped: {toast}"
     );
     assert!(
-        !toast.contains("SuperGrok"),
+        !toast.contains("Friday Pro"),
         "must not upsell billing on external auth: {toast}"
     );
 }
@@ -3695,13 +3696,13 @@ fn dashboard_cycle_mode_skips_always_approve_under_policy_pin() {
 fn dashboard_open_reseeds_pending_model_and_mode() {
     use crate::views::dashboard::DashboardDispatchMode;
     let mut app = test_app();
-    seed_model(&mut app, "grok-4.5", "Friday X 4.5");
+    seed_model(&mut app, "grok-4.5", "FridayX 4.5");
     open_dashboard(&mut app);
     if let Some(d) = app.dashboard.as_mut() {
         d.pending_model = Some(crate::views::dashboard::PendingDispatchModel {
             id: acp::ModelId::new(std::sync::Arc::from("grok-4.5")),
             effort: None,
-            display: "Friday X 4.5".to_string(),
+            display: "FridayX 4.5".to_string(),
         });
         d.pending_mode = DashboardDispatchMode::Plan;
     }
@@ -3970,14 +3971,14 @@ fn dashboard_dispatch_new_agent_is_working_with_prompt_title() {
 #[test]
 fn dashboard_dispatch_applies_pending_model_and_plan() {
     let mut app = test_app();
-    seed_model(&mut app, "grok-4.5", "Friday X 4.5");
+    seed_model(&mut app, "grok-4.5", "FridayX 4.5");
     open_dashboard(&mut app);
     let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4.5"));
     if let Some(d) = app.dashboard.as_mut() {
         d.pending_model = Some(crate::views::dashboard::PendingDispatchModel {
             id: model_id.clone(),
             effort: Some(xai_grok_shell::sampling::types::ReasoningEffort::High),
-            display: "Friday X 4.5".to_string(),
+            display: "FridayX 4.5".to_string(),
         });
         d.pending_mode = crate::views::dashboard::DashboardDispatchMode::Plan;
     }
@@ -4009,14 +4010,14 @@ fn dashboard_dispatch_applies_pending_model_and_plan() {
 #[test]
 fn dashboard_new_agent_button_applies_pending_model_and_plan() {
     let mut app = test_app();
-    seed_model(&mut app, "grok-4.5", "Friday X 4.5");
+    seed_model(&mut app, "grok-4.5", "FridayX 4.5");
     open_dashboard(&mut app);
     let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4.5"));
     if let Some(d) = app.dashboard.as_mut() {
         d.pending_model = Some(crate::views::dashboard::PendingDispatchModel {
             id: model_id.clone(),
             effort: Some(xai_grok_shell::sampling::types::ReasoningEffort::High),
-            display: "Friday X 4.5".to_string(),
+            display: "FridayX 4.5".to_string(),
         });
         d.pending_mode = crate::views::dashboard::DashboardDispatchMode::Plan;
     }

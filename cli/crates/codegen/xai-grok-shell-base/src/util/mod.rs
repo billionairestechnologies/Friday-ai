@@ -312,13 +312,13 @@ pub fn process_cmdline_args(pid: u32) -> Option<Vec<String>> {
         None
     }
 }
-/// Whether a process name or command line is Friday X's: the shipped `friday` binary, or a dev/test build named after
+/// Whether a process name or command line is FridayX's: the shipped `friday` binary, or a dev/test build named after
 /// its crate (`xai-grok-pager-bin`, `xai_grok_shell_base-…`). Case-insensitive.
 fn is_friday_process_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     lower.contains("friday") || lower.contains("xai-grok") || lower.contains("xai_grok")
 }
-/// True if `pid` is a Friday X process; pairs with [`kill_process_by_pid`] to avoid killing a recycled PID.
+/// True if `pid` is a FridayX process; pairs with [`kill_process_by_pid`] to avoid killing a recycled PID.
 /// Best-effort on macOS/BSD (liveness-only via `kill -0`), exact on Linux (/proc cmdline) and Windows (image path).
 pub fn is_grok_process(pid: u32) -> bool {
     #[cfg(target_os = "linux")]

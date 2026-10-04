@@ -229,7 +229,7 @@ pub(crate) fn collect_startup_warnings_from(
             None,
         );
         warning.note = Some(
-            "Friday X also saves each copy to the backup file shown in the copy message. To copy \
+            "FridayX also saves each copy to the backup file shown in the copy message. To copy \
              directly, run `friday wrap ssh <host>` on your local computer or use a terminal that \
              supports OSC 52. You can also use `/copy <file>` or `/minimal`."
                 .to_owned(),
@@ -260,7 +260,7 @@ pub(crate) fn collect_startup_warnings_from(
     {
         let message = match fullscreen_active {
             Some(true) => "Fullscreen may be unreliable in tmux control mode",
-            Some(false) => "Friday X is using inline mode because tmux control mode limits fullscreen",
+            Some(false) => "FridayX is using inline mode because tmux control mode limits fullscreen",
             None => "Display may be limited in tmux control mode",
         };
         let mut warning = TerminalWarning::new(WarningCategory::ControlMode, message, None, None);
@@ -354,7 +354,7 @@ pub(crate) fn wezterm_kitty_keyboard_warning_from(
             None,
         );
         warning.note = Some(
-            "For this session, type `\\` and then press Enter. Friday X can't negotiate the Kitty \
+            "For this session, type `\\` and then press Enter. FridayX can't negotiate the Kitty \
              keyboard protocol over SSH yet. `enable_kitty_keyboard = true` applies only to \
              local WezTerm sessions."
                 .to_string(),
@@ -396,7 +396,7 @@ fn sandbox_profile_conflict_warning_from(conflicts: Vec<String>) -> Option<Termi
         fix: None,
         config_path: None,
         note: Some(format!(
-            "Friday X is using the user profile. Compare `.friday/sandbox.toml` with {}, then rename \
+            "FridayX is using the user profile. Compare `.friday/sandbox.toml` with {}, then rename \
              or remove the conflicting project profile. Project settings can add profile names \
              but can't redefine a user profile.",
             crate::util::display_user_grok_path(xai_grok_config::SANDBOX_CONFIG_FILENAME)
@@ -526,7 +526,7 @@ pub(crate) fn collect_notification_warnings_with_method(
     {
         let mut warning = TerminalWarning::new(
             WarningCategory::NotificationProtocolFallback,
-            "Friday X is using the terminal bell because the terminal was not recognized",
+            "FridayX is using the terminal bell because the terminal was not recognized",
             None,
             None,
         );
@@ -865,11 +865,11 @@ pub fn color_support_warning(
             None,
             None,
         );
-        warning.note = Some("Unset `NO_COLOR`, then restart Friday X.".to_string());
+        warning.note = Some("Unset `NO_COLOR`, then restart FridayX.".to_string());
         return Some(warning);
     }
 
-    // Checked before the detected level is consulted at all: the level says what Friday X emits, which is a different question from what survives tmux
+    // Checked before the detected level is consulted at all: the level says what FridayX emits, which is a different question from what survives tmux
     // A truecolor detection is not evidence that truecolor reaches the terminal
     // A session with no color evidence (piped `friday doctor`) still has a clamping client worth reporting
     if color_passthrough == TmuxColorPassthrough::Reduced {
@@ -2420,7 +2420,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "voice dictation is withheld in Friday X (Distribution::current)"]
+    #[ignore = "voice dictation is withheld in FridayX (Distribution::current)"]
     fn voice_missing_finding_has_stable_id_and_manual_remediation() {
         let finding = voice_missing_finding(
             "no microphone recorder found on PATH: install pipewire (pw-record)".to_owned(),
@@ -2887,7 +2887,7 @@ mod tests {
         assert!(w.config_path.is_none());
     }
 
-    /// Regression: a tmux client that reduces color used to be invisible to Doctor whenever Friday X's own detection reported truecolor.
+    /// Regression: a tmux client that reduces color used to be invisible to Doctor whenever FridayX's own detection reported truecolor.
     /// A session with washed-out themes was then reported completely healthy.
     #[test]
     fn color_support_warning_reports_tmux_clamp_at_truecolor() {

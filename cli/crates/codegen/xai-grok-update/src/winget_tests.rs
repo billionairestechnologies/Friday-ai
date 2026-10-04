@@ -40,7 +40,7 @@ fn non_utf8_path_still_matches() {
 
 #[test]
 fn pinned_hand_off_forces_install_and_notes_ignored_channel() {
-    let expected = "Friday X was installed with WinGet, so WinGet manages its updates.\n\
+    let expected = "FridayX was installed with WinGet, so WinGet manages its updates.\n\
         WinGet ships only the stable channel, so the alpha channel does not apply to this install.\n\
         Quit all running Grok sessions (`friday leader kill` stops a background leader), then run:\n  \
         winget install --id xAI.GrokBuild -e --version 1.0.40 --force\n\

@@ -1,6 +1,6 @@
 //! Resolve the per-path lock key a tool call targets.
 //!
-//! Used by the Friday X CLI's `execute_tool_calls`, which buckets a whole batch of parallel calls
+//! Used by the FridayX CLI's `execute_tool_calls`, which buckets a whole batch of parallel calls
 //! by the first present arg among [`PROD_LOCK_PATH_KEYS`] and serializes writers of one file.
 //! Relative vs absolute, `./`/`..` aliases, and symlinked ancestors all collapse to one string,
 //! or two writers of one file would miss each other. The tool server itself does not lock; it
@@ -11,7 +11,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// The argument names the production Friday X CLI dispatcher keys its per-path lock on, in
+/// The argument names the production FridayX CLI dispatcher keys its per-path lock on, in
 /// priority order. `file_path`: grok_build (`search_replace`), opencode (`edit`, `write`,
 /// `read`), codex (`read_file`); `path`: tools that take a bare `path`; `target_file`: grok_build
 /// `read_file`.

@@ -521,7 +521,7 @@ fn load_plugin_agent_definition(
     }
 }
 
-/// Expand `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` (and the Friday X aliases) in a plugin agent's body so the model receives absolute paths.
+/// Expand `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` (and the FridayX aliases) in a plugin agent's body so the model receives absolute paths.
 fn substitute_plugin_vars(def: &mut AgentDefinition, plugin: &crate::plugins::LoadedPlugin) {
     // Untrusted plugins are loaded frontmatter-only (body is None), and most agents use a built-in system prompt
     // Skip computing root/data paths when there is nothing to expand

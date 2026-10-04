@@ -105,7 +105,7 @@ impl std::error::Error for RuleParseError {}
 
 /// Parse a permission rule string into a native `PermissionRule`.
 /// Unrecognized prefixes (`EnterWorktree`, `NotebookEdit`/`NotebookRead`, anything else) return `Err` and the rule is skipped; legacy `SendAgentMessage` still parses.
-/// `WebFetch(domain:…)` matches the host, not a glob; bare tool names are wildcards; `.claude` `mcp__…` is rewritten onto Friday X's unprefixed `<server>__<tool>` names.
+/// `WebFetch(domain:…)` matches the host, not a glob; bare tool names are wildcards; `.claude` `mcp__…` is rewritten onto FridayX's unprefixed `<server>__<tool>` names.
 pub fn parse_permission_rule(
     rule: &str,
     action: RuleAction,
@@ -202,7 +202,7 @@ pub fn parse_permission_rule(
             });
         }
 
-        // `.claude` `mcp__<server>[__<tool>]` spelling: strip `mcp__` and rewrite onto Friday X's unprefixed `<server>__<tool>` names
+        // `.claude` `mcp__<server>[__<tool>]` spelling: strip `mcp__` and rewrite onto FridayX's unprefixed `<server>__<tool>` names
         // Otherwise the literal falls through to `ToolFilter::Any` and matches nothing; a bare `mcp__` still falls through
         if let Some(rest) = rule.strip_prefix("mcp__")
             && !rest.is_empty()
@@ -211,7 +211,7 @@ pub fn parse_permission_rule(
                 // `*` covers every MCP tool, so the rule is tool-wide (no pattern)
                 None
             } else if rest.contains("__") {
-                // The rest is already `<server>__<tool>` (or `<server>__*`), the Friday X qualified name, so use it verbatim
+                // The rest is already `<server>__<tool>` (or `<server>__*`), the FridayX qualified name, so use it verbatim
                 // Server names may contain single underscores, but `__` only ever separates server from tool
                 Some(rest.to_string())
             } else {

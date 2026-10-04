@@ -1,4 +1,4 @@
-//! E2E path-deny and Friday X hook write-deny (subprocess; arm64-tagged).
+//! E2E path-deny and FridayX hook write-deny (subprocess; arm64-tagged).
 //! Soft-skips when enforcement is unavailable; only `SANDBOX_E2E_REQUIRE_ENFORCEMENT` hard-requires a usable backend.
 #![cfg(all(unix, feature = "enforce"))]
 use std::fs;
@@ -633,7 +633,7 @@ fn subprocess_devbox_genuine(workspace: &Path) {
     eprintln!("OK: devbox enforcement applied inside genuine bwrap");
     std::process::exit(0);
 }
-/// Workspace-profile Friday X-owned hook write-deny probes (existing sources and first-run).
+/// Workspace-profile FridayX-owned hook write-deny probes (existing sources and first-run).
 fn subprocess_hook_write_deny(workspace: &Path, first_run: bool) {
     let home = PathBuf::from(std::env::var(FRIDAY_HOME_ENV).expect(FRIDAY_HOME_ENV));
     let profile = xai_grok_sandbox::ProfileName::Workspace;
@@ -677,7 +677,7 @@ fn subprocess_hook_write_deny(workspace: &Path, first_run: bool) {
             }
             assert_write_denied(&format!("{name} (first-run)"), path);
         }
-        eprintln!("OK: first-run Friday X hook slots denied");
+        eprintln!("OK: first-run FridayX hook slots denied");
     } else {
         let keep = hooks_dir.join("keep.json");
         match fs::read_to_string(&keep) {
@@ -1186,9 +1186,9 @@ fn hardlinked_hooks_paths_refuses_startup() {
         "expected hard-link refusal signal\nstderr: {stderr}"
     );
 }
-/// Workspace profile: Friday X-owned direct hook sources are write-denied but readable.
+/// Workspace profile: FridayX-owned direct hook sources are write-denied but readable.
 /// Create / overwrite / unlink / rename / mkdir fail; absolute hooks-paths targets are denied; parent rename is blocked.
-/// Friday X/CWD/temp siblings stay writable.
+/// FridayX/CWD/temp siblings stay writable.
 #[test]
 fn workspace_protects_direct_hook_sources() {
     if skip_if_enforcement_unavailable() {
@@ -1295,7 +1295,7 @@ fn symlinked_hooks_json_refuses_startup() {
         "symlinked hooks JSON must refuse startup\nstderr: {stderr}"
     );
 }
-/// First-run: missing fixed slots are created as real Friday X state before apply, then write-denied.
+/// First-run: missing fixed slots are created as real FridayX state before apply, then write-denied.
 /// Parent asserts post-exit host tree is valid (no vendor stubs).
 #[test]
 fn workspace_protects_direct_hook_sources_first_run() {
@@ -1314,7 +1314,7 @@ fn workspace_protects_direct_hook_sources_first_run() {
         "missing pass marker\nstderr: {stderr}"
     );
     for needle in [
-        "OK: first-run Friday X hook slots denied",
+        "OK: first-run FridayX hook slots denied",
         "OK: hooks-paths (first-run) write denied",
         "OK: hooks nested (first-run) mkdir denied",
         "OK: hooks nested file (first-run) write denied",

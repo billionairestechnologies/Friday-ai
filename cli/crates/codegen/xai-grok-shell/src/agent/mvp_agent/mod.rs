@@ -157,9 +157,9 @@ pub(crate) fn jwt_claim_matches_user_subscription_tier(
         "XBasic" => jwt_claim == "x_basic",
         "XPremium" => jwt_claim == "x_premium",
         "XPremiumPlus" => jwt_claim == "x_premium_plus",
-        "SuperGrokPro" => jwt_claim == "supergrok_heavy",
+        "Pro" => jwt_claim == "supergrok_heavy",
         "SuperGrokLite" => jwt_claim == "supergrok_lite",
-        "SuperGrokPlus" => jwt_claim == "supergrok_plus",
+        "Pro" => jwt_claim == "supergrok_plus",
         _ => jwt_claim.parse::<u64>().is_ok_and(|n| n != 0),
     }
 }

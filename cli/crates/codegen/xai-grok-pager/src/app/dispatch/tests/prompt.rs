@@ -2003,7 +2003,7 @@ fn prompt_response_formatted_402_takes_credit_limit_path() {
     dispatch(
         Action::TaskComplete(TaskResult::PromptResponse {
             agent_id: id,
-            result: Err("Request failed (402): Friday X usage balance exhausted".to_string()),
+            result: Err("Request failed (402): FridayX usage balance exhausted".to_string()),
             http_status: None,
             prompt_id: None,
         }),
@@ -2043,7 +2043,7 @@ fn credit_limit_402_does_not_overwrite_stash_when_in_flight_cleared() {
     dispatch(
         Action::TaskComplete(TaskResult::PromptResponse {
             agent_id: id,
-            result: Err("Request failed (402): Friday X usage balance exhausted".to_string()),
+            result: Err("Request failed (402): FridayX usage balance exhausted".to_string()),
             http_status: Some(402),
             prompt_id: None,
         }),

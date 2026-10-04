@@ -1810,7 +1810,7 @@ pub(super) fn handle_prompt_response(
                 // For body-only protocols (Warp, iTerm2/OSC 9), emit_notification folds the title into the body automatically
                 let notif_title = session_name
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| "Friday X".into());
+                    .unwrap_or_else(|| "FridayX".into());
 
                 app.deferred_notification = Some((
                     NotificationEvent {

@@ -1,4 +1,4 @@
-//! Voice input for Friday X CLI: an xAI streaming STT client and the [`run_voice_pipeline`] task that emits [`VoiceEvent`]s for the pager.
+//! Voice input for FridayX CLI: an xAI streaming STT client and the [`run_voice_pipeline`] task that emits [`VoiceEvent`]s for the pager.
 //!
 //! Voice is dictation only: the mic streams to STT and the transcript lands in the prompt box.
 //!

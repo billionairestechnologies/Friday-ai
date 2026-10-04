@@ -1838,7 +1838,7 @@ impl Config {
     pub fn is_trace_upload_enabled(&self) -> bool {
         self.resolve_trace_upload().value
     }
-    /// Always off: feedback submission and trace attachments went to the original vendor's service, and Friday X
+    /// Always off: feedback submission and trace attachments went to the original vendor's service, and FridayX
     /// has no such ingestion. (Problem reports go through the Friday web app's support center.)
     pub fn is_feedback_enabled(&self) -> bool {
         false
@@ -2087,7 +2087,7 @@ impl Config {
                     .as_ref()
                     .and_then(|s| s.image_gen_enabled),
             )
-            // Friday X has no image backend yet (the tool called a vendor image API), so it is off until the gateway has one.
+            // FridayX has no image backend yet (the tool called a vendor image API), so it is off until the gateway has one.
             .default(false)
             .resolve()
     }
@@ -4163,7 +4163,7 @@ pub struct Features {
     /// Default: true (index any git repo). Patterns can explicitly match non-git directories.
     #[serde(default)]
     pub codebase_indexing: CodebaseIndexingSetting,
-    /// Show a blocking warning when Friday X starts outside a Git repository. Default: false. Used as the local fallback when the `non_git_warning` remote settings flag in `grok_build_settings` is absent.
+    /// Show a blocking warning when FridayX starts outside a Git repository. Default: false. Used as the local fallback when the `non_git_warning` remote settings flag in `grok_build_settings` is absent.
     /// When the remote flag is present it takes precedence: `Some(false)` from remote settings overrides `true` here.
     #[serde(default)]
     pub non_git_warning: bool,

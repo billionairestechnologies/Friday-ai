@@ -1,6 +1,6 @@
-# Friday X User Guide
+# FridayX User Guide
 
-Learn how to install, configure, and extend Friday X, the terminal-based AI coding assistant from SpaceXAI.
+Learn how to install, configure, and extend FridayX, the terminal-based AI coding assistant from SpaceXAI.
 
 ---
 
@@ -20,7 +20,7 @@ Start here. These guides cover what you need on your first day.
 
 ## Tier 2: Core Feature Docs
 
-Customize and extend Friday X.
+Customize and extend FridayX.
 
 | # | Document | Description |
 |---|----------|-------------|
@@ -37,7 +37,7 @@ Customize and extend Friday X.
 
 ## Tier 3: Advanced Usage Docs
 
-Automate, script, and integrate Friday X with other systems.
+Automate, script, and integrate FridayX with other systems.
 
 | # | Document | Description |
 |---|----------|-------------|

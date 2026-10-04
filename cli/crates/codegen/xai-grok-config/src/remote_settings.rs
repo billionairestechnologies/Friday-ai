@@ -831,12 +831,12 @@ pub struct RemoteSettings {
     /// When `None` or `Some(false)`, sessions are shown in a flat list.
     #[serde(default)]
     pub session_picker_grouped: Option<bool>,
-    /// Whether the user is allowed to use Friday X. Remote settings `grok_build_access_gate` targeting rules set it.
+    /// Whether the user is allowed to use FridayX. Remote settings `grok_build_access_gate` targeting rules set it.
     /// `None` means no server response yet (the client uses its own fallback check); `Some(false)` means blocked.
     #[serde(default)]
     pub allow_access: Option<bool>,
     /// User-friendly display name for the current subscription tier
-    /// (e.g. "SuperGrok", "X Premium+", "Free", "API Key"). Set by CCP
+    /// (e.g. "Friday Pro", "X Premium+", "Free", "API Key"). Set by CCP
     /// from the JWT tier claim (OAuth) or credential kind (API key).
     /// Free/Invalid OAuth → `"Free"`; API keys → `"API Key"` (never free).
     #[serde(default)]

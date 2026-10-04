@@ -43,7 +43,7 @@ impl Distribution {
         }
         Self { withheld }
     }
-    /// This build's distribution: Friday X.
+    /// This build's distribution: FridayX.
     ///
     /// Withheld, whatever config, requirements or the environment say: product telemetry and trace upload,
     /// crash/error reporting, remote control from other devices, and voice dictation (its speech would go to a

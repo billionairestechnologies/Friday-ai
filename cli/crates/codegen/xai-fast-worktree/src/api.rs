@@ -202,7 +202,7 @@ pub struct WorktreeBuilder {
     worktree_id: Option<String>,
     #[cfg(feature = "metadata")]
     metadata: Option<serde_json::Value>,
-    /// Friday X home whose `worktrees.db` receives the record; the resolved home when `None`.
+    /// FridayX home whose `worktrees.db` receives the record; the resolved home when `None`.
     #[cfg(feature = "metadata")]
     registry_home: Option<PathBuf>,
     nfs: Option<NfsWorktreeOpts>,

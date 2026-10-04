@@ -65,7 +65,7 @@ pub(crate) fn hand_off_message(target: Target<'_>, channel: &str) -> String {
     let command = target.command();
     let channel_note = ignored_channel_note(channel);
     format!(
-        "Friday X was installed with WinGet, so WinGet manages its updates.\n\
+        "FridayX was installed with WinGet, so WinGet manages its updates.\n\
          {channel_note}\
          Quit all running Grok sessions (`friday leader kill` stops a background leader), then run:\n  \
          {command}\n\
@@ -86,10 +86,10 @@ pub(crate) fn ignored_channel_note(channel: &str) -> String {
     }
 }
 
-/// Follows "A new version of Friday X is available" in headless runs and `friday update --check`.
+/// Follows "A new version of FridayX is available" in headless runs and `friday update --check`.
 pub(crate) fn update_available_note(target: Target<'_>) -> String {
     format!(
-        "Installed with WinGet: quit Friday X and run `{}` \
+        "Installed with WinGet: quit FridayX and run `{}` \
          (new releases can take a few days to reach WinGet).",
         target.command()
     )

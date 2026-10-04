@@ -1,4 +1,4 @@
-//! Diff hunk construction for the Friday X TUI.
+//! Diff hunk construction for the FridayX TUI.
 //!
 //! Turns edit-tool output into line-tagged [`DiffHunk`]s for the pager to render, and back into unified-diff text.
 //! The input is structured `SearchReplaceEditDetail` records, ACP `ToolCall` payloads, or plain before/after text.

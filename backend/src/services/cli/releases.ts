@@ -4,7 +4,7 @@ import { memoAsync } from "../../utils/ttlMemo.js";
 import { isPlatform, isVersion, type Platform } from "./installScripts.js";
 
 /**
- * Where Friday X binaries live. CI uploads them to object storage behind a CDN and writes `latest.json`
+ * Where FridayX binaries live. CI uploads them to object storage behind a CDN and writes `latest.json`
  * ({"version":"x.y.z"}) last, so a half-uploaded release is never advertised. This server is the only thing
  * the installers and `friday update` talk to: it can pause a bad release (FRIDAY_X_VERSION_PIN) without
  * touching anyone's machine.
@@ -13,11 +13,11 @@ import { isPlatform, isVersion, type Platform } from "./installScripts.js";
 export const latestVersion = memoAsync(60_000, async (): Promise<string> => {
   const pinned = process.env.FRIDAY_X_VERSION_PIN?.trim();
   if (pinned && isVersion(pinned)) return pinned;
-  if (!env.fridayXReleasesUrl) throw new HttpError(503, "Friday X downloads aren't published yet.");
+  if (!env.fridayXReleasesUrl) throw new HttpError(503, "FridayX downloads aren't published yet.");
   const res = await fetch(`${env.fridayXReleasesUrl}/latest.json`, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
-  if (!res?.ok) throw new HttpError(503, "Couldn't reach the Friday X release server. Try again in a minute.");
+  if (!res?.ok) throw new HttpError(503, "Couldn't reach the FridayX release server. Try again in a minute.");
   const version = String(((await res.json().catch(() => ({}))) as { version?: unknown }).version ?? "");
-  if (!isVersion(version)) throw new HttpError(503, "Friday X release information is unavailable right now.");
+  if (!isVersion(version)) throw new HttpError(503, "FridayX release information is unavailable right now.");
   return version;
 }, () => "latest");
 
@@ -28,7 +28,7 @@ export function assetFile(platform: Platform): string {
 export function assetUrl(platform: string, version: string): string {
   if (!isPlatform(platform)) throw new HttpError(404, "Unknown platform.");
   if (!isVersion(version)) throw new HttpError(400, "Unknown version.");
-  if (!env.fridayXReleasesUrl) throw new HttpError(503, "Friday X downloads aren't published yet.");
+  if (!env.fridayXReleasesUrl) throw new HttpError(503, "FridayX downloads aren't published yet.");
   return `${env.fridayXReleasesUrl}/v${version}/${assetFile(platform)}`;
 }
 

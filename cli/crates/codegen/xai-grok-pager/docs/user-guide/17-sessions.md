@@ -1,6 +1,6 @@
 # Session Management
 
-Friday X saves every conversation to disk automatically. Whether you work in the TUI, in headless mode, or over agent stdio, Friday X records the exchange as a session. You can resume, rewind, or compact it. This document describes how to manage sessions.
+FridayX saves every conversation to disk automatically. Whether you work in the TUI, in headless mode, or over agent stdio, FridayX records the exchange as a session. You can resume, rewind, or compact it. This document describes how to manage sessions.
 
 ---
 
@@ -15,13 +15,13 @@ A session is a persistent conversation with full history. It includes:
 - Token usage and turn counts
 - Subagent sessions (when enabled)
 
-Sessions are identified by a unique session ID (a UUIDv7 when Friday X generates it; a client may supply its own ID with `-s`) and stored on disk under `~/.friday/sessions/`. Set `FRIDAY_HOME` to override the base directory; when it is unset, Friday X uses `~/.friday`.
+Sessions are identified by a unique session ID (a UUIDv7 when FridayX generates it; a client may supply its own ID with `-s`) and stored on disk under `~/.friday/sessions/`. Set `FRIDAY_HOME` to override the base directory; when it is unset, FridayX uses `~/.friday`.
 
 ---
 
 ## Storage Layout
 
-Friday X stores each session in its own directory, grouped by working directory. It URL-encodes the working directory to name the group. When the encoded name exceeds 255 bytes, it instead uses a slug plus a hash and records the original path in a `.cwd` file inside the group.
+FridayX stores each session in its own directory, grouped by working directory. It URL-encodes the working directory to name the group. When the encoded name exceeds 255 bytes, it instead uses a slug plus a hash and records the original path in a `.cwd` file inside the group.
 
 ```
 ~/.friday/sessions/<encoded-cwd>/<session-id>/
@@ -61,13 +61,13 @@ This clears the current context and begins a new conversation. Alias: `/clear`.
 
 ### Exit
 
-End the session and quit Friday X:
+End the session and quit FridayX:
 
 ```
 /quit
 ```
 
-Alias: `/exit`. To leave the current session but stay in Friday X, use `/home` to return to the welcome screen.
+Alias: `/exit`. To leave the current session but stay in FridayX, use `/home` to return to the welcome screen.
 
 ### Delete the current session
 
@@ -147,7 +147,7 @@ Alias: `/title`. `/rename --auto` clears a manual title and re-enables auto-titl
 /undo
 ```
 
-When you run `/rewind` or `/undo` (or press **Esc Esc** within 800ms while idle with an empty prompt and conversation messages), Friday X:
+When you run `/rewind` or `/undo` (or press **Esc Esc** within 800ms while idle with an empty prompt and conversation messages), FridayX:
 
 1. Shows a list of rewind points (one per user prompt)
 2. Lets you select which point to rewind to
@@ -169,7 +169,7 @@ When **Confirm before rewind** is on (default in `/settings`), every pick asks f
 
 ### Auto-Compact
 
-Friday X automatically compacts the conversation when the context window approaches its limit. You will see a notification when auto-compact triggers. The `context_window` setting on your model configuration controls when this threshold is reached.
+FridayX automatically compacts the conversation when the context window approaches its limit. You will see a notification when auto-compact triggers. The `context_window` setting on your model configuration controls when this threshold is reached.
 
 ---
 
@@ -192,7 +192,7 @@ This shows:
 - API backend and sandbox profile (when set)
 - Context window usage (used and total tokens, with the percentage used)
 
-On the Session info tab, click a value to copy it, or drag to select a range (same highlight as the tool viewer). `c` copies the session ID and `y` copies the whole block. Copy uses the same clipboard route as the rest of Friday X, including `friday wrap`.
+On the Session info tab, click a value to copy it, or drag to select a range (same highlight as the tool viewer). `c` copies the session ID and `y` copies the whole block. Copy uses the same clipboard route as the rest of FridayX, including `friday wrap`.
 
 ---
 
@@ -291,7 +291,7 @@ Output is JSON with `sessionId`, `updatedAt`, `session`, and `turns`. A specific
 
 ## Worktree Sessions
 
-When working with subagents or session forks, Friday X can create isolated git worktrees per session. Each worktree gets its own copy of the working directory, so file changes in one session do not affect another.
+When working with subagents or session forks, FridayX can create isolated git worktrees per session. Each worktree gets its own copy of the working directory, so file changes in one session do not affect another.
 
 Worktree sessions are managed internally through the `friday/git/worktree/*` extension methods. Key operations:
 
@@ -326,7 +326,7 @@ grok clone https://example.com/org/repo.git \
 grok clone https://example.com/org/repo.git --no-redirects
 ```
 
-`GROVE_REDIRECTS=0` remains a runtime kill switch. Friday X does not save the kill switch as the clone's redirect choice.
+`GROVE_REDIRECTS=0` remains a runtime kill switch. FridayX does not save the kill switch as the clone's redirect choice.
 
 ### Checking Disk Usage
 
@@ -379,7 +379,7 @@ Those names do not accumulate. Each gc pass drops the ones that no longer hold a
 
 ### Persistence Format
 
-Friday X stores the conversation as newline-delimited JSON (JSONL). Each line in `updates.jsonl` is a self-contained ACP session update event. This format supports:
+FridayX stores the conversation as newline-delimited JSON (JSONL). Each line in `updates.jsonl` is a self-contained ACP session update event. This format supports:
 
 - Incremental writes (append-only during a session)
 - Efficient streaming reads (for session restore)

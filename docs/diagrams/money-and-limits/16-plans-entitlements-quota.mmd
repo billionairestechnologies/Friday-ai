@@ -37,11 +37,11 @@ flowchart TB
     E3[Documents per day + Library storage]
     E4[Custom skills, Team Up size, MCP servers, automations]
     E5[Priority support tickets]
-    E6[Friday X - terminal and editor agent, on or off per plan, package or person]
+    E6[FridayX - terminal and editor agent, on or off per plan, package or person]
   end
   Ent --> E1 & E2 & E3 & E4 & E5 & E6
 
-  subgraph meter ["Usage meter in CREDITS - what a call really costs us. Web, mobile and Friday X share it"]
+  subgraph meter ["Usage meter in CREDITS - what a call really costs us. Web, mobile and FridayX share it"]
     Pre[Pre-flight: reserve credits]
     Prompt[Charge the real prompt before the model runs]
     Round[Charge each tool-loop / Build round atomically]

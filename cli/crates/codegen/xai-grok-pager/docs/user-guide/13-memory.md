@@ -1,12 +1,12 @@
 # Cross-Session Memory
 
-Memory lets Friday X recall facts, decisions, and patterns from earlier sessions. Friday X indexes the information you save and searches it automatically, so a new session can reuse relevant context.
+Memory lets FridayX recall facts, decisions, and patterns from earlier sessions. FridayX indexes the information you save and searches it automatically, so a new session can reuse relevant context.
 
 ---
 
 ## What Is Memory?
 
-Without memory, each Friday X session starts fresh: the model knows nothing about previous sessions. When you enable memory, Friday X can:
+Without memory, each FridayX session starts fresh: the model knows nothing about previous sessions. When you enable memory, FridayX can:
 
 - Recall project conventions you explained before.
 - Reuse debugging steps that worked.
@@ -22,14 +22,14 @@ projects; workspace memory holds facts about one repository. Clones and
 worktrees of the same repository share one workspace scope.
 
 Each scope keeps its knowledge as ordinary Markdown files. `topics/` holds
-curated notes, one file per subject, and is what Friday X reads at the start of a
+curated notes, one file per subject, and is what FridayX reads at the start of a
 session. New facts captured after each turn, including a turn you stop before it
 finishes, land as small observations that a later consolidation pass (`/dream`)
 folds into topics. A bounded generated
 index of both scopes is injected into the model's context once per session so
 it can decide which topics to open.
 
-Notes you recorded with earlier versions of Friday X are carried over
+Notes you recorded with earlier versions of FridayX are carried over
 automatically the first time a workspace is opened after updating: each section
 of the earlier notes becomes a topic, and sections whose name already matches a
 topic are appended to it under a "From earlier sessions" heading. The earlier
@@ -98,13 +98,13 @@ When v2 is on (`[memory_v2] enabled`), each scope stores Markdown under `~/.frid
 
 ## Automatic Saves
 
-When a session ends, Friday X saves a structured metadata summary to that session's daily log. The summary contains:
+When a session ends, FridayX saves a structured metadata summary to that session's daily log. The summary contains:
 
 - Message counts (user, assistant, and tool results).
 - Topics: the first few substantive user prompts from the session, up to five.
 - The session date and time (UTC).
 
-Friday X builds the summary from conversation metadata without an LLM call, without added latency. Friday X skips the save for trivial sessions -- those with fewer than three substantive prompts, or fewer than 50 bytes of user text.
+FridayX builds the summary from conversation metadata without an LLM call, without added latency. FridayX skips the save for trivial sessions -- those with fewer than three substantive prompts, or fewer than 50 bytes of user text.
 
 The summary does not record tool usage, file paths, or shell commands. The session ID forms part of the log filename. To turn automatic saves off, set `session.save_on_end = false`. For richer capture of decisions, patterns, and reasoning, use `/flush`.
 
@@ -131,13 +131,13 @@ Use `/flush` when you want to preserve important context:
 
 ### Remember
 
-Ask Friday X to remember something, and it appends the note to a `MEMORY.md` file -- the workspace file for project-specific items, or the global `~/.friday/memory/MEMORY.md` for cross-project preferences:
+Ask FridayX to remember something, and it appends the note to a `MEMORY.md` file -- the workspace file for project-specific items, or the global `~/.friday/memory/MEMORY.md` for cross-project preferences:
 
 ```
 > remember to always open PR links after pushing
 ```
 
-Friday X records entries as durable statements under organized headings, such as `## Preferences`, `## Project Context`, or `## Debugging`. The file watcher reindexes the change on the next memory search, so the new entry is searchable within the current session.
+FridayX records entries as durable statements under organized headings, such as `## Preferences`, `## Project Context`, or `## Debugging`. The file watcher reindexes the change on the next memory search, so the new entry is searchable within the current session.
 
 You can also save a note directly with the `/remember` command:
 
@@ -145,11 +145,11 @@ You can also save a note directly with the `/remember` command:
 /remember always open PR links after pushing
 ```
 
-Run `/remember` with no text to enter remember mode, where the next line you type becomes the note. Either way, Friday X opens a review panel showing the note (with an optional rewritten version you can toggle with `Tab`); the note is written only after you confirm. On save, Friday X shows `Memory saved to ~/.friday/memory/MEMORY.md`.
+Run `/remember` with no text to enter remember mode, where the next line you type becomes the note. Either way, FridayX opens a review panel showing the note (with an optional rewritten version you can toggle with `Tab`); the note is written only after you confirm. On save, FridayX shows `Memory saved to ~/.friday/memory/MEMORY.md`.
 
 ### Forget
 
-Ask Friday X to forget something, and it finds and removes the matching entry:
+Ask FridayX to forget something, and it finds and removes the matching entry:
 
 ```
 > forget the snake_case convention
@@ -159,13 +159,13 @@ Forget is best-effort: the model searches memory and removes entries that match.
 
 ### Recall
 
-Ask what Friday X remembers:
+Ask what FridayX remembers:
 
 ```
 > what do you remember?
 ```
 
-Friday X searches across all memory files and summarizes what it knows, grouped by source: global preferences, project-specific knowledge, and session history. Use `/memory` to browse the raw files.
+FridayX searches across all memory files and summarizes what it knows, grouped by source: global preferences, project-specific knowledge, and session history. Use `/memory` to browse the raw files.
 
 ### Direct Editing
 
@@ -214,13 +214,13 @@ You can also open `/memory` from the command palette.
 
 ## Memory Notifications
 
-When you save a note with `/remember`, Friday X confirms in the scrollback:
+When you save a note with `/remember`, FridayX confirms in the scrollback:
 
 ```
 Memory saved to ~/.friday/memory/MEMORY.md
 ```
 
-Background saves — automatic flush, automatic Dream, and session-end — run silently and do not post a scrollback message. `/flush` and `/dream` report their outcome in scrollback when you run them yourself. Use `/memory` at any time to browse what Friday X has stored.
+Background saves — automatic flush, automatic Dream, and session-end — run silently and do not post a scrollback message. `/flush` and `/dream` report their outcome in scrollback when you run them yourself. Use `/memory` at any time to browse what FridayX has stored.
 
 ---
 
@@ -236,7 +236,7 @@ Dream reorganizes individual session logs and memory entries into a coherent, de
 
 ### Auto-Dream
 
-Dream also runs automatically. By default, Friday X checks the consolidation gates at launch and periodically during a session, and runs Dream once enough time has passed and enough sessions have accumulated:
+Dream also runs automatically. By default, FridayX checks the consolidation gates at launch and periodically during a session, and runs Dream once enough time has passed and enough sessions have accumulated:
 
 ```toml
 [memory.dream]
@@ -252,7 +252,7 @@ check_interval_secs = 3600 # Also check the gates hourly
 
 ### First-Turn Injection
 
-On the first turn of each session, Friday X automatically searches memory for content relevant to the current project and injects it as context. This means Friday X starts with knowledge from previous sessions without a reminder.
+On the first turn of each session, FridayX automatically searches memory for content relevant to the current project and injects it as context. This means FridayX starts with knowledge from previous sessions without a reminder.
 
 First-turn injection can be configured:
 
@@ -270,7 +270,7 @@ Memory is also searched after auto-compaction to recover relevant context that m
 
 ## Memory Search
 
-Friday X searches memory automatically, but you can also trigger searches manually in the chat:
+FridayX searches memory automatically, but you can also trigger searches manually in the chat:
 
 ```
 Search memory for "auth middleware patterns"
@@ -404,7 +404,7 @@ You configure flush under `[compaction]`, not `[memory]`, because it is a compac
 | `enabled` | `true` | Enable the pre-compaction memory flush |
 | `soft_threshold_tokens` | `4000` | Token headroom before the compact threshold that triggers a flush |
 | `max_flush_write_chars` | `8000` | Maximum characters the flush may write to memory |
-| `flush_model` | unset | Model for the flush turn. When unset or `""`, Friday X uses the session's primary model. |
+| `flush_model` | unset | Model for the flush turn. When unset or `""`, FridayX uses the session's primary model. |
 | `idle_timeout_secs` | `300` | Idle seconds before a background flush. Set `0` to disable idle flushes. |
 | `semantic_dedup_threshold` | unset | Cosine-similarity threshold for de-duplicating flushed content. When unset, defaults to `0.92`. |
 
@@ -425,13 +425,13 @@ You configure pruning under `[compaction]`, not `[memory]`, because it is a comp
 
 ## Memory Staleness
 
-When a session memory is old, Friday X attaches a staleness note to it in search results. Older results get a stronger reminder to verify the current state before you rely on them. These notes help you spot stored facts that might no longer be accurate. Global and workspace memories never receive staleness notes, because they hold curated long-term knowledge.
+When a session memory is old, FridayX attaches a staleness note to it in search results. Older results get a stronger reminder to verify the current state before you rely on them. These notes help you spot stored facts that might no longer be accurate. Global and workspace memories never receive staleness notes, because they hold curated long-term knowledge.
 
 ---
 
 ## File Watcher
 
-By default, Friday X watches `~/.friday/memory/` for external file changes. If you edit memory files directly (e.g., in your editor), the changes are picked up automatically on the next memory search:
+By default, FridayX watches `~/.friday/memory/` for external file changes. If you edit memory files directly (e.g., in your editor), the changes are picked up automatically on the next memory search:
 
 - Created or modified files are reindexed.
 - Deleted files have their stale chunks removed from the index.

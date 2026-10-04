@@ -37,9 +37,9 @@ Friday AI is now a production-shaped assistant platform, not only a chat UI.
 
 ---
 
-### Friday X — the coding agent for terminals and editors
+### FridayX — the coding agent for terminals and editors
 
-Friday X (`friday`) is a second front door to the same platform: a terminal agent and editor integrations (VS Code
+FridayX (`friday`) is a second front door to the same platform: a terminal agent and editor integrations (VS Code
 extension; JetBrains, Zed and other ACP editors via `friday agent stdio`). It is a modified fork of an open-source
 (Apache-2.0) coding-agent harness, in `cli/`, with the original vendor's login, models, telemetry and services
 removed, and Friday's put in their place.
@@ -290,7 +290,7 @@ Friday-ai/
     src/services/           chat, providers, billing, connectors, usage
     src/services/providers/ one adapter per model vendor
   supabase/migrations/      0001–0050
-  cli/                      Friday X (Rust agent, binary 'friday')
+  cli/                      FridayX (Rust agent, binary 'friday')
   ide/                      editor integrations (VS Code extension, ACP setup)
   docs/operations/OPERATIONS.md        deploy + incident runbook
 ```

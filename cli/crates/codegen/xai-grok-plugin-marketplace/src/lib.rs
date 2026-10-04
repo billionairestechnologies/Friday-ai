@@ -22,7 +22,7 @@ pub use error::MarketplaceError;
 pub use scanner::scan_marketplace;
 pub use types::*;
 
-/// Display name of the official marketplace source. Friday X has none yet: plugins come from sources the user
+/// Display name of the official marketplace source. FridayX has none yet: plugins come from sources the user
 /// adds themselves, so nothing is auto-registered and nothing is fetched from a vendor repository.
 pub const OFFICIAL_SOURCE_NAME: &str = "Friday Official";
 

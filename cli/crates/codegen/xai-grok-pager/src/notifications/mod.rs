@@ -430,7 +430,7 @@ mod tests {
         svc.escape_writer = EscapeWriter::new(tx, WriterSync::new());
         svc.notify(NotificationEvent {
             kind: NotificationEventKind::TurnComplete,
-            title: "Friday X".into(),
+            title: "FridayX".into(),
             body: "Turn complete".into(),
             session_id: Some("test-session".into()),
         });
@@ -451,7 +451,7 @@ mod tests {
         svc.escape_writer = EscapeWriter::new(tx, WriterSync::new());
         svc.notify(NotificationEvent {
             kind: NotificationEventKind::SessionReady,
-            title: "Friday X".into(),
+            title: "FridayX".into(),
             body: "Session ready".into(),
             session_id: None,
         });

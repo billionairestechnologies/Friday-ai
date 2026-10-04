@@ -1,8 +1,8 @@
-//! Canonical external-settings tool name ↔ Friday X tool correspondence: one table
+//! Canonical external-settings tool name ↔ FridayX tool correspondence: one table
 //! replacing two that drifted apart.
 //!
 //! Two consumers read it independently. The hook matcher (`xai-grok-hooks`) needs the
-//! Friday X tool **names** an external settings term maps to (and the reverse, for regex
+//! FridayX tool **names** an external settings term maps to (and the reverse, for regex
 //! matchers); the agent builder (`xai-grok-agent`) needs the [`ToolKind`] a `tools:`
 //! allowlist entry resolves to. A row may carry a kind without names (`PowerShell`
 //! shares `Execute`, with no distinct tool) or names without a kind (e.g.
@@ -13,14 +13,14 @@
 use super::tool::ToolKind;
 use ToolKind::*;
 
-/// One Claude tool's correspondence to Friday X, read via the accessor functions below.
+/// One Claude tool's correspondence to FridayX, read via the accessor functions below.
 struct ClaudeTool {
     claude: &'static str,
-    /// Friday X [`ToolKind`] for allowlist resolution; `None` for names that are matchable
+    /// FridayX [`ToolKind`] for allowlist resolution; `None` for names that are matchable
     /// (spawn/plan-mode directives) but must not resolve an allowlist.
     kind: Option<ToolKind>,
-    /// Friday X tool names this Claude tool maps to (empty when there is no direct
-    /// Friday X tool — the entry then only contributes a `kind`).
+    /// FridayX tool names this Claude tool maps to (empty when there is no direct
+    /// FridayX tool — the entry then only contributes a `kind`).
     grok: &'static [&'static str],
 }
 
@@ -79,7 +79,7 @@ const CLAUDE_TOOLS: &[ClaudeTool] = &[
     match_only("ListMcpResourcesTool", &["ListMcpResources"]),                        // cursor preset
 ];
 
-/// The Friday X [`ToolKind`] a Claude allowlist entry resolves to, if any.
+/// The FridayX [`ToolKind`] a Claude allowlist entry resolves to, if any.
 pub fn kind_for(claude: &str) -> Option<ToolKind> {
     CLAUDE_TOOLS
         .iter()
@@ -87,7 +87,7 @@ pub fn kind_for(claude: &str) -> Option<ToolKind> {
         .and_then(|t| t.kind)
 }
 
-/// The Friday X tool names a Claude matcher term fires on.
+/// The FridayX tool names a Claude matcher term fires on.
 pub fn grok_names_for(claude: &str) -> impl Iterator<Item = &'static str> {
     CLAUDE_TOOLS
         .iter()
@@ -106,7 +106,7 @@ pub fn claude_names_for(grok_name: &str) -> impl Iterator<Item = &'static str> +
         .map(|t| t.claude)
 }
 
-/// Every distinct Friday X name the table references, for the `xai-grok-agent` drift-check
+/// Every distinct FridayX name the table references, for the `xai-grok-agent` drift-check
 /// test that asserts each is a real client tool name.
 pub fn grok_names() -> impl Iterator<Item = &'static str> {
     let mut seen = std::collections::HashSet::new();
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn every_row_contributes() {
-        // A row with neither a kind nor a Friday X name is dead weight (and signals a typo).
+        // A row with neither a kind nor a FridayX name is dead weight (and signals a typo).
         for t in CLAUDE_TOOLS {
             assert!(
                 t.kind.is_some() || !t.grok.is_empty(),

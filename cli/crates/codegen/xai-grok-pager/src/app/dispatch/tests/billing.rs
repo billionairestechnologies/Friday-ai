@@ -339,10 +339,10 @@ fn credit_limit_translate_max_tier_retry_is_second_option() {
 }
 
 #[test]
-#[ignore = "vendor subscription tiers/upsell URLs do not exist in Friday X"]
+#[ignore = "vendor subscription tiers/upsell URLs do not exist in FridayX"]
 fn is_max_tier_positive_match() {
     assert!(is_max_tier(Some("supergrok_heavy")));
-    assert!(is_max_tier(Some("SuperGrok Heavy")));
+    assert!(is_max_tier(Some("Premium")));
     assert!(is_max_tier(Some("SUPERFRIDAY_HEAVY")));
 }
 
@@ -431,7 +431,7 @@ fn upsell_non_max_qa_heading_is_spending_cap_when_payg_on() {
 }
 
 #[test]
-#[ignore = "vendor subscription tiers/upsell URLs do not exist in Friday X"]
+#[ignore = "vendor subscription tiers/upsell URLs do not exist in FridayX"]
 fn upsell_non_max_upgrade_url_is_supergrok() {
     let mut app = test_app_with_agent();
     open_upsell_qa(
@@ -447,7 +447,7 @@ fn upsell_non_max_upgrade_url_is_supergrok() {
 }
 
 #[test]
-#[ignore = "vendor subscription tiers/upsell URLs do not exist in Friday X"]
+#[ignore = "vendor subscription tiers/upsell URLs do not exist in FridayX"]
 fn upsell_non_max_payg_url_is_usage() {
     let mut app = test_app_with_agent();
     open_upsell_qa(
@@ -500,7 +500,7 @@ fn upsell_non_max_unified_shows_buy_credits() {
     assert_eq!(option_at(q, 1).label, "Buy more credits");
     assert_eq!(
         option_at(q, 1).description,
-        "Purchase credits to keep using Friday X"
+        "Purchase credits to keep using FridayX"
     );
     assert_eq!(option_at(q, 2).label, "Try Again");
 }
@@ -569,7 +569,7 @@ fn is_credit_limit_error_matches_legacy_403_and_pool_402() {
     assert!(is_credit_limit_error(Some(402), "anything"));
     assert!(is_credit_limit_error(
         None,
-        "API error (status 402 Payment Required): Friday X usage balance exhausted"
+        "API error (status 402 Payment Required): FridayX usage balance exhausted"
     ));
     assert!(is_credit_limit_error(
         None,
@@ -814,7 +814,7 @@ fn team_auth_disables_agent_billing_surface() {
 
 #[serial_test::serial(FRIDAY_TEST_OPEN_URL_FILE)]
 #[test]
-#[ignore = "vendor subscription tiers/upsell URLs do not exist in Friday X"]
+#[ignore = "vendor subscription tiers/upsell URLs do not exist in FridayX"]
 fn manage_billing_gates_on_consumer_billing_surface() {
     let out = std::env::temp_dir().join(format!("friday-manage-billing-{}.txt", std::process::id()));
     let _ = std::fs::remove_file(&out);
@@ -1293,18 +1293,18 @@ fn free_usage_upsell_shows_three_options_with_exact_labels() {
     assert_eq!(q.question, "You hit your free usage limit.");
     let expected = [
         (
-            "Upgrade to SuperGrok",
+            "Upgrade to Pro",
             "For everyday coding and productivity tasks",
             Some(UPSELL_URL_UPGRADE),
         ),
         (
-            "Upgrade to SuperGrok Plus",
+            "Upgrade to Pro",
             "Significantly higher usage and rate limits",
             Some(UPSELL_URL_UPGRADE),
         ),
         (
-            "Upgrade to SuperGrok Heavy",
-            "Get the most out of Friday X. Highest usage limits.",
+            "Upgrade to Premium",
+            "Get the most out of FridayX. Highest usage limits.",
             Some(UPSELL_URL_UPGRADE),
         ),
     ];
@@ -1437,11 +1437,11 @@ fn restricted_command_submit_opens_three_option_upsell() {
     let q = first_question(qv);
     assert_eq!(q.question, "Unlock all features with SuperGrok.");
     assert_eq!(q.options.len(), 3);
-    assert_eq!(option_at(q, 0).label, "Upgrade to SuperGrok");
+    assert_eq!(option_at(q, 0).label, "Upgrade to Pro");
     assert_eq!(option_at(q, 0).id.as_deref(), Some(UPSELL_URL_UPGRADE));
-    assert_eq!(option_at(q, 1).label, "Upgrade to SuperGrok Plus");
+    assert_eq!(option_at(q, 1).label, "Upgrade to Pro");
     assert_eq!(option_at(q, 1).id.as_deref(), Some(UPSELL_URL_UPGRADE));
-    assert_eq!(option_at(q, 2).label, "Upgrade to SuperGrok Heavy");
+    assert_eq!(option_at(q, 2).label, "Upgrade to Premium");
     assert_eq!(option_at(q, 2).id.as_deref(), Some(UPSELL_URL_UPGRADE));
 }
 
@@ -1717,7 +1717,7 @@ fn billing_fetched_clears_usage_modal_loading() {
         &mut app,
         Some(test_bal(50.0)),
         true,
-        Some("SuperGrok".into()),
+        Some("Friday Pro".into()),
     );
     let agent = test_agent(&app, AgentId(0));
     let Some(crate::views::modal::ActiveModal::UsageInfo { state }) = agent.active_modal.as_ref()
@@ -1726,7 +1726,7 @@ fn billing_fetched_clears_usage_modal_loading() {
     };
     assert!(!state.billing_loading);
     assert!(state.billing_error.is_none());
-    assert_eq!(state.ctx.subscription_tier.as_deref(), Some("SuperGrok"));
+    assert_eq!(state.ctx.subscription_tier.as_deref(), Some("Friday Pro"));
     // The modal renders from the agent's cached billing mirrors.
     assert_eq!(agent.credit_balance.as_ref().unwrap().usage_pct, 50.0);
 }

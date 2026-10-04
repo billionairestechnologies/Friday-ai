@@ -173,7 +173,7 @@ fn task_lifecycle_satisfier(
         || has(ToolNamespace::GrokBuildConcise, "run_terminal_cmd", true)
         || has(ToolNamespace::OpenCode, "bash", false)
 }
-/// `Cursor:Shell` can background, but it does not satisfy Friday X output tools.
+/// `Cursor:Shell` can background, but it does not satisfy FridayX output tools.
 fn cursor_shell_can_background(
     tool_config: &xai_grok_tools::registry::types::ToolServerConfig,
 ) -> bool {

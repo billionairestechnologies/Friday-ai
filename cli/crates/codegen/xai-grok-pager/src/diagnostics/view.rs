@@ -388,8 +388,8 @@ fn clipboard_findings(
         ClipboardRecovery::UnverifiedSsh => findings.push(manual_finding(
             crate::diagnostics::CLIPBOARD_DELIVERY_UNVERIFIED_ID,
             FindingDisposition::Issue,
-            "Friday X can't verify this clipboard route across the remote boundary",
-            "When you copy, Friday X sends OSC 52 but can't confirm that the outer terminal accepted \
+            "FridayX can't verify this clipboard route across the remote boundary",
+            "When you copy, FridayX sends OSC 52 but can't confirm that the outer terminal accepted \
              it. Each copy is also saved to a backup file; the copy message shows the path. If \
              paste fails, run `friday wrap ssh <host>` on your local computer or use `/minimal`. \
              For repeated SSH sessions, run `friday doctor fix ssh-wrap` on your local computer.",
@@ -397,8 +397,8 @@ fn clipboard_findings(
         ClipboardRecovery::UnverifiedContainer => findings.push(manual_finding(
             crate::diagnostics::CLIPBOARD_DELIVERY_UNVERIFIED_ID,
             FindingDisposition::Issue,
-            "Friday X can't verify this clipboard route across the container boundary",
-            "When you copy, Friday X sends OSC 52 but can't confirm that the outer terminal accepted \
+            "FridayX can't verify this clipboard route across the container boundary",
+            "When you copy, FridayX sends OSC 52 but can't confirm that the outer terminal accepted \
              it. Each copy is also saved to a backup file; the copy message shows the path. If \
              paste fails, start the container command with local `friday wrap <command>`, or use \
              `/minimal`.",
@@ -406,7 +406,7 @@ fn clipboard_findings(
         ClipboardRecovery::UnverifiedOther => findings.push(manual_finding(
             crate::diagnostics::CLIPBOARD_DELIVERY_UNVERIFIED_ID,
             FindingDisposition::Issue,
-            "Friday X can't verify this clipboard route",
+            "FridayX can't verify this clipboard route",
             "Each copy is also saved to a backup file; the copy message shows the path. For a \
              remote or container command, use local `friday wrap <command>`. You can also use \
              `/minimal` to select text in the terminal.",
@@ -415,7 +415,7 @@ fn clipboard_findings(
             crate::diagnostics::CLIPBOARD_DELIVERY_UNAVAILABLE_ID,
             FindingDisposition::Issue,
             "This clipboard route can't reach the target clipboard",
-            "When you copy, Friday X saves the text to the backup file shown in the copy message. To \
+            "When you copy, FridayX saves the text to the backup file shown in the copy message. To \
              copy directly, run `friday wrap ssh <host>` on your local computer. For repeated SSH \
              sessions, run `friday doctor fix ssh-wrap` there. You can also use `/copy <file>` or \
              `/minimal`.",
@@ -424,7 +424,7 @@ fn clipboard_findings(
             crate::diagnostics::CLIPBOARD_DELIVERY_UNAVAILABLE_ID,
             FindingDisposition::Issue,
             "This clipboard route can't reach the target clipboard",
-            "When you copy, Friday X saves the text to the backup file shown in the copy message. \
+            "When you copy, FridayX saves the text to the backup file shown in the copy message. \
              Start the container command with local `friday wrap <command>`, use `/copy <file>`, or \
              use `/minimal`.",
         )),
@@ -432,7 +432,7 @@ fn clipboard_findings(
             crate::diagnostics::CLIPBOARD_DELIVERY_UNAVAILABLE_ID,
             FindingDisposition::Issue,
             "This clipboard route can't reach the target clipboard",
-            "When you copy, Friday X saves the text to the backup file shown in the copy message. Use \
+            "When you copy, FridayX saves the text to the backup file shown in the copy message. Use \
              `/copy <file>` or `/minimal`, then check the native clipboard tool listed above.",
         )),
     }

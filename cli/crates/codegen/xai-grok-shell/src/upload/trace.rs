@@ -1702,7 +1702,7 @@ pub(crate) mod tests {
         );
     }
     #[test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     fn dynamic_resolver_refreshes_proxy_token() {
         use crate::session::repo_changes::UploadMethod;
         use chrono::{Duration, Utc};
@@ -1772,7 +1772,7 @@ pub(crate) mod tests {
         }
     }
     #[test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     fn dynamic_resolver_rereads_disk_on_expired_token() {
         use crate::session::repo_changes::UploadMethod;
         use chrono::{Duration, Utc};
@@ -1882,7 +1882,7 @@ pub(crate) mod tests {
     }
     /// `resolve_async()` picks up a fresh disk token (written by another flow) when the in-memory token is expired.
     #[tokio::test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     async fn resolve_async_picks_up_disk_refreshed_token() {
         use crate::session::repo_changes::UploadMethod;
         use chrono::{Duration, Utc};
@@ -1935,7 +1935,7 @@ pub(crate) mod tests {
     /// `resolve_async()` drives `refresh_chain` when the in-memory OIDC token is expired and no fresh disk token exists.
     /// The refresher fires and the resolved config carries the fresh token, not the stale `base_config` snapshot.
     #[tokio::test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     async fn resolve_async_drives_refresh_chain_when_token_expired() {
         use crate::session::repo_changes::UploadMethod;
         use chrono::{Duration, Utc};
@@ -2007,7 +2007,7 @@ pub(crate) mod tests {
     /// Proactive refresh keeps the cache hot so `resolve_async` on the trace upload path is a cache hit.
     /// The refresher fires once (proactive), then `resolve_async` picks up the cached token without calling the refresher again.
     #[tokio::test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     async fn proactive_refresh_makes_trace_resolve_a_cache_hit() {
         use crate::session::repo_changes::UploadMethod;
         use chrono::{Duration, Utc};

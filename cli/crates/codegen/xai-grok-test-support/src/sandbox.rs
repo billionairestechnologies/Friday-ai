@@ -243,7 +243,7 @@ impl TestSandbox {
     pub fn init_git_workspace(&self) {
         run_git(self, &["init"]);
         run_git(self, &["config", "user.email", "test@test.invalid"]);
-        run_git(self, &["config", "user.name", "Friday X Test"]);
+        run_git(self, &["config", "user.name", "FridayX Test"]);
         let readme = self.workspace.join("README.md");
         if !readme.exists() {
             std::fs::write(&readme, "test file\n").expect("write sandbox git fixture");

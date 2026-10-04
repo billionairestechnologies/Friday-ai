@@ -820,7 +820,7 @@
 - **Sessions poisoned by rejected images** are now healed permanently so future turns succeed without retrying the bad image.
 - **Auto permission mode** now correctly honors your explicit "always allow" grants and narrow allow rules from settings.
 - **Subagent lifecycle events** are now preserved even when delivered out of order, ensuring all subagents appear correctly in the UI.
-- **Keystrokes typed while Friday X is starting** are now preserved in the composer instead of being lost.
+- **Keystrokes typed while FridayX is starting** are now preserved in the composer instead of being lost.
 - **Background tasks killed from the UI** now correctly wake the model when needed instead of staying parked after a single-task stop.
 - **[stop]** / Ctrl+C inside a fullscreen subagent overlay now cancels the visible child session.
 - **Hook failures** now show the first line of stderr output instead of only the exit code.
@@ -930,7 +930,7 @@
 
 - Dashboard rows show a short summary of what the agent did in the previous turn
 - Extensions modal groups items alphabetically with collapsible Skills sections
-- Friday X skips the project-directory prompt when launched from home or other non-project directories
+- FridayX skips the project-directory prompt when launched from home or other non-project directories
 - `/feedback` opens a dedicated report box instead of prompt mode
 - Auto theme detection works over SSH and inside tmux
 - Markdown tables reflow inside cells on narrow panes instead of clipping
@@ -939,7 +939,7 @@
 ## Bug Fixes
 
 - MCP tools that return images no longer drop or corrupt large screenshots
-- Sandboxed Friday X starts on large directories with many deny-glob matches
+- Sandboxed FridayX starts on large directories with many deny-glob matches
 - Rapid send-now presses no longer lose earlier queued messages
 - Esc and stop prevent background tasks from restarting the model after cancel
 - Login no longer skips when an invalid API key is in the environment
@@ -954,7 +954,7 @@
 - Mode indicator (plan/agent/ask) stays in sync after resume and mode changes
 - `/delete` returns to the dashboard when you delete a session opened from it
 - Enter in the slash command menu runs the highlighted command
-- Friday X retries more server errors during outages
+- FridayX retries more server errors during outages
 - Session-only slash commands show a message when used from the dashboard
 - Queued prompts stay visible while waiting on subagents, and slash/image rows can be reordered
 - Auto recaps no longer appear mid-turn or while busy
@@ -1083,7 +1083,7 @@
 
 ## Bug Fixes
 
-- **Friday X** no longer crashes on startup when the host machine has no free threads.
+- **FridayX** no longer crashes on startup when the host machine has no free threads.
 
 
 # 0.2.113 — 2026-07-28
@@ -1098,7 +1098,7 @@
 ## Bug Fixes
 
 - **Terminal command output** is no longer lost or duplicated when the gateway is unreachable.
-- **Invalid MCP server entries** in config.toml no longer prevent Friday X from starting; problems are shown in `friday inspect`.
+- **Invalid MCP server entries** in config.toml no longer prevent FridayX from starting; problems are shown in `friday inspect`.
 - **SessionEnd hooks** now run on exit in non-leader TUI and headless sessions.
 - **Paste chips** now display with the correct background in inline prompts and question inputs.
 - **Pasted content chips** now behave consistently when editing answers in the question view.
@@ -1129,7 +1129,7 @@
 
 ## Features
 
-- **New /tutorial slash command** opens an opt-in nine-topic onboarding tour of Friday X.
+- **New /tutorial slash command** opens an opt-in nine-topic onboarding tour of FridayX.
 - **New tool_overrides option** lets you set date cutoffs and domain allowlists for the agent's built-in search tools.
 - **New toolOverrides option** lets you set date cutoffs and domain allowlists for the agent's built-in search tools.
 - **New config options** let you add query parameters or environment-backed headers to custom model providers and control which variables reach shell tools.
@@ -1141,7 +1141,7 @@
 - **Image edit** can now use a remotely configured model slug instead of the hardcoded default.
 - **`friday doctor fix`** can now repair common tmux clipboard and passthrough problems.
 - **Per-provider auth helpers** now work on Windows and can run from a configurable working directory.
-- **/resume** now shows only native Friday X sessions by default and shows a hint when external sessions are hidden.
+- **/resume** now shows only native FridayX sessions by default and shows a hint when external sessions are hidden.
 - **`friday --resume`** can now resume a session by its title as well as by ID.
 - **Workflows overlay** now shows live per-agent progress and automatically follows the active phase.
 - **Workflow runs** that failed can now be resumed; scratch file limits were also increased.
@@ -1191,10 +1191,10 @@
 - Forking a session that used compaction no longer causes later rewinds to fail with missing checkpoint errors.
 - When a permission prompt appears while viewing scrollback, focus now correctly moves to the prompt so you can answer.
 - Pressing Esc once now cancels the current agent turn (except in fullscreen vim scrollback mode).
-- Friday X now automatically stops a turn that keeps repeating the exact same tool call many times in a row.
+- FridayX now automatically stops a turn that keeps repeating the exact same tool call many times in a row.
 - Configs using either spelling of the workspace teleport disable flag now load and save correctly.
 - Background subagent completion messages no longer leak into unrelated sessions when multiple sessions are active.
-- When the auto-permission classifier times out or fails, Friday X now shows a normal permission prompt instead of silently denying.
+- When the auto-permission classifier times out or fails, FridayX now shows a normal permission prompt instead of silently denying.
 - **Managed MCP tools** no longer time out prematurely on slow operations like Notion updates.
 
 ## Performance
@@ -1291,7 +1291,7 @@
 
 - **/btw** now works inside `friday --minimal`, showing answers in the live area and committing them to scrollback on Esc.
 - **New Appearance setting** "Snap prompt to top on send" lets you keep the viewport where it is instead of jumping to the new prompt.
-- **Default model** is now Friday X 4.5 with high/medium/low reasoning effort and improved compaction settings.
+- **Default model** is now FridayX 4.5 with high/medium/low reasoning effort and improved compaction settings.
 - **New `/summarize` slash command** is now available as an alias for `/recap` to request an on-demand session summary.
 
 ## Bug Fixes
@@ -1356,7 +1356,7 @@
 
 - **New /jump slash command** lets you quickly jump to any previous turn in the conversation.
 - **New /timeline sidebar** shows a clickable tick rail for fast navigation between conversation turns.
-- **friday login** now requests Friday X Projects scopes so workspace listing works after consent.
+- **friday login** now requests FridayX Projects scopes so workspace listing works after consent.
 - **Permission mode** can now be set fleet-wide via remote config when no local setting exists.
 - **Edit tool output** has a setting to show a compact one-line summary instead of always-expanded diffs.
 - **Tab completion** in !bash mode now works like a normal terminal (prefix fill, dropdown, directory drill-down).
@@ -1426,7 +1426,7 @@
 - **Multiline mode** now correctly sends the top queued message on empty Enter when a turn is running.
 - **Queued commands** no longer disappear or delay when pressing Enter twice quickly during a running turn.
 - **Minimal mode** text is now readable on dark terminals with proper contrast and highlighted user prompts.
-- **Friday X no longer crashes** when printing resume hints after the terminal pane has closed.
+- **FridayX no longer crashes** when printing resume hints after the terminal pane has closed.
 - **Long-running turns** with multiple waits now show updated status markers in the transcript instead of appearing stuck.
 - **Claude and Cursor hooks** are now correctly disabled at session start when disabled in config.
 
@@ -1454,7 +1454,7 @@
 - **/terminal-setup** now shows your terminal's color support level and which themes are available.
 - **friday setup --json** prints your team's managed configuration without installing it.
 - Messages you type while the model waits on tasks now stay queued; pressing Enter twice sends them immediately by cancelling the current turn.
-- **How-to Guides** modal now shows a tip linking to Ask Friday X above the footer shortcuts.
+- **How-to Guides** modal now shows a tip linking to Ask FridayX above the footer shortcuts.
 - **Subagent** `task` and `spawn_subagent` tools now accept an optional `model` parameter in the CLI.
 - **Keyboard Shortcuts** modal now lists the paste key binding for images under the Input section.
 
@@ -1694,7 +1694,7 @@
 - **Try Again** on the free-usage paywall now correctly resubmits after rate-limit retries.
 - **Cursor** now respects your terminal's default blink style instead of always blinking.
 - **Skill commands** in scrollback now highlight only the command name, not the arguments.
-- **Plan files** now default to .friday/plan.md to match Friday X conventions.
+- **Plan files** now default to .friday/plan.md to match FridayX conventions.
 - **LaTeX math** renders correctly for display equations and complex subscripts.
 - **Queue hint** in the terminal no longer shows incorrect bold text on part of the message.
 
@@ -1885,7 +1885,7 @@
 
 - **Contextual hints** now show shortcuts like plan mode or clipboard paste when relevant.
 - **Graceful shutdowns** now allow interrupted turns to resume with a configurable pause budget.
-- **Friday X.com chat sessions** now integrate fully with the gateway bridge for model catalog and resume.
+- **FridayX.com chat sessions** now integrate fully with the gateway bridge for model catalog and resume.
 
 ## Bug Fixes
 
@@ -2312,7 +2312,7 @@
 - **ER diagrams** now render as entity boxes with attributes and relationships in the TUI.
 - New "Respect manual folds" setting keeps hand-expanded blocks stable while content streams in.
 - **Ctrl+X** now stops running turns or closes sessions from inside the agent detail view.
-- **Friday X** can now export usage metrics and events to your own OpenTelemetry collector when enabled.
+- **FridayX** can now export usage metrics and events to your own OpenTelemetry collector when enabled.
 - **WezTerm users** now receive guidance when Shift+Enter fails because kitty keyboard protocol is disabled.
 - **Long-running sessions** now tell the model when the local calendar date changes past midnight.
 - **Agent Dashboard** now works without leader mode and shows local idle sessions from disk.
@@ -2857,7 +2857,7 @@
 
 - **New /login** slash command lets you re-authenticate from within a session without quitting.
 - **Compaction summaries** now include the full transcript path so the model can reference prior details.
-- **Cursor skills and rules** are now discovered alongside Friday X and Claude directories.
+- **Cursor skills and rules** are now discovered alongside FridayX and Claude directories.
 
 ## Bug Fixes
 

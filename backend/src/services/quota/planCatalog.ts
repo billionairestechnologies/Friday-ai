@@ -16,7 +16,7 @@ export type CatalogPlanId = Plan | "enterprise";
 
 export const ENTITLEMENT_DEFS = [
   { key: "buildMode", label: "Build Mode", type: "boolean", hint: "Coding agent with a live sandbox" },
-  { key: "fridayX", label: "Friday X (CLI + IDE)", type: "boolean", hint: "Terminal and editor coding agent; uses the same credits" },
+  { key: "fridayX", label: "FridayX (CLI + IDE)", type: "boolean", hint: "Terminal and editor coding agent; uses the same credits" },
   { key: "buildMaxRounds", label: "Build rounds per run", type: "number", hint: "How long one build can work before stopping" },
   { key: "deepResearchPerDay", label: "Deep Research per day", type: "number", hint: "0 turns it off" },
   { key: "documentsPerDay", label: "Documents per day", type: "number", hint: "Generated PPTX, XLSX, DOCX, PDF…" },

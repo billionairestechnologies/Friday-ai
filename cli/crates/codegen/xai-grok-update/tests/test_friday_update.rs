@@ -1,4 +1,4 @@
-//! End-to-end tests for Friday X's self-update against a mock of the Friday backend's release endpoints:
+//! End-to-end tests for FridayX's self-update against a mock of the Friday backend's release endpoints:
 //! `GET /version` (plain text), `GET /download/<platform>?version=` and `GET /sha256/<platform>?version=`.
 //!
 //! They prove the property that matters: a download is activated only if its SHA-256 equals what Friday

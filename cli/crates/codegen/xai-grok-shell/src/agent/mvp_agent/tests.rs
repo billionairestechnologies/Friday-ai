@@ -92,10 +92,10 @@ fn jwt_claim_matches_user_subscription_tier_known_pairs() {
         ("x_basic", "XBasic"),
         ("x_premium", "XPremium"),
         ("x_premium_plus", "XPremiumPlus"),
-        ("supergrok_heavy", "SuperGrokPro"),
+        ("supergrok_heavy", "Pro"),
         ("9", "EnterpriseMystery"),
         ("supergrok_lite", "SuperGrokLite"),
-        ("supergrok_plus", "SuperGrokPlus"),
+        ("supergrok_plus", "Pro"),
     ];
     for (claim, user_tier) in cases {
         assert!(
@@ -108,19 +108,19 @@ fn jwt_claim_matches_user_subscription_tier_known_pairs() {
 fn jwt_claim_matches_user_subscription_tier_rejects_stale_and_unknown() {
     assert!(!jwt_claim_matches_user_subscription_tier(
         "x_basic",
-        "SuperGrokPro"
+        "Pro"
     ));
     assert!(!jwt_claim_matches_user_subscription_tier(
         "supergrok",
-        "SuperGrokPro"
+        "Pro"
     ));
     assert!(!jwt_claim_matches_user_subscription_tier(
         "supergrok",
-        "SuperGrokPlus"
+        "Pro"
     ));
     assert!(!jwt_claim_matches_user_subscription_tier(
         "supergrok_heavy",
-        "SuperGrokPlus"
+        "Pro"
     ));
     assert!(!jwt_claim_matches_user_subscription_tier("free", "GrokPro"));
     assert!(!jwt_claim_matches_user_subscription_tier("", "XPremium"));
@@ -440,7 +440,7 @@ async fn first_subagent_turn_allocation_does_not_walk_the_sessions_index() {
 /// It advances the per-session counter, persisted via exactly one `SetNextTraceTurn`.
 /// This is what makes each sibling `turn_{N}` reachable: without the advance every harness turn would clobber the same GCS path.
 #[tokio::test(flavor = "current_thread")]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_harness_trace_turns_numbers_siblings_and_persists_counter() {
     let agent = build_minimal_agent_for_tests();
     {
@@ -554,7 +554,7 @@ async fn upload_harness_trace_turns_uploads_disabled_does_not_burn_counter() {
 /// Guards three facts of the per-harness-turn manifest. (1) Every turn's ctx carries a FRESH `artifact_tracker`, so turn 1 never inherits turn 0's recorded artifacts.
 /// (2) Recording the turn's metadata and turn_messages yields a manifest listing exactly those two. (3) `fully_uploaded` is true iff neither failed.
 #[tokio::test(flavor = "current_thread")]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_harness_trace_turns_build_per_turn_manifest() {
     use crate::upload::manifest::{
         ArtifactResult, ArtifactStatus, build_manifest, record_artifact, resolve_upload_method,
@@ -2620,7 +2620,7 @@ async fn upload_trace_exact_intent_cannot_bypass_the_offer_gate() {
 }
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_trace_exact_intent_requires_and_consumes_a_matching_grant() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = trace_gate_env(tmp.path());
@@ -2666,7 +2666,7 @@ async fn upload_trace_exact_intent_requires_and_consumes_a_matching_grant() {
 }
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_trace_exact_intent_cannot_bypass_residency() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = trace_gate_env(tmp.path());
@@ -2683,7 +2683,7 @@ async fn upload_trace_exact_intent_cannot_bypass_residency() {
 }
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_trace_checks_residency_before_the_offer_gate() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = trace_gate_env(tmp.path());
@@ -2752,7 +2752,7 @@ async fn upload_trace_team_account_rejects_even_the_exact_intent() {
 }
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_trace_archive_failure_uses_an_isolated_directory() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = trace_gate_env(tmp.path());
@@ -2779,7 +2779,7 @@ async fn upload_trace_archive_failure_uses_an_isolated_directory() {
 }
 #[tokio::test]
 #[serial_test::serial]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn upload_trace_upload_failure_uses_an_isolated_directory() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = trace_gate_env(tmp.path());
@@ -4058,7 +4058,7 @@ async fn prepare_video_gen_config_disabled_when_zdr_flag_set() {
     assert!(!zdr_restricted);
 }
 #[tokio::test(flavor = "current_thread")]
-#[ignore = "vendor-hosted media/search tools are off in Friday X"]
+#[ignore = "vendor-hosted media/search tools are off in FridayX"]
 async fn prepare_video_gen_config_respects_feature_flag() {
     use xai_grok_tools::implementations::grok_build::video_gen::VideoGenConfig;
     let agent = build_minimal_agent_for_tests();
@@ -4113,7 +4113,7 @@ async fn prepare_image_gen_config_sends_client_identifier_header() {
 }
 /// Same contract for video generation (also a direct API call).
 #[tokio::test(flavor = "current_thread")]
-#[ignore = "vendor-hosted media/search tools are off in Friday X"]
+#[ignore = "vendor-hosted media/search tools are off in FridayX"]
 async fn prepare_video_gen_config_sends_client_identifier_header() {
     use xai_grok_tools::implementations::grok_build::video_gen::VideoGenConfig;
     let agent = build_minimal_agent_for_tests();
@@ -4242,7 +4242,7 @@ fn enable_trace_upload_config(agent: &MvpAgent) {
     cfg.telemetry.trace_upload = Some(true);
 }
 #[tokio::test]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn product_analytics_enabled_for_normal_user_with_telemetry_on() {
     let agent = build_agent_with_auth(xai_grok_login::GrokAuth::test_default());
     enable_product_telemetry(&agent);
@@ -4314,7 +4314,7 @@ async fn diagnostic_upload_skipped_for_opted_out_user() {
     );
 }
 #[tokio::test]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn diagnostic_upload_sent_for_normal_user() {
     let (stub_url, count) = spawn_counting_storage_stub().await;
     let agent = build_agent_with_auth(xai_grok_login::GrokAuth::test_default());
@@ -4409,7 +4409,7 @@ async fn diagnostic_upload_skipped_for_opted_out_user_with_own_bucket() {
 /// The diagnostics uploader is wired once (at agent construction), so it must re-check the live trace-upload mirror at invocation time.
 /// A mid-session config-level kill switch stops diagnostics uploads too.
 #[tokio::test]
-#[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+#[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
 async fn diagnostic_upload_skipped_after_mid_session_trace_upload_kill_switch() {
     let (stub_url, count) = spawn_counting_storage_stub().await;
     let agent = build_agent_with_auth(xai_grok_login::GrokAuth::test_default());
@@ -7293,7 +7293,7 @@ fn gated_reconnect_recheck_lifts_gate_clearing_paywall_flash() {
                         let head = String::from_utf8_lossy(&head);
                         let response = if head.contains("/user?include=subscription") {
                             let body =
-                                r#"{"userId":"user-flash","subscriptionTier":"SuperGrokPro"}"#;
+                                r#"{"userId":"user-flash","subscriptionTier":"Pro"}"#;
                             format!(
                                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
                                  Content-Length: {}\r\nConnection: close\r\n\r\n{body}",

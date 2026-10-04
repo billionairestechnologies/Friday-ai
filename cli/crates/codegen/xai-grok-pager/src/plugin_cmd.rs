@@ -708,7 +708,7 @@ fn cmd_validate(path: &str) -> Result<()> {
         }
         Ok(ManifestLoadResult::NotFound) => {
             println!(
-                "No plugin.json found. Friday X discovers skills, agents, and hooks \
+                "No plugin.json found. FridayX discovers skills, agents, and hooks \
                  automatically from standard directories. A manifest is only needed \
                  for custom paths or metadata."
             );

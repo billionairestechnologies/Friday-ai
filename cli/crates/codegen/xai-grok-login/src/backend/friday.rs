@@ -1,7 +1,7 @@
-//! The Friday X backend: sign in with a Friday account through the browser (RFC 8628 device code), then
+//! The FridayX backend: sign in with a Friday account through the browser (RFC 8628 device code), then
 //! use that account's plan, models and usage meter through the Friday gateway.
 //!
-//! Friday issues one long-lived, revocable token per device (`fxt_…`, shown in Settings → Friday X). It is
+//! Friday issues one long-lived, revocable token per device (`fxt_…`, shown in Settings → FridayX). It is
 //! stored as an OIDC-style session whose issuer is Friday, which is the shape the shell already treats as
 //! "first-party" (session bearer to the first-party backend), so the existing session plumbing applies.
 
@@ -18,7 +18,7 @@ use crate::{AuthChannels, AuthManager, AuthMode, AuthUrlInfo, AuthUrlMode, GrokA
 /// Identifies this client to Friday's device login (shown on the approval page and in Settings).
 pub const FRIDAY_CLIENT_ID: &str = "friday-x-cli";
 
-/// Which client this is, so Settings → Friday X can say "Friday X for VS Code". The editor integrations set
+/// Which client this is, so Settings → FridayX can say "FridayX for VS Code". The editor integrations set
 /// `FRIDAY_X_CLIENT` (vscode, jetbrains, zed); anything else is the terminal. Only known names are accepted:
 /// the value is sent to the server as the client id, so it must never be free text.
 pub fn client_id() -> &'static str {
@@ -93,7 +93,7 @@ async fn request_code(client: &reqwest::Client, issuer: &str) -> anyhow::Result<
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if status.as_u16() == 403 {
-            anyhow::bail!("Friday X isn't available for your account yet.");
+            anyhow::bail!("FridayX isn't available for your account yet.");
         }
         anyhow::bail!("Friday couldn't start the sign-in (HTTP {status}). {body}");
     }
@@ -157,7 +157,7 @@ async fn device_login(auth_manager: &Arc<AuthManager>, mut channels: Option<Auth
         }
         None => {
             eprintln!();
-            eprintln!("To sign in to Friday X, open this page in your browser:");
+            eprintln!("To sign in to FridayX, open this page in your browser:");
             eprintln!();
             eprintln!("  {display}");
             eprintln!();
@@ -252,22 +252,51 @@ impl AuthBackend for FridayAuthBackend {
 
     fn refresher(
         &self,
-        _manager: Arc<AuthManager>,
+        manager: Arc<AuthManager>,
         _auth_provider_command: Option<String>,
         _diagnostic_uploader: Option<DiagnosticUploader>,
     ) -> Arc<dyn TokenRefresher> {
-        Arc::new(FridayRefresher)
+        Arc::new(FridayRefresher { snapshot: manager })
     }
 }
 
-/// Friday tokens don't rotate: a token is valid until it is signed out (Settings → Friday X) or its year
-/// is up, and either way the remedy is a new login, so "refresh" is an immediate, permanent no.
-struct FridayRefresher;
+/// Friday tokens don't rotate, so "refresh" means one thing: ask the server whether this token is still good.
+///
+/// A 401 on some request does NOT prove the token is bad. It is also what a request that went out without a token
+/// gets (a call queued before sign-in finished, a race with the login completing), and the first version of this
+/// answered every 401 with "permanent failure", which made the app delete a freshly saved, perfectly valid sign-in
+/// and ask the person to log in again on every launch. Now the token is checked at `/me`: only a 401 THERE
+/// retires it. Anything else (accepted, forbidden by plan, network trouble) leaves the sign-in alone.
+struct FridayRefresher {
+    snapshot: Arc<dyn crate::refresh::AuthSnapshot>,
+}
 
 #[async_trait::async_trait]
 impl TokenRefresher for FridayRefresher {
     async fn refresh(&self, _reason: RefreshReason) -> RefreshOutcome {
-        RefreshOutcome::permanent(crate::error::RefreshTokenFailedReason::RefreshTokenRejected, None)
+        let Some(auth) = self.snapshot.current().or_else(|| self.snapshot.expired_auth()) else {
+            return RefreshOutcome::permanent(crate::error::RefreshTokenFailedReason::RefreshTokenRejected, None);
+        };
+        verify_token(&xai_grok_env::friday_api_base(), auth).await
+    }
+}
+
+/// `GET <api>/me` with the token: 401 retires it, anything else keeps it (see [`FridayRefresher`]).
+async fn verify_token(api_base: &str, auth: GrokAuth) -> RefreshOutcome {
+    let client = xai_grok_http::shared_client();
+    let response = client
+        .get(format!("{api_base}/me"))
+        .bearer_auth(&auth.key)
+        .timeout(StdDuration::from_secs(10))
+        .send()
+        .await;
+    match response {
+        Ok(r) if r.status() == reqwest::StatusCode::UNAUTHORIZED => {
+            RefreshOutcome::permanent_for(crate::error::RefreshTokenFailedReason::RefreshTokenRejected, &auth)
+        }
+        Ok(r) if r.status().is_success() => RefreshOutcome::transient("the server still accepts this sign-in"),
+        Ok(r) => RefreshOutcome::transient(format!("sign-in check returned HTTP {}", r.status().as_u16())),
+        Err(e) => RefreshOutcome::transient(format!("couldn't reach Friday to check the sign-in: {e}")),
     }
 }
 
@@ -283,6 +312,52 @@ mod tests {
         assert!(!is_friday_url(&format!("{origin}.evil.example/api/x/v1")));
         assert!(!is_friday_url("https://api.x.ai/v1"));
         assert!(!is_friday_url("https://example.com/?next=friday.billionairestechnologies.com"));
+    }
+
+    /// Serves one canned HTTP response per connection on a loopback port; returns the base URL.
+    fn serve(status: &'static str) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten().take(4) {
+                let mut stream = stream;
+                let mut buf = [0u8; 2048];
+                let _ = stream.read(&mut buf);
+                let _ = write!(stream, "HTTP/1.1 {status}\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}");
+            }
+        });
+        format!("http://{addr}")
+    }
+
+    fn sample_auth() -> GrokAuth {
+        GrokAuth { key: "fxt_test_token_0123456789".into(), auth_mode: AuthMode::Oidc, ..GrokAuth::test_default() }
+    }
+
+    #[tokio::test]
+    async fn a_token_the_server_still_accepts_is_never_retired_by_a_stray_401() {
+        let outcome = verify_token(&serve("200 OK"), sample_auth()).await;
+        assert!(matches!(outcome, RefreshOutcome::TransientFailure { .. }), "{outcome:?}");
+    }
+
+    #[tokio::test]
+    async fn a_token_the_server_rejects_is_retired() {
+        let outcome = verify_token(&serve("401 Unauthorized"), sample_auth()).await;
+        assert!(matches!(outcome, RefreshOutcome::PermanentFailure { .. }), "{outcome:?}");
+    }
+
+    #[tokio::test]
+    async fn a_plan_that_excludes_friday_x_or_a_server_error_does_not_log_the_person_out() {
+        for status in ["403 Forbidden", "500 Internal Server Error"] {
+            let outcome = verify_token(&serve(status), sample_auth()).await;
+            assert!(matches!(outcome, RefreshOutcome::TransientFailure { .. }), "{status}: {outcome:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_server_does_not_log_the_person_out() {
+        let outcome = verify_token("http://127.0.0.1:9", sample_auth()).await;
+        assert!(matches!(outcome, RefreshOutcome::TransientFailure { .. }), "{outcome:?}");
     }
 
     #[test]

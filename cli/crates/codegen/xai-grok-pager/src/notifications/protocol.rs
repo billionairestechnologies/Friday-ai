@@ -64,10 +64,10 @@ fn notification_sequence(
     let body = sanitize_osc_text(body);
     Some(match protocol {
         // Body-only protocols fold the title (session name) into the body.
-        // OSC 777 already uses the tab title as subtitle, so keep "Friday X".
+        // OSC 777 already uses the tab title as subtitle, so keep "FridayX".
         NotificationProtocol::Osc9 => format!("\x1b]9;{body} \u{b7} {title}\x07").into(),
         NotificationProtocol::Osc99 => format!("\x1b]99;i=grok;{body} \u{b7} {title}\x1b\\").into(),
-        NotificationProtocol::Osc777 => format!("\x1b]777;notify;Friday X;{body}\x1b\\").into(),
+        NotificationProtocol::Osc777 => format!("\x1b]777;notify;FridayX;{body}\x1b\\").into(),
         NotificationProtocol::Bel => Cow::Borrowed("\x07"),
         NotificationProtocol::None => return None,
     })
@@ -214,7 +214,7 @@ mod tests {
         let (writer, rx) = capture_writer();
         emit_notification(NotificationProtocol::Osc777, "title", "body", &ctx, &writer);
         let payload = rx.try_recv().expect("one payload enqueued");
-        assert_eq!(payload.data(), "\x1b]777;notify;Friday X;body\x1b\\".as_bytes());
+        assert_eq!(payload.data(), "\x1b]777;notify;FridayX;body\x1b\\".as_bytes());
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
 
         let osc777 = notification_sequence(NotificationProtocol::Osc777, "ignored\x1b", "b\x1body")
             .expect("osc777 yields a sequence");
-        assert_eq!(osc777.as_ref(), "\x1b]777;notify;Friday X;body\x1b\\");
+        assert_eq!(osc777.as_ref(), "\x1b]777;notify;FridayX;body\x1b\\");
     }
 
     #[test]

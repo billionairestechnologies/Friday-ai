@@ -9,7 +9,7 @@
 mod registry;
 pub use registry::{FIRST_PARTY_CREDENTIAL_ENV_VARS, env_bool, env_string};
 // ── Friday ──────────────────────────────────────────────────────────────────────────────────────
-// Friday X talks to exactly one server: the Friday backend. Everything the CLI used to resolve against
+// FridayX talks to exactly one server: the Friday backend. Everything the CLI used to resolve against
 // vendor hosts (login, model list, inference) now derives from this origin, so a deployment, a staging
 // server or a local backend is one variable: `FRIDAY_X_URL`.
 /// Production Friday origin; the compiled default when `FRIDAY_X_URL` is unset.
@@ -22,7 +22,7 @@ pub fn friday_origin() -> String {
         .trim_end_matches('/')
         .to_string()
 }
-/// `<origin>/api/x`: the Friday X API root (device login, `/me`, `/models`).
+/// `<origin>/api/x`: the FridayX API root (device login, `/me`, `/models`).
 pub fn friday_api_base() -> String {
     format!("{}/api/x", friday_origin())
 }
@@ -76,7 +76,7 @@ pub struct GrokBuildEndpoints {
     pub ws_origin: &'static str,
 }
 const PRODUCTION_ENDPOINTS: GrokBuildEndpoints = GrokBuildEndpoints {
-    // Friday X has one server. The vendor asset/relay/cloud-gateway services this client once knew do not
+    // FridayX has one server. The vendor asset/relay/cloud-gateway services this client once knew do not
     // exist here; those constants stay (the types still carry them) but point nowhere real.
     cli_chat_proxy_base_url: "https://friday.billionairestechnologies.com/api/x/v1",
     asset_server_url: "https://friday.billionairestechnologies.com/unsupported/assets",

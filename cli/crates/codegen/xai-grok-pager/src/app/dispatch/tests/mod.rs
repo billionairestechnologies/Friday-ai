@@ -166,7 +166,7 @@ fn test_app() -> AppView {
         bootstrap_acp_commands: Vec::new(),
         auth_methods: vec![acp::AuthMethod::Agent(acp::AuthMethodAgent::new(
             acp::AuthMethodId::new("friday"),
-            "Friday X".to_string(),
+            "FridayX".to_string(),
         ))],
         auth_state: AuthState::Done,
         logout_pending: false,

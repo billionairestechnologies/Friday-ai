@@ -5,12 +5,12 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 /**
- * Friday X for VS Code is a thin client: the agent, the login and the models all live in the `friday` CLI and the
+ * FridayX for VS Code is a thin client: the agent, the login and the models all live in the `friday` CLI and the
  * Friday backend, so the editor adds only what a terminal cannot (a launcher that finds the project, "send this
  * selection", an installer, a status entry). Nothing here knows about plans, models or limits.
  */
 
-const TERMINAL_NAME = "Friday X";
+const TERMINAL_NAME = "FridayX";
 let statusItem: vscode.StatusBarItem;
 
 function config() {
@@ -53,7 +53,7 @@ async function ensureInstalled(): Promise<string | null> {
   const exe = resolveExecutable();
   if (exe) return exe;
   const pick = await vscode.window.showInformationMessage(
-    "Friday X isn't installed yet. Install it now? (It downloads the `friday` command and verifies its checksum.)",
+    "FridayX isn't installed yet. Install it now? (It downloads the `friday` command and verifies its checksum.)",
     "Install",
     "Not now",
   );
@@ -62,10 +62,10 @@ async function ensureInstalled(): Promise<string | null> {
 }
 
 async function installOrUpdate() {
-  const terminal = vscode.window.createTerminal({ name: "Friday X install" });
+  const terminal = vscode.window.createTerminal({ name: "FridayX install" });
   terminal.show();
   terminal.sendText(installCommand());
-  vscode.window.showInformationMessage("When the installer finishes, run “Friday X: Open”.");
+  vscode.window.showInformationMessage("When the installer finishes, run “FridayX: Open”.");
 }
 
 function launch(exe: string, args: string[] = []): vscode.Terminal {
@@ -129,7 +129,7 @@ async function sendFile() {
 async function runSubcommand(sub: string) {
   const exe = await ensureInstalled();
   if (!exe) return;
-  const terminal = vscode.window.createTerminal({ name: `Friday X ${sub}`, env: { FRIDAY_X_URL: serverUrl(), FRIDAY_X_CLIENT: "vscode" } });
+  const terminal = vscode.window.createTerminal({ name: `FridayX ${sub}`, env: { FRIDAY_X_URL: serverUrl(), FRIDAY_X_CLIENT: "vscode" } });
   terminal.show();
   terminal.sendText(`${exe.includes(" ") ? `"${exe}"` : exe} ${sub}`);
 }
@@ -137,8 +137,8 @@ async function runSubcommand(sub: string) {
 export function activate(context: vscode.ExtensionContext) {
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
   statusItem.command = "fridayX.open";
-  statusItem.text = "$(sparkle) Friday X";
-  statusItem.tooltip = "Open Friday X";
+  statusItem.text = "$(sparkle) FridayX";
+  statusItem.tooltip = "Open FridayX";
   statusItem.show();
 
   context.subscriptions.push(

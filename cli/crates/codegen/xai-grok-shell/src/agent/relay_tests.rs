@@ -560,7 +560,7 @@ async fn test_auth_refresh_failure_continues_with_backoff() {
 /// A non-sticky auth verdict (`ProviderInteractiveRequired`) must neither cancel the relay nor reconnect-storm, and a recovered credential must start the backoff over.
 /// The mock relay accepts every WebSocket and rejects the bearer on the first frame, so the backoff must survive the connect. Connections 1–3 carry the rejected key: gaps grow 2s → 4s. Before connection 3 a new key lands on disk, so recovery adopts it and reconnects at once (connection 4). That key is rejected too; the following delay must be the base 2s again rather than the inherited 8s.
 #[tokio::test]
-#[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
+#[ignore = "remote relay/sync/share services of the original product are removed in FridayX"]
 async fn non_sticky_verdict_keeps_reconnecting_with_growing_backoff() {
     use std::sync::Mutex;
     use tokio::sync::Notify;
@@ -715,7 +715,7 @@ fn relay_initialize_gains_user_message_echo_capability() {
     assert_eq!(frame.get("id"), Some(&serde_json::json!(7)));
 }
 #[test]
-#[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
+#[ignore = "remote relay/sync/share services of the original product are removed in FridayX"]
 fn relay_initialize_without_capabilities_block_gets_one() {
     let mut frame = serde_json::json!({
         "jsonrpc": "2.0", "id": 1, "method": "initialize",
@@ -728,7 +728,7 @@ fn relay_initialize_without_capabilities_block_gets_one() {
     );
 }
 #[test]
-#[ignore = "remote relay/sync/share services of the original product are removed in Friday X"]
+#[ignore = "remote relay/sync/share services of the original product are removed in FridayX"]
 fn relay_explicit_user_message_echo_is_respected() {
     let mut frame = serde_json::json!({
         "jsonrpc": "2.0", "id": 1, "method": "initialize",

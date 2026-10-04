@@ -29,7 +29,7 @@ pub enum Error {
     Rejected(String),
 }
 
-/// Friday X sends no product analytics: with no base URL, `post` returns before any network call.
+/// FridayX sends no product analytics: with no base URL, `post` returns before any network call.
 /// (The `Telemetry` capability is also withheld, so nothing constructs a client; this is the second lock.)
 const API_BASE_URL: &str = "";
 const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);

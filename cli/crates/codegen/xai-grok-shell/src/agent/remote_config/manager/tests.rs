@@ -1996,11 +1996,11 @@ fn make_entry_config_with_id(
 fn build_prefetched_map_distinct_ids_same_slug() {
     let entries = vec![
         make_entry_config_with_id(Some("auto"), "grok-build", Some("Auto")),
-        make_entry_config_with_id(Some("grok-build"), "grok-build", Some("Friday X")),
+        make_entry_config_with_id(Some("grok-build"), "grok-build", Some("FridayX")),
         make_entry_config_with_id(
             Some("experimental-fast"),
             "experimental-fast",
-            Some("Friday X Fast"),
+            Some("FridayX Fast"),
         ),
     ];
     let map = build_prefetched_map(entries, None);
@@ -2578,7 +2578,7 @@ async fn failed_models_endpoint_fetch_blocks_prompts_with_the_endpoint_url() {
     );
     assert_eq!(
         Some(
-            "No models are available: `[features] remote_fetch = false` stops Friday X from reading \
+            "No models are available: `[features] remote_fetch = false` stops FridayX from reading \
              https://proxy.example.com/v1/models. Add a `[model.<id>]` table that names an endpoint id, \
              or turn remote_fetch on."
         ),

@@ -316,7 +316,7 @@ async fn run_relay_loop(
                     event = "relay_disconnected",
                     ws_url = %config.ws_url,
                 );
-                tprintln!("Disconnected from Friday X WebSocket server");
+                tprintln!("Disconnected from FridayX WebSocket server");
                 info!("WebSocket disconnected, will reconnect");
             }
             Err(e) => {

@@ -1,6 +1,6 @@
 # Headless Mode and Scripting
 
-Headless mode runs Friday X non-interactively from the command line. It accepts a single prompt, executes it with full tool access, and returns the result. Use it to automate tasks, script workflows, build integrations, and parse output programmatically.
+Headless mode runs FridayX non-interactively from the command line. It accepts a single prompt, executes it with full tool access, and returns the result. Use it to automate tasks, script workflows, build integrations, and parse output programmatically.
 
 ---
 
@@ -12,7 +12,7 @@ Passing a prompt non-interactively triggers headless mode. The most common way i
 grok -p "Your prompt here"
 ```
 
-Friday X processes the prompt, runs any necessary tools, and prints the result to stdout. The process exits when the response is complete.
+FridayX processes the prompt, runs any necessary tools, and prints the result to stdout. The process exits when the response is complete.
 
 ---
 
@@ -202,7 +202,7 @@ Usage notes:
 
 The `sessionId` field is useful for resuming the conversation later.
 
-On failure, Friday X emits an error object (process exit non-zero). Prompt-level
+On failure, FridayX emits an error object (process exit non-zero). Prompt-level
 failures may also include frozen spend fields when usage was recorded:
 
 ```json
@@ -244,13 +244,13 @@ reason (e.g. `tool_use`, `pause_turn`) is on the `usage` line's `stopReason`.
 Per-response `message_id`/`stopReason`/`signature` are populated on the Messages
 API backend; other backends report what they carry.
 
-Friday X may also emit `max_turns_reached` and `auto_compact_*` events; treat the list as non-exhaustive and switch on `type`.
+FridayX may also emit `max_turns_reached` and `auto_compact_*` events; treat the list as non-exhaustive and switch on `type`.
 
 ### streaming-messages-json
 
 Newline-delimited JSON in the Messages API `stream-json` wire format. The data-bearing surface matches the Messages shape exactly. This includes the `assistant`/`user` message bodies, `usage`, `tool_use`/`tool_result`, inline web search, `stop_reason`, and the `--include-partial-messages` event framing. A consumer that reconstructs messages, reads spend, or detects errors works without changes.
 
-The `system`/`init` and terminal `result` lines carry metadata. Friday X emits the fields it has real data for and omits pure-placeholder fields it cannot fill, rather than zero-filling them. As a result, those two lines may not pass strict `init`/`result` schema validation. The individual fields are listed below. Read the fidelity notes before treating any one field as authoritative. For a clean xAI-native stream with no placeholder shape, use `streaming-json`.
+The `system`/`init` and terminal `result` lines carry metadata. FridayX emits the fields it has real data for and omits pure-placeholder fields it cannot fill, rather than zero-filling them. As a result, those two lines may not pass strict `init`/`result` schema validation. The individual fields are listed below. Read the fidelity notes before treating any one field as authoritative. For a clean xAI-native stream with no placeholder shape, use `streaming-json`.
 
 The stream opens with a `system`/`init` line, then `assistant` messages whose `message.content[]` holds `text`, `thinking`, and `tool_use` blocks, `user` messages carrying `tool_result` blocks, and a terminal `result`:
 
@@ -280,13 +280,13 @@ On `init`, `skills` is live. It lists the session's user-invocable skill names, 
 
 The other `init` fields carry real data:
 
-- `apiKeySource` is `user` for API-key auth and `oauth` otherwise. Friday X does not distinguish the schema's `project`, `org`, and `temporary` sources.
-- `permissionMode` is the effective headless mode mapped to the Messages enum: the `--permission-mode` value, or `bypassPermissions` under `--yolo`, else `default`. Friday X-only modes such as `auto` collapse to `default`.
+- `apiKeySource` is `user` for API-key auth and `oauth` otherwise. FridayX does not distinguish the schema's `project`, `org`, and `temporary` sources.
+- `permissionMode` is the effective headless mode mapped to the Messages enum: the `--permission-mode` value, or `bypassPermissions` under `--yolo`, else `default`. FridayX-only modes such as `auto` collapse to `default`.
 - `mcp_servers[].status` is one `friday/mcp/list` snapshot, emitted only for `streaming-messages-json`: `connected`, `failed`, `needs-auth`, `pending`, or `disabled`. Servers still handshaking are `pending`. `disabled` is only stamped after the session reports `sessionMcpResolved`; an unresolved list row is `pending` even when `enabled` is still false. The snapshot does not wait for the Blocking startup grace; that grace still applies to the prompt's toolset. Other output formats omit the array and do not call `friday/mcp/list`.
 
-Friday X omits the schema's pure-placeholder `init` fields it has no data for, rather than emitting dummy values: `claude_code_version`, `output_style`, and `plugins`.
+FridayX omits the schema's pure-placeholder `init` fields it has no data for, rather than emitting dummy values: `claude_code_version`, `output_style`, and `plugins`.
 
-`result` includes `duration_ms`, `duration_api_ms`, `num_turns`, `stop_reason`, `total_cost_usd`, `usage` (Messages API `message.usage` shape), and `modelUsage`. It also includes `errors[]` on the error subtypes. Friday X omits the schema's always-empty `permission_denials`, because it does not collect permission denials. `structured_output` (with `--json-schema`) is snake_case, matching the schema.
+`result` includes `duration_ms`, `duration_api_ms`, `num_turns`, `stop_reason`, `total_cost_usd`, `usage` (Messages API `message.usage` shape), and `modelUsage`. It also includes `errors[]` on the error subtypes. FridayX omits the schema's always-empty `permission_denials`, because it does not collect permission denials. `structured_output` (with `--json-schema`) is snake_case, matching the schema.
 
 `model` appears on `init` and every `assistant` frame. It is the real model id when known, and the literal `"unknown"` only when no model is known at emit time.
 
@@ -294,7 +294,7 @@ The assistant frame's `stop_sequence` is wired end-to-end. It carries the provid
 
 The emitted error subtypes are `error_max_turns`, `error_during_execution`, and `error_max_structured_output_retries`. The schema's `error_max_budget_usd` subtype is never emitted, because grok has no budget feature.
 
-`result.usage` reports the Messages `message.usage` shape with the three token buckets disjoint: `input_tokens` (uncached), `cache_read_input_tokens`, and `cache_creation_input_tokens`. Friday X derives these from the turn's aggregate ledger, reshaped into those buckets. Subagent cache creation is included in `cache_creation_input_tokens`. The aggregate ledger tracks it as its own bucket, so it is no longer folded into `input_tokens`.
+`result.usage` reports the Messages `message.usage` shape with the three token buckets disjoint: `input_tokens` (uncached), `cache_read_input_tokens`, and `cache_creation_input_tokens`. FridayX derives these from the turn's aggregate ledger, reshaped into those buckets. Subagent cache creation is included in `cache_creation_input_tokens`. The aggregate ledger tracks it as its own bucket, so it is no longer folded into `input_tokens`.
 
 `result.usage` always emits numeric buckets, even when data is missing. This happens when the turn's usage ledger is incomplete (the same condition that surfaces `usage_is_incomplete` in the `json` format), or when no aggregate ledger reached the reducer at all. Any bucket grok cannot account for falls back to `0`, because the Messages API schema has no marker for incomplete or absent usage. The reducer logs a warning to stderr in both cases. Read an all-zero `usage` here as "unknown", not "free".
 
@@ -310,9 +310,9 @@ On the Messages API backend, the framing is faithful. `message_start` carries th
 
 Some backends surface per-response metadata only at end of turn. Those backends fall back to a synthesized `message_start.id` and zero-seeded input `usage`. They defer the reasoning `signature` to the final `assistant` line, which is authoritative in that case.
 
-Tool-call input is emitted as a single `input_json_delta` carrying the complete arguments JSON, followed by `content_block_stop`. It is not a sequence of token-level fragments. This is a deliberate divergence from the Messages API's incremental `partial_json` streaming. Friday X's ACP tool-call path delivers each tool call as one validated JSON object once the arguments are fully parsed, so a single delta is the accurate representation. A consumer that concatenates `partial_json` reassembles the identical object either way. The backend web-search `server_tool_use` block's `input.query` is emitted the same way, as one `input_json_delta`.
+Tool-call input is emitted as a single `input_json_delta` carrying the complete arguments JSON, followed by `content_block_stop`. It is not a sequence of token-level fragments. This is a deliberate divergence from the Messages API's incremental `partial_json` streaming. FridayX's ACP tool-call path delivers each tool call as one validated JSON object once the arguments are fully parsed, so a single delta is the accurate representation. A consumer that concatenates `partial_json` reassembles the identical object either way. The backend web-search `server_tool_use` block's `input.query` is emitted the same way, as one `input_json_delta`.
 
-The Messages API `citations_delta` carries inline citations for cited text spans, such as those from web search. This stream does not produce it. Friday X's Messages content deltas are limited to text, thinking, signature, and tool-input JSON, so there is no citation data to surface as a `citations_delta`. Backend web-search source URLs are reported inline on the completed `web_search_tool_result` block instead (see above), not as per-span text citations.
+The Messages API `citations_delta` carries inline citations for cited text spans, such as those from web search. This stream does not produce it. FridayX's Messages content deltas are limited to text, thinking, signature, and tool-input JSON, so there is no citation data to surface as a `citations_delta`. Backend web-search source URLs are reported inline on the completed `web_search_tool_result` block instead (see above), not as per-span text citations.
 
 Fidelity caveats apply to a few fields.
 
@@ -438,7 +438,7 @@ done
 
 ### Python Wrapper
 
-Friday X's headless mode can be wrapped as an OpenAI-compatible chat completion API:
+FridayX's headless mode can be wrapped as an OpenAI-compatible chat completion API:
 
 ```python
 import asyncio
@@ -591,11 +591,11 @@ If you've previously logged in, cached credentials are used automatically.
 
 ## Project Root Discovery
 
-When Friday X starts, it discovers the project root by walking upward from `--cwd`
+When FridayX starts, it discovers the project root by walking upward from `--cwd`
 (or the current directory) until it finds a `.git` directory.
 
 Note: If `--cwd` is nested inside a large repository (such as a monorepo),
-Friday X discovers that repository as the project root and scopes its discovery (AGENTS.md, skills, git history) to it, which can make
+FridayX discovers that repository as the project root and scopes its discovery (AGENTS.md, skills, git history) to it, which can make
 startup slow. Point `--cwd` at the specific subproject you want to work in to keep
 the scope small.
 
@@ -603,7 +603,7 @@ the scope small.
 
 ## File Locations
 
-Friday X stores data in `~/.friday` (override with `FRIDAY_HOME`; see [Environment Variables for Headless](#environment-variables-for-headless)):
+FridayX stores data in `~/.friday` (override with `FRIDAY_HOME`; see [Environment Variables for Headless](#environment-variables-for-headless)):
 
 | Path                     | Contents                              |
 | ------------------------ | ------------------------------------- |

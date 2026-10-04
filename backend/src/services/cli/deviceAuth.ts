@@ -4,7 +4,7 @@ import { HttpError } from "../../middleware/errorHandler.js";
 import { memoAsync } from "../../utils/ttlMemo.js";
 
 /**
- * Device-code login for Friday X (CLI + IDE extensions), shaped like RFC 8628 so any OAuth-minded client
+ * Device-code login for FridayX (CLI + IDE extensions), shaped like RFC 8628 so any OAuth-minded client
  * can drive it: the CLI asks for a code pair, the user approves the short code in the signed-in web app,
  * the CLI polls and is handed a long-lived token. Why not just reuse the Supabase session: it expires in
  * an hour, and a refresh token sitting in a dotfile would be a full-account credential. A CLI token is
@@ -132,7 +132,7 @@ export async function pollDeviceAuthorization(deviceCode: string): Promise<Devic
   const { error } = await supabaseAdmin.from("cli_tokens").insert({
     user_id: row.user_id,
     token_hash: hashSecret(token),
-    name: row.client_name ? String(row.client_name) : "Friday X",
+    name: row.client_name ? String(row.client_name) : "FridayX",
     client: /code|vscode|jetbrains|zed|ide/i.test(String(row.client_name ?? "")) ? "ide" : "cli",
   });
   if (error) throw new HttpError(500, "Couldn't finish signing in. Run `friday login` again.");

@@ -182,7 +182,7 @@
         let payload = SessionNotification {
             session_id: acp::SessionId::new("sess-1"),
             update: XaiSessionUpdate::ServedModel {
-                display_name: "Friday X 4.7 Fast".to_string(),
+                display_name: "FridayX 4.7 Fast".to_string(),
             },
             meta: None,
         };
@@ -192,7 +192,7 @@
 
         let agent = app.agents.get_mut(&AgentId(0)).unwrap();
         assert_eq!(
-            Some("Friday X 4.7 Fast".to_string()),
+            Some("FridayX 4.7 Fast".to_string()),
             agent.session.models.footer_model_name(),
             "the footer names the served model, listed or not"
         );

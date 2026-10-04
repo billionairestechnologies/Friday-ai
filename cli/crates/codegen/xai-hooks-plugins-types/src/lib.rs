@@ -53,7 +53,7 @@ pub enum PluginOrigin {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         marketplace: Option<String>,
     },
-    /// Friday X's install registry (marketplace or direct git/local install).
+    /// FridayX's install registry (marketplace or direct git/local install).
     MarketplaceInstall {
         /// Marketplace source display name (None for direct installs).
         #[serde(default, skip_serializing_if = "Option::is_none")]

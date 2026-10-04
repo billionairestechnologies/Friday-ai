@@ -203,7 +203,7 @@ pub(crate) fn apply_write_deny_paths_to_capability_set(
         let _ = caps.remove_exact_file_caps_for_paths(&rule_paths);
         tracing::info!(
             count = entries.len(),
-            "Applied Seatbelt write-deny for Friday X-owned direct hook sources"
+            "Applied Seatbelt write-deny for FridayX-owned direct hook sources"
         );
     }
     #[cfg(target_os = "linux")]

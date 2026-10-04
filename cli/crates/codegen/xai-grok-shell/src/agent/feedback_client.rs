@@ -240,10 +240,10 @@ impl FeedbackClient {
         request: RequestBuilder,
         context: &'static str,
     ) -> Result<T> {
-        // Friday X never sends feedback, session signals or per-turn analytics: this client is the only way those
+        // FridayX never sends feedback, session signals or per-turn analytics: this client is the only way those
         // reached a server, so it refuses before any network I/O (feedback is also switched off in config).
         let _ = request;
-        anyhow::bail!("{context}: not available in Friday X");
+        anyhow::bail!("{context}: not available in FridayX");
         #[allow(unreachable_code)]
         let request = xai_grok_otel::inject_trace_context_into_request(request);
         let req = request.build().context(context)?;
@@ -806,7 +806,7 @@ mod forbidden_tests {
     }
 
     #[tokio::test]
-    #[ignore = "telemetry, trace/feedback upload and session sync are removed in Friday X"]
+    #[ignore = "telemetry, trace/feedback upload and session sync are removed in FridayX"]
     async fn send_json_bails_on_403_with_clear_message() {
         let router = Router::new().route(
             "/v1/feedback/config",

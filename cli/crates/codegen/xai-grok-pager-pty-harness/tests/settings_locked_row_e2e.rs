@@ -30,7 +30,7 @@ use xai_grok_pager_pty_harness::{
 
 const ROWS: u16 = 50;
 const COLS: u16 = 120;
-const BANNER_TITLE: &str = "Help improve Friday X";
+const BANNER_TITLE: &str = "Help improve FridayX";
 /// Head of the row's label (`Coding data, retention, and training`).
 /// The modal truncates long labels, so match the stable prefix.
 const ROW_LABEL: &str = "Coding data";

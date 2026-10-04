@@ -166,16 +166,16 @@ fn link_elided_away_does_not_make_the_marker_clickable() {
 }
 
 #[test]
-#[ignore = "fixture names an original-product model/connector that Friday X does not ship"]
+#[ignore = "fixture names an original-product model/connector that FridayX does not ship"]
 fn render_ansi_emits_absolute_link_spans() {
-    let input = "[Friday X] \x1b]8;;https://example.com/repo\x07repo\x1b]8;;\x07";
+    let input = "[FridayX] \x1b]8;;https://example.com/repo\x07repo\x1b]8;;\x07";
     let (_, spans) = render(input, Rect::new(3, 5, 40, 1), 2);
 
     assert_eq!(spans.len(), 1);
     let Some(span) = spans.first() else {
         panic!("expected a link span: {spans:?}");
     };
-    // Area x 3, plus 2 columns of padding, plus the 7 of `[Friday X] `.
+    // Area x 3, plus 2 columns of padding, plus the 7 of `[FridayX] `.
     assert_eq!((span.row, span.col_start, span.col_end), (5, 12, 16));
     assert_eq!(span.url.as_ref(), "https://example.com/repo");
 }

@@ -5,7 +5,7 @@
     unreachable_code,
     dead_code
 )]
-//! Telemetry engine for Friday X sessions.
+//! Telemetry engine for FridayX sessions.
 //! Covers product events, Mixpanel emission, Sentry error reporting, OpenTelemetry tracing, and the structured unified log.
 //!
 //! Extracted from `xai-file-utils` so telemetry has its own ownership boundary (see CODEOWNERS).
