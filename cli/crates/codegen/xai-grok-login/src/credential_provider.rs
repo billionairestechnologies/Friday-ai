@@ -899,8 +899,9 @@ mod tests {
             );
         }
 
+        // First-party is Friday's origin in this build.
         let resolved = embedding_session_credentials(
-            "https://api.x.ai/v1",
+            "https://friday.billionairestechnologies.com/api/x/v1",
             Some(&mgr),
             Some(api_key_provider),
         );

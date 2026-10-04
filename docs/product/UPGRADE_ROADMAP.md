@@ -196,3 +196,18 @@ Status: ✅ done · 🚧 partly done · ⬜ not started
    entitlement (Free 30 rounds, Pro 100, Premium/Enterprise 150).
 4. **Not verified here** (needs real keys/devices): payments, Resend delivery, provider probes, E2B,
    Android/iOS builds.
+
+## O. Friday X — terminal and editor agent (shipped on branch `feature/friday-x`)
+
+| Item | Status |
+|---|---|
+| Device-code login, revocable CLI tokens (migration 0050), web approval page, signed-in devices in Settings | Done |
+| `fridayX` entitlement, editable per plan / package / grant in the Console; checked on every request | Done |
+| Metered OpenAI-compatible model gateway over the existing provider adapters, same credit meter and ledger | Done |
+| `friday-x/auto` routing + server-owned model list, context windows and client settings | Done |
+| CLI fork (`cli/`): rebrand, Friday login/models/chat, FRIDAY.md memory, AGENTS.md / CLAUDE.md read, no telemetry, egress allow-list + CI audit | Done; verified against a mock Friday server |
+| One-line installers (macOS/Linux/WSL, PowerShell, CMD), checksum-verified `friday update` | Done; release pipeline written, not yet run |
+| VS Code extension | Built and packaged (`.vsix`); not published |
+| JetBrains / Zed | Work through ACP (`friday agent stdio`); documented in `ide/README.md` |
+| Live-provider test, real deployment, signed + notarized binaries, marketplace publishing | **Next** (needs credentials and certificates) |
+| Web search, image generation and an official plugin marketplace for Friday X | Later (need Friday-hosted backends) |

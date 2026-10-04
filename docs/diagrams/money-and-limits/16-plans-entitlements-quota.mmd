@@ -1,0 +1,56 @@
+flowchart TB
+  subgraph define [Defined in the Team Console]
+    Catalog[Plan catalog - price, bullets, token limits, entitlements per plan]
+    Packages[Packages - public or private, duration, caps, entitlements]
+    Offers[Offer codes - plan grants, packages, discounts, student passes]
+  end
+
+  subgraph acquire [How a user gets access]
+    Buy[Buy plan or package - Razorpay order priced server-side]
+    Webhook[Payment webhook - applies plan or package]
+    Redeem[Redeem code - instant or reviewed]
+    Grant[Manual grant by staff]
+  end
+
+  AccessGrant[(access_grants - who, what, until when)]
+  Profile[(profiles.plan / custom_monthly_cap / entitlements)]
+  Org[(organizations - seats, pooled tokens, entitlements)]
+  Sweep[Hourly expiry sweep - reverts ended grants]
+
+  Catalog --> Buy
+  Packages --> Buy
+  Buy --> Webhook --> AccessGrant
+  Offers --> Redeem --> AccessGrant
+  Grant --> AccessGrant
+  AccessGrant --> Profile & Org
+  Sweep --> AccessGrant
+
+  subgraph resolve [Per request]
+    Ent[Entitlements = plan defaults <- catalog <- organization <- personal package]
+    Limits[Credit limits = catalog limits for 5-hour, weekly and monthly windows, scaled by a personal monthly cap]
+  end
+  Profile & Org & Catalog --> Ent & Limits
+
+  subgraph enforce [Enforced server-side]
+    E1[Build Mode on/off + rounds per run]
+    E2[Deep Research per day]
+    E3[Documents per day + Library storage]
+    E4[Custom skills, Team Up size, MCP servers, automations]
+    E5[Priority support tickets]
+    E6[Friday X - terminal and editor agent, on or off per plan, package or person]
+  end
+  Ent --> E1 & E2 & E3 & E4 & E5 & E6
+
+  subgraph meter ["Usage meter in CREDITS - what a call really costs us. Web, mobile and Friday X share it"]
+    Pre[Pre-flight: reserve credits]
+    Prompt[Charge the real prompt before the model runs]
+    Round[Charge each tool-loop / Build round atomically]
+    Stop[Limit crossed -> stop cleanly, keep work]
+    Rec[Reconcile to the provider's real usage, write token_ledger with its feature]
+    Guard[Runaway guard: repeated identical rounds stop; one turn may spend at most 80 percent of the 5-hour window]
+  end
+  Limits --> Pre --> Prompt --> Round --> Rec
+  Round -->|over| Stop
+  Round --> Guard
+  Rec --> Show[Users see percent used + reset time only - never credits or money]
+  Rec --> Profit[Console - Finance: cost vs sell, profit controls, live usage]

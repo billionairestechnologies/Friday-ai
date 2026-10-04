@@ -84,108 +84,26 @@
 </head>
 <body>
   <header>
-    <h1>Friday AI — what we built</h1>
-    <p class="meta">Leadership pack · branch <code>claude/architecture-analysis-p7x2lr</code> · folder <code>docs/diagrams/</code></p>
+    <h1>Friday — what we built</h1>
+    <p class="meta">Leadership pack · generated from <code>docs/diagrams/</code> by <code>scripts/build-diagrams.mjs</code></p>
     <p>Open this file in a browser. Download SVG or PNG under each diagram, or use Print → Save as PDF for the whole pack.</p>
     <p><button class="print" onclick="window.print()">Print / Save as PDF</button></p>
   </header>
   <main>
     <section>
-      <h2>Share with leadership</h2>
+      <h2>In one page</h2>
       <ul class="share">
-        <li><strong>Friday is now an agent platform:</strong> models use real tools — web search and page reading, code execution, the user's GitHub/Gmail/Drive/Calendar/Notion/Vercel/Railway/Supabase/Razorpay, and any MCP server.</li>
-        <li><strong>Coding agent:</strong> Build Mode plans, edits, searches code, imports a GitHub repo and opens a pull request.</li>
-        <li><strong>New for users:</strong> long-term memory, Deep Research reports, scheduled Automations with push, search across all chats, shareable chat links.</li>
-        <li><strong>To go live:</strong> apply Supabase migrations 0001–0027, set production secrets, deploy, then check <code>/api/health/ready</code>.</li>
+        <li><strong>Friday is an agent platform.</strong> Models use real tools (web, code, documents, the user's connected apps, MCP servers), remember users, run scheduled automations, and Build Mode is a coding agent that opens GitHub pull requests.</li>
+        <li><strong>One account, every surface.</strong> Web, Android, iOS and now <strong>Friday X</strong>, a terminal and editor coding agent (VS Code, JetBrains, Zed). One plan, one model list, one usage meter.</li>
+        <li><strong>The backend decides.</strong> Plans, entitlements, models and limits are edited in the Team Console and reach every client at once, with no app update.</li>
+        <li><strong>Usage is metered in credits</strong> (what a call really costs us), enforced per round, and shown to users only as percent and reset time.</li>
+        <li><strong>Company back office:</strong> support, CRM, plans and offers, finance and profit controls, mail hosting, status page with incidents and crash reports.</li>
       </ul>
     </section>
 
+    <h2 class="group">Overview</h2>
     <section>
-      <h2>1. System architecture</h2>
-      <div class="actions">
-        <button onclick="downloadSvg('01','01-system-architecture.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('01','01-system-architecture.png')">Download PNG</button>
-      </div>
-      <pre class="mermaid-src" data-id="01">
-flowchart TB
-  subgraph clients [Clients]
-    Browser[Web app - React Vite]
-    Android[Android - Kotlin Compose]
-    IOS[iOS - SwiftUI]
-    Console[Team Console /admin - staff RBAC]
-    Public[Public pages - /status /plans /share]
-  end
-
-  subgraph api [Friday API - Express TypeScript]
-    MW[Helmet CORS request ID rate limits quota pre-flight]
-    AuthR["/api/auth"]
-    ChatR["/api/chat SSE + search + share"]
-    Agent[Agent tool loop - native tool calling + usage meter]
-    Tools[Tools: web, run_code, create_document, use_skill, connectors, MCP, memory]
-    BuildR["/api/build - Build Mode coding agent"]
-    AutoR["/api/automations + scheduler"]
-    LibR["/api/library + /api/files"]
-    SkillR["/api/skills"]
-    StatusR["/api/status - probes, incidents, reports, crashes"]
-    ConsoleR["/api/console - support CRM tasks updates campaigns plans status"]
-    Engage["/api/updates /api/support /api/offers /api/email"]
-    BillR["/api/billing - catalog + packages"]
-    ConnR["/api/connectors /api/mcp /api/memory"]
-    OrgR["/api/organizations /usage /projects /voice"]
-  end
-
-  subgraph core [Shared services]
-    Quota[Quota metering - reserve, charge per round, reconcile]
-    Ent[Entitlements - plan &lt;- catalog &lt;- org &lt;- package]
-    Docs[Document renderers - pptx xlsx docx pdf text]
-    Sched[Schedulers - automations, campaigns, grant expiry, status probes]
-  end
-
-  subgraph data [Data plane]
-    SB[(Supabase Postgres + Auth + Realtime)]
-    Store[Supabase Storage - attachments + generated files]
-    Redis[(Redis - quota counters, allowances, model health, leases)]
-  end
-
-  subgraph vendors [External services]
-    Models[OpenAI Anthropic Gemini OpenRouter ScaleMax Sarvam Ollama]
-    E2B[E2B sandboxes - code + builds]
-    Web[Web search + page fetch - SSRF guarded]
-    Apps[GitHub Google Notion Vercel Railway Supabase Razorpay + user MCP]
-    Pay[Razorpay checkout + webhook]
-    Mail[Resend - OTP, support, campaigns, alerts]
-  end
-
-  Browser &amp; Android &amp; IOS --&gt; MW
-  Console --&gt; ConsoleR
-  Public --&gt; StatusR &amp; BillR &amp; ChatR
-  MW --&gt; AuthR &amp; ChatR &amp; BuildR &amp; AutoR &amp; LibR &amp; SkillR &amp; Engage &amp; BillR &amp; ConnR &amp; OrgR
-  ChatR --&gt; Agent --&gt; Tools
-  BuildR --&gt; Tools
-  Tools --&gt; Models &amp; Web &amp; E2B &amp; Apps &amp; Docs
-  Agent --&gt; Quota
-  BuildR --&gt; Quota
-  Quota --&gt; Ent
-  ChatR --&gt; Ent
-  BillR --&gt; Ent
-  AutoR --&gt; ChatR
-  Docs --&gt; Store
-  LibR --&gt; SB &amp; Store
-  ConsoleR --&gt; SB
-  ConsoleR --&gt; Mail
-  StatusR --&gt; Mail
-  Engage --&gt; SB &amp; Mail
-  BillR --&gt; Pay
-  AuthR --&gt; SB &amp; Mail
-  Sched --&gt; SB &amp; Mail &amp; Models
-  Quota --&gt; Redis
-  ChatR --&gt; SB
-      </pre>
-      <div class="diagram" id="render-01"></div>
-    </section>
-
-    <section>
-      <h2>2. What the system can do</h2>
+      <h2>1. What the system can do</h2>
       <div class="actions">
         <button onclick="downloadSvg('02','02-what-system-can-do.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('02','02-what-system-can-do.png')">Download PNG</button>
@@ -225,15 +143,25 @@ mindmap
       Share read-only links
     Business
       Teams roles budgets
-      Token quota incl Team Up
+      Credit meter incl Team Up and Friday X
       Razorpay checkout
       Audit log of connector use
+    Friday X
+      Terminal agent - friday
+      VS Code extension
+      JetBrains and Zed via ACP
+      Same account, plan, models and meter
+      One-line install, checksum verified
+    Back office
+      Finance - cost vs sell, profit controls
+      Mail hosting - company mailboxes
+      Plans, packages, offers, entitlements
       </pre>
       <div class="diagram" id="render-02"></div>
     </section>
 
     <section>
-      <h2>3. What users can do</h2>
+      <h2>2. What users can do</h2>
       <div class="actions">
         <button onclick="downloadSvg('03','03-what-users-can-do.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('03','03-what-users-can-do.png')">Download PNG</button>
@@ -258,7 +186,10 @@ flowchart TB
   User --&gt; Team[Team org invite budget]
   User --&gt; Pay[Pay Pro or Business via Razorpay]
   User --&gt; Data[Download or delete my data]
-  User --&gt; Usage[See usage and estimated cost]
+  User --&gt; Usage[See usage - percent used and reset time]
+  User --&gt; FX[Use Friday X in the terminal or an editor]
+  FX --&gt; Install[One-line install, then friday login in the browser]
+  Settings --&gt; Devices[Settings - Friday X - signed-in devices, sign out]
 
   Settings --&gt; Account[Account profile]
   Settings --&gt; Appearance[Appearance]
@@ -272,47 +203,137 @@ flowchart TB
     </section>
 
     <section>
-      <h2>4. How chat works (agent loop)</h2>
+      <h2>3. Go-live checklist</h2>
       <div class="actions">
-        <button onclick="downloadSvg('04','04-how-chat-works.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('04','04-how-chat-works.png')">Download PNG</button>
+        <button onclick="downloadSvg('10','10-go-live-checklist.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('10','10-go-live-checklist.png')">Download PNG</button>
       </div>
-      <pre class="mermaid-src" data-id="04">
-sequenceDiagram
-  actor U as User
-  participant FE as App
-  participant API as Friday API
-  participant DB as Supabase
-  participant M as AI model
-  participant T as Tools
-
-  U-&gt;&gt;FE: Message (+ files, Search / Deep Research)
-  FE-&gt;&gt;API: POST /api/chat/.../stream with JWT
-  API-&gt;&gt;API: Rate limit + token quota reservation
-  API-&gt;&gt;DB: Save message, load history + memory + project
-  API-&gt;&gt;API: Intent probes (search / build / image) in parallel
-  alt Build request
-    API-&gt;&gt;API: Build Mode coding agent (see diagram 12)
-  else Model supports tools
-    loop up to 8 rounds (16 for Deep Research)
-      API-&gt;&gt;M: Stream turn with tool list
-      M--&gt;&gt;API: Text and/or tool calls
-      API-&gt;&gt;T: Run tools in parallel (web, code, GitHub, Gmail, MCP...)
-      T--&gt;&gt;API: Results (treated as untrusted data)
-      API--&gt;&gt;FE: SSE text + step rows + citations
-    end
-  else No tool support
-    API-&gt;&gt;M: Plain streaming with failover + hedging
-    M--&gt;&gt;API: Tokens
-  end
-  API-&gt;&gt;DB: Save reply, steps, citations, token usage
-  API--&gt;&gt;FE: done
+      <pre class="mermaid-src" data-id="10">
+flowchart TD
+  A[Create Supabase project] --&gt; B[Apply migrations 0001 to 0050 in order]
+  B --&gt; C[Set env secrets - Supabase, KEY_ENCRYPTION_SECRET, Resend]
+  C --&gt; C2[Optional: E2B, Google, GitHub, Razorpay, TinyFish, Redis]
+  C2 --&gt; D[Deploy API plus frontend - one Docker image]
+  D --&gt; E[Check /api/health/ready]
+  E --&gt; F{Ready?}
+  F --&gt;|No| C
+  F --&gt;|Yes| G[Smoke test: signup OTP, chat, tool call, file]
+  G --&gt; H[Smoke test: memory, automation run now, share link, MCP add]
+  H --&gt; I[Build Mode: small app + GitHub import PR]
+  I --&gt; FX1[Friday X: set FRIDAY_X_RELEASES_URL, tag a release, install with the one-liner]
+  FX1 --&gt; FX2[friday login, friday models, one prompt - check the Usage bar moved]
+  FX2 --&gt; J[Production live]
       </pre>
-      <div class="diagram" id="render-04"></div>
+      <div class="diagram" id="render-10"></div>
+    </section>
+
+    <h2 class="group">Platform</h2>
+    <section>
+      <h2>4. System architecture</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('01','01-system-architecture.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('01','01-system-architecture.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="01">
+flowchart TB
+  subgraph clients [Clients]
+    Browser[Web app - React Vite]
+    Android[Android - Kotlin Compose]
+    IOS[iOS - SwiftUI]
+    Console[Team Console /admin - staff RBAC]
+    Public[Public pages - /status /plans /share /p pages]
+    FX[Friday X - terminal CLI, VS Code, JetBrains, Zed]
+  end
+
+  subgraph api [Friday API - Express TypeScript]
+    MW[Helmet CORS request ID rate limits quota pre-flight]
+    AuthR["/api/auth"]
+    ChatR["/api/chat SSE + search + share"]
+    Agent[Agent tool loop - native tool calling + usage meter]
+    Tools[Tools: web, run_code, create_document, use_skill, connectors, MCP, memory]
+    BuildR["/api/build - Build Mode coding agent"]
+    AutoR["/api/automations + scheduler"]
+    LibR["/api/library + /api/files"]
+    SkillR["/api/skills"]
+    StatusR["/api/status - probes, incidents, reports, crashes"]
+    ConsoleR["/api/console - support CRM tasks updates campaigns plans status"]
+    Engage["/api/updates /api/support /api/offers /api/email"]
+    BillR["/api/billing - catalog + packages"]
+    ConnR["/api/connectors /api/mcp /api/memory"]
+    OrgR["/api/organizations /usage /projects /voice"]
+    PagesR["/api/pages - live docs, sheets, slides"]
+    XR["/api/x - Friday X device login, models, metered gateway"]
+    InstR["/x - installers, version, checksums"]
+    FinR["Console: Finance (cost vs sell, P&amp;L, profit controls) + Mailbox (mail hosting)"]
+  end
+
+  subgraph core [Shared services]
+    Quota[Credit meter - priced per call, reserve, charge per round, reconcile, runaway guard]
+    Ent[Entitlements - plan &lt;- catalog &lt;- org &lt;- package]
+    Docs[Document renderers - pptx xlsx docx pdf text]
+    Sched[Schedulers - automations, campaigns, grant expiry, status probes]
+    Jobs[Turn jobs - turns outlive the app, resume after deploy]
+    Know[Project knowledge - embeddings + hybrid search]
+    Browse[Browser agent - Playwright in an E2B sandbox]
+  end
+
+  subgraph data [Data plane]
+    SB[(Supabase Postgres + Auth + Realtime)]
+    Store[Supabase Storage - attachments + generated files]
+    Redis[(Redis - quota counters, allowances, model health, leases)]
+  end
+
+  subgraph vendors [External services]
+    Models[OpenAI Anthropic Gemini OpenRouter ScaleMax Sarvam Ollama]
+    E2B[E2B sandboxes - code + builds]
+    Web[Web search + page fetch - SSRF guarded]
+    Apps[GitHub Google Notion Vercel Railway Supabase Razorpay + user MCP]
+    Pay[Razorpay checkout + webhook]
+    Mail[Resend - OTP, support, campaigns, alerts]
+    Mailcow[Mailcow - company domains and mailboxes]
+    Releases[(Release bucket + CDN - Friday X binaries)]
+  end
+
+  Browser &amp; Android &amp; IOS --&gt; MW
+  FX --&gt; XR
+  FX -. one-line install .-&gt; InstR
+  XR --&gt; Quota &amp; Ent &amp; Models
+  XR --&gt; SB
+  InstR --&gt; Releases
+  PagesR --&gt; SB
+  FinR --&gt; SB
+  FinR --&gt; Mailcow
+  Agent --&gt; Jobs &amp; Know &amp; Browse
+  Browse --&gt; E2B
+  Console --&gt; ConsoleR
+  Public --&gt; StatusR &amp; BillR &amp; ChatR
+  MW --&gt; AuthR &amp; ChatR &amp; BuildR &amp; AutoR &amp; LibR &amp; SkillR &amp; Engage &amp; BillR &amp; ConnR &amp; OrgR &amp; PagesR
+  ChatR --&gt; Agent --&gt; Tools
+  BuildR --&gt; Tools
+  Tools --&gt; Models &amp; Web &amp; E2B &amp; Apps &amp; Docs
+  Agent --&gt; Quota
+  BuildR --&gt; Quota
+  Quota --&gt; Ent
+  ChatR --&gt; Ent
+  BillR --&gt; Ent
+  AutoR --&gt; ChatR
+  Docs --&gt; Store
+  LibR --&gt; SB &amp; Store
+  ConsoleR --&gt; SB
+  ConsoleR --&gt; Mail
+  StatusR --&gt; Mail
+  Engage --&gt; SB &amp; Mail
+  BillR --&gt; Pay
+  AuthR --&gt; SB &amp; Mail
+  Sched --&gt; SB &amp; Mail &amp; Models
+  Quota --&gt; Redis
+  ChatR --&gt; SB
+      </pre>
+      <div class="diagram" id="render-01"></div>
     </section>
 
     <section>
-      <h2>5. How login works</h2>
+      <h2>5. How login works (web, mobile, terminal)</h2>
       <div class="actions">
         <button onclick="downloadSvg('05','05-how-login-works.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('05','05-how-login-works.png')">Download PNG</button>
@@ -325,6 +346,7 @@ sequenceDiagram
   participant Mail as Resend
   participant G as Google
   participant DB as Supabase Auth
+  participant CLI as Friday X (terminal / editor)
 
   alt Email and password
     U-&gt;&gt;FE: Email + password
@@ -345,84 +367,21 @@ sequenceDiagram
   else Company SSO
     U-&gt;&gt;FE: Continue with Company SSO
     FE-&gt;&gt;SSO: SSO_ENTRY_URL
+  else Terminal or editor (Friday X)
+    U-&gt;&gt;CLI: friday login
+    CLI-&gt;&gt;API: POST /api/x/oauth2/device/code
+    CLI-&gt;&gt;U: Opens /device, shows a code
+    U-&gt;&gt;FE: Signs in as above, checks the code, Approve
+    FE-&gt;&gt;API: POST /api/x/auth/device/approve
+    CLI-&gt;&gt;API: Poll /oauth2/token
+    API--&gt;&gt;CLI: Revocable fxt_ token (scoped to /api/x)
   end
       </pre>
       <div class="diagram" id="render-05"></div>
     </section>
 
     <section>
-      <h2>6. How Razorpay billing works</h2>
-      <div class="actions">
-        <button onclick="downloadSvg('06','06-how-billing-works.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('06','06-how-billing-works.png')">Download PNG</button>
-      </div>
-      <pre class="mermaid-src" data-id="06">
-sequenceDiagram
-  actor U as User
-  participant FE as Settings Billing
-  participant API as /api/billing
-  participant RZ as Razorpay
-  participant DB as billing_orders
-
-  U-&gt;&gt;FE: Choose Pro or Business
-  FE-&gt;&gt;API: POST /billing/orders
-  API-&gt;&gt;RZ: Create order
-  RZ--&gt;&gt;API: order_id
-  API-&gt;&gt;DB: Save created order
-  API--&gt;&gt;FE: key and orderId
-  FE-&gt;&gt;RZ: Open Checkout
-  U-&gt;&gt;RZ: Pay
-  RZ--&gt;&gt;API: Webhook with signature
-  API-&gt;&gt;API: Verify HMAC
-  API-&gt;&gt;DB: Mark paid and update plan
-      </pre>
-      <div class="diagram" id="render-06"></div>
-    </section>
-
-    <section>
-      <h2>7. How connectors and MCP tools work</h2>
-      <div class="actions">
-        <button onclick="downloadSvg('07','07-how-connectors-work.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('07','07-how-connectors-work.png')">Download PNG</button>
-      </div>
-      <pre class="mermaid-src" data-id="07">
-flowchart LR
-  subgraph oauth [OAuth connectors]
-    GH[GitHub]
-    GG[Google Gmail Drive Calendar - token auto-refresh]
-  end
-
-  subgraph token [Token connectors - verified then encrypted]
-    N[Notion]
-    S[Supabase]
-    R[Railway]
-    V[Vercel]
-    RZ[Razorpay keys]
-    B[Box Canva Finance]
-  end
-
-  subgraph mcp [MCP servers]
-    M[Any remote MCP server - https + optional auth]
-  end
-
-  User[Signed-in user] --&gt; Drawer[Plugins drawer / Settings]
-  Drawer --&gt; oauth &amp; token &amp; mcp
-  oauth --&gt; API[Friday API encrypts secrets]
-  token --&gt; API
-  mcp --&gt; API
-  API --&gt; DB[(connector_accounts / mcp_servers)]
-  API --&gt; Tools[Agent tools in chat]
-  Tools --&gt; T1[github_* read files, search code, issues]
-  Tools --&gt; T2[gmail_* drive_* calendar_events]
-  Tools --&gt; T3[notion_* vercel_deployments railway_projects supabase_query razorpay_payments]
-  Tools --&gt; T4[mcp_server_tool]
-  Tools --&gt; Audit[(admin_audit_logs)]
-      </pre>
-      <div class="diagram" id="render-07"></div>
-    </section>
-
-    <section>
-      <h2>8. Data model</h2>
+      <h2>6. Data model</h2>
       <div class="actions">
         <button onclick="downloadSvg('08','08-data-model.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('08','08-data-model.png')">Download PNG</button>
@@ -436,6 +395,9 @@ erDiagram
   profiles ||--o{ user_memories : remembers
   profiles ||--o{ automations : schedules
   profiles ||--o{ mcp_servers : adds
+  profiles ||--o{ cli_tokens : signs_in_devices
+  profiles ||--o{ cli_device_codes : approves
+  profiles ||--o{ token_ledger : spends
   organizations ||--o{ organization_memberships : has
   conversations ||--o{ messages : contains
   conversations ||--o| build_projects : builds
@@ -537,12 +499,34 @@ erDiagram
     text provider
     text access_token_encrypted
   }
+  cli_tokens {
+    uuid id
+    text token_hash "SHA-256 only"
+    text name "Friday X on this device"
+    text client "cli or ide"
+    timestamptz last_used_at
+    timestamptz revoked_at
+  }
+  cli_device_codes {
+    uuid id
+    text device_code_hash
+    text user_code "ABCD-EFGH"
+    text status "pending, approved, denied, used"
+    timestamptz expires_at
+  }
+  token_ledger {
+    uuid id
+    text provider_slug
+    text model_id
+    numeric cost_usd
+    text feature "chat, build, research, teamup, spark, automation, code"
+  }
       </pre>
       <div class="diagram" id="render-08"></div>
     </section>
 
     <section>
-      <h2>9. Identity and access</h2>
+      <h2>7. Identity and access</h2>
       <div class="actions">
         <button onclick="downloadSvg('09','09-identity-and-access.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('09','09-identity-and-access.png')">Download PNG</button>
@@ -575,31 +559,49 @@ flowchart LR
       <div class="diagram" id="render-09"></div>
     </section>
 
+    <h2 class="group">Chat and agents</h2>
     <section>
-      <h2>10. Go-live checklist</h2>
+      <h2>8. How chat works (agent loop)</h2>
       <div class="actions">
-        <button onclick="downloadSvg('10','10-go-live-checklist.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('10','10-go-live-checklist.png')">Download PNG</button>
+        <button onclick="downloadSvg('04','04-how-chat-works.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('04','04-how-chat-works.png')">Download PNG</button>
       </div>
-      <pre class="mermaid-src" data-id="10">
-flowchart TD
-  A[Create Supabase project] --&gt; B[Apply migrations 0001 to 0027 in order]
-  B --&gt; C[Set env secrets - Supabase, KEY_ENCRYPTION_SECRET, Resend]
-  C --&gt; C2[Optional: E2B, Google, GitHub, Razorpay, TinyFish, Redis]
-  C2 --&gt; D[Deploy API plus frontend - one Docker image]
-  D --&gt; E[Check /api/health/ready]
-  E --&gt; F{Ready?}
-  F --&gt;|No| C
-  F --&gt;|Yes| G[Smoke test: signup OTP, chat, tool call, file]
-  G --&gt; H[Smoke test: memory, automation run now, share link, MCP add]
-  H --&gt; I[Build Mode: small app + GitHub import PR]
-  I --&gt; J[Production live]
+      <pre class="mermaid-src" data-id="04">
+sequenceDiagram
+  actor U as User
+  participant FE as App
+  participant API as Friday API
+  participant DB as Supabase
+  participant M as AI model
+  participant T as Tools
+
+  U-&gt;&gt;FE: Message (+ files, Search / Deep Research)
+  FE-&gt;&gt;API: POST /api/chat/.../stream with JWT
+  API-&gt;&gt;API: Rate limit + token quota reservation
+  API-&gt;&gt;DB: Save message, load history + memory + project
+  API-&gt;&gt;API: Intent probes (search / build / image) in parallel
+  alt Build request
+    API-&gt;&gt;API: Build Mode coding agent (see diagram 12)
+  else Model supports tools
+    loop up to 8 rounds (16 for Deep Research)
+      API-&gt;&gt;M: Stream turn with tool list
+      M--&gt;&gt;API: Text and/or tool calls
+      API-&gt;&gt;T: Run tools in parallel (web, code, GitHub, Gmail, MCP...)
+      T--&gt;&gt;API: Results (treated as untrusted data)
+      API--&gt;&gt;FE: SSE text + step rows + citations
+    end
+  else No tool support
+    API-&gt;&gt;M: Plain streaming with failover + hedging
+    M--&gt;&gt;API: Tokens
+  end
+  API-&gt;&gt;DB: Save reply, steps, citations, token usage
+  API--&gt;&gt;FE: done
       </pre>
-      <div class="diagram" id="render-10"></div>
+      <div class="diagram" id="render-04"></div>
     </section>
 
     <section>
-      <h2>11. Agent tool loop</h2>
+      <h2>9. Agent tool loop</h2>
       <div class="actions">
         <button onclick="downloadSvg('11','11-agent-tool-loop.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('11','11-agent-tool-loop.png')">Download PNG</button>
@@ -635,7 +637,7 @@ flowchart TD
     </section>
 
     <section>
-      <h2>12. Build Mode coding agent + GitHub PRs</h2>
+      <h2>10. Build Mode coding agent + GitHub PRs</h2>
       <div class="actions">
         <button onclick="downloadSvg('12','12-build-mode-coding-agent.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('12','12-build-mode-coding-agent.png')">Download PNG</button>
@@ -648,7 +650,7 @@ sequenceDiagram
   participant SB as E2B sandbox
   participant GH as GitHub
 
-  U-&gt;&gt;API: &quot;Fix the login bug in github.com/acme/app&quot;
+  U-&gt;&gt;API: "Fix the login bug in github.com/acme/app"
   API-&gt;&gt;SB: Open sandbox (restore snapshot if expired)
   API-&gt;&gt;SB: git clone (token as one-off header, redacted)
   API-&gt;&gt;API: Read AGENTS.md / FRIDAY.md / CLAUDE.md
@@ -661,7 +663,7 @@ sequenceDiagram
   end
   API-&gt;&gt;SB: Probe app + browser screenshot
   API-&gt;&gt;M: Vision review of the page
-  U-&gt;&gt;API: &quot;Open a PR&quot;
+  U-&gt;&gt;API: "Open a PR"
   M--&gt;&gt;API: friday-pr title branch body
   API-&gt;&gt;SB: Fresh clone of base, overlay changes, commit, push
   API-&gt;&gt;GH: Create pull request
@@ -671,7 +673,7 @@ sequenceDiagram
     </section>
 
     <section>
-      <h2>13. Automations scheduler</h2>
+      <h2>11. Automations scheduler</h2>
       <div class="actions">
         <button onclick="downloadSvg('13','13-automations.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('13','13-automations.png')">Download PNG</button>
@@ -679,7 +681,7 @@ sequenceDiagram
       <pre class="mermaid-src" data-id="13">
 flowchart LR
   User[User] --&gt; Page[Automations page]
-  Page --&gt; Api[&quot;/api/automations&quot;]
+  Page --&gt; Api["/api/automations"]
   Api --&gt; T[(automations table)]
   subgraph Every API instance
     Tick[Scheduler tick every 60s] --&gt; Due[Select due rows]
@@ -689,7 +691,7 @@ flowchart LR
   Claim --&gt;|won the lease| Quota{Token quota OK?}
   Quota --&gt;|No| Fail[Record error, reschedule]
   Quota --&gt;|Yes| Chat[Normal chat pipeline with tools + memory]
-  Chat --&gt; Conv[(Automation&#x27;s own chat thread)]
+  Chat --&gt; Conv[(Automation's own chat thread)]
   Chat --&gt; Push[Push notification]
   Chat --&gt; Next[Compute next run in user time zone - DST safe]
   Next --&gt; T
@@ -699,7 +701,7 @@ flowchart LR
     </section>
 
     <section>
-      <h2>14. MCP servers</h2>
+      <h2>12. MCP servers</h2>
       <div class="actions">
         <button onclick="downloadSvg('14','14-mcp-servers.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('14','14-mcp-servers.png')">Download PNG</button>
@@ -727,8 +729,191 @@ sequenceDiagram
       </pre>
       <div class="diagram" id="render-14"></div>
     </section>
+
     <section>
-      <h2>15. Team Console (back office)</h2>
+      <h2>13. How connectors and MCP tools work</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('07','07-how-connectors-work.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('07','07-how-connectors-work.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="07">
+flowchart LR
+  subgraph oauth [OAuth connectors]
+    GH[GitHub]
+    GG[Google Gmail Drive Calendar - token auto-refresh]
+  end
+
+  subgraph token [Token connectors - verified then encrypted]
+    N[Notion]
+    S[Supabase]
+    R[Railway]
+    V[Vercel]
+    RZ[Razorpay keys]
+    B[Box Canva Finance]
+  end
+
+  subgraph mcp [MCP servers]
+    M[Any remote MCP server - https + optional auth]
+  end
+
+  User[Signed-in user] --&gt; Drawer[Plugins drawer / Settings]
+  Drawer --&gt; oauth &amp; token &amp; mcp
+  oauth --&gt; API[Friday API encrypts secrets]
+  token --&gt; API
+  mcp --&gt; API
+  API --&gt; DB[(connector_accounts / mcp_servers)]
+  API --&gt; Tools[Agent tools in chat]
+  Tools --&gt; T1[github_* read files, search code, issues]
+  Tools --&gt; T2[gmail_* drive_* calendar_events]
+  Tools --&gt; T3[notion_* vercel_deployments railway_projects supabase_query razorpay_payments]
+  Tools --&gt; T4[mcp_server_tool]
+  Tools --&gt; Audit[(admin_audit_logs)]
+      </pre>
+      <div class="diagram" id="render-07"></div>
+    </section>
+
+    <section>
+      <h2>14. Documents, Library and skills</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('18','18-documents-library-skills.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('18','18-documents-library-skills.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="18">
+flowchart TB
+  User[User asks: make a deck / sheet / report / PDF] --&gt; Agent[Agent tool loop]
+  Menu[Skill menu - enabled built-in + user skills] --&gt; Agent
+  Chosen[Skill picked in composer - pinned playbook] --&gt; Agent
+  Agent --&gt;|matching request| UseSkill[use_skill - loads the playbook]
+  Agent --&gt;|facts first| Research[web_search / run_code]
+  Agent --&gt; Create[create_document - model writes content only]
+
+  Create --&gt; Check{documentsPerDay + Library storage}
+  Check --&gt;|over| Refuse[Clear message - resets or upgrade]
+  Check --&gt;|ok| Render[Render server-side: pptxgenjs, exceljs, docx, pdfkit, text]
+  Render --&gt; Store[(Supabase Storage generated-files / inline fallback)]
+  Render --&gt; Rows[(generated_files)]
+  Rows --&gt; Card[Download card under the reply - SSE file event, saved on the message]
+  Rows --&gt; Library
+
+  subgraph Library [Library - private per user]
+    Docs[Documents]
+    Images[Images]
+    Code[Code]
+    Pages[Web pages]
+    Uploads[Uploads]
+  end
+  Replies[Assistant replies - code, pages, images auto-saved] --&gt; Library
+  Attach[User uploads] --&gt; Library
+
+  subgraph skills [Skills]
+    Builtin[16 built-in playbooks]
+    Own[User skills - create, edit, switch off]
+  end
+  skills --&gt; Menu
+      </pre>
+      <div class="diagram" id="render-18"></div>
+    </section>
+
+    <h2 class="group">Money and limits</h2>
+    <section>
+      <h2>15. Plans, entitlements and the credit meter</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('16','16-plans-entitlements-quota.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('16','16-plans-entitlements-quota.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="16">
+flowchart TB
+  subgraph define [Defined in the Team Console]
+    Catalog[Plan catalog - price, bullets, token limits, entitlements per plan]
+    Packages[Packages - public or private, duration, caps, entitlements]
+    Offers[Offer codes - plan grants, packages, discounts, student passes]
+  end
+
+  subgraph acquire [How a user gets access]
+    Buy[Buy plan or package - Razorpay order priced server-side]
+    Webhook[Payment webhook - applies plan or package]
+    Redeem[Redeem code - instant or reviewed]
+    Grant[Manual grant by staff]
+  end
+
+  AccessGrant[(access_grants - who, what, until when)]
+  Profile[(profiles.plan / custom_monthly_cap / entitlements)]
+  Org[(organizations - seats, pooled tokens, entitlements)]
+  Sweep[Hourly expiry sweep - reverts ended grants]
+
+  Catalog --&gt; Buy
+  Packages --&gt; Buy
+  Buy --&gt; Webhook --&gt; AccessGrant
+  Offers --&gt; Redeem --&gt; AccessGrant
+  Grant --&gt; AccessGrant
+  AccessGrant --&gt; Profile &amp; Org
+  Sweep --&gt; AccessGrant
+
+  subgraph resolve [Per request]
+    Ent[Entitlements = plan defaults &lt;- catalog &lt;- organization &lt;- personal package]
+    Limits[Credit limits = catalog limits for 5-hour, weekly and monthly windows, scaled by a personal monthly cap]
+  end
+  Profile &amp; Org &amp; Catalog --&gt; Ent &amp; Limits
+
+  subgraph enforce [Enforced server-side]
+    E1[Build Mode on/off + rounds per run]
+    E2[Deep Research per day]
+    E3[Documents per day + Library storage]
+    E4[Custom skills, Team Up size, MCP servers, automations]
+    E5[Priority support tickets]
+    E6[Friday X - terminal and editor agent, on or off per plan, package or person]
+  end
+  Ent --&gt; E1 &amp; E2 &amp; E3 &amp; E4 &amp; E5 &amp; E6
+
+  subgraph meter ["Usage meter in CREDITS - what a call really costs us. Web, mobile and Friday X share it"]
+    Pre[Pre-flight: reserve credits]
+    Prompt[Charge the real prompt before the model runs]
+    Round[Charge each tool-loop / Build round atomically]
+    Stop[Limit crossed -&gt; stop cleanly, keep work]
+    Rec[Reconcile to the provider's real usage, write token_ledger with its feature]
+    Guard[Runaway guard: repeated identical rounds stop; one turn may spend at most 80 percent of the 5-hour window]
+  end
+  Limits --&gt; Pre --&gt; Prompt --&gt; Round --&gt; Rec
+  Round --&gt;|over| Stop
+  Round --&gt; Guard
+  Rec --&gt; Show[Users see percent used + reset time only - never credits or money]
+  Rec --&gt; Profit[Console - Finance: cost vs sell, profit controls, live usage]
+      </pre>
+      <div class="diagram" id="render-16"></div>
+    </section>
+
+    <section>
+      <h2>16. How Razorpay billing works</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('06','06-how-billing-works.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('06','06-how-billing-works.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="06">
+sequenceDiagram
+  actor U as User
+  participant FE as Settings Billing
+  participant API as /api/billing
+  participant RZ as Razorpay
+  participant DB as billing_orders
+
+  U-&gt;&gt;FE: Choose Pro or Business
+  FE-&gt;&gt;API: POST /billing/orders
+  API-&gt;&gt;RZ: Create order
+  RZ--&gt;&gt;API: order_id
+  API-&gt;&gt;DB: Save created order
+  API--&gt;&gt;FE: key and orderId
+  FE-&gt;&gt;RZ: Open Checkout
+  U-&gt;&gt;RZ: Pay
+  RZ--&gt;&gt;API: Webhook with signature
+  API-&gt;&gt;API: Verify HMAC
+  API-&gt;&gt;DB: Mark paid and update plan
+      </pre>
+      <div class="diagram" id="render-06"></div>
+    </section>
+
+    <h2 class="group">Company back office</h2>
+    <section>
+      <h2>17. Team Console (back office)</h2>
       <div class="actions">
         <button onclick="downloadSvg('15','15-team-console.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('15','15-team-console.png')">Download PNG</button>
@@ -777,69 +962,7 @@ flowchart LR
     </section>
 
     <section>
-      <h2>16. Plans, entitlements and usage metering</h2>
-      <div class="actions">
-        <button onclick="downloadSvg('16','16-plans-entitlements-quota.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('16','16-plans-entitlements-quota.png')">Download PNG</button>
-      </div>
-      <pre class="mermaid-src" data-id="16">
-flowchart TB
-  subgraph define [Defined in the Team Console]
-    Catalog[Plan catalog - price, bullets, token limits, entitlements per plan]
-    Packages[Packages - public or private, duration, caps, entitlements]
-    Offers[Offer codes - plan grants, packages, discounts, student passes]
-  end
-
-  subgraph acquire [How a user gets access]
-    Buy[Buy plan or package - Razorpay order priced server-side]
-    Webhook[Payment webhook - applies plan or package]
-    Redeem[Redeem code - instant or reviewed]
-    Grant[Manual grant by staff]
-  end
-
-  AccessGrant[(access_grants - who, what, until when)]
-  Profile[(profiles.plan / custom_monthly_cap / entitlements)]
-  Org[(organizations - seats, pooled tokens, entitlements)]
-  Sweep[Hourly expiry sweep - reverts ended grants]
-
-  Catalog --&gt; Buy
-  Packages --&gt; Buy
-  Buy --&gt; Webhook --&gt; AccessGrant
-  Offers --&gt; Redeem --&gt; AccessGrant
-  Grant --&gt; AccessGrant
-  AccessGrant --&gt; Profile &amp; Org
-  Sweep --&gt; AccessGrant
-
-  subgraph resolve [Per request]
-    Ent[Entitlements = plan defaults &lt;- catalog &lt;- organization &lt;- personal package]
-    Limits[Token limits = catalog limits, scaled by a personal monthly cap]
-  end
-  Profile &amp; Org &amp; Catalog --&gt; Ent &amp; Limits
-
-  subgraph enforce [Enforced server-side]
-    E1[Build Mode on/off + rounds per run]
-    E2[Deep Research per day]
-    E3[Documents per day + Library storage]
-    E4[Custom skills, Team Up size, MCP servers, automations]
-    E5[Priority support tickets]
-  end
-  Ent --&gt; E1 &amp; E2 &amp; E3 &amp; E4 &amp; E5
-
-  subgraph meter [Usage metering - stops exactly at the limit]
-    Pre[Pre-flight: reserve message tokens]
-    Prompt[Charge the real prompt before the model runs]
-    Round[Charge each tool-loop / Build round atomically]
-    Stop[Limit crossed -&gt; stop cleanly, keep work]
-    Rec[Reconcile to the provider's real count]
-  end
-  Limits --&gt; Pre --&gt; Prompt --&gt; Round --&gt; Rec
-  Round --&gt;|over| Stop
-      </pre>
-      <div class="diagram" id="render-16"></div>
-    </section>
-
-    <section>
-      <h2>17. Status page, incidents, problem and crash reports</h2>
+      <h2>18. Status page, incidents, problem and crash reports</h2>
       <div class="actions">
         <button onclick="downloadSvg('17','17-status-and-reports.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('17','17-status-and-reports.png')">Download PNG</button>
@@ -881,46 +1004,164 @@ flowchart LR
       <div class="diagram" id="render-17"></div>
     </section>
 
+    <h2 class="group">Friday X (terminal and editor agent)</h2>
     <section>
-      <h2>18. Documents, Library and skills</h2>
+      <h2>19. Friday X architecture</h2>
       <div class="actions">
-        <button onclick="downloadSvg('18','18-documents-library-skills.svg')">Download SVG</button>
-        <button class="secondary" onclick="downloadPng('18','18-documents-library-skills.png')">Download PNG</button>
+        <button onclick="downloadSvg('19','19-friday-x-architecture.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('19','19-friday-x-architecture.png')">Download PNG</button>
       </div>
-      <pre class="mermaid-src" data-id="18">
+      <pre class="mermaid-src" data-id="19">
 flowchart TB
-  User[User asks: make a deck / sheet / report / PDF] --&gt; Agent[Agent tool loop]
-  Menu[Skill menu - enabled built-in + user skills] --&gt; Agent
-  Chosen[Skill picked in composer - pinned playbook] --&gt; Agent
-  Agent --&gt;|matching request| UseSkill[use_skill - loads the playbook]
-  Agent --&gt;|facts first| Research[web_search / run_code]
-  Agent --&gt; Create[create_document - model writes content only]
-
-  Create --&gt; Check{documentsPerDay + Library storage}
-  Check --&gt;|over| Refuse[Clear message - resets or upgrade]
-  Check --&gt;|ok| Render[Render server-side: pptxgenjs, exceljs, docx, pdfkit, text]
-  Render --&gt; Store[(Supabase Storage generated-files / inline fallback)]
-  Render --&gt; Rows[(generated_files)]
-  Rows --&gt; Card[Download card under the reply - SSE file event, saved on the message]
-  Rows --&gt; Library
-
-  subgraph Library [Library - private per user]
-    Docs[Documents]
-    Images[Images]
-    Code[Code]
-    Pages[Web pages]
-    Uploads[Uploads]
+  subgraph clients [Friday X clients - same engine everywhere]
+    CLI["friday - terminal agent (cli/)"]
+    VS["VS Code extension (ide/vscode)"]
+    JB["JetBrains, Zed and other ACP editors (friday agent stdio)"]
   end
-  Replies[Assistant replies - code, pages, images auto-saved] --&gt; Library
-  Attach[User uploads] --&gt; Library
 
-  subgraph skills [Skills]
-    Builtin[16 built-in playbooks]
-    Own[User skills - create, edit, switch off]
+  VS --&gt;|launches| CLI
+  JB --&gt;|ACP over stdio| CLI
+
+  subgraph local [On the user's machine]
+    Harness["Agent harness - loop, tools, diffs, sandbox, skills, hooks, MCP"]
+    Files[("Project files + AGENTS.md / CLAUDE.md read, FRIDAY.md written")]
+    Token[("~/.friday/auth.json, owner-only - revocable token")]
   end
-  skills --&gt; Menu
+  CLI --&gt; Harness
+  Harness &lt;--&gt; Files
+  Harness --- Token
+
+  subgraph backend [Friday backend - the single source of truth]
+    Auth["/api/x/oauth2 + /auth - device login"]
+    Models["/api/x/v1/models - plan-filtered, server-sized"]
+    GW["/api/x/v1/chat/completions - metered gateway"]
+    Ent["Entitlements: fridayX + plan limits"]
+    Meter["Credit meter + token_ledger (feature = code)"]
+    Prov["Provider adapters - OpenAI, Anthropic, Gemini, OpenRouter, ScaleMax ..."]
+  end
+  Harness --&gt;|"Bearer fxt_..."| Auth
+  Harness --&gt; Models
+  Harness --&gt; GW
+  Auth --&gt; Ent
+  Models --&gt; Ent
+  GW --&gt; Ent --&gt; Meter --&gt; Prov
+
+  Web["Web, Android and iOS apps - same plan, same meter"]
+  Meter -. one usage bar .- Web
+  Console["Team Console - edit plans, models, who gets Friday X"] --&gt; Ent
+  Console --&gt; Models
       </pre>
-      <div class="diagram" id="render-18"></div>
+      <div class="diagram" id="render-19"></div>
+    </section>
+
+    <section>
+      <h2>20. Friday X sign-in (device code)</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('20','20-friday-x-device-login.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('20','20-friday-x-device-login.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="20">
+sequenceDiagram
+  actor U as User
+  participant C as friday (CLI or editor)
+  participant API as Friday /api/x
+  participant W as Web app /device
+  participant DB as cli_device_codes + cli_tokens
+
+  U-&gt;&gt;C: friday login (or first run)
+  C-&gt;&gt;API: POST /oauth2/device/code
+  API-&gt;&gt;DB: Store hash(device_code) + user_code, 10 min
+  API--&gt;&gt;C: user_code, verification_uri_complete
+  C-&gt;&gt;U: Opens browser, prints ABCD-EFGH
+  U-&gt;&gt;W: Sign in to Friday (if needed)
+  W-&gt;&gt;API: GET /auth/device/ABCD-EFGH
+  API--&gt;&gt;W: Which client is asking
+  U-&gt;&gt;W: Check the code matches, Approve (or Deny)
+  W-&gt;&gt;API: POST /auth/device/approve
+  API-&gt;&gt;API: Friday X entitlement checked
+  API-&gt;&gt;DB: status = approved (compare-and-set)
+  loop every 5 s
+    C-&gt;&gt;API: POST /oauth2/token (device_code)
+    API--&gt;&gt;C: authorization_pending
+  end
+  C-&gt;&gt;API: POST /oauth2/token
+  API-&gt;&gt;DB: Claim once, store hash(fxt_ token)
+  API--&gt;&gt;C: access_token fxt_...
+  C-&gt;&gt;C: Save token, then every request carries it
+  Note over U,DB: Settings, Friday X lists every signed-in device. Sign out revokes the token at once.
+      </pre>
+      <div class="diagram" id="render-20"></div>
+    </section>
+
+    <section>
+      <h2>21. Friday X gateway and metering</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('21','21-friday-x-gateway-metering.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('21','21-friday-x-gateway-metering.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="21">
+flowchart TB
+  Req["POST /api/x/v1/chat/completions (one model turn)"]
+  Auth{"Token valid and not revoked?"}
+  Ent{"fridayX entitlement on?&lt;br/&gt;plan &lt;- catalog &lt;- org &lt;- personal grant"}
+  Model{"Model allowed on this plan?&lt;br/&gt;auto = best coding model the plan allows"}
+  Reserve{"Reserve credits against the 5-hour,&lt;br/&gt;weekly and monthly windows (or org pool)"}
+  Charge["Charge the real prompt up front"]
+  Call["Provider adapter - OpenAI, Anthropic, Gemini ... (tool calling)"]
+  Stream["Stream chunks back as OpenAI SSE"]
+  Final["Reconcile to exact usage + write token_ledger (feature = code)"]
+
+  Req --&gt; Auth
+  Auth -- no --&gt; E401["401 - run friday login"]
+  Auth -- yes --&gt; Ent
+  Ent -- no --&gt; E403["403 - not included in your plan"]
+  Ent -- yes --&gt; Model
+  Model -- no --&gt; E403b["403 / 404 with a code the client uses to refresh its model list"]
+  Model -- yes --&gt; Reserve
+  Reserve -- over --&gt; E429["429 + Retry-After - percent and reset time only"]
+  Reserve -- ok --&gt; Charge --&gt; Call --&gt; Stream --&gt; Final
+  Final -. same counters .-&gt; Meter[("Redis quota keys&lt;br/&gt;shared with web and mobile")]
+  Meter -. one usage bar .-&gt; Apps["Settings, Usage in every app"]
+      </pre>
+      <div class="diagram" id="render-21"></div>
+    </section>
+
+    <section>
+      <h2>22. Friday X install and release</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('22','22-friday-x-install-release.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('22','22-friday-x-install-release.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="22">
+flowchart LR
+  subgraph build [Release pipeline - GitHub Actions]
+    Tag["Tag friday-x-v1.2.3"] --&gt; Matrix["Build matrix - macOS arm64/x64, Linux gnu + musl x64/arm64, Windows x64/arm64"]
+    Matrix --&gt; Sums["SHA-256 per binary"]
+    Sums --&gt; Store[("Object storage + CDN&lt;br/&gt;/v1.2.3/friday-platform + .sha256")]
+    Store --&gt; Latest["latest.json written LAST&lt;br/&gt;so half a release is never offered"]
+  end
+
+  subgraph serve [Friday backend - /x]
+    Ver["/x/version"]
+    Down["/x/download/platform"]
+    Sha["/x/sha256/platform"]
+    Pin["FRIDAY_X_VERSION_PIN - pause a bad release"]
+  end
+  Latest --&gt; Ver
+  Store --&gt; Down &amp; Sha
+  Pin -. overrides .-&gt; Ver
+
+  subgraph user [One line on the user's machine]
+    SH["curl -fsSL host/x/install.sh | bash"]
+    PS["irm host/x/install.ps1 | iex"]
+    CMD["install.cmd - Windows CMD"]
+    Verify["Download, verify SHA-256, then install to ~/.friday/bin and add to PATH"]
+    Run["friday"]
+  end
+  SH &amp; PS &amp; CMD --&gt; Ver --&gt; Down --&gt; Sha --&gt; Verify --&gt; Run
+  Run -. "friday update" .-&gt; Ver
+      </pre>
+      <div class="diagram" id="render-22"></div>
     </section>
   </main>
 </body>

@@ -1,0 +1,134 @@
+erDiagram
+  profiles ||--o{ conversations : owns
+  profiles ||--o{ organization_memberships : joins
+  profiles ||--o{ connector_accounts : connects
+  profiles ||--o{ usage_events : meters
+  profiles ||--o{ user_memories : remembers
+  profiles ||--o{ automations : schedules
+  profiles ||--o{ mcp_servers : adds
+  profiles ||--o{ cli_tokens : signs_in_devices
+  profiles ||--o{ cli_device_codes : approves
+  profiles ||--o{ token_ledger : spends
+  organizations ||--o{ organization_memberships : has
+  conversations ||--o{ messages : contains
+  conversations ||--o| build_projects : builds
+  messages ||--o{ message_attachments : files
+  assistant_projects ||--o{ conversations : context
+  automations }o--o| conversations : writes_to
+  profiles ||--o{ generated_files : creates
+  profiles ||--o{ user_skills : writes
+  profiles ||--o{ access_grants : receives
+  profiles ||--o{ support_tickets : opens
+  profiles ||--o| staff_members : is_staff
+  staff_roles ||--o{ staff_members : grants
+  support_tickets ||--o{ support_messages : thread
+  plan_packages ||--o{ access_grants : applied_as
+  offers ||--o{ offer_redemptions : redeemed
+  announcements ||--o{ announcement_views : seen_by
+  email_campaigns ||--o{ email_campaign_sends : sends
+  crm_stages ||--o{ crm_contacts : stage
+  status_incidents ||--o{ status_incident_updates : timeline
+
+  plan_catalog {
+    text id
+    bigint monthly_price_paise
+    bigint weekly_tokens
+    jsonb entitlements
+  }
+  plan_packages {
+    uuid id
+    text plan
+    bool public
+    jsonb entitlements
+  }
+  access_grants {
+    uuid id
+    text source
+    timestamptz ends_at
+    text status
+  }
+  generated_files {
+    uuid id
+    text format
+    text storage_path
+    bigint size_bytes
+  }
+  user_skills {
+    uuid id
+    text name
+    text instructions
+  }
+  status_checks {
+    text component
+    bool ok
+    int latency_ms
+  }
+  crash_reports {
+    text fingerprint
+    text message
+    text stack
+  }
+
+  conversations {
+    uuid id
+    uuid user_id
+    text mode
+    text share_token
+  }
+  messages {
+    uuid id
+    text role
+    text content
+    jsonb build
+    tsvector search_tsv
+  }
+  user_memories {
+    uuid id
+    text content
+  }
+  automations {
+    uuid id
+    text frequency
+    text time_of_day
+    text timezone
+    timestamptz next_run_at
+    timestamptz running_until
+  }
+  build_projects {
+    uuid conversation_id
+    jsonb files
+    text repo
+    text repo_branch
+  }
+  mcp_servers {
+    uuid id
+    text url
+    text auth_header_encrypted
+  }
+  connector_accounts {
+    uuid id
+    text provider
+    text access_token_encrypted
+  }
+  cli_tokens {
+    uuid id
+    text token_hash "SHA-256 only"
+    text name "Friday X on this device"
+    text client "cli or ide"
+    timestamptz last_used_at
+    timestamptz revoked_at
+  }
+  cli_device_codes {
+    uuid id
+    text device_code_hash
+    text user_code "ABCD-EFGH"
+    text status "pending, approved, denied, used"
+    timestamptz expires_at
+  }
+  token_ledger {
+    uuid id
+    text provider_slug
+    text model_id
+    numeric cost_usd
+    text feature "chat, build, research, teamup, spark, automation, code"
+  }

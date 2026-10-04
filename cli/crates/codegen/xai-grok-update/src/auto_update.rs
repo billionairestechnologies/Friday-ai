@@ -1042,7 +1042,7 @@ pub(crate) fn tmp_download_path(dest: &std::path::Path) -> std::path::PathBuf {
 }
 
 /// Unique temp path `<base>.{pid}-{seq}.{ext}`, appended to the full name.
-/// A versioned base like `grok-0.1.181` would collide via `with_extension`, which treats everything after the last dot as the extension.
+/// A versioned base like `friday-0.1.181` would collide via `with_extension`, which treats everything after the last dot as the extension.
 /// The PID and a per-process counter keep racing updaters from clobbering each other.
 fn unique_temp_sibling(base: &std::path::Path, ext: &str) -> std::path::PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1798,8 +1798,8 @@ async fn regenerate_completions(binary: &std::path::Path, grok_home: &std::path:
     }
 }
 
-/// When both paths share a grandparent (e.g. `~/.friday/bin/grok` and `~/.friday/downloads/grok-0.1.203-linux-x86_64`),
-/// returns a relative path like `../downloads/grok-0.1.203-linux-x86_64`. Relative symlinks survive Docker bind-mounts
+/// When both paths share a grandparent (e.g. `~/.friday/bin/grok` and `~/.friday/downloads/friday-0.1.203-linux-x86_64`),
+/// returns a relative path like `../downloads/friday-0.1.203-linux-x86_64`. Relative symlinks survive Docker bind-mounts
 /// where `~/.friday/` is mapped into a container with a different `$HOME` (and thus a different absolute prefix).
 #[cfg(unix)]
 pub(crate) fn relative_symlink_target(
@@ -1809,7 +1809,7 @@ pub(crate) fn relative_symlink_target(
     let (Some(target_parent), Some(link_parent)) = (target.parent(), link.parent()) else {
         return target.to_path_buf();
     };
-    // Same directory: just the filename (e.g. grok-latest -> grok-0.1.203-…)
+    // Same directory: just the filename (e.g. grok-latest -> friday-0.1.203-…)
     if target_parent == link_parent
         && let Some(name) = target.file_name()
     {
@@ -2835,3 +2835,37 @@ mod windows_payload;
 #[cfg(test)]
 #[path = "auto_update_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod friday_tests {
+    use super::*;
+
+    #[test]
+    fn the_manual_install_command_points_at_the_friday_installer() {
+        let cmd = manual_install_cmd("stable");
+        let origin = xai_grok_shell::env::friday_origin();
+        assert!(cmd.contains(&format!("{origin}/x/install.")), "{cmd}");
+        assert!(!cmd.contains("x.ai"), "{cmd}");
+        // the channel is not part of the command: Friday X has one release line
+        assert_eq!(cmd, manual_install_cmd("alpha"));
+    }
+
+    #[test]
+    fn the_friday_platform_id_matches_the_release_endpoints() {
+        let id = friday_platform();
+        assert!(
+            [
+                "darwin-arm64",
+                "darwin-x64",
+                "linux-x64",
+                "linux-arm64",
+                "linux-x64-musl",
+                "linux-arm64-musl",
+                "windows-x64",
+                "windows-arm64",
+            ]
+            .contains(&id.as_str()),
+            "{id}"
+        );
+    }
+}

@@ -564,7 +564,10 @@ mod tests {
     #[test]
     fn test_format_agents_md_section_empty() {
         let ctx = test_context();
-        assert!(ctx.format_agents_md_section().is_none());
+        // No instruction files still carries the FRIDAY.md memory directive, and nothing else.
+        let section = ctx.format_agents_md_section().expect("memory directive");
+        assert!(section.contains("FRIDAY.md"));
+        assert!(!section.contains("## From:"));
     }
     #[test]
     fn test_format_agents_md_section_non_empty() {

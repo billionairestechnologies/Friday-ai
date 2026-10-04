@@ -1,0 +1,14 @@
+flowchart TB
+  phoneCall[Phone session]
+  presence[Presence registry]
+  sandbox[Sandbox]
+  machine[Connected computer or CLI]
+  appSession[App session]
+  result[Spoken if short or link if long]
+  phoneCall --> presence
+  presence --> sandbox
+  presence --> machine
+  presence --> appSession
+  sandbox --> result
+  machine --> result
+  appSession --> result

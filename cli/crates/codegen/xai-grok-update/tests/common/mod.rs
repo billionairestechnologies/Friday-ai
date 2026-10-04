@@ -83,7 +83,7 @@ pub fn set_test_version(v: &str) {
 // Install-test fixtures (shared by the blitz + convergence suites)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Host `{os}-{arch}` string matching the versioned binary naming scheme (`grok-{version}-{platform}`).
+/// Host `{os}-{arch}` string matching the versioned binary naming scheme (`friday-{version}-{platform}`).
 pub fn host_platform() -> String {
     let os = if cfg!(target_os = "macos") {
         "macos"

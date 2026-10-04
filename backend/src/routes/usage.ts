@@ -43,7 +43,7 @@ async function computeBreakdown(userId: string, since: Date) {
   })).sort((a, b) => b.quantity - a.quantity);
 }
 
-const FEATURES = ["chat", "build", "research", "teamup", "spark", "automation"];
+const FEATURES = ["chat", "build", "research", "teamup", "spark", "automation", "code"];
 
 /**
  * Where the usage went, by what it COST (the ledger's exact per-call cost), not by how many events

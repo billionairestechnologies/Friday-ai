@@ -1,0 +1,9 @@
+sequenceDiagram
+  participant User
+  participant Friday
+  User->>Friday: Speaks
+  Friday->>User: Answers
+  Note over Friday: Waits. Does not talk again.
+  User->>Friday: Speaks again
+  Friday->>User: Answers or asks one question
+  Note over Friday: Waits for the answer.

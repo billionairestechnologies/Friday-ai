@@ -41,6 +41,7 @@ const EVENT_LABELS: Record<string, string> = {
   teamup: "Team Up",
   spark: "Spark",
   automation: "Automations",
+  code: "Friday X",
 };
 
 export function labelForEventType(type: string): string {

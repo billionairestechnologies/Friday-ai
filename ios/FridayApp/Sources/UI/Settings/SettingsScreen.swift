@@ -569,6 +569,7 @@ private func usageLabel(_ type: String) -> String {
     case "teamup": return "Team Up"
     case "spark": return "Spark"
     case "automation": return "Automations"
+    case "code": return "Friday X"
     default: return type
     }
 }

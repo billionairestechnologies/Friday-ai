@@ -546,7 +546,7 @@ mod tests {
         );
         assert_eq!(
             mingit_object_base("0.2.10", "windows-aarch64"),
-            "grok-0.2.10-windows-aarch64-mingit"
+            "friday-0.2.10-windows-aarch64-mingit"
         );
         assert_eq!(staging_dir_name("0.2.10"), ".staging-0.2.10");
     }
@@ -556,7 +556,7 @@ mod tests {
         let digest = "56D7B226B7693196CFC71FEF26568F536C4A021AB6C37FF2DB4287BED908E96E";
         assert_eq!(
             parse_sha256_sidecar(&format!(
-                "{digest}  grok-0.2.10-windows-x86_64-mingit.zip\n"
+                "{digest}  friday-0.2.10-windows-x86_64-mingit.zip\n"
             )),
             Some(digest.to_ascii_lowercase())
         );

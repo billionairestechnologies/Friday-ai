@@ -1,0 +1,14 @@
+flowchart TD
+  A[Create Supabase project] --> B[Apply migrations 0001 to 0050 in order]
+  B --> C[Set env secrets - Supabase, KEY_ENCRYPTION_SECRET, Resend]
+  C --> C2[Optional: E2B, Google, GitHub, Razorpay, TinyFish, Redis]
+  C2 --> D[Deploy API plus frontend - one Docker image]
+  D --> E[Check /api/health/ready]
+  E --> F{Ready?}
+  F -->|No| C
+  F -->|Yes| G[Smoke test: signup OTP, chat, tool call, file]
+  G --> H[Smoke test: memory, automation run now, share link, MCP add]
+  H --> I[Build Mode: small app + GitHub import PR]
+  I --> FX1[Friday X: set FRIDAY_X_RELEASES_URL, tag a release, install with the one-liner]
+  FX1 --> FX2[friday login, friday models, one prompt - check the Usage bar moved]
+  FX2 --> J[Production live]

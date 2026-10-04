@@ -17,6 +17,18 @@ use crate::{AuthChannels, AuthManager, AuthMode, AuthUrlInfo, AuthUrlMode, GrokA
 
 /// Identifies this client to Friday's device login (shown on the approval page and in Settings).
 pub const FRIDAY_CLIENT_ID: &str = "friday-x-cli";
+
+/// Which client this is, so Settings → Friday X can say "Friday X for VS Code". The editor integrations set
+/// `FRIDAY_X_CLIENT` (vscode, jetbrains, zed); anything else is the terminal. Only known names are accepted:
+/// the value is sent to the server as the client id, so it must never be free text.
+pub fn client_id() -> &'static str {
+    match std::env::var("FRIDAY_X_CLIENT").as_deref() {
+        Ok("vscode") => "friday-x-vscode",
+        Ok("jetbrains") => "friday-x-jetbrains",
+        Ok("zed") => "friday-x-zed",
+        _ => FRIDAY_CLIENT_ID,
+    }
+}
 const SCOPE: &str = "friday-x";
 const SCOPE_KEY: &str = "friday";
 const MAX_WAIT: StdDuration = StdDuration::from_secs(15 * 60);
@@ -73,7 +85,7 @@ async fn request_code(client: &reqwest::Client, issuer: &str) -> anyhow::Result<
     let resp = client
         .post(format!("{issuer}/oauth2/device/code"))
         .header("x-friday-client-version", xai_grok_version::VERSION)
-        .form(&[("client_id", FRIDAY_CLIENT_ID), ("scope", SCOPE)])
+        .form(&[("client_id", client_id()), ("scope", SCOPE)])
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("Couldn't reach Friday ({e}). Check your connection and try again."))?;
@@ -109,7 +121,7 @@ async fn poll_for_token(client: &reqwest::Client, issuer: &str, code: &DeviceCod
             .form(&[
                 ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                 ("device_code", code.device_code.as_str()),
-                ("client_id", FRIDAY_CLIENT_ID),
+                ("client_id", client_id()),
             ])
             .send()
             .await
@@ -190,7 +202,7 @@ async fn device_login(auth_manager: &Arc<AuthManager>, mut channels: Option<Auth
         refresh_token: None,
         expires_at: Some(now + Duration::seconds(token.expires_in.unwrap_or(365 * 24 * 3600))),
         oidc_issuer: Some(issuer),
-        oidc_client_id: Some(FRIDAY_CLIENT_ID.to_owned()),
+        oidc_client_id: Some(client_id().to_owned()),
     };
     auth_manager.update(auth).await.map_err(|e| anyhow::anyhow!("Couldn't save your sign-in: {e}"))
 }

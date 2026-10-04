@@ -51,7 +51,15 @@ pub trait AuthBackend {
     ) -> Arc<dyn TokenRefresher>;
 }
 pub use friday::FRIDAY_CLIENT_ID;
+/// The backend this build signs in with: Friday's.
+#[cfg(not(test))]
 pub type ActiveAuthBackend = friday::FridayAuthBackend;
+/// Under `cargo test` this crate's inherited suite (token refresh, remedies, recovery, external providers, ~600
+/// tests) exercises the original OIDC backend it was written against: that machinery is generic, still compiled in,
+/// and worth keeping covered, but Friday's non-refreshing device token deliberately behaves differently (an expired
+/// token needs a new login). Friday's own backend is tested directly in `friday.rs`, not through this alias.
+#[cfg(test)]
+pub type ActiveAuthBackend = grok::GrokAuthBackend;
 /// Reports a URL the way a user says it, without the scheme.
 pub fn host_of(url: &str) -> String {
     url.strip_prefix("https://")

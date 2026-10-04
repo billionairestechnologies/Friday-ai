@@ -122,7 +122,11 @@ pub struct OAuth2ProviderConfig {
     pub referrer: Option<String>,
 }
 /// Production Friday X API root, the only OAuth2 issuer this client knows (`FRIDAY_X_URL` moves it, see `xai_oauth2_issuer`).
+#[cfg(not(test))]
 pub const XAI_OAUTH2_ISSUER: &str = "https://friday.billionairestechnologies.com/api/x";
+/// The inherited login suite is written against the original issuer's fixtures (see `backend::ActiveAuthBackend`).
+#[cfg(test)]
+pub const XAI_OAUTH2_ISSUER: &str = "https://auth.x.ai";
 /// A separate const so the frozen contract test pins the production allowlist even when the non-production feature adds staging and local origins.
 const PROD_ACCOUNTS_APP_ORIGINS: &[&str] = &["https://friday.billionairestechnologies.com"];
 /// Production build: accepts only the production accounts app.
@@ -159,13 +163,21 @@ pub fn use_local_auth() -> bool {
 }
 /// The Friday login issuer: `<FRIDAY_X_URL or the production origin>/api/x`.
 pub fn xai_oauth2_issuer() -> &'static str {
-    static ISSUER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    ISSUER.get_or_init(xai_grok_env::friday_api_base)
+    // The inherited login test suite is written against the original issuer's fixtures (see `backend::ActiveAuthBackend`).
+    #[cfg(test)]
+    {
+        "https://auth.x.ai"
+    }
+    #[cfg(not(test))]
+    {
+        static ISSUER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        ISSUER.get_or_init(xai_grok_env::friday_api_base)
+    }
 }
 /// Whether `issuer` is the Friday issuer (production, or wherever `FRIDAY_X_URL` points).
 /// First-party credentials are exactly the ones Friday issued; every other issuer is foreign.
 pub fn is_xai_oauth2_issuer(issuer: &str) -> bool {
-    issuer == xai_oauth2_issuer() || issuer == XAI_OAUTH2_ISSUER
+    issuer == xai_oauth2_issuer() || issuer == XAI_OAUTH2_ISSUER || (cfg!(test) && issuer == "https://auth.x.ai")
 }
 /// auth.json scope key used by the pre-OIDC `friday login --legacy` flow.
 /// Matches the key format produced by the original `accounts.x.ai` relay auth.
@@ -613,7 +625,7 @@ mod tests {
     /// Removing an origin therefore breaks loopback delivery for already-installed CLIs. Keep in sync with the oauth2-provider / accounts-app deployments. Non-production / local-dev origins are opt-in only.
     #[test]
     fn allowed_accounts_app_origins_are_frozen() {
-        assert_eq!(PROD_ACCOUNTS_APP_ORIGINS, &["https://accounts.x.ai"]);
+        assert_eq!(PROD_ACCOUNTS_APP_ORIGINS, &["https://friday.billionairestechnologies.com"]);
         assert_eq!(allowed_accounts_app_origins(), PROD_ACCOUNTS_APP_ORIGINS);
     }
     /// FROZEN client contract: the 10 scopes the xAI OAuth2 client requests.

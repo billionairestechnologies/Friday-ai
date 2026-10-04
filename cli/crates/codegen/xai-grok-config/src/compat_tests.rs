@@ -480,6 +480,8 @@ fn rules_dirs_gates_each_vendor() {
 fn agent_filenames_all_on_include_the_claude_subdir() {
     assert_eq!(
         vec![
+            "FRIDAY.md",
+            "Friday.md",
             "Agents.md",
             "Claude.md",
             "CLAUDE.md",
@@ -499,6 +501,8 @@ fn agent_filenames_drops_claude_subdir_when_off() {
     c.claude.agents = false;
     assert_eq!(
         vec![
+            "FRIDAY.md",
+            "Friday.md",
             "Agents.md",
             "Claude.md",
             "CLAUDE.md",

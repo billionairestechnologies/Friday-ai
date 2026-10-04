@@ -449,8 +449,8 @@ pub fn installed_on_disk_version() -> Option<String> {
     }
 }
 
-/// Handles the internal layout (`grok-0.1.150-macos-aarch64`) and the npm layout without a platform suffix
-/// (`grok-0.1.150`). Pre-releases parse whole: `grok-0.1.150-alpha.1-linux-x86_64` gives `0.1.150-alpha.1`. Unknown
+/// Handles the internal layout (`friday-0.1.150-macos-aarch64`) and the npm layout without a platform suffix
+/// (`friday-0.1.150`). Pre-releases parse whole: `friday-0.1.150-alpha.1-linux-x86_64` gives `0.1.150-alpha.1`. Unknown
 /// layouts (`grok-latest`, `grok-pager-*` when `bin_prefix` is `friday`) return `None` instead of garbage.
 pub(crate) fn version_from_versioned_binary_name(name: &str, bin_prefix: &str) -> Option<String> {
     const PLATFORM_OS: &[&str] = &["macos", "linux", "darwin", "windows"];
@@ -575,16 +575,16 @@ mod tests {
     #[test]
     fn test_version_from_versioned_binary_name() {
         let cases: &[(&str, Option<&str>)] = &[
-            ("grok-0.2.46-darwin-arm64", Some("0.2.46")),
-            ("grok-0.1.220-linux-x86_64", Some("0.1.220")),
-            ("grok-0.2.5-windows-x86_64.exe", Some("0.2.5")),
+            ("friday-0.2.46-darwin-arm64", Some("0.2.46")),
+            ("friday-0.1.220-linux-x86_64", Some("0.1.220")),
+            ("friday-0.2.5-windows-x86_64.exe", Some("0.2.5")),
             // Pre-releases must round-trip whole
             // Truncating to "0.1.220" would make an alpha install masquerade as the release and mask updates from alpha to stable
-            ("grok-0.1.220-alpha.4-linux-x86_64", Some("0.1.220-alpha.4")),
-            ("grok-0.1.220-alpha.4", Some("0.1.220-alpha.4")), // npm layout
+            ("friday-0.1.220-alpha.4-linux-x86_64", Some("0.1.220-alpha.4")),
+            ("friday-0.1.220-alpha.4", Some("0.1.220-alpha.4")), // npm layout
             ("grok-pager-0.1.5-darwin-arm64", None),           // "pager" is not a version
             ("grok-garbage-darwin-arm64", None),               // unparseable version
-            ("grok-0.2.46", Some("0.2.46")),                   // no platform suffix
+            ("friday-0.2.46", Some("0.2.46")),                   // no platform suffix
             ("other-0.2.46-darwin-arm64", None),               // wrong prefix
             ("grok-latest", None),                             // symlink alias, not a version
             ("friday", None),                                    // bare name

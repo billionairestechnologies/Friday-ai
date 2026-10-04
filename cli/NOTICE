@@ -1,0 +1,17 @@
+Friday X
+Copyright 2026 Billionaires Technologies
+
+This product is a modified version of Grok Build (https://github.com/xai-org/grok-build),
+Copyright 2023-2026 SpaceXAI, licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Changes made to the original work are recorded in this repository's git history: the first commit that
+adds this directory ("cli: import the Grok Build snapshot unmodified") is the upstream source exactly as
+published (xai-org/grok-build @ 559751f), and every later commit is a modification of it. In summary: the
+product and binary are renamed Friday X ("friday"); sign-in and model access go to the Friday backend
+instead of the original vendor's services; telemetry, analytics, feedback uploads, voice, remote control and
+vendor-hosted tools are removed or disabled; self-update is served by the Friday backend with checksum
+verification; and Friday project memory (FRIDAY.md) is added.
+
+"Grok", "xAI" and "SpaceXAI" are trademarks of their owners and are not used to name or promote this product.
+
+Third-party and vendored components keep their own licenses; see THIRD-PARTY-NOTICES.

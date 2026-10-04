@@ -662,7 +662,7 @@ private fun formatReset(iso: String?): String? = runCatching {
 private fun usageLabel(type: String): String = when (type) {
     "chat_message" -> "Chat"; "web_search" -> "Search"; "voice_second" -> "Voice"; "sandbox_run" -> "Build"
     "attachment_upload" -> "Attachments"; "image_generation" -> "Image generation"
-    "chat" -> "Chat"; "build" -> "Build"; "research" -> "Deep Research"; "teamup" -> "Team Up"; "spark" -> "Spark"; "automation" -> "Automations"; else -> type
+    "chat" -> "Chat"; "build" -> "Build"; "research" -> "Deep Research"; "teamup" -> "Team Up"; "spark" -> "Spark"; "automation" -> "Automations"; "code" -> "Friday X"; else -> type
 }
 
 /** Usage — the same windows as the web's Usage pane: weekly, 5-hour, monthly, organization pool and your cap, each with its

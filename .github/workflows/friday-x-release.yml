@@ -1,0 +1,127 @@
+name: Friday X release
+
+# Tag friday-x-vX.Y.Z to ship. Builds every platform, writes a SHA-256 next to each binary, uploads to the
+# releases bucket, and only then publishes latest.json, so a half-uploaded release is never offered.
+# The Friday backend serves /x/version, /x/download and /x/sha256 from this bucket (FRIDAY_X_RELEASES_URL).
+on:
+  push:
+    tags:
+      - "friday-x-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 0.1.0) when run by hand"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: darwin-arm64, os: macos-14, target: aarch64-apple-darwin }
+          - { platform: darwin-x64, os: macos-13, target: x86_64-apple-darwin }
+          - { platform: linux-x64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { platform: linux-arm64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          - { platform: windows-x64, os: windows-2022, target: x86_64-pc-windows-msvc }
+          - { platform: windows-arm64, os: windows-2022, target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "FRIDAY_VERSION=${VERSION#friday-x-v}" >> "$GITHUB_ENV"
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.94.0"
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+          key: ${{ matrix.target }}
+      - name: Build
+        working-directory: cli
+        shell: bash
+        run: cargo build --profile release-dist -p xai-grok-pager-bin --target ${{ matrix.target }}
+
+      - name: Stage binary and checksum
+        shell: bash
+        working-directory: cli
+        run: |
+          ext=""; case "${{ matrix.platform }}" in windows-*) ext=".exe";; esac
+          mkdir -p ../dist
+          cp "target/${{ matrix.target }}/release-dist/friday$ext" "../dist/friday-${{ matrix.platform }}$ext"
+          cd ../dist
+          if command -v sha256sum >/dev/null; then sha256sum "friday-${{ matrix.platform }}$ext" | cut -d' ' -f1 > "friday-${{ matrix.platform }}$ext.sha256"
+          else shasum -a 256 "friday-${{ matrix.platform }}$ext" | cut -d' ' -f1 > "friday-${{ matrix.platform }}$ext.sha256"; fi
+
+      # Code signing is optional until the certificates exist; the steps skip themselves without secrets.
+      - name: Sign and notarize (macOS)
+        if: startsWith(matrix.platform, 'darwin') && env.APPLE_CERT_P12 != ''
+        shell: bash
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          echo "$APPLE_CERT_P12" | base64 --decode > cert.p12
+          security create-keychain -p ci build.keychain && security default-keychain -s build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import cert.p12 -k build.keychain -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
+          IDENT=$(security find-identity -v -p codesigning build.keychain | head -1 | awk '{print $2}')
+          codesign --force --options runtime --timestamp --sign "$IDENT" "dist/friday-${{ matrix.platform }}"
+          ditto -c -k --keepParent "dist/friday-${{ matrix.platform }}" notarize.zip
+          xcrun notarytool submit notarize.zip --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          # The checksum must describe the signed bytes.
+          shasum -a 256 "dist/friday-${{ matrix.platform }}" | cut -d' ' -f1 > "dist/friday-${{ matrix.platform }}.sha256"
+
+      - name: Smoke test
+        if: matrix.platform == 'darwin-arm64' || matrix.platform == 'linux-x64' || matrix.platform == 'windows-x64'
+        shell: bash
+        run: |
+          ext=""; case "${{ matrix.platform }}" in windows-*) ext=".exe";; esac
+          chmod +x "dist/friday-${{ matrix.platform }}$ext" || true
+          "dist/friday-${{ matrix.platform }}$ext" --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: friday-${{ matrix.platform }}
+          path: dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: friday-x-release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.FRIDAY_X_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.FRIDAY_X_AWS_REGION }}
+      - name: Upload binaries, then the version pointer
+        shell: bash
+        run: |
+          V="${VERSION#friday-x-v}"
+          aws s3 cp dist "s3://${{ vars.FRIDAY_X_RELEASES_BUCKET }}/v$V/" --recursive \
+            --cache-control "public, max-age=31536000, immutable"
+          # latest.json goes last and is never cached: it is the switch that makes the release visible.
+          printf '{"version":"%s"}' "$V" > latest.json
+          aws s3 cp latest.json "s3://${{ vars.FRIDAY_X_RELEASES_BUCKET }}/latest.json" \
+            --content-type application/json --cache-control "no-cache"

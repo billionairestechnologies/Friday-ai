@@ -37,6 +37,26 @@ Friday AI is now a production-shaped assistant platform, not only a chat UI.
 
 ---
 
+### Friday X — the coding agent for terminals and editors
+
+Friday X (`friday`) is a second front door to the same platform: a terminal agent and editor integrations (VS Code
+extension; JetBrains, Zed and other ACP editors via `friday agent stdio`). It is a modified fork of an open-source
+(Apache-2.0) coding-agent harness, in `cli/`, with the original vendor's login, models, telemetry and services
+removed, and Friday's put in their place.
+
+- **Account, plan and models come from the backend.** Sign-in is a browser device-code flow against `/api/x`; the
+  model list, per-plan access, limits and even the client's own settings are fetched at runtime. A change made in
+  the Team Console reaches every installed terminal and editor with no update.
+- **One meter.** Every terminal turn is metered through the same credit accounting as chat (feature `code`), so usage
+  anywhere drains the one bar users see on web and mobile.
+- **Admin control.** `fridayX` is an entitlement (Console → Plans), set per plan, package or person; it is checked on
+  every request.
+- **Install.** One line per OS (`/x/install.sh`, `/x/install.ps1`, `/x/install.cmd`); binaries are checksum-verified
+  and `friday update` upgrades in place.
+- **Private.** No telemetry or analytics; the client talks to the Friday backend and nothing else.
+
+See [`../product/FRIDAY_X.md`](../product/FRIDAY_X.md) and diagrams 19-22.
+
 ## 2. System diagram (whole product)
 
 ```mermaid
@@ -269,7 +289,9 @@ Friday-ai/
     src/routes/             /auth /chat /billing /connectors /organizations ...
     src/services/           chat, providers, billing, connectors, usage
     src/services/providers/ one adapter per model vendor
-  supabase/migrations/      0001–0014
+  supabase/migrations/      0001–0050
+  cli/                      Friday X (Rust agent, binary 'friday')
+  ide/                      editor integrations (VS Code extension, ACP setup)
   docs/operations/OPERATIONS.md        deploy + incident runbook
 ```
 

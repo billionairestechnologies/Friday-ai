@@ -1,0 +1,55 @@
+name: Friday X CI
+
+# The Rust CLI is slow to build, so it only runs when it (or this workflow) changes. The egress audit is
+# static and costs seconds: it fails the build if a vendor host reappears in production code.
+on:
+  pull_request:
+    paths:
+      - "cli/**"
+      - ".github/workflows/friday-x-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "cli/**"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: No vendor hosts in production code
+        run: python3 cli/scripts/audit-egress.py
+
+  check:
+    needs: audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.94.0"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      - name: Build the friday binary
+        working-directory: cli
+        run: cargo check -p xai-grok-pager-bin
+      - name: Unit tests for the crates Friday X changed
+        working-directory: cli
+        run: >
+          cargo test --no-fail-fast
+          -p xai-grok-env -p xai-grok-auth -p xai-grok-shell-base -p xai-grok-agent -p xai-grok-update
+      # The login crate's inherited suite needs the whole workspace's jsonwebtoken feature set (built on its own it
+      # cannot choose a crypto provider), so CI runs Friday's own backend tests there.
+      - name: Friday sign-in backend tests
+        working-directory: cli
+        run: cargo test -p xai-grok-login --lib backend::friday
+      - name: Config tests (Linux paths)
+        working-directory: cli
+        run: cargo test -p xai-grok-config

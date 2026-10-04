@@ -9,7 +9,7 @@ fn winget_package_paths_are_matched_by_directory() {
         "C:/Users/alice/AppData/Local/Microsoft/WinGet/Packages/xAI.GrokBuild_Microsoft.Winget.Source_8wekyb3d8bbwe/grok.exe",
         r"\\?\C:\Users\alice\AppData\Local\Microsoft\WinGet\Packages\xAI.GrokBuild_Microsoft.Winget.Source_8wekyb3d8bbwe\grok.exe",
         r"\\fileserver\profiles\alice\AppData\Local\Microsoft\WinGet\Packages\xAI.GrokBuild_Microsoft.Winget.Source_8wekyb3d8bbwe\grok.exe",
-        r"C:\Users\alice\AppData\Local\Microsoft\WinGet\Packages\xAI.GrokBuild_Microsoft.Winget.Source_8wekyb3d8bbwe\grok-1.0.40-windows-x86_64.exe",
+        r"C:\Users\alice\AppData\Local\Microsoft\WinGet\Packages\xAI.GrokBuild_Microsoft.Winget.Source_8wekyb3d8bbwe\friday-1.0.40-windows-x86_64.exe",
     ];
     let non_matching = [
         r"C:\Users\alice\AppData\Local\Microsoft\WinGet\Links\grok.exe",

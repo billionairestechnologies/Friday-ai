@@ -1,0 +1,38 @@
+flowchart TB
+  subgraph clients [Friday X clients - same engine everywhere]
+    CLI["friday - terminal agent (cli/)"]
+    VS["VS Code extension (ide/vscode)"]
+    JB["JetBrains, Zed and other ACP editors (friday agent stdio)"]
+  end
+
+  VS -->|launches| CLI
+  JB -->|ACP over stdio| CLI
+
+  subgraph local [On the user's machine]
+    Harness["Agent harness - loop, tools, diffs, sandbox, skills, hooks, MCP"]
+    Files[("Project files + AGENTS.md / CLAUDE.md read, FRIDAY.md written")]
+    Token[("~/.friday/auth.json, owner-only - revocable token")]
+  end
+  CLI --> Harness
+  Harness <--> Files
+  Harness --- Token
+
+  subgraph backend [Friday backend - the single source of truth]
+    Auth["/api/x/oauth2 + /auth - device login"]
+    Models["/api/x/v1/models - plan-filtered, server-sized"]
+    GW["/api/x/v1/chat/completions - metered gateway"]
+    Ent["Entitlements: fridayX + plan limits"]
+    Meter["Credit meter + token_ledger (feature = code)"]
+    Prov["Provider adapters - OpenAI, Anthropic, Gemini, OpenRouter, ScaleMax ..."]
+  end
+  Harness -->|"Bearer fxt_..."| Auth
+  Harness --> Models
+  Harness --> GW
+  Auth --> Ent
+  Models --> Ent
+  GW --> Ent --> Meter --> Prov
+
+  Web["Web, Android and iOS apps - same plan, same meter"]
+  Meter -. one usage bar .- Web
+  Console["Team Console - edit plans, models, who gets Friday X"] --> Ent
+  Console --> Models

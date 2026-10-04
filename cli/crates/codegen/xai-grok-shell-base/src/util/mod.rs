@@ -312,14 +312,20 @@ pub fn process_cmdline_args(pid: u32) -> Option<Vec<String>> {
         None
     }
 }
-/// True if `pid` is a grok process; pairs with [`kill_process_by_pid`] to avoid killing a recycled PID.
+/// Whether a process name or command line is Friday X's: the shipped `friday` binary, or a dev/test build named after
+/// its crate (`xai-grok-pager-bin`, `xai_grok_shell_base-…`). Case-insensitive.
+fn is_friday_process_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("friday") || lower.contains("xai-grok") || lower.contains("xai_grok")
+}
+/// True if `pid` is a Friday X process; pairs with [`kill_process_by_pid`] to avoid killing a recycled PID.
 /// Best-effort on macOS/BSD (liveness-only via `kill -0`), exact on Linux (/proc cmdline) and Windows (image path).
 pub fn is_grok_process(pid: u32) -> bool {
     #[cfg(target_os = "linux")]
     {
         let cmdline_path = format!("/proc/{pid}/cmdline");
         match std::fs::read(&cmdline_path) {
-            Ok(data) => String::from_utf8_lossy(&data).contains("grok"),
+            Ok(data) => is_friday_process_name(&String::from_utf8_lossy(&data)),
             Err(_) => false,
         }
     }
@@ -352,9 +358,7 @@ pub fn is_grok_process(pid: u32) -> bool {
         let Some(name) = buf.get(..size as usize) else {
             return false;
         };
-        String::from_utf16_lossy(name)
-            .to_ascii_lowercase()
-            .contains("grok")
+        is_friday_process_name(&String::from_utf16_lossy(name))
     }
     #[cfg(all(not(target_os = "linux"), not(windows)))]
     {
@@ -386,7 +390,7 @@ pub fn is_grok_process_strict(pid: u32) -> bool {
                     .filter(|line| !line.is_empty())
                     .and_then(|line| std::path::Path::new(line).file_name())
                     .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.to_ascii_lowercase().contains("grok"))
+                    .is_some_and(is_friday_process_name)
             }
             _ => false,
         }
@@ -399,62 +403,62 @@ pub fn is_grok_process_strict(pid: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // The first-party host is Friday's origin (FRIDAY_X_URL moves it); the production default is used here.
+    const FRIDAY: &str = "https://friday.billionairestechnologies.com";
     #[test]
     fn test_is_cli_chat_proxy_url_accepts_proxy_subpath() {
-        assert!(is_cli_chat_proxy_url(
-            "https://cli-chat-proxy.grok.com/v1/chat/completions"
-        ));
+        assert!(is_cli_chat_proxy_url(&format!("{FRIDAY}/api/x/v1/chat/completions")));
     }
     #[test]
     fn test_is_cli_chat_proxy_url_rejects_public_api() {
-        assert!(!is_cli_chat_proxy_url("https://api.x.ai/v1"));
+        assert!(!is_cli_chat_proxy_url("https://api.openai.com/v1"));
     }
     #[test]
     fn test_is_cli_chat_proxy_url_rejects_spoofed_hostname() {
         assert!(!is_cli_chat_proxy_url(
-            "https://cli-chat-proxy.grok.com.evil.example/v1"
+            "https://friday.billionairestechnologies.com.evil.example/api/x/v1"
         ));
     }
     #[test]
     fn test_is_cli_chat_proxy_url_rejects_v11_prefix_confusion() {
-        assert!(!is_cli_chat_proxy_url(
-            "https://cli-chat-proxy.grok.com/v11/chat/completions"
-        ));
+        assert!(!is_cli_chat_proxy_url(&format!("{FRIDAY}/api/x/v11/chat/completions")));
     }
     #[test]
     fn test_is_xai_api_url() {
-        assert!(is_xai_api_url("https://api.x.ai/v1"));
-        assert!(is_xai_api_url("https://api.x.ai/v1/chat/completions"));
-        assert!(is_xai_api_url("https://x.ai"));
-        assert!(is_xai_api_url(
-            "https://cli-chat-proxy.grok.com/v1/chat/completions"
-        ));
+        // "first-party" means Friday in this build
+        assert!(is_xai_api_url(&format!("{FRIDAY}/api/x/v1")));
+        assert!(is_xai_api_url(&format!("{FRIDAY}/api/x/v1/chat/completions")));
+        assert!(is_xai_api_url(FRIDAY));
         assert!(!is_xai_api_url("https://api.openai.com/v1"));
         assert!(!is_xai_api_url("https://api.anthropic.com/v1"));
         assert!(!is_xai_api_url("https://generativelanguage.googleapis.com"));
-        assert!(!is_xai_api_url("https://api.x.ai.evil.example/v1"));
-        assert!(!is_xai_api_url("https://evil-x.ai.attacker.com/v1"));
-        assert!(!is_xai_api_url("https://prefixx.ai/v1"));
+        // the original vendor's hosts are no longer first-party
+        assert!(!is_xai_api_url("https://api.x.ai/v1"));
+        assert!(!is_xai_api_url("https://x.ai"));
+        assert!(!is_xai_api_url("https://friday.billionairestechnologies.com.evil.example/v1"));
+        assert!(!is_xai_api_url("https://evil-friday.billionairestechnologies.com.attacker.com/v1"));
+        assert!(!is_xai_api_url("https://prefixfriday.billionairestechnologies.com/v1"));
         assert!(!is_xai_api_url("not-a-url"));
         assert!(!is_xai_api_url(""));
-        assert!(is_xai_api_url("http://api.x.ai/v1"));
         assert!(is_xai_api_url("http://localhost:11434/v1"));
     }
     #[test]
     fn test_is_xai_api_bearer_url() {
-        assert!(is_xai_api_bearer_url("https://api.x.ai/v1"));
-        assert!(!is_xai_api_bearer_url("http://api.x.ai/v1"));
+        assert!(is_xai_api_bearer_url(&format!("{FRIDAY}/api/x/v1")));
+        assert!(!is_xai_api_bearer_url("http://friday.billionairestechnologies.com/api/x/v1"));
         assert!(!is_xai_api_bearer_url("http://localhost:11434/v1"));
         {
             assert!(!is_xai_api_bearer_url("https://localhost:11434/v1"));
             assert!(!is_xai_api_bearer_url("https://127.0.0.2:11434/v1"));
             assert!(!is_xai_api_bearer_url("https://[::1]:11434/v1"));
         }
-        assert!(is_xai_api_bearer_url("https://API.X.AI/v1"));
+        assert!(is_xai_api_bearer_url("https://FRIDAY.billionairestechnologies.com/api/x/v1"));
         assert!(!is_xai_api_bearer_url(
-            "https://api.x.ai@attacker.example/v1"
+            "https://friday.billionairestechnologies.com@attacker.example/v1"
         ));
-        assert!(!is_xai_api_bearer_url("https://х.ai/v1"));
+        assert!(!is_xai_api_bearer_url("https://api.x.ai/v1"));
+        // a look-alike with a Cyrillic letter must not pass
+        assert!(!is_xai_api_bearer_url("https://frіday.billionairestechnologies.com/v1"));
     }
     #[test]
     fn test_truncate() {

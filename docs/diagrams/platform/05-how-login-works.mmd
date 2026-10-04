@@ -1,0 +1,37 @@
+sequenceDiagram
+  actor U as User
+  participant FE as Login dialog
+  participant API as /api/auth
+  participant Mail as Resend
+  participant G as Google
+  participant DB as Supabase Auth
+  participant CLI as Friday X (terminal / editor)
+
+  alt Email and password
+    U->>FE: Email + password
+    FE->>API: POST /login
+    API->>DB: Check password
+    API->>Mail: Send 6-digit OTP
+    U->>FE: Enter OTP
+    FE->>API: POST /verify-otp
+    API-->>FE: Session JWT
+  else Google
+    U->>FE: Continue with Google
+    FE->>API: GET /auth/google/start
+    API->>G: OAuth consent
+    G-->>API: Code
+    API->>DB: Create or reuse user
+    API-->>FE: Hash friday_session
+    FE->>FE: Store JWT locally
+  else Company SSO
+    U->>FE: Continue with Company SSO
+    FE->>SSO: SSO_ENTRY_URL
+  else Terminal or editor (Friday X)
+    U->>CLI: friday login
+    CLI->>API: POST /api/x/oauth2/device/code
+    CLI->>U: Opens /device, shows a code
+    U->>FE: Signs in as above, checks the code, Approve
+    FE->>API: POST /api/x/auth/device/approve
+    CLI->>API: Poll /oauth2/token
+    API-->>CLI: Revocable fxt_ token (scoped to /api/x)
+  end

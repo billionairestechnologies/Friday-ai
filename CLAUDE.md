@@ -18,9 +18,9 @@ Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0044 (apply in order; RLS on, backend uses service role)
-cli/        Friday X CLI — terminal coding agent (Rust, Apache-2.0 fork; own LICENSE/NOTICE). Under construction.
-ide/        Friday X IDE extensions (VS Code, JetBrains, other ACP editors) — thin clients over the same login + gateway. Planned.
+supabase/   SQL migrations 0001…0050 (apply in order; RLS on, backend uses service role)
+cli/        Friday X CLI — terminal coding agent `friday` (Rust, Apache-2.0 fork; own LICENSE/NOTICE)
+ide/        Friday X editor integrations: vscode/ extension; JetBrains/Zed use `friday agent stdio` (ACP) — see ide/README.md
 docs/       README.md (index) · architecture/ · operations/ · product/ · diagrams/ (Mermaid .mmd → png/svg)
 scripts/    verify-migrations.mjs, react preview shell generator
 ```
@@ -36,6 +36,17 @@ npm --prefix backend test                                  # node:test via tsx, 
 npm --prefix backend run build && npm --prefix frontend run build
 npm run verify                                             # all of the above in one go
 cd backend && npm run dev        # API on :4000   |   cd frontend && npm run dev   # Vite on :5173, proxies /api
+```
+
+Friday X CLI (`cli/`, Rust — needs rustup; `rust-toolchain.toml` pins 1.94.0; `protoc` on PATH or `PROTOC=`):
+
+```bash
+cd cli && cargo build -p xai-grok-pager-bin          # target/debug/friday
+python3 cli/scripts/audit-egress.py                    # no vendor host in production code (CI: friday-x-ci.yml)
+cargo test -p xai-grok-env -p xai-grok-config -p xai-grok-auth -p xai-grok-shell-base -p xai-grok-login -p xai-grok-agent -p xai-grok-update
+FRIDAY_X_URL=http://localhost:4000 friday login      # point a build at a local backend
+(cd ide/vscode && npm install && npm run compile)     # VS Code extension
+node scripts/build-diagrams.mjs                       # re-render diagrams, index, leadership pack, zip
 ```
 
 Gotchas:
@@ -55,7 +66,7 @@ Gotchas:
 
 ## Backend map (backend/src)
 
-- `app.ts` routes: `/api/{health,auth,admin/providers,admin/quota,models,chat,share,push,library,memory,automations,mcp,build,voice,sandbox,usage,projects,billing,connectors,organizations,app,console,updates,support,email,offers,status,files,skills}`
+- `app.ts` routes: `/api/{health,auth,admin/providers,admin/quota,models,chat,share,push,library,memory,automations,mcp,build,voice,sandbox,usage,projects,billing,connectors,organizations,app,console,updates,support,email,offers,status,files,skills,pages,x}` plus the public `/x/*` installer surface (outside `/api`)
 - `services/providers/` — one adapter per vendor implementing `ProviderAdapter` (`types.ts`):
   `listModels`, `chat`, `chatStream`, `healthCheck`, optional **`chatStreamWithTools`**.
   `toolCalling.ts` holds the three tool dialects: OpenAI-compatible (openai, openrouter), Anthropic
@@ -124,6 +135,16 @@ Gotchas:
   documents and uploads (`libraryService.listLibrary`).
 - `services/skills/` — `catalog.ts` (16 built-in playbooks), `skillService.ts` (user skills + per-user
   toggles, `skillMenu` for the prompt, `activeSkillPrompt` for a composer-picked skill). Tool `use_skill`.
+- **Friday X** (terminal + editor agent; spec in `docs/product/FRIDAY_X.md`): `services/cli/` — `deviceAuth.ts` (RFC 8628 device
+  login, `fxt_` tokens stored as SHA-256 only, revocable; migration 0050), `gateway.ts` (`/api/x/v1/chat/completions`: OpenAI wire
+  format in/out over the existing provider adapters, charged through the SAME credit meter + ledger as chat, feature `code`;
+  `listCliModels` / `resolveCliModel` with `friday-x/auto` = best coding model the plan allows; `contextWindowFor`; `cliUser`,
+  `cliSettings` = server-driven client settings), `openaiCompat.ts` (pure wire translation; Gemini thought signatures ride inside tool
+  call ids), `installScripts.ts` + `releases.ts` (`/x/install.sh|ps1|cmd`, `/x/version|download|sha256`; binaries live in the
+  releases bucket, `FRIDAY_X_RELEASES_URL`, pin with `FRIDAY_X_VERSION_PIN`). Routes: `routes/cli.ts` (public handshake / web approval /
+  CLI-token sections), `routes/install.ts`; `middleware/cliAuth.ts` checks token + the `fridayX` entitlement on EVERY request. Web:
+  `routes/device.tsx` (`/device`), Settings → Friday X (install commands, signed-in devices).
+  **Rule: no client holds plans, models or limits** — the CLI/editors read everything from `/api/x` at runtime.
 - `services/billingService.ts` — prices from the catalog; `planId: "package"` checkout; webhook applies
   plans, enterprise seats (catalog tokens/seat) or packages (as access grants).
 
@@ -152,6 +173,21 @@ Gotchas:
   `lib/crash.ts` (crash reporter → `/api/status/crash`).
 - Legal: `lib/site/legal.ts` — POLICY_VERSION must match backend `policyService.ts`, Android
   `FridayViewModel.POLICY_VERSION` and iOS `FridayViewModel.policyVersion` (bump all four together).
+
+## Friday X (CLI + IDE) — what to know before touching it
+
+- `cli/` is a modified fork of Grok Build (Apache-2.0): the first commit that adds it is the pristine upstream snapshot, every later commit
+  is a Friday change (that history is the §4(b) "state your changes" record). Keep `LICENSE`, `NOTICE`, `THIRD-PARTY-NOTICES`.
+- Crates keep their `xai-*` names (upstream merges stay tractable); user-visible names are Friday X: binary `friday`, `~/.friday`,
+  `FRIDAY_*` env, `FRIDAY.md`. `FRIDAY_X_URL` moves the whole client to another Friday server.
+- Friday is the "first-party authority": see `xai-grok-login/src/backend/friday.rs`, `xai-grok-env` (`friday_origin`, the allow-list of
+  `/api/x` paths), `xai-grok-shell-base/src/util` (which hosts may receive the bearer), `xai-grok-auth/src/retry_middleware.rs`
+  (refuses any Friday request off the allow-list). Under `cargo test` the login crate's inherited suite runs against the original
+  backend/issuer fixtures (`ActiveAuthBackend` is cfg(test)-aliased); Friday's own backend is tested in `friday.rs`.
+- Withheld by `Distribution::current()`: telemetry, error reporting, remote control, voice. Off by default: web search, image/video
+  tools, feedback. Prompt templates live in `xai-grok-agent/templates/*.md`; after editing, run `python3 cli/scripts/encrypt_templates.py`.
+- The e2e rig used to verify it (mock Friday server + an egress-refusing proxy) is described in `docs/product/FRIDAY_X.md`; to repeat it,
+  serve `/api/x/oauth2/*`, `/v1/{models,user,settings,chat/completions}` and run `friday` with `FRIDAY_HOME`, `FRIDAY_X_URL`, `HTTP(S)_PROXY`.
 
 ## Testing a branch / switching branches
 
