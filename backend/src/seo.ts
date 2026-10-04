@@ -62,7 +62,7 @@ export const PUBLIC_PAGES: Record<string, PageMeta> = {
 };
 
 /** App pages that exist but are private or per-user — served, but kept out of search results. */
-const PRIVATE_PREFIXES = ["/c/", "/build", "/pages", "/automations", "/admin", "/share/", "/mobile-auth-bridge", "/projects", "/team", "/library", "/upgrade"];
+const PRIVATE_PREFIXES = ["/c/", "/build", "/pages", "/automations", "/admin", "/share/", "/mobile-auth-bridge", "/projects", "/team", "/library", "/upgrade", "/device"];
 
 function isKnownAppPath(p: string) {
   return p in PUBLIC_PAGES || PRIVATE_PREFIXES.some((prefix) => p === prefix.replace(/\/$/, "") || p.startsWith(prefix));
