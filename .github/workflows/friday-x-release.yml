@@ -49,9 +49,19 @@ jobs:
         with:
           workspaces: cli
           key: ${{ matrix.target }}
+      - name: Free disk (Linux)
+        if: runner.os == 'Linux'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      # The release-dist profile (codegen-units=1, debug, thin LTO) took >60 min on 2-4 core free runners. For the
+      # shipped binary, parallel codegen + no debuginfo + no LTO builds in ~15 min and is a few % slower at runtime.
       - name: Build
         working-directory: cli
         shell: bash
+        env:
+          CARGO_PROFILE_RELEASE_DIST_CODEGEN_UNITS: "16"
+          CARGO_PROFILE_RELEASE_DIST_DEBUG: "0"
+          CARGO_PROFILE_RELEASE_DIST_LTO: "off"
+          CARGO_PROFILE_RELEASE_DIST_INCREMENTAL: "false"
         run: cargo build --profile release-dist -p xai-grok-pager-bin --target ${{ matrix.target }}
 
       - name: Stage binary and checksum
