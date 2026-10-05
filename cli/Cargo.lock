@@ -14047,6 +14047,7 @@ dependencies = [
  "uuid",
  "webbrowser",
  "wiremock",
+ "xai-dirs",
  "xai-file-utils",
  "xai-grok-auth",
  "xai-grok-config",

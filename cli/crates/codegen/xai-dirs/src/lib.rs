@@ -96,6 +96,26 @@ pub fn user_grok_home() -> Option<PathBuf> {
     resolve_grok_home().is_some().then(grok_home)
 }
 
+/// Where FridayX mirrors the Friday web app's connectors as plugins (`marketplace/` = every app, `active/` = the
+/// ones this user connected). Written by the login crate's sync from `/api/x/v1/plugins`; read by plugin discovery.
+pub fn friday_plugins_root() -> Option<PathBuf> {
+    user_grok_home().map(|h| h.join("friday-plugins"))
+}
+
+/// The marketplace folder (a local source named "Friday").
+pub fn friday_marketplace_dir() -> Option<PathBuf> {
+    friday_plugins_root().map(|r| r.join("marketplace"))
+}
+
+/// One folder per connected app; discovery enables these automatically, so connecting an app in the web app is all it takes.
+pub fn friday_active_plugin_dirs() -> Vec<PathBuf> {
+    let Some(root) = friday_plugins_root().map(|r| r.join("active")) else { return Vec::new() };
+    let Ok(entries) = std::fs::read_dir(root) else { return Vec::new() };
+    let mut dirs: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.join("plugin.json").is_file()).collect();
+    dirs.sort();
+    dirs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

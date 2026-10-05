@@ -60,14 +60,33 @@ pub(crate) fn merge_managed_mcp_servers_with_policy(
     )
 }
 
+/// Name of the built-in server that carries the user's Friday connectors (Gmail, GitHub, Drive, Notion…).
+pub(crate) const FRIDAY_MCP_SERVER_NAME: &str = "friday";
+
+/// The signed-in user's Friday connectors as one MCP server. Tokens for the connected apps never leave the Friday
+/// server — the CLI only holds its own `fxt_` token and the tools run server-side. `None` when not signed in.
+pub(crate) fn friday_mcp_server() -> Option<acp::McpServer> {
+    let home = xai_grok_tools::util::grok_home::grok_home();
+    let store = xai_grok_login::read_auth_json(&xai_grok_login::auth_json_path(&home)).ok()?;
+    let token = store.values().map(|a| a.key.clone()).find(|k| k.starts_with("fxt_"))?;
+    let url = format!("{}/mcp", xai_grok_env::friday_api_base());
+    Some(acp::McpServer::Http(
+        acp::McpServerHttp::new(FRIDAY_MCP_SERVER_NAME, url)
+            .headers(vec![acp::HttpHeader::new("Authorization", format!("Bearer {token}"))]),
+    ))
+}
+
 /// Test seam: `managed_settings()` is a `OnceLock`, so tests inject a constructed policy here.
 fn merge_managed_mcp_servers_with_policy_from(
-    client_mcp_servers: Vec<acp::McpServer>,
+    mut client_mcp_servers: Vec<acp::McpServer>,
     cwd: &std::path::Path,
     plugin_registry: Option<&xai_grok_agent::plugins::PluginRegistry>,
     compat: &xai_grok_tools::types::compat::CompatConfig,
     ms: &xai_grok_workspace::permission::resolution::ManagedSettings,
 ) -> Vec<McpServerWithPolicy> {
+    if !client_mcp_servers.iter().any(|s| mcp_server_name(s) == FRIDAY_MCP_SERVER_NAME) {
+        client_mcp_servers.extend(friday_mcp_server());
+    }
     let project = crate::agent::folder_trust::project_scoped_mcp_names(cwd);
     let resolved = {
         let _mcp_merge_timer = crate::instrumentation::timer("mcp_merge_managed");

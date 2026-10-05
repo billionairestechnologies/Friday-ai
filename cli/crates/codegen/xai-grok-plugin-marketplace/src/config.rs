@@ -46,6 +46,17 @@ pub fn env_require_sha() -> bool {
 
 /// Reads `[marketplace].sources` array. Returns empty vec if not configured.
 pub fn load_sources(config: &toml::Value) -> Vec<MarketplaceSource> {
+    let mut sources = load_configured_sources(config);
+    // Friday's own marketplace: every Friday app as a plugin, mirrored from the server (see xai-grok-login friday_plugins).
+    if let Some(dir) = xai_dirs::friday_marketplace_dir().filter(|d| d.is_dir()) {
+        if !sources.iter().any(|s| matches!(&s.kind, SourceKind::Local { path } if *path == dir)) {
+            sources.insert(0, MarketplaceSource { name: "Friday".to_string(), kind: SourceKind::Local { path: dir } });
+        }
+    }
+    sources
+}
+
+fn load_configured_sources(config: &toml::Value) -> Vec<MarketplaceSource> {
     let Some(marketplace) = config.get("marketplace") else {
         return Vec::new();
     };
@@ -182,6 +193,11 @@ pub fn native_settings_roots() -> Vec<PathBuf> {
 /// Settings roots owned by other tools (`~/.claude`); sources found here are
 /// foreign for policy scoping.
 pub fn foreign_settings_roots() -> Vec<PathBuf> {
+    // FridayX's plugin screens show Friday (and sources the user adds here), not another product's marketplaces that
+    // happen to sit in `~/.claude`. `FRIDAY_IMPORT_CLAUDE_PLUGINS=1` brings the import back.
+    if std::env::var("FRIDAY_IMPORT_CLAUDE_PLUGINS").ok().as_deref() != Some("1") {
+        return Vec::new();
+    }
     xai_dirs::home_dir()
         .map(|h| h.join(".claude"))
         .into_iter()

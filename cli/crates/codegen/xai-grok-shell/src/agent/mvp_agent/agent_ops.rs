@@ -372,6 +372,8 @@ impl MvpAgent {
         if self.plugin_registry_initialized.replace(true) {
             return;
         }
+        // Mirror Friday's apps (connected or not) as plugins before discovery reads them; fast no-op when fresh.
+        xai_grok_login::friday_plugins::sync_if_stale();
         let remote_settings = self.cfg.borrow().remote_settings.clone();
         let (trusted, disk_config) = Self::registry_build_inputs(
             &self.launch_cwd,

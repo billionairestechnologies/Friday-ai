@@ -118,6 +118,9 @@ impl PluginRegistry {
     ) -> Self {
         let mut plugins = HashMap::new();
         let mut mcp_owners = HashMap::new();
+        let friday_active_root = xai_dirs::friday_plugins_root()
+            .map(|r| r.join("active"))
+            .and_then(|p| p.canonicalize().ok());
 
         for dp in discovered {
             let name = dp.manifest.name.clone();
@@ -169,10 +172,16 @@ impl PluginRegistry {
             // Determine enabled status.
             // Every plugin should be in either the `enabled` or `disabled` list (`DiscoveryConfig::populate_plugin_lists` ensures this)
             // A plugin is enabled only if it is in the `enabled` list and NOT in the `disabled` list (disabled takes precedence on conflict)
+            // Friday's connected-app plugins are on by default: connecting an app in the web app is the user's opt-in.
+            let friday_connected = friday_active_root
+                .as_ref()
+                .is_some_and(|active| dp.root.canonicalize().is_ok_and(|r| r.starts_with(active)));
             let explicitly_enabled = enabled
                 .iter()
                 .any(|e| e == &dp.id.0 || e == &dp.manifest.name);
-            let enabled = !is_disabled(&dp, disabled) && explicitly_enabled;
+            // `populate_plugin_lists` parks every User-scope plugin on the disabled list, so connected-app plugins
+            // bypass it: connect/disconnect in the Friday web app is the on/off switch for them.
+            let enabled = friday_connected || (!is_disabled(&dp, disabled) && explicitly_enabled);
 
             let mut loaded = LoadedPlugin {
                 name: name.clone(),

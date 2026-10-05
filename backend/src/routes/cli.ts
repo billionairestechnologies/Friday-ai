@@ -14,6 +14,8 @@ import {
   revokeCliSession,
   startDeviceAuthorization,
 } from "../services/cli/deviceAuth.js";
+import { createTicket } from "../services/console/supportService.js";
+import { connectedAppsSummary, handleMcpRequest, pluginCatalog } from "../services/cli/mcpServer.js";
 import { AUTO_MODEL, assertFridayX, cliSettings, cliStatus, cliUser, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
 
 /**
@@ -234,15 +236,87 @@ cliRouter.get(
         .map((m) => ({
           id: m.id,
           object: "model",
-          owned_by: m.provider,
+          // Never the vendor: FridayX shows model names only (the provider is Friday's business, not the user's).
+          owned_by: "friday",
           name: m.name,
-          description: `${m.provider}${m.recommended ? " · recommended for coding" : ""}`,
+          description: m.recommended ? "Recommended for coding" : "",
           context_window: m.contextWindow,
           api_backend: "chat_completions",
           supports_vision: m.vision,
         })),
       ],
     });
+  }),
+);
+
+// Friday's connectors as an MCP server (stateless JSON-RPC over Streamable HTTP); see services/cli/mcpServer.ts.
+cliRouter.post(
+  "/mcp",
+  requireCliAuth,
+  gatewayLimit,
+  asyncHandler(async (req, res) => {
+    const body = req.body;
+    if (Array.isArray(body)) {
+      const replies = (await Promise.all(body.map((m) => handleMcpRequest(req.user!.id, m ?? {})))).filter(Boolean);
+      return replies.length ? res.json(replies) : res.status(202).end();
+    }
+    const reply = await handleMcpRequest(req.user!.id, body ?? {});
+    return reply ? res.json(reply) : res.status(202).end();
+  }),
+);
+cliRouter.get("/mcp", (_req, res) => res.status(405).setHeader("Allow", "POST").end());
+
+// Feedback from the terminal lands in the Team Console as a support ticket (category "feedback"), like every other channel.
+const feedbackLimit = rateLimit({ name: "x-feedback", limit: 20, windowMs: 60 * 60_000 });
+cliRouter.post(
+  "/v1/feedback",
+  requireCliAuth,
+  feedbackLimit,
+  asyncHandler(async (req, res) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const text = String(b.feedbackText ?? b.feedback_text ?? "").trim().slice(0, 8000);
+    const rating = typeof b.ratingValue === "number" ? b.ratingValue : typeof b.rating_value === "number" ? b.rating_value : null;
+    const cats = Array.isArray(b.feedbackCategories) ? b.feedbackCategories.map(String).slice(0, 8).join(", ") : "";
+    const userId = req.user!.id;
+    const [{ data }, profile] = await Promise.all([
+      supabaseAdmin.auth.admin.getUserById(userId),
+      supabaseAdmin.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+    ]);
+    const lines = [
+      text || "(no text — rating only)",
+      "",
+      `— from FridayX${typeof b.shellVersion === "string" ? ` ${b.shellVersion.slice(0, 20)}` : ""}`,
+      rating !== null ? `Rating: ${rating}` : "",
+      cats ? `Categories: ${cats}` : "",
+      typeof b.modelId === "string" ? `Model: ${b.modelId.slice(0, 80)}` : "",
+    ].filter((l, i) => i < 2 || l);
+    const ticket = await createTicket({
+      userId,
+      email: data.user?.email ?? "unknown@friday.local",
+      name: profile.data?.full_name ?? "FridayX user",
+      subject: `FridayX feedback: ${(text || "rating").replace(/\s+/g, " ").slice(0, 80)}`,
+      body: lines.join("\n"),
+      category: "feedback",
+      channel: "app",
+    });
+    res.json({ feedbackId: String(ticket.id), createdAt: new Date().toISOString() });
+  }),
+);
+
+// The plugin catalog the terminal mirrors into its Plugins / Marketplace tabs (see services/cli/mcpServer.ts).
+cliRouter.get(
+  "/v1/plugins",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await pluginCatalog(req.user!.id));
+  }),
+);
+
+cliRouter.get(
+  "/v1/connectors",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await connectedAppsSummary(req.user!.id));
   }),
 );
 

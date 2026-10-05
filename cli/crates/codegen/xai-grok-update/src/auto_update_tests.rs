@@ -1516,7 +1516,7 @@ async fn test_cleanup_old_downloads_darwin_platform_recognized() {
 
 #[test]
 fn test_user_facing_constants_are_stable() {
-    assert_eq!(PROMPT_UPDATE_NOW, "Update now? [Y/n/d]");
+    assert_eq!(PROMPT_UPDATE_NOW, "Download and install the update now? [Y/n]");
     assert_eq!(
         MSG_AUTO_UPDATE_BACKGROUND,
         "Auto-update running in background."

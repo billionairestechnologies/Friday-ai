@@ -154,6 +154,10 @@ struct KnownMarketplaceEntry {
 /// Plugin dirs are filtered to names listed in `~/.claude/settings{.local}.json` `enabledPlugins`, so never-installed catalog plugins are skipped.
 /// A `false` entry there is an installed-but-disabled plugin; it is still discovered so its state can be mirrored.
 pub fn resolve_known_marketplaces() -> Vec<ResolvedMarketplace> {
+    // Same rule as `foreign_settings_roots`: no other product's marketplaces unless explicitly imported.
+    if std::env::var("FRIDAY_IMPORT_CLAUDE_PLUGINS").ok().as_deref() != Some("1") {
+        return vec![];
+    }
     let Some(home) = xai_dirs::home_dir() else {
         return vec![];
     };

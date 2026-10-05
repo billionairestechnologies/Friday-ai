@@ -44,6 +44,12 @@ pub const FRIDAY_ALLOWED_API_PATHS: &[&str] = &[
     "/v1/settings",
     "/v1/user",
     "/v1/chat/completions",
+    // Friday's own MCP server: the user's connected apps (Gmail, GitHub, Drive…) as tools, run server-side.
+    "/mcp",
+    // Feedback becomes a support ticket in the Friday Team Console.
+    "/v1/feedback",
+    // Friday apps mirrored as FridayX plugins (Plugins / Marketplace tabs).
+    "/v1/plugins",
     "/me",
     "/oauth2/device/code",
     "/oauth2/token",

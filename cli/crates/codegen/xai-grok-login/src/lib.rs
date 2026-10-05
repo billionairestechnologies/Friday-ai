@@ -22,6 +22,8 @@ pub mod device_code;
 pub mod error;
 pub mod external_auth;
 pub mod flow;
+pub mod friday_plugins;
+pub mod friday_usage;
 pub mod grok_auth_credentials;
 pub mod jwt;
 pub mod manager;

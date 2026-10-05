@@ -29,7 +29,7 @@ pub enum UpdateRunMode {
     NonBlocking,
 }
 
-const PROMPT_UPDATE_NOW: &str = "Update now? [Y/n/d]";
+const PROMPT_UPDATE_NOW: &str = "Download and install the update now? [Y/n]";
 const MSG_AUTO_UPDATE_BACKGROUND: &str = "Auto-update running in background.";
 const MSG_RUN_UPDATE_MANUAL: &str = "Run `friday update` to get the latest version.";
 
@@ -794,14 +794,8 @@ pub async fn run_update_if_available(
         }
         return Ok(false);
     } else {
-        if current_config
-            .cli
-            .dismissed_version
-            .as_deref()
-            .is_some_and(|v| v == latest_version)
-        {
-            return Ok(false);
-        }
+        // FridayX asks on every launch until the update is installed: a "no" only skips this launch (a persisted
+        // dismissal would hide a fix the owner wants everyone on).
         eprintln!(
             "A new version of FridayX is available: {} -> {}{}",
             current_version, latest_version, channel_label
@@ -822,15 +816,6 @@ pub async fn run_update_if_available(
                     } else {
                         eprintln!("{}", MSG_AUTO_UPDATE_BACKGROUND);
                         return Ok(false);
-                    }
-                } else if ans == "d" || ans == "dismiss" {
-                    let dismissed = latest_version.clone();
-                    if let Err(e) = config::update_config(|st| {
-                        st.cli.dismissed_version = Some(dismissed);
-                    })
-                    .await
-                    {
-                        tracing::warn!("Failed to save dismissed version: {}", e);
                     }
                 }
             }

@@ -1320,6 +1320,21 @@ impl AgentView {
         ) {
             status.push("context", ctx_line);
         }
+        // Friday plan usage as a small percentage (tightest window, from the server) — green-ish quiet until it matters.
+        if let Some(usage) = xai_grok_login::friday_usage::usage_label() {
+            let color = match usage.percent {
+                95..=100 => ratatui::style::Color::Red,
+                80..=94 => ratatui::style::Color::Yellow,
+                _ => theme.gray,
+            };
+            status.push(
+                "friday_usage",
+                Line::from(Span::styled(
+                    usage.text,
+                    Style::default().fg(color).bg(theme.bg_base),
+                )),
+            );
+        }
         let hover_or = |hovered: bool, resting: Style| {
             if hovered {
                 bg.fg(theme.text_primary)

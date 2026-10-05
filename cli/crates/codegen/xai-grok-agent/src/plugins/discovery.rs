@@ -403,6 +403,20 @@ pub fn discover_plugins(
     }
 
     // 6. Config-path plugins
+    // The user's connected Friday apps (mirrored by the login crate). Guidance-only plugins (a skill, no hooks, no MCP
+    // servers, no code), so they load as trusted user plugins; registry.rs switches them on by default.
+    for dir in xai_dirs::friday_active_plugin_dirs() {
+        collect_plugin(
+            &dir,
+            PluginScope::User,
+            PluginOrigin::UserGrok,
+            trust_store,
+            project_trusted,
+            &mut seen_paths,
+            &mut candidates,
+        );
+    }
+
     for dir in &config.config_paths {
         if dir.is_dir() {
             collect_plugin(

@@ -1838,10 +1838,10 @@ impl Config {
     pub fn is_trace_upload_enabled(&self) -> bool {
         self.resolve_trace_upload().value
     }
-    /// Always off: feedback submission and trace attachments went to the original vendor's service, and FridayX
-    /// has no such ingestion. (Problem reports go through the Friday web app's support center.)
+    /// On: FridayX feedback goes to Friday's own `/api/x/v1/feedback` (a support ticket in the Team Console). The
+    /// vendor trace upload stays off (`is_trace_upload_enabled`), and the egress allow-list refuses any other path.
     pub fn is_feedback_enabled(&self) -> bool {
-        false
+        true
     }
     pub(crate) fn is_session_recap_enabled(&self) -> bool {
         self.is_feature_enabled(Feature::SessionRecap)
