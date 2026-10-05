@@ -52,6 +52,13 @@ const PROMPTS = [
   "Write a Python script that renames files in bulk",
 ];
 
+const AIR_PROMPTS = [
+  "Book the table, message them, then stop",
+  "Build the page and stay on it until it runs",
+  "Check the morning news and send the short version",
+  "Call me only if a login is blocking you",
+];
+
 const BUILD_PROMPTS = [
   "Build a SaaS landing page with pricing and a waitlist form",
   "Create a Kanban board app with drag and drop",
@@ -730,8 +737,6 @@ export function Home({ conversationId, workspace = "chat", origin = "web" }: { c
                         Stay on it
                       </label>
                     </div>
-                    <AirPassphraseCard />
-                    <AirLinkCard />
                     {screenUrl && <AirScreen url={screenUrl} conversationId={conversationId} />}
                   </>
                 ) : available ? (
@@ -794,7 +799,7 @@ export function Home({ conversationId, workspace = "chat", origin = "web" }: { c
                 />
                 {available && !(air && !airUnlocked) && (
                   <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {(buildMode ? BUILD_PROMPTS : PROMPTS).map((p, i) => (
+                    {(buildMode ? BUILD_PROMPTS : air ? AIR_PROMPTS : PROMPTS).map((p, i) => (
                       <motion.button
                         key={p}
                         type="button"
@@ -808,6 +813,13 @@ export function Home({ conversationId, workspace = "chat", origin = "web" }: { c
                       </motion.button>
                     ))}
                   </div>
+                )}
+                {available && air && airUnlocked && (
+                  <details className="mx-auto mt-6 w-full max-w-md text-left">
+                    <summary className="cursor-pointer text-xs text-muted">Passphrase, WhatsApp, and Telegram</summary>
+                    <AirPassphraseCard />
+                    <AirLinkCard />
+                  </details>
                 )}
                 {!isPending && !(user && !user.isDevFallback) && (
                   <nav className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-subtle" aria-label="About Friday">
