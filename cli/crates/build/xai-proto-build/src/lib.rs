@@ -150,6 +150,19 @@ impl XaiProtoBuilder {
             );
         }
 
+        // Windows has no /dev/stdout or /dev/null for protoc to write the dependency list to (the
+        // release build failed with "/dev/stdout: No such file or directory"), so there just track
+        // the .proto files themselves: a coarser rerun trigger, same generated code.
+        if cfg!(windows) {
+            for proto in protos {
+                println!(
+                    "cargo:rerun-if-changed={}",
+                    proto.to_str().context("proto path not UTF-8")?
+                );
+            }
+            return Ok(());
+        }
+
         // Can only process one input file when using --dependency_out=FILE.
         for proto in protos {
             let mut command = Command::new(protoc.unwrap_or(Path::new("protoc")));
