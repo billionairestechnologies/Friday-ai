@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   ChevronDown,
-  FileText,
   FolderKanban,
   Hammer,
   LibraryBig,
@@ -269,14 +268,6 @@ export function Sidebar() {
               label="Library"
               onClick={() => {
                 void navigate({ to: "/library" });
-                if (window.innerWidth < 768) setOpen(false);
-              }}
-            />
-            <NavRow
-              icon={FileText}
-              label="Pages"
-              onClick={() => {
-                void navigate({ to: "/pages" });
                 if (window.innerWidth < 768) setOpen(false);
               }}
             />

@@ -8,14 +8,13 @@ import { loadMcpTools } from "./mcpService.js";
 import { googleToolsForScopes } from "./tools/google.js";
 import { MEMORY_TOOLS } from "./tools/memory.js";
 import { createDocumentTool } from "./tools/documents.js";
-import { PAGE_TOOLS } from "./tools/pages.js";
 import { useSkillTool } from "./tools/skills.js";
 import type { FridayTool } from "./tools/types.js";
 import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
-  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), ...browserTools(), ...PAGE_TOOLS, createDocumentTool, useSkillTool];
+  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), ...browserTools(), createDocumentTool, useSkillTool];
   // Both lookups sit on the critical path before the first token — run them concurrently.
   const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());
@@ -57,7 +56,7 @@ export const DEEP_RESEARCH_PROMPT =
   "link to its source at the point it's used, not just in the list at the end.\n\n" +
   "Do not stop after one or two searches and call it done — that is the failure mode this mode exists to prevent. " +
   "Keep researching until the sub-questions from your plan are genuinely answered with evidence, not assumed.\n\n" +
-  "The report is delivered IN THE CHAT. Do not call create_document or create_page unless the user explicitly asked for a " +
+  "The report is delivered IN THE CHAT. Do not call create_document unless the user explicitly asked for a " +
   "file; after the report you may offer to turn it into a document, deck or spreadsheet.";
 
 const CONNECTABLE: { app: string; probe: string }[] = [
@@ -114,17 +113,13 @@ export function toolUsePrompt(tools: FridayTool[], skillMenu = ""): string {
       ? "Use fetch_url to read a page; use browser only when you must interact (search forms, filters, clicking through, " +
         "JavaScript-only pages). Never sign in, pay, book, send or delete without the user confirming in chat."
       : null,
-    names.includes("create_page") || names.includes("create_document")
-      ? "FILES ONLY ON REQUEST: create a page or file (create_page / create_document) ONLY when the user's latest message asks for " +
+    names.includes("create_document")
+      ? "FILES ONLY ON REQUEST: create a file (create_document) ONLY when the user's latest message asks for " +
         "one, or clearly says yes to a file you offered. Asking you to research, look up, find out, explain, compare or analyse " +
         "is a request for an ANSWER IN THE CHAT — never turn it into a spreadsheet, deck or Word file on your own, even if " +
         "earlier messages mentioned those formats. When the answer would make a good file, finish it in chat and offer to " +
-        "turn it into one."
-      : null,
-    names.includes("create_page")
-      ? "For a doc, report, plan, spreadsheet, tracker or deck the user will keep working on, make a live page with " +
-        "create_page (they edit it in place, share it, export it). To change one later: read_page, then update_page. " +
-        "Use create_document only when they ask for a file in a specific format."
+        "turn it into one. Every file you make (presentation, PDF, spreadsheet, Word document, code file…) is saved to the " +
+        "user's Library, so tell them it is there."
       : null,
     names.includes("create_document")
       ? "When the user wants a presentation, spreadsheet, Word document, PDF or another file, make the real file with create_document " +

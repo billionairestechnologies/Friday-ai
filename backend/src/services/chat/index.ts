@@ -54,7 +54,6 @@ import { researchAgentsTool } from "../agent/tools/research.js";
 import { setTurnKind } from "../jobs/turns.js";
 import { projectSearchTool } from "../agent/tools/projectSearch.js";
 import { readyFileNames } from "../knowledge/projectKnowledge.js";
-import { pagesInConversation } from "../pages/pageService.js";
 import { buildCandidates, isBuildModel } from "../projectBuild/buildModels.js";
 import type { RepoRef } from "../projectBuild/github.js";
 import { alreadyAsked, clarifyRequest, ASK_MARKER } from "../projectBuild/clarify.js";
@@ -497,18 +496,9 @@ export async function streamMessage(
     // Memory + project context are pinned AFTER trimming, so a long chat can never trim them away.
     const memoryPrompt = await memoryPromptPromise;
     const activeSkill = await activeSkillPromise;
-    // Live pages made earlier in this chat: the model needs their ids to read/revise them later.
-    const chatPages = await pagesInConversation(conversationId).catch(() => []);
     const pinnedContext: ChatMessage[] = [
       ...(memoryPrompt ? [{ role: "system" as const, content: memoryPrompt }] : []),
       ...projectContext,
-      ...(chatPages.length
-        ? [{
-            role: "system" as const,
-            volatile: true,
-            content: `Friday pages in this chat (the user may have edited them — read_page before changing one):\n${chatPages.map((p) => `- ${p.kind} "${p.title}" — page_id ${p.id}, version ${p.version}`).join("\n")}`,
-          }]
-        : []),
       ...(activeSkill ? [{ role: "system" as const, content: activeSkillPrompt(activeSkill) }] : []),
     ];
     const history = appendExtractedText(
