@@ -1,24 +1,25 @@
 # To-do
 
-Air Dots. Nothing here is started. Do them in order. Each one lands on Friday, not in a side app.
+Air Dots lives on the `v3` branch of Friday. The website door is in. The phone trunks are not.
 
 ## 1. The worker
 
-- [ ] An Air Dot job on the Friday runtime: a graph, a loop, the same shape of work as Build Mode
-- [ ] It runs in the existing per-user E2B sandbox
-- [ ] It keeps going until the task is done
-- [ ] "rukho" or "stop" pauses it
-- [ ] An empty Friday usage meter stops it and keeps the work
-- [ ] Idle machines pause. Start the idle limit at 8 minutes
-- [ ] A daily awake cap so a loop cannot hold a machine open
-- [ ] Browser, shell, and files go through one gate that records the action
-- [ ] Pay, send, and delete wait for a yes
+- [x] An Air Dot job on the Friday runtime: same chat and Build Mode, tagged `origin: air`
+- [x] A clear "build me an app" ask opens the existing E2B sandbox
+- [x] "Stay on it" keeps going for a few turns until the reply says it is done or blocked
+- [x] "rukho" or "stop" pauses it
+- [x] An empty Friday usage meter stops it (the existing quota gate)
+- [ ] Idle machines pause at 8 minutes, and a daily awake cap
+- [ ] Browser, shell, and files go through one recorded gate
+- [x] Pay and delete wait for the passphrase once it is set
 
 ## 2. The website
 
-- [ ] Call now on the Friday site, on the On Air surface
-- [ ] The button is hidden unless the plan is Pro or Premium
-- [ ] Starting a Dot from chat spends only the Friday meter
+- [x] Call now on `/air` (browser line; the phone trunk is still open)
+- [x] Air Dots is hidden unless the plan includes it
+- [x] Starting a Dot spends the Friday meter and shows up as Air Dots
+- [x] Friday's face is the clover bot from bot-avatars, with thinking-orbs while a reply is working and a border beam on the composer
+- [x] States used now: idle, listening, working
 
 ## 3. Outbound call
 
@@ -33,14 +34,16 @@ Air Dots. Nothing here is started. Do them in order. Each one lands on Friday, n
 
 - [ ] One public number. Exotel for India, Telnyx or Twilio for everywhere else
 - [ ] Caller ID matches the account or the call ends
-- [ ] Spoken passphrase, hashed, asked before pay, send, or delete
+- [x] Spoken passphrase, hashed, asked before pay or delete once it is set
 - [ ] They can set or change the passphrase by talking
 
 ## 5. After the job
 
 - [ ] Friday calls back when the Dot is done, if they asked or if that is their setting
 - [ ] The result is also in the Friday thread
-- [ ] Call memory: transcript, capped recap, open loops, on the account
+- [ ] One memory per user, shared by the website, the Air Dot, and the phone
+- [ ] Save every call transcript and every Dot job. Do not trim the store
+- [ ] A new call and a new Dot run both load that user's memory before the first reply
 
 ## Not in this build
 

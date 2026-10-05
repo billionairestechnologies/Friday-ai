@@ -25,3 +25,4 @@ Nothing here is wired into the site yet.
 - Gemini Live is the voice. The worker model is chosen in admin and starts as the Build Mode model.
 - Pipecat carries the call. Exotel is the India number. Telnyx or Twilio is the international number.
 - A registered caller ID is the login. A spoken passphrase is the check before money, a send, or a delete.
+- One memory per user. The website, the Air Dot, and the phone all remember the same things.
