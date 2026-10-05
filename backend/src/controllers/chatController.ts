@@ -205,6 +205,8 @@ export async function live(req: Request, res: Response) {
 
 export async function stopMessage(req: Request, res: Response) {
   stopGeneration(req.params.id!, req.user!.id);
+  const { haltAirJob } = await import("../services/air/jobs.js");
+  haltAirJob(req.params.id!);
   // The turn may be running on another instance — its heartbeat sees this flag and stops it.
   await requestStop(req.params.id!, req.user!.id).catch(() => undefined);
   res.status(204).end();

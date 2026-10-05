@@ -34,7 +34,7 @@ import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
 import { Hammer, Radio, X } from "lucide-react";
-import { AirCallPanel, AirPassphraseCard, FridayFace } from "@/components/friday-presence";
+import { AirCallPanel, AirLinkCard, AirPassphraseCard, AirScreen, FridayFace } from "@/components/friday-presence";
 import { airWorkspace, isAirStop } from "@/lib/air";
 import { usePlan } from "@/lib/usage/planStore";
 import { SITE_NAV } from "@/lib/site/pages";
@@ -553,16 +553,14 @@ export function Home({ conversationId, workspace = "chat", origin = "web" }: { c
       else if (
         air &&
         airStay &&
-        airRounds.current < 3 &&
+        airRounds.current === 0 &&
         !ac.signal.aborted &&
         !live?.error &&
         !askQuestions &&
-        live?.plan?.status !== "pending" &&
-        (live?.text?.length ?? 0) > 40 &&
-        !/\b(done|finished|blocked|stopping)\b/i.test((live?.text ?? "").slice(-500))
+        live?.plan?.status !== "pending"
       ) {
-        airRounds.current += 1;
-        void send("Continue until this is done. If you are blocked, say so and stop.", undefined, undefined, true);
+        airRounds.current = 1;
+        void api.post("/air/jobs", { conversationId });
       }
     }
   }
@@ -733,9 +731,8 @@ export function Home({ conversationId, workspace = "chat", origin = "web" }: { c
                       </label>
                     </div>
                     <AirPassphraseCard />
-                    {screenUrl && (
-                      <iframe title="Friday screen" src={screenUrl} className="mt-4 h-64 w-full max-w-lg rounded-2xl border border-border" />
-                    )}
+                    <AirLinkCard />
+                    {screenUrl && <AirScreen url={screenUrl} conversationId={conversationId} />}
                   </>
                 ) : available ? (
                   <h1 className="relative text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl">

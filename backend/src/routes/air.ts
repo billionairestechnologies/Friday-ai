@@ -4,7 +4,8 @@ import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import { savePassphrase } from "../services/air/passphrase.js";
-import { acceptChannelMessage, airScreen, endCall, linkChannel, openCall, type AirChannel } from "../services/air/doors.js";
+import { acceptChannelMessage, airScreen, askForLogin, callAllowance, dropOnScreen, endCall, linkChannel, openCall, tickCall, type AirChannel } from "../services/air/doors.js";
+import { runAirJob } from "../services/air/jobs.js";
 
 export const airRouter = Router();
 
@@ -55,6 +56,37 @@ airRouter.post(
   }),
 );
 
+airRouter.get(
+  "/minutes",
+  asyncHandler(async (req, res) => {
+    res.json(await callAllowance(req.user!.id));
+  }),
+);
+
+airRouter.post(
+  "/jobs",
+  asyncHandler(async (req, res) => {
+    const body = z.object({ conversationId: z.string().uuid(), task: z.string().min(1).max(8000).optional() }).parse(req.body);
+    res.status(202).json(await runAirJob(req.user!.id, body.conversationId, body.task ?? "Continue until this is done. If you are blocked, say so and stop."));
+  }),
+);
+
+airRouter.post(
+  "/login",
+  asyncHandler(async (req, res) => {
+    const body = z.object({ conversationId: z.string().uuid(), reason: z.string().min(1).max(500), urgent: z.boolean().optional() }).parse(req.body);
+    res.status(202).json(await askForLogin(req.user!.id, body.conversationId, body.reason, Boolean(body.urgent)));
+  }),
+);
+
+airRouter.post(
+  "/calls/:id/tick",
+  asyncHandler(async (req, res) => {
+    const body = z.object({ seconds: z.number().int().min(1).max(60) }).parse(req.body);
+    res.json(await tickCall(req.user!.id, req.params.id!, body.seconds));
+  }),
+);
+
 airRouter.post(
   "/calls/:id/end",
   asyncHandler(async (req, res) => {
@@ -67,5 +99,13 @@ airRouter.get(
   "/screen/:conversationId",
   asyncHandler(async (req, res) => {
     res.json(await airScreen(req.user!.id, req.params.conversationId!));
+  }),
+);
+
+airRouter.post(
+  "/screen/:conversationId/drop",
+  asyncHandler(async (req, res) => {
+    const body = z.object({ name: z.string().min(1).max(80), content: z.string().max(200_000) }).parse(req.body);
+    res.status(201).json(await dropOnScreen(req.user!.id, req.params.conversationId!, body.name, body.content));
   }),
 );

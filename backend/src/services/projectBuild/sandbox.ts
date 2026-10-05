@@ -68,6 +68,25 @@ export async function getProject(conversationId: string): Promise<ProjectRow | n
   return (data as ProjectRow | null) ?? null;
 }
 
+/** Looking at the screen keeps an existing Air Dots machine awake. It does not start a new one. */
+export async function touchSandbox(conversationId: string): Promise<{ awake: boolean }> {
+  const project = await getProject(conversationId);
+  if (!project?.sandbox_id || !env.e2bApiKey) return { awake: false };
+  try {
+    const sandbox = await Sandbox.connect(project.sandbox_id, { apiKey: env.e2bApiKey });
+    const air = await conversationIsAir(conversationId);
+    await sandbox.setTimeout(air ? AIR_SANDBOX_TTL_MS : SANDBOX_TTL_MS);
+    return { awake: true };
+  } catch {
+    return { awake: false };
+  }
+}
+
+export async function writeSandboxFile(userId: string, conversationId: string, path: string, content: string) {
+  const sandbox = await BuildSandbox.open(userId, conversationId);
+  await sandbox.write(path.replace(/^\/+/, ""), content);
+}
+
 export async function saveProject(userId: string, conversationId: string, patch: Partial<Omit<ProjectRow, "conversation_id">>) {
   const { error } = await supabaseAdmin
     .from("build_projects")

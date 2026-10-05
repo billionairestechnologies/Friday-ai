@@ -39,13 +39,18 @@ export function AirCallPanel({ conversationId, onClose }: { conversationId?: str
   const mic = useMicrophone();
   const [callId, setCallId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [left, setLeft] = useState<number | null>(null);
+  const [dial, setDial] = useState<"browser" | "phone">("browser");
 
   useEffect(() => {
     let gone = false;
     api
-      .post<{ id: string }>("/air/calls", conversationId ? { conversationId } : {})
+      .post<{ id: string; dial?: { mode?: "browser" | "phone" }; allowance?: { left: number } }>("/air/calls", conversationId ? { conversationId } : {})
       .then((res) => {
-        if (!gone) setCallId(res.id);
+        if (gone) return;
+        setCallId(res.id);
+        setDial(res.dial?.mode === "phone" ? "phone" : "browser");
+        setLeft(res.allowance?.left ?? null);
       })
       .catch((err: unknown) => {
         if (!gone) setError(err instanceof Error ? err.message : "Couldn't open the call.");
@@ -54,6 +59,20 @@ export function AirCallPanel({ conversationId, onClose }: { conversationId?: str
       gone = true;
     };
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!callId) return;
+    const timer = window.setInterval(() => {
+      void api
+        .post<{ left: number }>(`/air/calls/${callId}/tick`, { seconds: 15 })
+        .then((res) => setLeft(res.left))
+        .catch(() => {
+          setError("This month's call minutes are used up.");
+          window.clearInterval(timer);
+        });
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [callId]);
 
   async function hangUp() {
     mic.stop();
@@ -69,8 +88,9 @@ export function AirCallPanel({ conversationId, onClose }: { conversationId?: str
           <div>
             <h2 className="text-xl font-medium text-foreground">On the line</h2>
             <p className="mt-1 text-sm text-muted">
-              {error ?? "This is Friday, in the browser. The phone number connects when the trunk is configured."}
+              {error ?? (dial === "phone" ? "Calling the number on your account." : "Friday is on the line in the browser. Call minutes still count.")}
             </p>
+            {left != null && <p className="mt-1 text-xs text-muted">{left} call minutes left this month</p>}
           </div>
           <div className="flex gap-2">
             <button
@@ -86,6 +106,77 @@ export function AirCallPanel({ conversationId, onClose }: { conversationId?: str
           </div>
         </div>
       </VoiceBeam>
+    </div>
+  );
+}
+
+export function AirScreen({ url, conversationId }: { url: string; conversationId?: string }) {
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [dropped, setDropped] = useState<string | null>(null);
+
+  return (
+    <div
+      className="relative mt-4 h-72 w-full max-w-lg overflow-hidden rounded-2xl border border-border"
+      onMouseMove={(e) => {
+        const box = e.currentTarget.getBoundingClientRect();
+        setCursor({ x: e.clientX - box.left, y: e.clientY - box.top });
+      }}
+      onMouseLeave={() => setCursor(null)}
+      onTouchMove={(e) => {
+        const box = e.currentTarget.getBoundingClientRect();
+        const touch = e.touches[0];
+        if (!touch) return;
+        setCursor({ x: touch.clientX - box.left, y: touch.clientY - box.top });
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (!file || !conversationId) return;
+        void file.text().then((content) => api.post(`/air/screen/${conversationId}/drop`, { name: file.name, content }).then(() => setDropped(file.name)));
+      }}
+    >
+      <iframe title="Friday screen" src={url} className="h-full w-full" />
+      {cursor && (
+        <span
+          className="pointer-events-none absolute size-4 rounded-full border-2 border-foreground bg-background/70"
+          style={{ left: cursor.x - 8, top: cursor.y - 8 }}
+        />
+      )}
+      <p className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-background/80 px-2 py-1 text-[11px] text-muted">
+        {dropped ? `Added ${dropped}` : "Mouse or finger. Drop a file onto the screen."}
+      </p>
+    </div>
+  );
+}
+
+export function AirLinkCard() {
+  const [telegram, setTelegram] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+
+  async function link(channel: "telegram" | "whatsapp", externalId: string) {
+    setNote(null);
+    try {
+      await api.post("/air/channels", { channel, externalId });
+      setNote(`${channel} linked`);
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Couldn't link that.");
+    }
+  }
+
+  return (
+    <div className="mt-4 grid w-full max-w-md gap-2 text-left">
+      <p className="text-xs font-medium text-muted">WhatsApp and Telegram</p>
+      <div className="flex gap-2">
+        <input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="Telegram chat id" className="h-9 min-w-0 flex-1 rounded-full border border-border bg-composer px-3 text-sm" />
+        <button type="button" className="h-9 rounded-full border border-border px-3 text-sm" onClick={() => void link("telegram", telegram)}>Link</button>
+      </div>
+      <div className="flex gap-2">
+        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="WhatsApp number" className="h-9 min-w-0 flex-1 rounded-full border border-border bg-composer px-3 text-sm" />
+        <button type="button" className="h-9 rounded-full border border-border px-3 text-sm" onClick={() => void link("whatsapp", whatsapp)}>Link</button>
+      </div>
+      {note && <p className="text-xs text-muted">{note}</p>}
     </div>
   );
 }
