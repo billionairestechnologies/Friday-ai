@@ -3,7 +3,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Check, Gift, Sparkles, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { setAuthIntent } from "@/lib/auth/intent";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useChat } from "@/lib/chat/store";
+import { LoginPopout } from "@/components/popouts";
 import {
   formatRupees,
   openCheckout,
@@ -250,8 +253,15 @@ export function UpgradePage() {
   const minSeats = enterprise?.minSeats ?? 3;
   const enterprisePerSeat = enterprise ? (annual ? enterprise.annualPricePaise : enterprise.monthlyPricePaise) : 0;
   const canPay = Boolean(config?.keyId) && signedIn;
+  // A signed-out visitor who taps a plan must land on sign-up/login, not a dead button; they come back here signed in.
+  const setDialog = useChat((st) => st.setDialog);
+  const openAuth = (intent: "login" | "signup" = "signup") => {
+    setAuthIntent(intent);
+    setDialog("login");
+  };
 
   async function checkout(key: string, body: Record<string, unknown>) {
+    if (!signedIn) return openAuth("signup");
     setBusyPlan(key);
     setNotice(null);
     try {
@@ -267,10 +277,12 @@ export function UpgradePage() {
 
   const buyPlan = (planId: Tier) => void checkout(planId, { planId, billingCycle: annual ? "annual" : "monthly", ...offerFor(planId) });
   const buyEnterprise = () => {
+    if (!signedIn) return openAuth("signup");
     if (!selectedOrgId) return setNotice("Create or select a team first.");
     void checkout("enterprise", { planId: "enterprise", billingCycle: annual ? "annual" : "monthly", seats, organizationId: selectedOrgId, ...offerFor("enterprise") });
   };
   const buyPackage = (pkg: PublicPackage) => {
+    if (!signedIn) return openAuth("signup");
     if (pkg.target === "organization" && !selectedOrgId) return setNotice("Create or select a team first.");
     void checkout(`package:${pkg.id}`, {
       planId: "package",
@@ -331,6 +343,7 @@ export function UpgradePage() {
 
   return (
     <div className="min-h-dvh bg-background px-4 py-10 text-foreground md:px-8">
+      <LoginPopout />
       <button
         type="button"
         aria-label="Close"
@@ -397,7 +410,7 @@ export function UpgradePage() {
         )}
 
         {notice && <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">{notice}</p>}
-        {!signedIn && <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">Sign in to see your current plan and upgrade.</p>}
+        {!signedIn && <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">Sign up or log in to pick a plan — tap any plan below.</p>}
 
         {tab === "individual" ? (
           <div className={cn("mt-10 grid w-full gap-5", individual.length >= 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>
@@ -414,11 +427,11 @@ export function UpgradePage() {
                   highlighted={plan.highlight}
                   price={formatRupees(free ? 0 : annual ? plan.annualPricePaise : plan.monthlyPricePaise)}
                   cadence={free ? "/month" : annual ? "/year" : "/month"}
-                  current={isCurrent(plan.id)}
-                  cta={free ? "Free forever" : `Upgrade to ${plan.name}`}
-                  onBuy={free ? undefined : () => buyPlan(tier)}
+                  current={signedIn && isCurrent(plan.id)}
+                  cta={!signedIn ? (free ? "Sign up free" : `Sign up for ${plan.name}`) : free ? "Free forever" : `Upgrade to ${plan.name}`}
+                  onBuy={!signedIn ? () => openAuth("signup") : free ? undefined : () => buyPlan(tier)}
                   busy={busyPlan === plan.id}
-                  disabled={free || busyPlan !== null || !canPay}
+                  disabled={signedIn && (free || busyPlan !== null || !canPay)}
                   features={plan.features}
                   included={entitlementChips(plan.entitlements)}
                   models={modelsByTier[tier]}
@@ -454,7 +467,7 @@ export function UpgradePage() {
                   </label>
                   <button
                     type="button"
-                    disabled={busyPlan !== null || !canPay || orgs.length === 0}
+                    disabled={signedIn && (busyPlan !== null || !canPay || orgs.length === 0)}
                     onClick={buyEnterprise}
                     className="h-11 rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
                   >
@@ -489,10 +502,10 @@ export function UpgradePage() {
                   price={formatRupees(pkg.pricePaise)}
                   cadence={pkg.durationDays ? ` for ${pkg.durationDays} days` : " one-time"}
                   current={false}
-                  cta="Get this package"
+                  cta={signedIn ? "Get this package" : "Sign up to get this"}
                   onBuy={() => buyPackage(pkg)}
                   busy={busyPlan === `package:${pkg.id}`}
-                  disabled={busyPlan !== null || !canPay || (pkg.target === "organization" && orgs.length === 0)}
+                  disabled={signedIn && (busyPlan !== null || !canPay || (pkg.target === "organization" && orgs.length === 0))}
                   features={[
                     ...pkg.features,
                     ...(pkg.monthlyTokenCap ? [`${tokens(pkg.monthlyTokenCap)} tokens a month`] : []),
