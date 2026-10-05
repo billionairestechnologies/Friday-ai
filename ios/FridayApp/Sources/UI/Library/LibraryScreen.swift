@@ -66,7 +66,7 @@ struct LibraryScreen: View {
                 VStack {
                     Spacer()
                     Text((items ?? []).isEmpty
-                         ? "Nothing here yet. Code, pages and images from your chats are saved here automatically."
+                         ? "Nothing here yet. Presentations, PDFs, spreadsheets, documents, code and images from your chats are saved here automatically."
                          : "Nothing in this category.")
                         .font(.system(size: 14)).foregroundColor(FridayColor.muted).multilineTextAlignment(.center).padding(32)
                     Spacer()

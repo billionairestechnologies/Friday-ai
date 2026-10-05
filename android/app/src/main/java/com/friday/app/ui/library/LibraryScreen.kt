@@ -161,7 +161,7 @@ fun LibraryScreen(onClose: () -> Unit) {
             items == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = FridayText, strokeWidth = 2.dp) }
             visible.isEmpty() -> Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    if (all.isEmpty()) "Nothing here yet. Code, pages and images from your chats are saved here automatically." else "Nothing in this category.",
+                    if (all.isEmpty()) "Nothing here yet. Presentations, PDFs, spreadsheets, documents, code and images from your chats are saved here automatically." else "Nothing in this category.",
                     color = FridayMuted, fontSize = 14.sp,
                 )
             }

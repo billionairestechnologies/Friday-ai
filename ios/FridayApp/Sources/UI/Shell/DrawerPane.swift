@@ -59,7 +59,6 @@ struct DrawerPane: View {
                     navRow(icon: "square.and.pencil", label: "New chat") { vm.newChat(); vm.page = "chat" }
                     navRow(icon: "hammer", label: "Build") { vm.newBuild(); vm.page = "chat" }
                     navRow(icon: "books.vertical", label: "Library") { vm.page = "library" }
-                    navRow(icon: "doc.text", label: "Pages") { vm.page = "pages" }
                     navRow(icon: "arrow.triangle.2.circlepath", label: "Automations") { vm.page = "automations" }
                     // Skills live in Plugins; Help & support and System status live in Settings (same as web).
 

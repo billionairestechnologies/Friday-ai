@@ -192,7 +192,6 @@ fun DrawerPane(
             PlainRow(Icons.Default.Edit, "New chat", onNewChat)
             PlainRow(Icons.Default.Build, "Build", onNewBuild)
             PlainRow(Icons.AutoMirrored.Filled.LibraryBooks, "Library") { onNavigate("library") }
-            PlainRow(Icons.Default.Description, "Pages") { onNavigate("pages") }
             PlainRow(Icons.Default.AutoMode, "Automations") { onNavigate("automations") }
             // Skills live in Plugins; Help & support and System status live in Settings (same as web).
 
