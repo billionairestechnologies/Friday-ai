@@ -8,6 +8,7 @@ type PhoneConfig = {
   includedMinutes: number;
   hardCapMinutes: number;
   maxHeldSeconds: number;
+  voice?: "gemini" | "sarvam";
   channels: { telegram: boolean; whatsapp: boolean; email: boolean };
 };
 
@@ -60,6 +61,9 @@ export default function Phone() {
             <Input type="number" value={config.hardCapMinutes} onChange={(e) => setConfig({ ...config, hardCapMinutes: Number(e.target.value) })} />
           </Field>
         </div>
+        <Field label="Voice" hint="Gemini Live is the call. Sarvam is the Indian voice.">
+          <Input value={config.voice ?? "gemini"} onChange={(e) => setConfig({ ...config, voice: e.target.value === "sarvam" ? "sarvam" : "gemini" })} />
+        </Field>
         <Toggle checked={config.channels.telegram} onChange={(telegram) => setConfig({ ...config, channels: { ...config.channels, telegram } })} label="Telegram delivery" />
         <Toggle checked={config.channels.whatsapp} onChange={(whatsapp) => setConfig({ ...config, channels: { ...config.channels, whatsapp } })} label="WhatsApp delivery" />
         <Toggle checked={config.channels.email} onChange={(email) => setConfig({ ...config, channels: { ...config.channels, email } })} label="Email delivery" />

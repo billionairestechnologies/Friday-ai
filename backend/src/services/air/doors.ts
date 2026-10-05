@@ -7,6 +7,7 @@ import { savePassphrase } from "./passphrase.js";
 import { usedCallSeconds, addCallSeconds, getPhoneConfig } from "../phone/store.js";
 import { deliverResult } from "../phone/delivery.js";
 import { runAirJob } from "./jobs.js";
+import { dialAccount } from "../phone/trunk.js";
 
 export type AirChannel = "whatsapp" | "telegram";
 
@@ -79,17 +80,10 @@ export async function openCall(userId: string, conversationId?: string) {
 }
 
 async function placeOutboundCall(userId: string) {
-  const sid = process.env.EXOTEL_SID ?? "";
-  const token = process.env.EXOTEL_TOKEN ?? "";
-  const key = process.env.EXOTEL_API_KEY ?? "";
-  const callerId = process.env.EXOTEL_CALLER_ID ?? "";
-  if (!sid || !token || !key || !callerId) return { mode: "browser" as const };
   const profile = await supabaseAdmin.from("profiles").select("phone").eq("id", userId).maybeSingle();
   const to = ((profile.data as { phone?: string | null } | null)?.phone ?? "").replace(/\s/g, "");
   if (!to) return { mode: "browser" as const, reason: "no-phone" };
-  const body = new URLSearchParams({ From: to, CallerId: callerId, CallType: "trans", Url: `${process.env.PUBLIC_API_URL ?? ""}/api/phone/turn` });
-  const res = await fetch(`https://${key}:${token}@api.exotel.com/v1/Accounts/${sid}/Calls/connect`, { method: "POST", body }).catch(() => null);
-  return { mode: res?.ok ? "phone" as const : "browser" as const };
+  return dialAccount(to);
 }
 
 export async function tickCall(userId: string, callId: string, seconds: number) {

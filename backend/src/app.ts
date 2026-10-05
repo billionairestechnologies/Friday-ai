@@ -70,6 +70,7 @@ export function createApp() {
   // upload endpoint yet) — base64 inflates size by ~33%, and up to MAX_ATTACHMENTS images can be
   // attached per message, so 2mb was rejecting any real photo outright with a bare 413 before it
   // ever reached chatService's own, more specific vision-support error.
+  app.use(express.urlencoded({ extended: false }));
   app.use(
     express.json({
       limit: "30mb",

@@ -28,6 +28,7 @@ function applyConfig(next: PhoneConfig, persist: boolean) {
     ...next,
     enabledPlanIds: [...next.enabledPlanIds],
     channels: { ...next.channels },
+    voice: next.voice === "sarvam" ? "sarvam" : "gemini",
   };
   if (persist) void supabaseAdmin.from("phone_settings").upsert({ id: 1, config, updated_at: new Date().toISOString() }).then(() => undefined, () => undefined);
 }

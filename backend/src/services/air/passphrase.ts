@@ -4,6 +4,14 @@ import { HttpError } from "../../middleware/errorHandler.js";
 
 const KEYLEN = 32;
 
+/** "my passcode is jagga jasoos" or "change my passcode to jagga jasoos". */
+export function spokenPassphrase(text: string): string | null {
+  const match = text.trim().match(/\b(?:my passcode is|change my passcode to)\s+(.+)$/i);
+  const phrase = match?.[1]?.trim() ?? "";
+  if (phrase.length < 4 || phrase.length > 80) return null;
+  return phrase;
+}
+
 export function hashPassphrase(phrase: string): string {
   const salt = randomBytes(16).toString("hex");
   const hash = scryptSync(phrase, salt, KEYLEN).toString("hex");

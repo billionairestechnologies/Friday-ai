@@ -135,6 +135,7 @@ const phoneConfigSchema = z.object({
   includedMinutes: z.number().int().min(0).max(10_000),
   hardCapMinutes: z.number().int().min(0).max(10_000),
   maxHeldSeconds: z.number().int().min(5).max(60),
+  voice: z.enum(["gemini", "sarvam"]).default("gemini"),
   channels: z.object({ telegram: z.boolean(), whatsapp: z.boolean(), email: z.boolean() }),
 });
 

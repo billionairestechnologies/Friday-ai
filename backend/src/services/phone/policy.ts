@@ -8,6 +8,8 @@ export type PhoneConfig = {
   includedMinutes: number;
   hardCapMinutes: number;
   maxHeldSeconds: number;
+  /** Gemini Live speaks first. Sarvam is the switch for the Indian voice. */
+  voice: "gemini" | "sarvam";
   channels: { telegram: boolean; whatsapp: boolean; email: boolean };
 };
 
@@ -25,6 +27,7 @@ export const DEFAULT_PHONE_CONFIG: PhoneConfig = {
   includedMinutes: 60,
   hardCapMinutes: 60,
   maxHeldSeconds: 10,
+  voice: "gemini",
   channels: { telegram: true, whatsapp: false, email: true },
 };
 

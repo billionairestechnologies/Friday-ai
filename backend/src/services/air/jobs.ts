@@ -5,6 +5,7 @@ import { deliverResult } from "../phone/delivery.js";
 import { getPhoneConfig } from "../phone/store.js";
 import type { DeliveryChannel } from "../phone/policy.js";
 import { HttpError } from "../../middleware/errorHandler.js";
+import { callbackIfWanted } from "../phone/callback.js";
 
 const halted = new Set<string>();
 const running = new Set<string>();
@@ -71,6 +72,7 @@ export async function runAirJob(userId: string, conversationId: string, task: st
     if (config.channels.whatsapp) channels.push("whatsapp");
     if (config.channels.email) channels.push("email");
     await deliverResult(userId, null, login ? `Friday needs you on the screen. ${last}` : last, channels, config);
+    if (!login) await callbackIfWanted(userId, last);
   }
   return { started: true, login, text: last };
 }

@@ -4,7 +4,10 @@ import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import { endPhoneCall, handlePhoneTurn } from "../services/phone/runtime.js";
-import { getUserPhoneSettings, hydrateUserPhone, listPresence, registerPresence, setUserPhoneSettings } from "../services/phone/store.js";
+import { answerTrunk, samePathSecret, type TrunkName } from "../services/phone/trunk.js";
+import { liveSession } from "../services/phone/live.js";
+import { transcribeAudio, synthesizeSpeech } from "../services/voiceService.js";
+import { getPhoneConfig, getUserPhoneSettings, hydrateUserPhone, listPresence, loadPhoneConfig, registerPresence, setUserPhoneSettings } from "../services/phone/store.js";
 import type { DeliveryChannel } from "../services/phone/policy.js";
 
 export const phoneRouter = Router();
@@ -20,6 +23,18 @@ function assertGateway(req: { header(name: string): string | undefined }) {
   if (!expected) throw new HttpError(503, "The phone gateway secret is not set yet.");
   const given = req.header("x-friday-phone-secret") ?? "";
   if (!sameSecret(given, expected)) throw new HttpError(401, "Unknown caller.");
+}
+
+function publicTurn(result: { sessionId: string; action: string; speak: string; hold: boolean; jobId: string | null; conversationId: string | null; delivery: string[] }) {
+  return {
+    sessionId: result.sessionId,
+    action: result.action,
+    speak: result.speak,
+    hold: result.hold,
+    jobId: result.jobId,
+    conversationId: result.conversationId,
+    delivery: result.delivery,
+  };
 }
 
 const turnBody = z.object({
@@ -42,15 +57,7 @@ phoneRouter.post(
     const text = (body.text ?? body.transcript ?? body.SpeechResult ?? "").trim();
     if (!text) throw new HttpError(400, "Empty turn.");
     const result = await handlePhoneTurn(from, text, body.sessionId ?? body.CallSid);
-    res.json({
-      sessionId: result.sessionId,
-      action: result.action,
-      speak: result.speak,
-      hold: result.hold,
-      jobId: result.jobId,
-      conversationId: result.conversationId,
-      delivery: result.delivery,
-    });
+    res.json(publicTurn(result));
   }),
 );
 
@@ -67,6 +74,54 @@ phoneRouter.post(
     const sessionId = body.sessionId ?? body.CallSid;
     if (!sessionId) throw new HttpError(400, "Missing call id.");
     res.json(await endPhoneCall(sessionId, body.seconds ?? body.Duration ?? 0));
+  }),
+);
+
+function trunkRoute(trunk: TrunkName) {
+  return asyncHandler(async (req, res) => {
+    if (!samePathSecret(req.params.secret)) throw new HttpError(401, "Unknown caller.");
+    const answer = await answerTrunk(trunk, (req.body ?? {}) as Record<string, unknown>);
+    if (typeof answer === "string") {
+      res.type("application/xml").send(answer);
+      return;
+    }
+    res.json(answer);
+  });
+}
+
+phoneRouter.post("/exotel/:secret", trunkRoute("exotel"));
+phoneRouter.post("/twilio/:secret", trunkRoute("twilio"));
+phoneRouter.post("/telnyx/:secret", trunkRoute("telnyx"));
+
+/** Pipecat posts one audio chunk here. Gemini Live hears it; Friday decides; Gemini speaks the line. */
+phoneRouter.post(
+  "/live",
+  asyncHandler(async (req, res) => {
+    assertGateway(req);
+    await loadPhoneConfig();
+    const body = z.object({
+      from: z.string().min(3),
+      sessionId: z.string().min(1).max(80).optional(),
+      audioBase64: z.string().min(8),
+    }).parse(req.body ?? {});
+    const sessionId = body.sessionId ?? body.from;
+    if (getPhoneConfig().voice === "sarvam") {
+      const heard = await transcribeAudio(Buffer.from(body.audioBase64, "base64"), "call.wav");
+      const result = await handlePhoneTurn(body.from, heard.text, sessionId);
+      const spoken = result.speak ? await synthesizeSpeech(result.speak) : { audio: Buffer.alloc(0), mime: "audio/wav" };
+      res.json({ ...publicTurn(result), audioBase64: spoken.audio.toString("base64"), mime: spoken.mime });
+      return;
+    }
+    const session = await liveSession(sessionId);
+    const text = await session.hear(body.audioBase64);
+    if (!text) {
+      res.json({ sessionId, action: "speak", speak: "I didn't catch that.", hold: true, audioBase64: "" });
+      return;
+    }
+    const result = await handlePhoneTurn(body.from, text, sessionId);
+    const audioBase64 = result.speak ? await session.speak(result.speak) : "";
+    if (result.action === "hangup" || result.action === "release") session.close();
+    res.json({ ...publicTurn(result), audioBase64, mime: "audio/pcm;rate=24000" });
   }),
 );
 

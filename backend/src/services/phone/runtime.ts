@@ -2,7 +2,9 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { createConversation } from "../chat/conversations.js";
 import { runTurn } from "../jobs/runTurn.js";
 import { resolveEffectivePlan } from "../quota/tokenQuotaService.js";
-import { assertPassphrase } from "../air/passphrase.js";
+import { assertPassphrase, savePassphrase, spokenPassphrase } from "../air/passphrase.js";
+import { allowSensitive } from "../projectBuild/actionGate.js";
+import { callbackIfWanted } from "./callback.js";
 import { deliverResult } from "./delivery.js";
 import {
   PHONE_BEHAVIOR,
@@ -53,7 +55,7 @@ async function dispatch(userId: string, email: string | null, text: string, chan
   await deliverResult(userId, email, text, channels, getPhoneConfig());
 }
 
-export async function handlePhoneTurn(from: string, text: string, sessionId?: string): Promise<PhoneTurnResult> {
+export async function handlePhoneTurn(from: string, text: string, sessionId?: string, context?: string): Promise<PhoneTurnResult> {
   const id = sessionId || `call_${digits(from) || "unknown"}`;
   const session = sessions.get(id) ?? { id, userId: null, conversationId: null, from };
   sessions.set(id, session);
@@ -86,10 +88,38 @@ export async function handlePhoneTurn(from: string, text: string, sessionId?: st
     return { ...decision, sessionId: id, conversationId: session.conversationId, jobId: null };
   }
 
+  const nextPhrase = spokenPassphrase(text);
+  if (nextPhrase) {
+    try {
+      await savePassphrase(user.id, nextPhrase);
+    } catch (err) {
+      return {
+        ...decision,
+        action: "speak",
+        speak: err instanceof Error ? err.message : "I couldn't save that passphrase.",
+        hold: false,
+        sessionId: id,
+        conversationId: session.conversationId,
+        jobId: null,
+      };
+    }
+    return {
+      ...decision,
+      action: "speak",
+      speak: "Saved. I'll ask for it before a payment, a send, or a delete.",
+      hold: false,
+      sessionId: id,
+      conversationId: session.conversationId,
+      jobId: null,
+    };
+  }
+
   if (/\byes\b/i.test(text) && /\b(pay|send|delete|transfer|purchase)\b/i.test(text)) {
     const phrase = text.split(/\byes\b/i)[1]?.trim();
     try {
       await assertPassphrase(user.id, phrase);
+      const opened = session.conversationId ?? (await ensureConversation(session, user.id, decision.build));
+      allowSensitive(opened);
     } catch (err) {
       return {
         ...decision,
@@ -105,7 +135,7 @@ export async function handlePhoneTurn(from: string, text: string, sessionId?: st
 
   const conversationId = await ensureConversation(session, user.id, decision.build);
   const request = {
-    content: text,
+    content: context?.trim() || text,
     inputMode: "voice" as const,
     think: false,
     behavior: PHONE_BEHAVIOR,
@@ -124,7 +154,9 @@ export async function handlePhoneTurn(from: string, text: string, sessionId?: st
       request,
       attachments: [],
     }).then((result) => {
-      if (result.text.trim()) void dispatch(user.id, user.email, result.text, decision.delivery);
+      if (!result.text.trim()) return;
+      void dispatch(user.id, user.email, result.text, decision.delivery);
+      if (decision.callback) void callbackIfWanted(user.id, result.text);
     });
     return { ...decision, sessionId: id, conversationId, jobId };
   }
@@ -143,7 +175,9 @@ export async function handlePhoneTurn(from: string, text: string, sessionId?: st
 
   if (!result) {
     void pending.then((finished) => {
-      if (finished.text.trim()) void dispatch(user.id, user.email, finished.text, decision.delivery);
+      if (!finished.text.trim()) return;
+      void dispatch(user.id, user.email, finished.text, decision.delivery);
+      if (decision.callback) void callbackIfWanted(user.id, finished.text);
     });
     return {
       ...decision,
