@@ -30,13 +30,14 @@ Example shape, not a script: they ask for a mail draft. She reads the point back
 
 ## 2. Memory
 
-- On end, store the transcript on the session, keyed to the verified account, not the raw caller ID alone.
-- Next call, inject a short recap: last job, last delivery channel, open loops. Cap it. Do not dump the full history into the voice context.
-- A simple vector store over session summaries is enough.
-- The recap is context for this call. She does not open by reading it back.
-- Quiet hours and language from Friday settings apply to callbacks, not to this recap.
+- One store per user. The website, the Air Dot, and the phone share it.
+- Keep every chat, every call transcript, and every Air Dot job. Do not drop what they said.
+- The next call and the next Dot run both load that store before the first reply.
+- The live call pulls the memories this conversation needs. It does not replay old audio into Gemini.
+- She can answer "what did I tell you" from the store. She does not open the call by reading it aloud.
+- The curious beat may use one real detail ("yesterday you left the Surat note half done") and then wait.
+- Quiet hours and language apply to callbacks, not to what is saved.
 - Memory never grants a tool. Send, delete, and pay still need a spoken yes.
-- The curious beat may use the recap ("yesterday you left the Surat note half done") and then wait.
 
 ## 3. Cost guard
 
