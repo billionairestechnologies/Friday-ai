@@ -13,3 +13,6 @@ coverage/
 
 # AWS deploy settings (real secrets)
 infra/aws/app.env
+
+# The FridayX CLI workspace has a source crate in cli/crates/build/ (the "build/" rule above would hide it from CI)
+!cli/crates/build/
