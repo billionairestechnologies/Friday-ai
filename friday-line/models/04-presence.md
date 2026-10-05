@@ -6,7 +6,7 @@ Presence is the set of live endpoints for one user. The phone session can see th
 
 - `phone` — this call
 - `app` — web or mobile session online
-- `cli` — FridayX on a computer, online
+- `cli` — Friday X on a computer, online
 - `sandbox` — a sandbox Friday owns, whether or not a computer is online
 - `telegram`, `whatsapp`, `email` — delivery endpoints, and later places a job can be given
 
