@@ -1,38 +1,27 @@
-# Friday line
+# Air Dots
 
-Friday on a phone call. The name on the call stays **Friday**. This folder is the architecture for that surface: the plan, the working models, the flows, and the diagrams. Nothing here is wired into the app yet. Build starts after the research pass.
+Friday is the product. **Air Dots** is the always-on computer inside it, and the call that drives it.
 
-A call is a full Friday session. Tools, skills, agent loops, always-on agents, the sandbox, build mode, schedules, and workflows are the same runtime the web app, mobile apps, and CLI already use. The phone is another way in.
+The person they talk to is Friday. The website button says **Call now**. That surface is **On Air**. This folder used to be called Friday line. The name of the feature is Air Dots. The folder path stays `friday-line` so the repo link does not move.
+
+Nothing here is wired into the site yet.
 
 ## Read this order
 
-1. [PLAN.md](PLAN.md) — what it is, what a call does, and the build order
-2. [UPGRADES.md](UPGRADES.md) — persona, memory, cost guard, human in the loop
-3. [TODO.md](TODO.md) — the work list, not started
-4. [models/](models/README.md) — the records the runtime keeps
-5. [flows/](flows/README.md) — discussion, hold-or-release, making a job, delivery, co-working
-6. [diagrams/](diagrams/README.md) — Mermaid sources, plus SVG and PNG
-
-## Where this sits
-
-```
-friday-line/     this folder — phone session architecture
-backend/         Friday API
-frontend/        web app and Team Console
-android/  ios/   mobile apps
-cli/             FridayX
-docs/            platform docs already in the repo
-```
-
-Web, mobile, CLI, Telegram, WhatsApp, and email do not each grow their own Friday. They call the runtime described here. Admin changes a plan or a minute cap once. Every surface reads that.
+1. [PLAN.md](PLAN.md) — the system, the call, the sandbox, the minutes, the cost
+2. [TODO.md](TODO.md) — build order
+3. [UPGRADES.md](UPGRADES.md) — how she speaks, what she remembers, when she stops
+4. [models/](models/README.md) — session, job, sandbox presence, delivery, entitlements
+5. [flows/](flows/README.md) — discussion, hold or release, making a job
+6. [diagrams/](diagrams/README.md) — the earlier drawings, still useful under the new name
 
 ## Locked decisions
 
-- The person on the other end of the call is Friday. No second product name.
-- Premium only, until the Team Console allow-list says otherwise.
-- About ₹4 per connected minute. The cap lives in admin.
-- Short work (about 5–10 seconds) stays on the line and is spoken back.
-- Long work (deep research, build, sandbox, loops) starts on the call and finishes off it.
-- The person chooses delivery: spoken, the app, Telegram, WhatsApp, or email.
-- The call is a discussion. They speak, Friday answers, Friday waits.
-- Persona and memory are upgrades on that session. They do not replace the runtime or the delivery channels.
+- One website. One phone number. No new app.
+- Agent work, the sandbox, and Build Mode spend the Friday usage meter.
+- Call minutes are separate: Pro 15 a month, Premium 60 a month, hidden on every other plan.
+- One E2B sandbox per user, the one Friday already has. It pauses when idle.
+- The loop runs until the task is done, they say stop, or the meter is empty.
+- Gemini Live is the voice. The worker model is chosen in admin and starts as the Build Mode model.
+- Pipecat carries the call. Exotel is the India number. Telnyx or Twilio is the international number.
+- A registered caller ID is the login. A spoken passphrase is the check before money, a send, or a delete.

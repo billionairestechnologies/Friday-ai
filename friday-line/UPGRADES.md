@@ -1,6 +1,6 @@
 # Upgrades
 
-These sit on the existing phone session. They do not replace the runtime, the delivery channels, or the hold-or-release rule.
+These sit on Air Dots. Friday is the person on the call. They do not replace the runtime, the delivery channels, or the hold-or-release rule.
 
 ## 1. Persona
 

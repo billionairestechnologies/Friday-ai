@@ -1,132 +1,172 @@
-# Plan
+# Air Dots
 
-Status: saved, not started. Research first. Implementation after that.
+Friday is the product. Air Dots is the always-on computer inside Friday, and the call that drives it.
 
-## What this is
+The person on the phone is Friday. The button on the website says **Call now**. The surface that button opens is **On Air**. There is no second app, no second login, and no second usage meter for the work. Call minutes are the only extra limit, and they show up only on Pro and Premium.
 
-Someone who will not live in an app can still run Friday. They call. Friday is the person on the line. They can ask for anything the runtime can already do, and for the things still being built on the same runtime: tool calls, skills, auto-looping agents, always-on agents, sandboxes, build mode, deep research, documents, mail, notes, schedules, automations, and workflows.
+This replaces the earlier "Friday line" name. The runtime, the hold-or-release rule, the persona, and the call memory still stand. They now sit under Air Dots.
 
-The phone is not a smaller Friday. If a computer, the CLI, or a sandbox is connected, the call can drive that too. They talk. Friday operates the connected system.
+## What we looked at
 
-## Upgrades
+| System | What it actually is | What Air Dots keeps | What we leave |
+|---|---|---|---|
+| OpenDots | Always-on coworkers, each with a computer, text and calls sharing one context | Call stays up only for the talk. The computer keeps working. Approval before a save or a send. | A new workspace, Spaces, Slack, and one computer per specialist |
+| OpenBot | Any agent, one gateway that allows and records every computer action, one container per coworker | One gate in front of the browser, the shell, and files. An audit row for every action | Thirteen example bots and a second product to sign into |
+| Rakazo | Persistent teammates, a private computer, routines, voice, web plus desktop plus mobile | One computer per user, paused when idle, routines, the web as the home | Electron, Expo, and a bring-your-own meter |
+| Coucou | A notch pet that watches coding sessions on your Mac | Tell the person when Friday needs them | A desktop mascot |
+| Grok build | A loop that keeps going, with a graph of the work, until the task is done | That loop, inside the user's sandbox, until the job is done or the meter is empty | A separate CLI product for this feature |
 
-Four upgrades sit on this session. They do not replace the runtime, the delivery channels, or the hold-or-release rule. The spec is [UPGRADES.md](UPGRADES.md).
+Air Dots is not a clone of any of these. It is Friday's existing account, Friday's existing meter, and Friday's existing sandbox, with a loop that does not die when the call ends.
 
-- **Persona.** Style lives in Friday's system prompt. Short spoken turns, one curious beat, then she waits.
-- **Memory.** Transcript and a capped recap are stored on the verified account. The next call sees last job, last channel, and open loops. Memory does not grant a tool.
-- **Cost guard.** The hold-or-release rule stands. She stays short because the line is metered. The gateway enforces the same entitlements as the app.
-- **Human in the loop.** Spoken yes, voice PIN when it leaves the account, and "rukho" or "stop" pauses a loop. Unknown numbers never reach the agent.
+## The shape
 
-## How the call feels
+```mermaid
+flowchart TB
+  web[Friday website Call now]
+  phone[One phone number]
+  pipe[Pipecat]
+  voice[Gemini Live the person]
+  runtime[Friday runtime]
+  meter[Friday usage meter]
+  callmin[Call minutes Pro 15 Premium 60]
+  dot[Air Dot the worker loop]
+  box[One sandbox per user]
+  web --> pipe
+  phone --> pipe
+  pipe --> voice
+  voice --> runtime
+  runtime --> meter
+  runtime --> callmin
+  runtime --> dot
+  dot --> box
+  box --> runtime
+```
 
-A discussion. The user asks. Friday answers. She stops and waits. The full spoken style is the persona upgrade.
+Two brains, on purpose.
 
-- One turn each. Friday does not keep talking, and she does not fill silence.
-- She asks a clarifying question only when the job is actually ambiguous, then she waits.
-- She does not run an interview or a script.
-- Barge-in exists so the user can cut in. She does not talk over them.
-- Sarvam handles hearing, voice, and turn-taking on the Indian phone line. The decisions come from Friday's runtime.
+- **Friday on the call** is Gemini Live, audio to audio. She talks, she listens, she stops. She does not run the computer.
+- **The Air Dot** is the worker. It is the same kind of loop Grok build uses: tools, a graph of the job, and it keeps going until the task is done. It runs in the user's sandbox. Its tokens come out of the Friday usage meter, the same meter as chat and Build Mode.
 
-## Hold the line, or leave it
+The call can start a job, hear a short result, or hang up while the Dot keeps working. When the job is done, or when they asked to be called, Friday rings them.
 
-A connected minute costs about ₹4. The capability is the same either way. The clock decides whether the line stays up.
+## The sandbox
 
-- **Short work, about 5–10 seconds.** Stay on the call. Friday says she is getting the details, runs the tool or skill, and speaks the result. A lookup, a status check, a short note, a mail draft they want heard, a small edit.
-- **Long work.** Deep research, a build, a sandbox run, an agent loop, a workflow that has to execute. Friday says what she is starting and where the result will land. The call ends. The job keeps running.
-- If they say "stay with me" on a long job, that is an explicit choice and it spends the minute cap. The default is to release the line.
-- If a held tool overruns the short window, Friday says she is continuing it off the line and that job becomes async.
+Friday already has this. One E2B machine per user, paused when idle, resumed next time, with files and browser logins kept. Air Dots uses that machine. It does not create a second one.
 
-## Where the result goes
+Cost control is a limit, not a new product:
 
-They say it on the call, or it follows Friday settings. One job can be spoken and also copied out.
+- Idle for the admin limit, starting at 8 minutes with no step running, and the machine pauses.
+- The job does not disappear. The next step resumes the same machine.
+- A hard awake cap per day stops a runaway loop from holding a machine open. The work is kept. Friday says the meter or the cap stopped it.
+- Shell, browser, and files never run on Friday's own server. If the sandbox is down, the tool fails clearly.
 
-- Spoken on the call
-- In the Friday app
-- Telegram
-- WhatsApp
-- Email
+The sandbox is how Friday uses a browser, logs into a site, uses a connector, runs a skill, and uses Build Mode. Zomato, Swiggy, and Walmart are not plugins. They are sites in that browser. Friday can search, click, and fill. She asks before she pays, sends, or deletes. The passphrase covers that yes when the action leaves the account.
 
-"Put it in the app." "Send it on Telegram." "WhatsApp and email." The spoken choice overrides the default for that job. Settings are the default next time: which channels are on, quiet hours, language, and whether a finished long job also gets a short callback.
+## The loop
 
-WhatsApp is a delivery channel in the design. Telegram can ship first. The admin flag turns WhatsApp on when that path is free. Email ships with the others. The app always has the artifact, because the app is a view of the same job.
+The Air Dot is not a scheduled prompt. Friday already has those automations. An Air Dot is a job with a graph:
 
-## What the phone can run
+- It plans the steps.
+- It runs them in the sandbox.
+- It checks the result and continues.
+- It stops when the task is done, when the person says "rukho" or "stop", or when the Friday usage meter is empty.
 
-Nothing in this list is phone-only. The phone calls the same runtime as the app.
+Scheduling and automations stay. "Every morning, order nothing, just tell me the traffic" is still an automation. "Book the table, then message them, then stop" is an Air Dot that runs until that graph is done. Both write into the same Friday thread. Both spend the same usage meter.
 
-- **Tools and skills.** Whatever is registered for that plan. The voice layer does not keep a second, smaller catalog.
-- **Deep research and other slow data work.** Started on the call, finished off the call, delivered where they asked.
-- **Build mode.** Apps, presentations, documents, notes, mail, and the other artifact types. A spoken yes before something is created or sent. Then it runs off the line.
-- **Auto-looping and always-on agents.** Create, pause, change, and ask status from the phone. The loop runs in the agent runtime. The call is the remote control, not the place the loop lives.
-- **Sandbox, co-working.** Friday can open or attach a sandbox and operate it. Fast steps are spoken. Long steps are reported on the chosen channel. If their computer or CLI session is online, the phone can target that system.
-- **Scheduling, automations, workflows.** "Every morning, research this and email it" becomes a workflow record. The scheduler runs it later. The phone creates and edits it the same way the app does.
+The model behind the loop is chosen in the Team Console. Do not bake Fable, Astra, or any other name into the client. Start the loop on the same model Build Mode already uses, so the power and the bill match a job the person could have typed. Swap the model in admin when you pick Fable, Astra, or whatever wins the test. The voice model is not this model.
 
-## Who can call
+## The call
 
-Checked at the start of every call, before Friday speaks as herself.
+### Call now
 
-- Registered account. The caller ID matches a verified phone on that account.
-- The plan is in the admin allow-list. Right now that list is Premium only. Free and Pro are off.
-- Remaining phone minutes for the period are above zero.
-- Otherwise one sentence and the call ends: not linked, not on this plan, or minutes used up.
+On the Friday website, **Call now** sits on On Air. The click places a call to the mobile number on the account. Friday is already talking when they pick up. The website stays the home. No new app.
 
-Unknown numbers never reach the agent. Sending, deleting, and paying need a spoken yes, plus a voice PIN when the action leaves the account.
+### They call Friday
 
-## One config
+One number. India and international are two trunks on that same gateway, not two products.
 
-The Team Console is the only place that turns the phone on, prices it, and moves it between plans. Web, mobile, CLI, the phone gateway, and the notifier do not each store "Premium includes the phone."
+- India: an Exotel number.
+- Everywhere else: Telnyx or Twilio.
+- Pipecat is the pipe between that number and Gemini Live. Pipecat does not sell the number.
 
-Admin fields, read by every surface:
+A personal Jio SIM can prove one inbound call on a desk. It cannot be the number users call. It will not route, record, or scale, and it will not cover a user outside India.
 
-- `phone.enabled_plan_ids` — starts as Premium. Adding Pro later is an admin edit. The next call and the next app fetch allow it.
-- `phone.inr_per_minute` — 4, so burn is visible and the cap can be resized.
-- `phone.included_minutes` and `phone.hard_cap_minutes`
-- `phone.max_held_seconds` — a short hold cannot drift into a silent call
-- Master switches for Telegram, WhatsApp, and email
-- Which skills, tools, sandboxes, and agent features the phone may invoke. Default is the same set as the app on that plan.
+### Who is calling
 
-Friday settings, one record, edited from any surface:
+The caller ID matches the verified number on the account. That is the login. Unknown numbers hear one sentence and the call ends.
 
-- Default delivery channels
-- Linked Telegram, WhatsApp, and email
-- Callback when a long job finishes
-- Quiet hours and language
+A passphrase is for the moments that need a second check, not for every hello. The person sets it by talking: "my passcode is jagga jasoos." Friday stores a hash. She asks for it before a payment, a send, or a delete, and when a call arrives from a number that is not on the account yet. They can change it the same way.
 
-Clients show or hide Call from the entitlements payload. The gateway enforces the same payload, so an old app cannot grant a free user a call by skipping a button.
+### Minutes
 
-## Voice path
+Call minutes are a separate counter. They are not the Friday usage meter.
 
-Sarvam for speech. Exotel for the Indian number (`api.in.exotel.com`, KYC, Exophone saved under Sarvam Deploy, Phone Numbers). The Sarvam agent stays thin: audio in, each user turn to Friday, audio back.
+| Plan | Call minutes each month | Where it shows |
+|---|---|---|
+| Free | none | Call now stays hidden |
+| Pro | 15 | Visible only while Pro is selected |
+| Premium | 60 | Visible only while Premium is selected |
 
-- Each turn goes to the runtime with the call session id.
-- The runtime returns a spoken reply, or a spoken acknowledgement plus a job id and a delivery target.
-- `on_end` stores the transcript on the session, keyed to the verified account, and deducts minutes. The next call gets a capped recap, not the full history.
-- Gateway hosted in India. Sarvam's tool-call egress `4.213.167.70` is allowlisted. The service token stays on the server.
+Agent work started from a call, from the website, or from a schedule spends the normal Friday meter. A loop that runs for an hour after hang-up does not spend call minutes. Only the time the phone line is up spends them.
 
-Latency to hold while testing the short path: a spoken acknowledgement under a second, a simple answer inside the 5–10 second hold. A US-east voice hop adds 200–300 ms on its own.
+Short work, about 5 to 10 seconds, stays on the line. She says she is getting it, then speaks the result. Longer work leaves the line. "Stay with me" is allowed and spends minutes.
 
-Rough carrier and speech cost, before Friday's own model bill: Exotel about ₹0.40–₹1.50 per minute, Sarvam speech-to-text ₹30 per hour, Bulbul text-to-speech ₹30 per 10,000 characters. The product meters the call at about ₹4 per minute so the plan price covers the stack. Sarvam's older "₹1 per minute" headline is not the current API price card.
+### What a minute costs us
 
-## What this pass does not do
+Gemini 3.8 Live, published paid rates: about $0.005 per minute of audio in and $0.018 per minute of audio out. If both sides talked for a full minute, that is about $0.023, roughly ₹2 at ₹84 per dollar. A normal call is less, because nobody talks the entire minute.
 
-- Rename the voice on the call. She is Friday.
-- Open the number to Free or Pro. The allow-list can be edited later.
-- Leave the line open while a presentation, a research run, or an app is generated, unless they explicitly stay and spend minutes.
-- Turn on a paid WhatsApp API. The channel exists in the model and stays off until it is free.
-- Hardcode plan checks inside web, iOS, Android, or the CLI.
-- Put Friday's prompt, memory, or tool catalog inside Sarvam. That would make a second brain.
+That headline is not the whole bill. Gemini re-bills the audio still sitting in the session on later turns. Without compression, a long call costs more than the headline and can die around 15 minutes. Air Dots turns compression on, and the call memory that matters is text, not a pile of raw audio.
+
+Add the phone trunk, about ₹0.5 to ₹1.5 per minute in India. Plan on about ₹3 to ₹5 of direct cost per connected minute once compression is on, before the worker model. The worker is extra, and it is already inside the Friday meter.
+
+At that range, 15 Pro minutes are about ₹45 to ₹75 of call cost. 60 Premium minutes are about ₹180 to ₹300. Those are our cost, not the price. The usage meter still covers the sandbox and the loop.
+
+Grok audio-to-audio can replace Gemini Live later from the same admin switch, if its speech API is the one you want in production. Do not block the first build on it. Pipecat can point at either.
+
+## Memory
+
+Three layers, all on the verified account, never on the raw phone number alone.
+
+1. **This call.** The transcript, stored when the line drops.
+2. **The recap.** Last job, last place the result went, open loops. Capped. Injected next time. She does not recite it as a greeting.
+3. **The person.** The same Friday memory chat already uses. Preferences, names, the passphrase hash. The curious line may use one fact from it, then wait.
+
+Memory never grants a payment or a send.
+
+## How she sounds
+
+This is the system prompt, not a voice vendor setting.
+
+Short spoken sentences. One idea, then stop. English or Hindi. A real reaction to the last thing they said, then the task. One question at a time. One curious beat when the job allows it, specific to what they just said, then silence. No "sure", no "anything else?", no fun facts. She does not talk over them. Barge-in cuts her mid-sentence.
+
+She should feel like a sharp person who is sitting there for them. Friendly, a little curious, never a menu.
+
+## What she can do
+
+Anything the sandbox and Friday's connectors can already do, plus the jobs the loop finishes after the call:
+
+- Build Mode, documents, research, mail, skills
+- Browser search and any site the person can log into
+- Connectors Friday already has
+- Schedules and automations
+- An order on Zomato, Swiggy, or Walmart, stopped for a spoken yes before money moves
+
+No plugin is added per website. If a site has no connector, the sandbox browser is the connector. If Friday is missing a tool, it is one tool on the existing runtime, not a new app.
+
+## What not to add
+
+- A Friday Air app, a dots app, or a second install
+- A new meter for agent work
+- A computer per specialist
+- A personal SIM as the public number
+- The voice model running the long loop
 
 ## Build order
 
-The architecture is the whole runtime. The order is only so the first call is already Friday.
+1. **The Air Dot.** A job that loops in the existing per-user sandbox until it is done, paused, or out of meter. Idle pause and the awake cap. The website can start one before any phone exists.
+2. **The gate.** Every browser, shell, and file action is allowed and recorded. Pay, send, and delete wait for a yes.
+3. **Call now, outbound only.** Pipecat, Gemini Live, Exotel, the verified number, the 15 and 60 minute counters, hidden unless the plan is Pro or Premium.
+4. **The inbound number.** Caller ID login, passphrase for the dangerous yes, India plus international trunks.
+5. **She rings back** when the Dot finishes, or when they asked, inside the remaining minutes and quiet hours.
 
-1. A session the phone, the app, and the CLI share: tools, skills, agents, sandbox, build, workflows.
-2. Duration policy and delivery targets on that session.
-3. Phone gateway on Sarvam and Exotel, Premium gate, and the minute ledger.
-4. Presence, so a call can attach a sandbox and a connected system.
-5. Delivery workers for the app, Telegram, email, and WhatsApp behind the admin flag.
-6. Settings and Team Console screens that only edit the shared config.
-
-## Voice vendor
-
-Sarvam is the voice layer because the call has to sound right in Indian languages on an 8 kHz phone line, with barge-in, and with Exotel as a first-party connection. Bulbul v3 is the telephony voice. A self-hosted speech-to-text, model, speech cascade with the same Sarvam speech models measures about 700 ms–1.2 s before any tool runs. That cascade is the escape hatch if the hosted agent cannot hand each turn to Friday cleanly. It is not the first build.
+The website gets Call now in step 3. The always-on computer is already real in step 1.
