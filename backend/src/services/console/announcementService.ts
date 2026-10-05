@@ -9,7 +9,7 @@ import { NEW_USER_DAYS } from "./directory.js";
  */
 
 export type Audience = "all" | "free" | "paid" | "pro" | "premium" | "new_users";
-export type Platform = "web" | "android" | "ios";
+export type Platform = "web" | "android" | "ios" | "air" | "whatsapp" | "telegram";
 
 export type AnnouncementInput = {
   title: string;

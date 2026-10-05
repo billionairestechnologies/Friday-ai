@@ -33,7 +33,10 @@ import { useBuildPrefs } from "@/lib/build-mode/prefs";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
-import { Hammer, X } from "lucide-react";
+import { Hammer, Radio, X } from "lucide-react";
+import { AirCallPanel, AirPassphraseCard, FridayFace } from "@/components/friday-presence";
+import { airWorkspace, isAirStop } from "@/lib/air";
+import { usePlan } from "@/lib/usage/planStore";
 import { SITE_NAV } from "@/lib/site/pages";
 
 type ConversationMode = "single" | "auto" | "teamup";
@@ -68,8 +71,14 @@ function isConnectionDrop(err: unknown): boolean {
   return err instanceof TypeError || /failed to fetch|load failed|network ?error|network request failed|terminated|connection (was )?(lost|closed|reset)|other side closed/i.test(msg);
 }
 
-export function Home({ conversationId, workspace = "chat" }: { conversationId?: string; workspace?: "chat" | "build" } = {}) {
+export function Home({ conversationId, workspace = "chat", origin = "web" }: { conversationId?: string; workspace?: "chat" | "build"; origin?: "web" | "air" } = {}) {
   const buildMode = workspace === "build";
+  const air = origin === "air";
+  const airUnlocked = usePlan((s) => !s.loaded || s.entitlements == null || s.entitlements.airDots !== false);
+  const airRounds = useRef(0);
+  const [airStay, setAirStay] = useState(true);
+  const [callOpen, setCallOpen] = useState(false);
+  const [screenUrl, setScreenUrl] = useState<string | null>(null);
   const navigate = useNavigate();
   const greeting = useGreeting();
   const { user, isPending } = useCurrentUserState();
@@ -288,6 +297,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
     if (chat?.conversationId) {
       if (!conversationId || conversationId !== chat.conversationId) {
         if (buildMode) void navigate({ to: "/build/$conversationId", params: { conversationId: chat.conversationId } });
+        else if (air) void navigate({ to: "/air/$conversationId", params: { conversationId: chat.conversationId } });
         else void navigate({ to: "/c/$conversationId", params: { conversationId: chat.conversationId } });
       }
       // Same conversation, but the user picked a different model since the last message —
@@ -307,9 +317,12 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       return { conversationId: chat.conversationId };
     }
 
-    const body: { mode: ConversationMode; providerSlug?: string; modelId?: string; projectId?: string; workspace?: "build" } = { mode };
-    if (s.activeProjectId && !buildMode) body.projectId = s.activeProjectId;
-    if (buildMode) body.workspace = "build";
+    const body: { mode: ConversationMode; providerSlug?: string; modelId?: string; projectId?: string; workspace?: "build"; origin?: "air" } = { mode };
+    if (s.activeProjectId && !buildMode && !air) body.projectId = s.activeProjectId;
+    const firstTask = chat?.messages.find((m) => m.role === "user")?.content ?? "";
+    const openBuild = buildMode || (air && airWorkspace(firstTask) === "build");
+    if (openBuild) body.workspace = "build";
+    if (air) body.origin = "air";
     if (mode === "single") {
       const decoded = decodeModelId(model);
       if (!decoded) throw new Error("Pick a model first");
@@ -317,14 +330,15 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       body.modelId = decoded.modelId;
     }
     const res = await api.post<{ conversation: { id: string } }>("/chat/conversations", body);
-    useChat.getState().setConversationId(chatId, res.conversation.id, buildMode ? undefined : (s.activeProjectId ?? undefined), buildMode ? "build" : undefined);
+    useChat.getState().setConversationId(chatId, res.conversation.id, openBuild ? undefined : (s.activeProjectId ?? undefined), openBuild ? "build" : undefined);
     useChat.getState().setConversationModel(chatId, model);
-    if (buildMode) void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversation.id } });
+    if (openBuild) void navigate({ to: "/build/$conversationId", params: { conversationId: res.conversation.id } });
+    else if (air) void navigate({ to: "/air/$conversationId", params: { conversationId: res.conversation.id } });
     else void navigate({ to: "/c/$conversationId", params: { conversationId: res.conversation.id } });
     return { conversationId: res.conversation.id };
   }
 
-  async function send(text: string, files?: File[], queuedAttachments?: ChatMessage["attachments"]) {
+  async function send(text: string, files?: File[], queuedAttachments?: ChatMessage["attachments"], autoContinue = false) {
     const s = useChat.getState();
     const trimmed = text.trim();
     let attachments = queuedAttachments ?? s.attachments;
@@ -338,6 +352,18 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       }
     }
     if (!trimmed && attachments.length === 0) return;
+    if (!autoContinue) airRounds.current = 0;
+    if (air && isAirStop(trimmed)) {
+      const id = s.chats.find((c) => c.id === s.activeId)?.conversationId;
+      s.clearDraft();
+      if (id) void api.post(`/chat/conversations/${id}/stop`, {});
+      return;
+    }
+    if (air && !airUnlocked) {
+      setSendError("Air Dots isn't on your plan.");
+      window.setTimeout(() => setSendError(null), 4000);
+      return;
+    }
     // Only blocks re-sending into the SAME chat that's already streaming — a global busy flag
     // here used to refuse sending into any OTHER chat too (and a stuck one made every send
     // forever after do nothing silently), which is exactly what broke multitasking across chats.
@@ -524,6 +550,20 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       if (connectionDropped) window.setTimeout(() => setResumeTick((t) => t + 1), 800);
       const next = useQueue.getState().shift(chatId);
       if (next) void send(next.text, undefined, next.attachments ?? []);
+      else if (
+        air &&
+        airStay &&
+        airRounds.current < 3 &&
+        !ac.signal.aborted &&
+        !live?.error &&
+        !askQuestions &&
+        live?.plan?.status !== "pending" &&
+        (live?.text?.length ?? 0) > 40 &&
+        !/\b(done|finished|blocked|stopping)\b/i.test((live?.text ?? "").slice(-500))
+      ) {
+        airRounds.current += 1;
+        void send("Continue until this is done. If you are blocked, say so and stop.", undefined, undefined, true);
+      }
     }
   }
 
@@ -564,6 +604,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
               <Hammer className="size-3" /> Build
             </span>
           )}
+          {air && !buildMode && (
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-chip px-2.5 py-1 text-xs font-medium text-foreground">
+              <Radio className="size-3" /> Air Dots
+            </span>
+          )}
           <span className="min-w-0 flex-1 truncate text-sm text-muted">{buildMode && empty ? "New build" : title}</span>
           <HeaderActions />
         </header>
@@ -598,6 +643,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
                     streaming={streaming}
+                    air={air}
                     disabled={!available}
                     placeholder="Describe what to build, or what to change in the repo…"
                     buildWorkspace={buildMode}
@@ -644,6 +690,52 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                       Friday plans it, writes the code, runs it in a real sandbox, tests it and fixes what breaks — you
                       watch every file and command live, then preview, download or open a pull request.
                     </motion.p>
+                  </>
+                ) : available && air && !airUnlocked ? (
+                  <>
+                    <h1 className="text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
+                      Air Dots is off on this plan
+                    </h1>
+                    <p className="mt-3 max-w-lg text-pretty text-sm text-muted">
+                      Pro includes it. The same Friday, the same tokens — call minutes are the only extra.
+                    </p>
+                    <Link to="/upgrade" className="mt-6 inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background">
+                      See plans
+                    </Link>
+                  </>
+                ) : available && air ? (
+                  <>
+                    <FridayFace busy={streaming} size={88} />
+                    <h1 className="mt-4 text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
+                      What should I take care of?
+                    </h1>
+                    <p className="mt-3 max-w-lg text-pretty text-sm text-muted">
+                      Friday stays on it. Ask for an app and it opens Build Mode. Say rukho or stop to pause. Same tokens as the rest of Friday.
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                      <button type="button" className="h-9 rounded-full bg-foreground px-3 text-sm text-background" onClick={() => setCallOpen(true)}>
+                        Call now
+                      </button>
+                      <button
+                        type="button"
+                        className="h-9 rounded-full border border-border px-3 text-sm"
+                        onClick={() => {
+                          const id = conversationId ?? useChat.getState().chats.find((c) => c.id === useChat.getState().activeId)?.conversationId;
+                          if (!id) return;
+                          void api.get<{ url: string | null }>(`/air/screen/${id}`).then((res) => setScreenUrl(res.url));
+                        }}
+                      >
+                        Screen
+                      </button>
+                      <label className="inline-flex items-center gap-2 text-sm text-muted">
+                        <input type="checkbox" checked={airStay} onChange={(e) => setAirStay(e.target.checked)} />
+                        Stay on it
+                      </label>
+                    </div>
+                    <AirPassphraseCard />
+                    {screenUrl && (
+                      <iframe title="Friday screen" src={screenUrl} className="mt-4 h-64 w-full max-w-lg rounded-2xl border border-border" />
+                    )}
                   </>
                 ) : available ? (
                   <h1 className="relative text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl">
@@ -699,10 +791,11 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   onSend={(message, files) => void send(message, files)}
                   onStop={stop}
                   streaming={streaming}
-                  disabled={!available}
+                  air={air}
+                  disabled={!available || (air && !airUnlocked)}
                   buildWorkspace={buildMode}
                 />
-                {available && (
+                {available && !(air && !airUnlocked) && (
                   <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {(buildMode ? BUILD_PROMPTS : PROMPTS).map((p, i) => (
                       <motion.button
@@ -788,6 +881,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                     onSend={(message, files) => void send(message, files)}
                     onStop={stop}
                     streaming={streaming}
+                    air={air}
                     disabled={!available}
                     placeholder={pendingPlan ? "Tell me what to change in the plan…" : buildMode ? "Ask for a change, or reply to Friday…" : undefined}
                     buildWorkspace={buildMode}
@@ -810,6 +904,7 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
       </Suspense>
       <Popouts />
       <CompleteProfileModal />
+      {callOpen && <AirCallPanel conversationId={conversationId} onClose={() => setCallOpen(false)} />}
       {sendError && (
         <div className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-elevated px-4 py-2 text-sm text-danger shadow-[var(--shadow-panel)]">
           {sendError}

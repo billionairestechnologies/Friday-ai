@@ -27,6 +27,7 @@ import { cliRouter } from "./routes/cli.js";
 import { installRouter } from "./routes/install.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { buildRouter } from "./routes/build.js";
+import { airRouter } from "./routes/air.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
 import { requestContext } from "./middleware/requestContext.js";
@@ -92,6 +93,7 @@ export function createApp() {
   app.use("/api/automations", automationsRouter);
   app.use("/api/mcp", mcpRouter);
   app.use("/api/build", buildRouter);
+  app.use("/api/air", airRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/sandbox", sandboxRouter);
   app.use("/api/usage", usageRouter);

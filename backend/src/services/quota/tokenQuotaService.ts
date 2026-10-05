@@ -409,7 +409,12 @@ export async function reconcileQuota(reservation: Reservation, actualTokens: num
 /** Fire-and-forget audit row for admin profitability reporting — distinct from usage_events'
  *  broader "token_usage" rows (kept for the existing monthly cost summary) in that this one
  *  carries the per-model input/output split and the original reservation for cross-checking. */
-export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation" | "code";
+export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation" | "code" | "air";
+
+/** Air Dots spends the same pool. The label is `air` so Finance can see it apart from chat and Build. */
+export function ledgerFeatureFor(origin: string | null | undefined, otherwise: LedgerFeature): LedgerFeature {
+  return origin === "air" ? "air" : otherwise;
+}
 
 export async function recordTokenLedger(
   userId: string,

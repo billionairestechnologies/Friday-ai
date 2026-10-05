@@ -86,6 +86,26 @@ const buildConversationRoute = createRoute({
   component: BuildShell,
 });
 
+function AirShell() {
+  const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
+  useEffect(() => {
+    document.title = "Friday";
+  }, [conversationId]);
+  return <Home conversationId={conversationId} origin="air" />;
+}
+
+const airRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/air",
+  component: AirShell,
+});
+
+const airConversationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/air/$conversationId",
+  component: AirShell,
+});
+
 // The Team Console (company back office) — hidden, standalone, not linked from the regular app.
 // Code-split: none of it ships in the chat app's bundle.
 const ConsoleApp = lazy(() => import("@/console/ConsoleApp").then((m) => ({ default: m.ConsoleApp })));
@@ -275,6 +295,8 @@ const routeTree = rootRoute.addChildren([
   conversationRoute,
   buildRoute,
   buildConversationRoute,
+  airRoute,
+  airConversationRoute,
   adminRoute,
   adminSectionRoute,
   upgradeRoute,

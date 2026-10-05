@@ -7,6 +7,7 @@ import { runTurn } from "../services/jobs/runTurn.js";
 import { requestStop } from "../services/jobs/turns.js";
 import { readEvents } from "../services/projectBuild/events.js";
 import { getOwnedConversation } from "../services/chat/conversations.js";
+import { entitlementsFor } from "../services/quota/entitlements.js";
 
 const pageSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -25,14 +26,19 @@ const createConversationSchema = z
     title: z.string().trim().max(200).optional(),
     projectId: z.string().uuid().optional(),
     workspace: z.enum(["chat", "build"]).optional().default("chat"),
+    origin: z.enum(["web", "air"]).optional().default("web"),
   })
   .refine((data) => data.mode !== "single" || (data.providerSlug && data.modelId), {
     message: "providerSlug and modelId are required for single mode",
   });
 
 export async function createConversation(req: Request, res: Response) {
-  const { mode, providerSlug, modelId, title, projectId, workspace } = createConversationSchema.parse(req.body);
-  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title, projectId, workspace);
+  const { mode, providerSlug, modelId, title, projectId, workspace, origin } = createConversationSchema.parse(req.body);
+  if (origin === "air" && !(await entitlementsFor(req.user!.id)).airDots) {
+    res.status(403).json({ error: "Air Dots isn't on your plan." });
+    return;
+  }
+  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title, projectId, workspace, origin);
   res.status(201).json({ conversation });
 }
 

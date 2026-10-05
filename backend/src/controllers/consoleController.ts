@@ -155,7 +155,7 @@ const announcementSchema = z.object({
   ctaUrl: optionalUrl,
   kind: z.enum(["feature", "improvement", "news", "maintenance"]).default("feature"),
   audience: audience.default("all"),
-  platforms: z.array(z.enum(["web", "android", "ios"])).min(1).default(["web", "android", "ios"]),
+  platforms: z.array(z.enum(["web", "android", "ios", "air", "whatsapp", "telegram"])).min(1).default(["web", "android", "ios"]),
   publishAt: isoDate,
   expiresAt: isoDate,
 });

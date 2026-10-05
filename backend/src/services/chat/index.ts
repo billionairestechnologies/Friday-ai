@@ -77,6 +77,7 @@ import {
   chargeProgress,
   QUOTA_STOP_MESSAGE,
   reconcileQuota,
+  ledgerFeatureFor,
   recordTokenLedger,
   resolveEffectivePlan,
   type Reservation,
@@ -247,6 +248,12 @@ export async function streamMessage(
   const activeSkillPromise = options.skillId ? getSkill(userId, options.skillId).catch(() => null) : Promise.resolve(null);
   try {
     const conversation = await getOwnedConversation(userId, conversationId);
+    const turnOrigin = (conversation as { origin?: string | null }).origin;
+    if (turnOrigin === "air" && !(await entitlementsPromise).airDots) {
+      onEvent({ t: "err", c: "Air Dots isn't on your plan." });
+      onEvent({ t: "done" });
+      return;
+    }
     mark("conversation loaded");
     if (research) {
       const allowance = await consumeDailyAllowance(userId, "deep_research", (await entitlementsPromise).deepResearchPerDay);
@@ -570,7 +577,7 @@ export async function streamMessage(
             candidate.modelId,
             usage,
             i === 0 ? (reservation?.reserveTokens ?? 0) : 0,
-            "teamup",
+            ledgerFeatureFor(turnOrigin, "teamup"),
           );
         }
       }
@@ -758,7 +765,7 @@ export async function streamMessage(
           if (planner) {
             reconcileTokens = creditsForUsage(drafted.usage, await meterRatesFor(planner.slug, planner.modelId));
             void recordTokenUsage(userId, planner.slug, planner.modelId, drafted.usage, { conversationId, mode });
-            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0, "build");
+            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0, ledgerFeatureFor(turnOrigin, "build"));
           }
           onEvent({ t: "done" });
           return;
@@ -797,7 +804,7 @@ export async function streamMessage(
             built.candidate.modelId,
             built.usage,
             reservation?.reserveTokens ?? 0,
-            "build",
+            ledgerFeatureFor(turnOrigin, "build"),
           );
         }
         // E2B bills for the time the sandbox runs — booked as sandbox_second so the P&L and plan economics carry it.
@@ -1021,7 +1028,7 @@ export async function streamMessage(
       usedCandidate.modelId,
       tokenUsage,
       reservation?.reserveTokens ?? 0,
-      research ? "research" : "chat",
+      ledgerFeatureFor(turnOrigin, research ? "research" : buildWorkspace ? "build" : "chat"),
     );
 
     const label =

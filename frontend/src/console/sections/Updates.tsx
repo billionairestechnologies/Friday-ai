@@ -205,9 +205,10 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
             <Field label="Button link"><Input value={form.ctaUrl} onChange={(e) => setForm({ ...form, ctaUrl: e.target.value })} placeholder="https://…/build" /></Field>
           </div>
           <Field label="Platforms">
-            <div className="flex gap-2">
-              {["web", "android", "ios"].map((p) => {
+            <div className="flex flex-wrap gap-2">
+              {(["web", "android", "ios", "air", "whatsapp", "telegram"] as const).map((p) => {
                 const on = form.platforms.includes(p);
+                const label = { web: "Web", android: "Android", ios: "iOS", air: "Air Dots", whatsapp: "WhatsApp", telegram: "Telegram" }[p];
                 return (
                   <button
                     key={p}
@@ -215,7 +216,7 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
                     onClick={() => setForm({ ...form, platforms: on ? form.platforms.filter((x) => x !== p) : [...form.platforms, p] })}
                     className={cn("h-9 rounded-full border px-4 text-sm transition-colors", on ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:text-foreground")}
                   >
-                    {{ web: "Web", android: "Android", ios: "iOS" }[p]}
+                    {label}
                   </button>
                 );
               })}
