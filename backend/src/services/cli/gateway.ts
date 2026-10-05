@@ -215,6 +215,8 @@ function sendJsonError(res: Response, status: number, message: string, type: str
  * sent) → charge the real prompt → call the provider → reconcile to the exact usage and write the ledger.
  */
 export async function runCompletion(userId: string, body: CompletionRequest, res: Response, signal: AbortSignal): Promise<void> {
+  const { registerPresence } = await import("../phone/store.js");
+  registerPresence(userId, "cli");
   const messages = toAgentMessages(Array.isArray(body.messages) ? body.messages : []);
   if (!messages.some((m) => m.role === "user" || m.role === "tool")) return sendJsonError(res, 400, "`messages` needs at least one user message.", "invalid_request_error");
   const tools: ToolSpec[] = toToolSpecs(body.tools);

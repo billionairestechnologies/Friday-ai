@@ -3,9 +3,18 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { loadSecrets } from "./secrets.js";
 import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
+import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
 
 export const PROJECT_DIR = "/home/user/app";
+
+async function conversationIsAir(conversationId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.from("conversations").select("origin").eq("id", conversationId).maybeSingle();
+  if (error || !data) return false;
+  return (data as { origin?: string }).origin === "air";
+}
 const SANDBOX_TTL_MS = 15 * 60 * 1000;
+/** Air Dots machines pause after 8 idle minutes so a loop cannot hold a computer open. */
+const AIR_SANDBOX_TTL_MS = 8 * 60 * 1000;
 /**
  * Persistent sandboxes (default on): when the TTL runs out — or a build ends with nothing to preview —
  * the sandbox is PAUSED, not killed. The next message resumes it exactly as it was: node_modules
@@ -90,24 +99,25 @@ export class BuildSandbox {
     readonly conversationId: string,
     /** True when this call created a brand-new sandbox (files restored from snapshot, nothing installed). */
     readonly fresh: boolean,
+    private readonly timeoutMs = SANDBOX_TTL_MS,
   ) {
     this.sandbox = sandbox;
   }
 
   /** Creates a brand-new sandbox and restores the last known file snapshot into it. */
-  private static async createFresh(userId: string, conversationId: string, apiKey: string, files: ProjectFiles): Promise<Sandbox> {
+  private static async createFresh(userId: string, conversationId: string, apiKey: string, files: ProjectFiles, timeoutMs: number): Promise<Sandbox> {
     let sandbox: Sandbox;
     if (SANDBOX_PERSIST) {
       try {
         // autoResume: opening the preview URL of a paused sandbox wakes it up.
-        sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS, lifecycle: { onTimeout: "pause", autoResume: true } });
+        sandbox = await Sandbox.create({ apiKey, timeoutMs, lifecycle: { onTimeout: "pause", autoResume: true } });
       } catch (err) {
         // An account/region without pause support must still get a sandbox.
         console.error("[build] pausable sandbox unavailable, using kill-on-timeout:", err instanceof Error ? err.message : err);
-        sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
+        sandbox = await Sandbox.create({ apiKey, timeoutMs });
       }
     } else {
-      sandbox = await Sandbox.create({ apiKey, timeoutMs: SANDBOX_TTL_MS });
+      sandbox = await Sandbox.create({ apiKey, timeoutMs });
     }
     await sandbox.commands.run(`mkdir -p ${PROJECT_DIR}`);
     await Promise.all(Object.entries(files).map(([path, content]) => sandbox.files.write(`${PROJECT_DIR}/${path}`, content)));
@@ -119,19 +129,27 @@ export class BuildSandbox {
     if (!env.e2bApiKey) throw new HttpError(503, "Building isn't configured yet — missing E2B_API_KEY.");
     const apiKey = env.e2bApiKey;
     const project = await getProject(conversationId);
+    const air = await conversationIsAir(conversationId);
+    const timeoutMs = air ? AIR_SANDBOX_TTL_MS : SANDBOX_TTL_MS;
 
     if (project?.sandbox_id) {
       try {
         const sandbox = await Sandbox.connect(project.sandbox_id, { apiKey });
-        await sandbox.setTimeout(SANDBOX_TTL_MS).catch(() => {});
-        return new BuildSandbox(sandbox, userId, conversationId, false);
+        await sandbox.setTimeout(timeoutMs).catch(() => {});
+        return new BuildSandbox(sandbox, userId, conversationId, false, timeoutMs);
       } catch {
         /* expired / unreachable — fall through to a fresh one */
       }
     }
 
-    const sandbox = await BuildSandbox.createFresh(userId, conversationId, apiKey, project?.files ?? {});
-    return new BuildSandbox(sandbox, userId, conversationId, true);
+    if (air) {
+      const minutes = Math.round(timeoutMs / 60_000);
+      const cap = (await entitlementsFor(userId)).airAwakeMinutes;
+      const allowance = await consumeDailyAllowance(userId, "air_awake", cap, minutes);
+      if (!allowance.ok) throw new HttpError(402, "Today's Air Dots computer time is used up. It resets at midnight UTC.");
+    }
+    const sandbox = await BuildSandbox.createFresh(userId, conversationId, apiKey, project?.files ?? {}, timeoutMs);
+    return new BuildSandbox(sandbox, userId, conversationId, true, timeoutMs);
   }
 
   /**
@@ -153,7 +171,7 @@ export class BuildSandbox {
         this.reconnecting = (async () => {
           if (!env.e2bApiKey) throw new HttpError(503, "Building isn't configured yet — missing E2B_API_KEY.");
           const project = await getProject(this.conversationId);
-          this.sandbox = await BuildSandbox.createFresh(this.userId, this.conversationId, env.e2bApiKey, project?.files ?? {});
+          this.sandbox = await BuildSandbox.createFresh(this.userId, this.conversationId, env.e2bApiKey, project?.files ?? {}, this.timeoutMs);
         })().finally(() => {
           this.reconnecting = null;
         });
@@ -246,7 +264,7 @@ export class BuildSandbox {
   }
 
   private touch() {
-    void this.sandbox.setTimeout(SANDBOX_TTL_MS).catch(() => {});
+    void this.sandbox.setTimeout(this.timeoutMs).catch(() => {});
   }
 
   async write(path: string, content: string) {

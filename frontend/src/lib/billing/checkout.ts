@@ -27,6 +27,7 @@ export type Entitlements = {
   fridayX: boolean;
   airDots: boolean;
   airCallMinutes: number;
+  airAwakeMinutes: number;
   voice: boolean;
   canvas: boolean;
   images: boolean;

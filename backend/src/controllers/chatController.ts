@@ -127,6 +127,8 @@ const sendMessageSchema = z
   });
 
 export async function streamMessage(req: Request, res: Response) {
+  const { registerPresence } = await import("../services/phone/store.js");
+  if (req.user) registerPresence(req.user.id, "web");
   const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, permissionMode, repo, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);

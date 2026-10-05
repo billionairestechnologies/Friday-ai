@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
 import * as st from "../controllers/statusController.js";
@@ -8,6 +9,8 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { requireAnyPermission, requirePermission as can, requireStaff } from "../services/console/permissions.js";
+import { getPhoneConfig, loadPhoneConfig, recentDeliveries, setPhoneConfig } from "../services/phone/store.js";
+import { DEFAULT_PHONE_CONFIG, type PhoneConfig } from "../services/phone/policy.js";
 
 /** Team Console API — staff only; every route names the permission it needs (see permissions.ts). */
 export const consoleRouter = Router();
@@ -125,3 +128,27 @@ consoleRouter.get("/mailbox/accounts/:accountId/messages/:uid", can("mailbox.use
 consoleRouter.get("/mailbox/accounts/:accountId/messages/:uid/attachments/:index", can("mailbox.use"), h(mail.attachment));
 consoleRouter.post("/mailbox/accounts/:accountId/actions", can("mailbox.use"), h(mail.act));
 consoleRouter.post("/mailbox/accounts/:accountId/send", can("mailbox.use"), h(mail.send));
+
+const phoneConfigSchema = z.object({
+  enabledPlanIds: z.array(z.string().min(1)).min(1),
+  inrPerMinute: z.number().min(0).max(100),
+  includedMinutes: z.number().int().min(0).max(10_000),
+  hardCapMinutes: z.number().int().min(0).max(10_000),
+  maxHeldSeconds: z.number().int().min(5).max(60),
+  channels: z.object({ telegram: z.boolean(), whatsapp: z.boolean(), email: z.boolean() }),
+});
+
+consoleRouter.get("/phone", can("plans.view"), h(async (_req, res) => {
+  await loadPhoneConfig();
+  res.json({ config: getPhoneConfig(), defaults: DEFAULT_PHONE_CONFIG });
+}));
+
+consoleRouter.put("/phone", can("plans.manage"), h(async (req, res) => {
+  const config = phoneConfigSchema.parse(req.body) as PhoneConfig;
+  setPhoneConfig(config);
+  res.json({ config: getPhoneConfig() });
+}));
+
+consoleRouter.get("/phone/deliveries/:userId", can("users.view"), h(async (req, res) => {
+  res.json({ deliveries: recentDeliveries(req.params.userId!) });
+}));
