@@ -443,6 +443,16 @@ export async function streamMessage(
         correctionSourceUrl = correction.imageUrl;
       }
     }
+    if (imageIntent && !(await entitlementsPromise).images) {
+      onEvent({ t: "err", c: "Image generation isn't on your plan." });
+      onEvent({ t: "done" });
+      return;
+    }
+    if (canvas && !(await entitlementsPromise).canvas) {
+      onEvent({ t: "err", c: "Canvas isn't on your plan." });
+      onEvent({ t: "done" });
+      return;
+    }
     if (imageIntent) {
       onEvent({ t: "status", s: "generating_image" });
       const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment, correctionSourceUrl);

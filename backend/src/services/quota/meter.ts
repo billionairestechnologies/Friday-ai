@@ -1,4 +1,4 @@
-import { effectiveCostRatesUsd, findPricing, loadFinanceSettings, loadPricing } from "../finance/pricing.js";
+import { consumptionRatesUsd, findPricing, loadFinanceSettings, loadPricing } from "../finance/pricing.js";
 import { estimateCostCents, type TokenUsage } from "../tokenUsage.js";
 
 /**
@@ -44,13 +44,16 @@ export function fallbackRates(providerSlug: string): MeterRates {
   };
 }
 
-/** The rates a model is metered at (Console → Finance): the blended supplier rate, the model's own override, or the provider default. Never throws. */
+/**
+ * The rates a user's plan burns at. Same cost fields as Team Console → Finance → the model row.
+ * What we pay (the pack) is not this number. Never throws.
+ */
 export async function meterRatesFor(providerSlug: string, modelId: string): Promise<MeterRates> {
   try {
     const [rows, settings] = await Promise.all([loadPricing(), loadFinanceSettings()]);
     const row = findPricing(rows, providerSlug, modelId);
-    const eff = effectiveCostRatesUsd(row, settings);
-    if (eff) return eff.rates;
+    const burn = consumptionRatesUsd(row, settings);
+    if (burn) return burn.rates;
   } catch {
     /* pricing table unavailable — fall through to the default */
   }

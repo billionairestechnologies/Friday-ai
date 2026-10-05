@@ -46,6 +46,8 @@ function entitlementChips(e: Partial<Entitlements> | undefined): string[] {
   const chips: string[] = [];
   if (e.buildMode === false) chips.push("No Build Mode");
   else if (e.buildMaxRounds) chips.push(`Build: ${e.buildMaxRounds} rounds/run`);
+  if (e.airDots) chips.push(e.airCallMinutes ? `Air Dots · ${e.airCallMinutes} call min` : "Air Dots");
+  if (e.fridayX === false) chips.push("No FridayX");
   if (e.deepResearchPerDay) chips.push(`${e.deepResearchPerDay} Deep Research/day`);
   if (e.documentsPerDay) chips.push(`${e.documentsPerDay} documents/day`);
   if (e.customSkills) chips.push(`${e.customSkills} custom skills`);
