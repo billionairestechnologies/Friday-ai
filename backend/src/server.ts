@@ -10,6 +10,7 @@ const { createApp } = await import("./app.js");
 const { startAutomationScheduler, stopAutomationScheduler } = await import("./services/automations/automationService.js");
 const { startCampaignScheduler } = await import("./services/console/campaignService.js");
 const { startGrantExpirySweep } = await import("./services/console/plansService.js");
+const { startPlanRolloverSweep } = await import("./services/billing/planSchedule.js");
 const { startStatusMonitor } = await import("./services/status/statusService.js");
 const { startTurnSweeper, stopTurnSweeper } = await import("./services/jobs/sweeper.js");
 const { drainTurns } = await import("./services/jobs/turns.js");
@@ -24,6 +25,7 @@ const server = app.listen(env.port, () => {
   startAutomationScheduler();
   startCampaignScheduler();
   startGrantExpirySweep();
+  startPlanRolloverSweep();
   startStatusMonitor();
   startTurnSweeper();
 });

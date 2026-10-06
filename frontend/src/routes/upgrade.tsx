@@ -95,6 +95,7 @@ function PlanCard({
   cadence,
   current,
   cta,
+  note,
   onBuy,
   busy,
   disabled,
@@ -111,6 +112,7 @@ function PlanCard({
   cadence: string;
   current: boolean;
   cta: string;
+  note?: string | null;
   onBuy?: () => void;
   busy: boolean;
   disabled: boolean;
@@ -150,6 +152,7 @@ function PlanCard({
       >
         {current ? "Current plan" : busy ? "Starting…" : cta}
       </button>
+      {note && <p className="mt-2 text-xs text-muted">{note}</p>}
       <FeatureList items={features} />
       <Chips title="Included" items={included ?? []} />
       <Chips title="Models unlocked" items={models ?? []} />
@@ -295,6 +298,32 @@ export function UpgradePage() {
     });
   };
 
+  // A cheaper plan bought while a pricier one is running starts when that one ends (server:
+  // billing/planSchedule.ts), so the button must say so instead of "Upgrade".
+  const RANK: Record<string, number> = { free: 0, pro: 1, premium: 2 };
+  const shortDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null);
+  const paidActive = Boolean(currentPlan && !currentPlan.isEnterprise && currentPlan.plan !== "free");
+  const endsOn = shortDate(currentPlan?.planRenewsAt);
+  const ctaFor = (plan: CatalogPlan): string => {
+    if (!signedIn) return plan.monthlyPricePaise <= 0 ? "Sign up free" : `Sign up for ${plan.name}`;
+    if (plan.monthlyPricePaise <= 0) return "Free forever";
+    if (currentPlan?.scheduledPlan?.plan === plan.id) return `Add more ${plan.name}`;
+    if (paidActive && currentPlan && RANK[plan.id] < RANK[currentPlan.plan]) return endsOn ? `Switch on ${endsOn}` : `Switch to ${plan.name}`;
+    return `Upgrade to ${plan.name}`;
+  };
+  const noteFor = (plan: CatalogPlan): string | null => {
+    if (!signedIn || !currentPlan) return null;
+    if (currentPlan.scheduledPlan?.plan === plan.id) {
+      const on = shortDate(currentPlan.scheduledPlan.startsAt);
+      return on ? `Booked — starts ${on}, when your ${currentPlan.plan} plan ends.` : "Booked — starts when your current plan ends.";
+    }
+    if (isCurrent(plan.id) && plan.monthlyPricePaise > 0 && endsOn) return `Active until ${endsOn}. Buying again adds to the end.`;
+    if (paidActive && RANK[plan.id] < RANK[currentPlan.plan] && plan.monthlyPricePaise > 0)
+      return `You keep ${currentPlan.plan === "premium" ? "Premium" : "your plan"} until ${endsOn ?? "it ends"}; ${plan.name} starts after that.`;
+    if (paidActive && RANK[plan.id] > RANK[currentPlan.plan]) return "Starts now. Your unused days are added to the new plan.";
+    return null;
+  };
+
   const isCurrent = (id: CatalogPlan["id"]) =>
     id === "free" ? !currentPlan || (currentPlan.plan === "free" && !currentPlan.isEnterprise) : Boolean(currentPlan?.plan === id && !currentPlan.isEnterprise);
 
@@ -430,7 +459,8 @@ export function UpgradePage() {
                   price={formatRupees(free ? 0 : annual ? plan.annualPricePaise : plan.monthlyPricePaise)}
                   cadence={free ? "/month" : annual ? "/year" : "/month"}
                   current={signedIn && isCurrent(plan.id)}
-                  cta={!signedIn ? (free ? "Sign up free" : `Sign up for ${plan.name}`) : free ? "Free forever" : `Upgrade to ${plan.name}`}
+                  cta={ctaFor(plan)}
+                  note={noteFor(plan)}
                   onBuy={!signedIn ? () => openAuth("signup") : free ? undefined : () => buyPlan(tier)}
                   busy={busyPlan === plan.id}
                   disabled={signedIn && (free || busyPlan !== null || !canPay)}
