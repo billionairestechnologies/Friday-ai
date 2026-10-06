@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { entitlementsFor } from "../quota/entitlements.js";
-import { createConversation, insertUserMessage } from "../chat/conversations.js";
+import { createConversation } from "../chat/conversations.js";
 import { assertPassphrase, parseSpokenPassphrase, setSpokenPassphrase } from "./passphrase.js";
 import { addCallSeconds, loadPhoneConfig, usedCallSeconds } from "../phone/store.js";
 import { deliverResult } from "../phone/delivery.js";
@@ -111,7 +111,7 @@ export async function acceptChannelMessage(channel: AirChannel, externalId: stri
     return { conversationId, approved: true };
   }
 
-  await insertUserMessage(conversationId, body, "text", [], userId);
+  // The turn saves the message itself (chat/index.ts streamMessage); inserting it here doubled it.
   const started = await startAirJob(userId, conversationId, body, { source: channel });
   if (!started.started) await tell("I'm still on the last job. Say rukho to stop it, or wait for the update.");
   return { conversationId, jobId: started.job?.id ?? null };

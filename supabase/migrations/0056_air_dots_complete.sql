@@ -29,6 +29,26 @@ create index if not exists air_jobs_running_idx on public.air_jobs (lease_until)
 create unique index if not exists air_jobs_one_running on public.air_jobs (conversation_id) where status = 'running';
 alter table public.air_jobs enable row level security;
 
+-- ── Dots ─────────────────────────────────────────────────────────────────────
+-- A dot is one Air Dots thread the person named and gave standing instructions (and a look): one
+-- conversation, the same account, memory, meter and machine. Not a second assistant per dot.
+create table if not exists public.air_dots (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  conversation_id uuid not null references public.conversations (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 40),
+  instructions text not null default '' check (char_length(instructions) <= 2000),
+  face text not null default 'blob',
+  color text not null default '#8eb7e8' check (color ~ '^#[0-9a-fA-F]{6}$'),
+  motion text not null default 'working',
+  sort int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists air_dots_user_idx on public.air_dots (user_id, sort, created_at);
+create unique index if not exists air_dots_conversation_idx on public.air_dots (conversation_id);
+alter table public.air_dots enable row level security;
+
 -- ── The gate ─────────────────────────────────────────────────────────────────
 -- Every shell, browser, file and connector action an Air Dot takes, allowed or refused.
 create table if not exists public.air_actions (

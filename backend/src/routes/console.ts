@@ -149,6 +149,11 @@ consoleRouter.put("/phone", can("plans.manage"), h(async (req, res) => {
   res.json({ config: getPhoneConfig() });
 }));
 
+consoleRouter.get("/phone/air", can("plans.view"), h(async (_req, res) => {
+  const { airOverview } = await import("../services/air/consoleOverview.js");
+  res.json(await airOverview());
+}));
+
 consoleRouter.get("/phone/deliveries/:userId", can("users.view"), h(async (req, res) => {
   res.json({ deliveries: recentDeliveries(req.params.userId!) });
 }));

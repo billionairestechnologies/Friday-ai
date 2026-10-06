@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { WhatsNewCard } from "@/components/whats-new-card";
 import { cn } from "@/lib/utils";
 import { useCan } from "../access";
-import { Badge, Button, Card, Drawer, EmptyState, ErrorNote, Field, Input, Loading, PageHeader, Select, Textarea, act, formatDate, fromLocalInput, statusTone, toLocalInput, useResource } from "../ui";
+import { Badge, Button, Card, Drawer, EmptyState, ErrorNote, Field, Input, Loading, PageHeader, Select, Textarea, act, formatDate, fromLocalInput, statusTone, toLocalInput, useResource, Toggle } from "../ui";
 
 type Update = {
   id: string;
@@ -20,6 +20,7 @@ type Update = {
   status: "draft" | "published" | "archived";
   publish_at: string | null;
   expires_at: string | null;
+  featured?: boolean;
   created_at: string;
   stats: { views: number; clicks: number };
 };
@@ -79,7 +80,7 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
   const navigate = useNavigate();
   const canManage = useCan("updates.manage");
   const canMarket = useCan("marketing.manage");
-  const blank = { title: "", body: "", imageUrl: "", ctaLabel: "", ctaUrl: "", kind: "feature" as Update["kind"], audience: "all", platforms: ["web", "android", "ios"], publishAt: "", expiresAt: "" };
+  const blank = { title: "", body: "", imageUrl: "", ctaLabel: "", ctaUrl: "", kind: "feature" as Update["kind"], audience: "all", platforms: ["web", "android", "ios"], publishAt: "", expiresAt: "", featured: false };
   const [form, setForm] = useState(blank);
   const [id, setId] = useState<string | null>(null);
   const [status, setStatus] = useState<Update["status"]>("draft");
@@ -101,6 +102,7 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
         platforms: update.platforms,
         publishAt: toLocalInput(update.publish_at),
         expiresAt: toLocalInput(update.expires_at),
+        featured: Boolean(update.featured),
       });
       setId(update.id);
       setStatus(update.status);
@@ -222,6 +224,15 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
               })}
             </div>
           </Field>
+          {form.platforms.includes("air") && (
+            <Toggle checked={form.featured} onChange={(featured) => setForm({ ...form, featured })} label="Featured card on the Air Dots home" />
+          )}
+          {(form.platforms.includes("telegram") || form.platforms.includes("whatsapp")) && (
+            <p className="text-xs text-muted">
+              Publishing sends it to everyone in this audience who linked Telegram (free). WhatsApp only sends through the approved
+              template (WHATSAPP_UPDATE_TEMPLATE), about ₹1.02 a person.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Go live at" hint="Empty = when you publish"><Input type="datetime-local" value={form.publishAt} onChange={(e) => setForm({ ...form, publishAt: e.target.value })} /></Field>
             <Field label="Stop showing at" hint="Optional"><Input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} /></Field>

@@ -22,6 +22,8 @@ export type AnnouncementInput = {
   platforms: Platform[];
   publishAt?: string | null;
   expiresAt?: string | null;
+  /** The one card on the Air Dots home (needs the "air" platform). */
+  featured?: boolean;
 };
 
 function toRow(input: Partial<AnnouncementInput>) {
@@ -36,6 +38,7 @@ function toRow(input: Partial<AnnouncementInput>) {
   if (input.platforms !== undefined) row.platforms = input.platforms;
   if (input.publishAt !== undefined) row.publish_at = input.publishAt || null;
   if (input.expiresAt !== undefined) row.expires_at = input.expiresAt || null;
+  if (input.featured !== undefined) row.featured = Boolean(input.featured);
   return row;
 }
 
@@ -81,6 +84,11 @@ export async function setAnnouncementStatus(id: string, status: "draft" | "publi
   }
   const { data, error } = await supabaseAdmin.from("announcements").update(patch).eq("id", id).select().single();
   if (error || !data) throw new HttpError(404, "Update not found");
+  // Publishing to Telegram / WhatsApp also sends it there (air/broadcast.ts), in the background.
+  if (status === "published" && Array.isArray(data.platforms) && data.platforms.some((p: string) => p === "telegram" || p === "whatsapp")) {
+    const { broadcastAnnouncement } = await import("../air/broadcast.js");
+    void broadcastAnnouncement(data as Parameters<typeof broadcastAnnouncement>[0]).catch(() => undefined);
+  }
   return data;
 }
 

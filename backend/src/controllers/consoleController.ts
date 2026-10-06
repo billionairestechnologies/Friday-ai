@@ -158,6 +158,7 @@ const announcementSchema = z.object({
   platforms: z.array(z.enum(["web", "android", "ios", "air", "whatsapp", "telegram"])).min(1).default(["web", "android", "ios"]),
   publishAt: isoDate,
   expiresAt: isoDate,
+  featured: z.boolean().optional(),
 });
 
 export async function listUpdates(_req: Request, res: Response) {

@@ -23,6 +23,7 @@ import {
 import { latestJob, startAirJob, stopAirJob } from "../services/air/jobs.js";
 import { recentActions } from "../services/air/gate.js";
 import { dropOnScreen, getScreen, screenInput } from "../services/air/screen.js";
+import { createDot, deleteDot, listDots, recentJobs, updateDot } from "../services/air/dots.js";
 import { readTelegramUpdate, readWhatsAppWebhook, telegramLinkUrl, verifyWhatsAppSubscription } from "../services/air/channels.js";
 
 export const airRouter = Router();
@@ -121,6 +122,49 @@ airRouter.delete(
   }),
 );
 
+airRouter.get(
+  "/featured",
+  asyncHandler(async (req, res) => {
+    const { featuredForUser } = await import("../services/air/broadcast.js");
+    res.json({ featured: await featuredForUser(req.user!.id).catch(() => null) });
+  }),
+);
+
+// ── Dots ────────────────────────────────────────────────────────────────────
+const dotBody = z.object({
+  name: z.string().max(40).optional(),
+  instructions: z.string().max(2000).optional(),
+  face: z.string().max(20).optional(),
+  color: z.string().max(7).optional(),
+  motion: z.string().max(20).optional(),
+  sort: z.number().optional(),
+});
+airRouter.get(
+  "/dots",
+  asyncHandler(async (req, res) => {
+    res.json({ dots: await listDots(req.user!.id) });
+  }),
+);
+airRouter.post(
+  "/dots",
+  asyncHandler(async (req, res) => {
+    res.status(201).json({ dot: await createDot(req.user!.id, dotBody.parse(req.body ?? {})) });
+  }),
+);
+airRouter.patch(
+  "/dots/:id",
+  asyncHandler(async (req, res) => {
+    res.json({ dot: await updateDot(req.user!.id, z.string().uuid().parse(req.params.id), dotBody.parse(req.body ?? {})) });
+  }),
+);
+airRouter.delete(
+  "/dots/:id",
+  asyncHandler(async (req, res) => {
+    await deleteDot(req.user!.id, z.string().uuid().parse(req.params.id));
+    res.status(204).end();
+  }),
+);
+
 // ── Jobs ────────────────────────────────────────────────────────────────────
 airRouter.post(
   "/jobs",
@@ -136,6 +180,12 @@ airRouter.get(
   asyncHandler(async (req, res) => {
     await getOwnedConversation(req.user!.id, req.params.conversationId!);
     res.json({ job: await latestJob(req.user!.id, req.params.conversationId!) });
+  }),
+);
+airRouter.get(
+  "/jobs/:conversationId/history",
+  asyncHandler(async (req, res) => {
+    res.json({ jobs: await recentJobs(req.user!.id, req.params.conversationId!) });
   }),
 );
 airRouter.post(

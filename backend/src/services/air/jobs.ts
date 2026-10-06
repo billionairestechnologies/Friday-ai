@@ -10,6 +10,7 @@ import { deliverResult } from "../phone/delivery.js";
 import { loadPhoneConfig } from "../phone/store.js";
 import type { DeliveryChannel } from "../phone/policy.js";
 import { callbackIfWanted } from "../phone/callback.js";
+import { dotInstructionsFor } from "./dots.js";
 
 /**
  * An Air Dot: a job that keeps working in the person's conversation until it is done, they say
@@ -240,6 +241,9 @@ export async function runJobLoop(job: AirJob, resumed: boolean): Promise<void> {
   let lastText = "";
   try {
     const maxRounds = Math.min(MAX_AIR_ROUNDS, (await entitlementsFor(job.user_id)).buildMaxRounds || MAX_AIR_ROUNDS);
+    // A named dot's standing instructions travel as behaviour, not as words in the thread.
+    const dot = await dotInstructionsFor(job.conversation_id).catch(() => null);
+    const behavior = dot?.instructions ? `${AIR_BEHAVIOR}\n\nYou are working as "${dot.name}". Standing instructions from the person: ${dot.instructions}` : AIR_BEHAVIOR;
     for (let round = job.rounds + 1; ; round++) {
       const before = await loadJob(job.id);
       if (!before || before.status !== "running") return;
@@ -254,7 +258,7 @@ export async function runJobLoop(job: AirJob, resumed: boolean): Promise<void> {
           content: first ? job.task : CONTINUE_PROMPT,
           inputMode: "text",
           think: false,
-          behavior: AIR_BEHAVIOR,
+          behavior,
           webSearch: false,
           canvas: false,
           options: {},

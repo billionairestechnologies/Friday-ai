@@ -92,7 +92,7 @@ function AirShell() {
   useEffect(() => {
     document.title = "Friday";
   }, [conversationId]);
-  return <AirWorkspace />;
+  return <AirWorkspace conversationId={conversationId} />;
 }
 
 const airRoute = createRoute({
