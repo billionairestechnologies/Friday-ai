@@ -2,7 +2,7 @@
 
 Friday is the product. **Air Dots** is the always-on computer inside it, and the call that drives it.
 
-The person they talk to is Friday. The website button says **Call now**. That surface is **On Air**. This folder used to be called Friday line. The name of the feature is Air Dots. The folder path stays `friday-line` so the repo link does not move.
+The person they talk to is Friday. The website button says **Call now**. That surface is **On Air**. This used to be called Friday line. The name is Air Dots, and this folder is `airdots`.
 
 Nothing here is wired into the site yet.
 
