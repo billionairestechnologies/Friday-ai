@@ -94,6 +94,19 @@ const AIR_MOTION = `
 @keyframes air-blink { 50% { opacity: 0; } }
 `;
 
+/** Phones: the sidebar becomes a drawer and the computer opens full screen (finger as the cursor). */
+function useNarrow() {
+  const query = "(max-width: 767px)";
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
 function errorText(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
 }
@@ -101,8 +114,9 @@ function errorText(err: unknown, fallback: string) {
 export function AirWorkspace({ conversationId }: { conversationId?: string } = {}) {
   const navigate = useNavigate();
   const initial = useMemo(loadView, []);
+  const narrow = useNarrow();
   const [theme, setTheme] = useState<Theme>(initial.theme);
-  const [nav, setNav] = useState(initial.nav);
+  const [nav, setNav] = useState(initial.nav && !(typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches));
   const [groups, setGroups] = useState<Group[]>(initial.groups);
   const [railW, setRailW] = useState(initial.railW);
   const [screenW, setScreenW] = useState(initial.screenW);
@@ -411,9 +425,14 @@ export function AirWorkspace({ conversationId }: { conversationId?: string } = {
   }
 
   return (
-    <div className="air-stage flex h-dvh gap-3 p-3" style={{ background: bg, color: ink, fontFamily: "var(--font-sans)" }}>
+    <div className={narrow ? "air-stage flex h-dvh gap-2 p-2" : "air-stage flex h-dvh gap-3 p-3"} style={{ background: bg, color: ink, fontFamily: "var(--font-sans)" }}>
       <style>{AIR_MOTION}</style>
-      <aside className="flex shrink-0 flex-col rounded-2xl px-2 py-3 transition-[width] duration-300" style={{ width: nav ? 220 : 76, background: panelBg, boxShadow: card }}>
+      {narrow && nav && <button type="button" aria-label="Close the list" className="fixed inset-0 z-30 bg-black/40" onClick={() => setNav(false)} />}
+      <aside
+        className={narrow ? (nav ? "fixed inset-y-2 left-2 z-40 flex w-[260px] flex-col rounded-2xl px-2 py-3" : "hidden") : "flex shrink-0 flex-col rounded-2xl px-2 py-3 transition-[width] duration-300"}
+        style={{ width: narrow ? undefined : nav ? 220 : 76, background: panelBg, boxShadow: narrow ? "0 16px 40px rgba(0,0,0,.35)" : card }}
+        onClick={(e) => { if (narrow && (e.target as HTMLElement).closest("button[data-pick]")) setNav(false); }}
+      >
         <div className={nav ? "flex items-center justify-between px-1" : "flex flex-col items-center gap-2"}>
           {nav && (
             <a href="/" className="flex items-center gap-1 text-[14px]" title="Back to Friday">
@@ -435,7 +454,7 @@ export function AirWorkspace({ conversationId }: { conversationId?: string } = {
             const state = badges[item.id];
             const needs = state === "needs_approval" || state === "needs_login";
             return (
-              <button key={item.id} type="button" className={nav ? "relative flex items-center gap-2 rounded-2xl px-1 py-1 text-left text-[14px]" : "relative grid size-12 place-items-center self-center rounded-2xl"} style={{ background: openId === item.id ? soft : "transparent" }} onClick={() => { setOpenId(item.id); setGroupId(null); setMaking(null); setCall(false); setRail(false); }}>
+              <button key={item.id} data-pick type="button" className={nav ? "relative flex items-center gap-2 rounded-2xl px-1 py-1 text-left text-[14px]" : "relative grid size-12 place-items-center self-center rounded-2xl"} style={{ background: openId === item.id ? soft : "transparent" }} onClick={() => { setOpenId(item.id); setGroupId(null); setMaking(null); setCall(false); setRail(false); }}>
                 <span className="relative">
                   <Mark face={item.face as Face} color={item.color} size={40} state={state === "running" ? "working" : "default"} />
                   {needs && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-medium" style={{ background: item.color, color: "#1c1b19" }}>!</span>}
@@ -464,6 +483,12 @@ export function AirWorkspace({ conversationId }: { conversationId?: string } = {
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
+        {narrow && !nav && (
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <button type="button" aria-label="Open the list of dots" className="grid size-9 place-items-center rounded-full" style={{ background: panelBg }} onClick={() => setNav(true)}>☰</button>
+            <p className="truncate text-sm">{dot?.name ?? group?.name ?? "Air Dots"}</p>
+          </div>
+        )}
         {error && (
           <div className="air-in mb-2 flex items-center justify-between rounded-2xl px-4 py-2 text-sm" style={{ background: dark ? "#3a1d1d" : "#fdecec", color: dark ? "#f6caca" : "#8a1f1f" }}>
             {error}
@@ -582,7 +607,7 @@ export function AirWorkspace({ conversationId }: { conversationId?: string } = {
                   <Phone className="size-4" />
                 </button>
               </div>
-              <div className="flex-1 space-y-3 overflow-y-auto px-6 py-2">
+              <div className={narrow ? "flex-1 space-y-3 overflow-y-auto px-3 py-2" : "flex-1 space-y-3 overflow-y-auto px-6 py-2"}>
                 <div key={dot.id} className="air-pop flex justify-center pb-2 pt-1">
                   <button type="button" aria-label={`Open ${dot.name}`} className="rounded-full" onClick={(event) => { event.stopPropagation(); setRail(true); void refreshSide(dot); }}>
                     <Mark face={dot.face as Face} color={dot.color} size={88} state={working ? "working" : "default"} />
@@ -598,16 +623,21 @@ export function AirWorkspace({ conversationId }: { conversationId?: string } = {
                 )}
               </div>
               <Composer draft={draft} setDraft={setDraft} onSend={() => void send(draft)} theme={theme} line={line} placeholder={working ? "Say rukho to stop" : `Message ${dot.name}`} working={working} />
-              {call && <CallCard dot={dot} theme={theme} panelBg={panelBg} line={line} muted={muted} onClose={() => setCall(false)} />}
+              {call && <CallCard narrow={narrow} dot={dot} theme={theme} panelBg={panelBg} line={line} muted={muted} onClose={() => setCall(false)} />}
             </div>
-            {screen && (
+            {screen && !narrow && (
               <>
                 <div role="separator" aria-label="Resize the computer" className="mx-1 w-1.5 shrink-0 cursor-col-resize self-stretch rounded-full" style={{ background: line }} onPointerDown={(event) => dragWidth(event, screenW, setScreenW, 320, 900)} />
                 <LiveScreen dot={dot} width={screenW} working={working} onClose={() => setScreen(false)} onTakeOver={() => void hold()} onGiveBack={() => void signedIn()} />
               </>
             )}
+            {screen && narrow && (
+              <div className="fixed inset-0 z-40 flex p-2" style={{ background: bg }}>
+                <LiveScreen dot={dot} width="100%" working={working} onClose={() => setScreen(false)} onTakeOver={() => void hold()} onGiveBack={() => void signedIn()} />
+              </div>
+            )}
             {rail && (
-              <aside className="air-in absolute right-4 top-1/2 z-20 flex max-h-[480px] -translate-y-1/2 flex-col overflow-hidden rounded-3xl" style={{ width: railW, background: panelBg, boxShadow: "0 16px 40px rgba(0,0,0,.12)" }} onClick={(event) => event.stopPropagation()}>
+              <aside className="air-in absolute right-4 top-1/2 z-20 flex max-h-[480px] -translate-y-1/2 flex-col overflow-hidden rounded-3xl" style={{ width: narrow ? "calc(100% - 16px)" : railW, right: narrow ? 8 : undefined, background: panelBg, boxShadow: "0 16px 40px rgba(0,0,0,.12)" }} onClick={(event) => event.stopPropagation()}>
                 <div role="separator" aria-label="Resize the side pane" className="absolute inset-y-6 left-0 w-1.5 cursor-col-resize" onPointerDown={(event) => dragWidth(event, railW, setRailW, 220, 440)} />
                 <div className="flex items-center gap-1 px-3 pt-3">
                   <button type="button" className="h-8 rounded-full px-3 text-[13px]" style={{ background: panel === "work" ? soft : "transparent" }} onClick={() => setPanel("work")}>Work</button>
@@ -824,7 +854,7 @@ function DotSettings({ dot, theme, ink, muted, line, onSave, onDelete, onError }
 }
 
 /** The real call: Friday rings the verified mobile, or this browser is the line. Minutes count either way. */
-function CallCard({ dot, theme, panelBg, line, muted, onClose }: { dot: AirDot; theme: Theme; panelBg: string; line: string; muted: string; onClose: () => void }) {
+function CallCard({ narrow, dot, theme, panelBg, line, muted, onClose }: { narrow?: boolean; dot: AirDot; theme: Theme; panelBg: string; line: string; muted: string; onClose: () => void }) {
   const mic = useMicrophone();
   const [callId, setCallId] = useState<string | null>(null);
   const [mode, setMode] = useState<"phone" | "browser" | null>(null);
@@ -869,7 +899,7 @@ function CallCard({ dot, theme, panelBg, line, muted, onClose }: { dot: AirDot; 
   }
 
   return (
-    <div className="air-in absolute right-8 top-16 z-30 w-80" onClick={(event) => event.stopPropagation()}>
+    <div className={narrow ? "air-in absolute inset-x-2 top-14 z-30" : "air-in absolute right-8 top-16 z-30 w-80"} onClick={(event) => event.stopPropagation()}>
       <VoiceBeam type="pill" theme={theme} look="glow" colorVariant="gold" stream={mic.stream}>
         <div className="rounded-3xl border p-4" style={{ background: panelBg, borderColor: line }}>
           <div className="flex items-center gap-2">
@@ -897,7 +927,7 @@ function CallCard({ dot, theme, panelBg, line, muted, onClose }: { dot: AirDot; 
 }
 
 /** The dot's computer, live: what its browser shows, and the person's own mouse/finger/keys on it. */
-function LiveScreen({ dot, width, working, onClose, onTakeOver, onGiveBack }: { dot: AirDot; width: number; working: boolean; onClose: () => void; onTakeOver: () => void; onGiveBack: () => void }) {
+function LiveScreen({ dot, width, working, onClose, onTakeOver, onGiveBack }: { dot: AirDot; width: number | string; working: boolean; onClose: () => void; onTakeOver: () => void; onGiveBack: () => void }) {
   const [shot, setShot] = useState<Screen | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState("");
