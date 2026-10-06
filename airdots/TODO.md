@@ -1,6 +1,6 @@
 # To-do
 
-Air Dots is built on branch `feature/airdots-complete` (on top of `feature/airdots` / `v3`). It is **not merged**.
+Air Dots is built on branch `v3` (same work as `feature/airdots`).
 Migrations **0054–0056** must be applied before deploying it. Code paths are named in brackets.
 
 ## 1. The worker
@@ -10,6 +10,7 @@ Migrations **0054–0056** must be applied before deploying it. Code paths are n
 - [x] The model reports its state with the `air_report` tool (working / done / blocked / needs_login / needs_approval) — no word matching
 - [x] "rukho" or "stop" stops it from any door (web, WhatsApp, Telegram, the chat Stop button), on any instance
 - [x] An empty Friday usage meter stops it (status `out_of_meter`)
+- [x] One computer per person: every dot's browser is a tab on the same machine, so a sign-in done once works for all dots; it pauses (keeping sign-ins) when idle (`air_machines`). Each dot keeps its own build sandbox so projects don't overwrite each other
 - [x] Idle machines pause at 8 minutes; every keep-alive is charged to the daily awake cap (Pro 20 / Premium 45 min) (`air/awake.ts`)
 - [x] Browser, shell, files and connectors go through one recorded gate (`air/gate.ts`, `air_actions`); Build Mode uses the same gate
 - [x] Pay, buy, book, send, post and delete wait for a yes; the passphrase once it is set; one yes = one action
@@ -50,6 +51,7 @@ Migrations **0054–0056** must be applied before deploying it. Code paths are n
 ## 6. Admin
 
 - [x] Team Console → Phone & Air Dots: running jobs, waiting on people, calls, minutes, refused actions
+- [x] Team Console → Users → a person: their computer (awake / paused), awake minutes today vs cap, call minutes, passphrase (set / locked), channels, dots, jobs; buttons to pause the computer (jobs stop, work kept), unlock or clear the passphrase
 - [x] Product updates: Air Dots / WhatsApp / Telegram platforms; publishing sends to linked Telegram chats (WhatsApp via an approved template only); one featured card on the Air Dots home
 
 ## To go live

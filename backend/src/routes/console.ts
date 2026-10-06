@@ -26,6 +26,25 @@ consoleRouter.get("/overview", can("overview.view"), h(c.overview));
 consoleRouter.get("/users", can("users.view"), h(c.listUsers));
 consoleRouter.get("/users/:userId", can("users.view"), h(c.getUser));
 consoleRouter.patch("/users/:userId", can("users.manage"), h(c.updateUser));
+// A person's Air Dots: computer, minutes, passphrase, channels — and pause / unlock (services/air/userAdmin.ts).
+consoleRouter.get("/users/:userId/air", can("users.view"), h(async (req, res) => {
+  const { userAirStatus } = await import("../services/air/userAdmin.js");
+  res.json(await userAirStatus(req.params.userId!));
+}));
+consoleRouter.post("/users/:userId/air/pause", can("users.manage"), h(async (req, res) => {
+  const { pauseUserAir } = await import("../services/air/userAdmin.js");
+  res.json(await pauseUserAir(req.params.userId!));
+}));
+consoleRouter.post("/users/:userId/air/unlock", can("users.manage"), h(async (req, res) => {
+  const { unlockPassphrase } = await import("../services/air/userAdmin.js");
+  await unlockPassphrase(req.params.userId!);
+  res.json({ ok: true });
+}));
+consoleRouter.post("/users/:userId/air/clear-passphrase", can("users.manage"), h(async (req, res) => {
+  const { clearPassphrase } = await import("../services/air/userAdmin.js");
+  await clearPassphrase(req.params.userId!);
+  res.json({ ok: true });
+}));
 
 consoleRouter.get("/team", can("team.manage"), h(c.listTeam));
 consoleRouter.post("/team", can("team.manage"), h(c.inviteMember));

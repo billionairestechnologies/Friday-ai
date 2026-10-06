@@ -15,8 +15,19 @@ const context = await browser.newContext({
   userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
   locale: "en-IN",
 });
+// One browser per machine, one tab per Air Dot ("tab" = its conversation): every dot shares the same
+// cookies and sign-ins (log in once), but each keeps its own page.
+const tabs = new Map();
+let tab = "";
 let page = await context.newPage();
-context.on("page", (p) => { page = p; });
+tabs.set("", page);
+context.on("page", (p) => { page = p; tabs.set(tab, p); });
+async function useTab(name) {
+  tab = String(name || "");
+  let p = tabs.get(tab);
+  if (!p || p.isClosed()) { p = await context.newPage(); tabs.set(tab, p); }
+  page = p;
+}
 
 async function settle() {
   await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
@@ -51,6 +62,7 @@ async function snapshot() {
 const el = (ref) => page.locator('[data-friday-ref="' + String(ref).replace(/[^0-9]/g, "") + '"]').first();
 
 async function handle(cmd) {
+  await useTab(cmd.tab);
   switch (cmd.action) {
     case "open":
       await page.goto(cmd.url, { waitUntil: "domcontentloaded", timeout: 30000 });

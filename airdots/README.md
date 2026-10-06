@@ -4,7 +4,7 @@ Friday is the product. **Air Dots** is the always-on computer inside it, and the
 
 The person they talk to is Friday. The website button says **Call now**. That surface is **On Air**. This used to be called Friday line. The name is Air Dots, and this folder is `airdots`.
 
-Built on branch `feature/airdots-complete` (not merged): the web page, jobs, the gate, calls, the voice bridge and the channels. What is left is configuring real numbers and keys — see [TODO.md](TODO.md) → *To go live*.
+Built on branch `v3`: the web page, jobs, the gate, calls, the voice bridge and the channels. What is left is configuring real numbers and keys — see [TODO.md](TODO.md) → *To go live*.
 
 ## Read this order
 

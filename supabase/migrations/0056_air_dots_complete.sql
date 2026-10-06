@@ -133,6 +133,15 @@ create table if not exists public.browser_sessions (
 );
 alter table public.browser_sessions enable row level security;
 
+-- One Air Dots computer per person: every dot's browser is a tab on this machine, so a sign-in done
+-- once works for all of them, and the machine pauses (not dies) when idle, keeping those sign-ins.
+create table if not exists public.air_machines (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  sandbox_id text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.air_machines enable row level security;
+
 -- ── Product updates ──────────────────────────────────────────────────────────
 -- One featured card on the Air Dots home (an update marked featured, not a second ad product).
 alter table public.announcements add column if not exists featured boolean not null default false;

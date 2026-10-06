@@ -65,15 +65,36 @@ async function rememberedSandbox(conversationId: string): Promise<string | null>
   return (data as { sandbox_id?: string } | null)?.sandbox_id ?? null;
 }
 
+/** Air Dots: the person's one computer (air_machines). Everything else: one browser per chat. */
+async function rememberedMachine(userId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin.from("air_machines").select("sandbox_id").eq("user_id", userId).maybeSingle();
+  return (data as { sandbox_id?: string } | null)?.sandbox_id ?? null;
+}
+
+async function createMachine(apiKey: string, persistent: boolean): Promise<Sandbox> {
+  if (!persistent) return Sandbox.create({ apiKey, timeoutMs: BROWSER_TTL_MS });
+  // Pause instead of dying on idle, so the person's sign-ins survive; opening it again resumes it.
+  return Sandbox.create({ apiKey, timeoutMs: BROWSER_TTL_MS, lifecycle: { onTimeout: "pause", autoResume: true } }).catch(() =>
+    Sandbox.create({ apiKey, timeoutMs: BROWSER_TTL_MS }),
+  );
+}
+
 async function sandboxFor(conversationId: string, opts: { create?: boolean } = {}): Promise<Sandbox> {
   if (!env.e2bApiKey) throw new HttpError(503, "The browser needs E2B_API_KEY on the server.");
   const owner = await airOwner(conversationId);
-  if (owner) await chargeAwake(owner, `browser:${conversationId}`, BROWSER_TTL_MS);
-  if (!sessions.has(conversationId)) {
-    const remembered = await rememberedSandbox(conversationId);
-    if (remembered) sessions.set(conversationId, { sandboxId: remembered, ready: Promise.resolve() });
+  // The session key: the person's machine for Air Dots, the chat for everything else.
+  const key = owner ? `user:${owner}` : conversationId;
+  if (owner) await chargeAwake(owner, `machine:${owner}`, BROWSER_TTL_MS);
+  if (!sessions.has(key)) {
+    const remembered = owner ? await rememberedMachine(owner) : await rememberedSandbox(conversationId);
+    if (remembered) sessions.set(key, { sandboxId: remembered, ready: Promise.resolve() });
   }
-  const existing = sessions.get(conversationId);
+  return connectOrCreate(key, conversationId, owner, opts);
+}
+
+async function connectOrCreate(key: string, conversationId: string, owner: string | null, opts: { create?: boolean }): Promise<Sandbox> {
+  if (!env.e2bApiKey) throw new HttpError(503, "The browser needs E2B_API_KEY on the server.");
+  const existing = sessions.get(key);
   if (existing) {
     try {
       const sb = await Sandbox.connect(existing.sandboxId, { apiKey: env.e2bApiKey });
@@ -81,18 +102,19 @@ async function sandboxFor(conversationId: string, opts: { create?: boolean } = {
       await existing.ready;
       return sb;
     } catch {
-      sessions.delete(conversationId);
+      sessions.delete(key);
     }
   }
   if (opts.create === false) throw new HttpError(404, "No browser is open for this chat yet.");
-  const sb = await Sandbox.create({ apiKey: env.e2bApiKey, timeoutMs: BROWSER_TTL_MS });
-  await supabaseAdmin.from("browser_sessions").upsert({ conversation_id: conversationId, sandbox_id: sb.sandboxId, updated_at: new Date().toISOString() }).then(() => undefined, () => undefined);
+  const sb = await createMachine(env.e2bApiKey, Boolean(owner));
+  if (owner) await supabaseAdmin.from("air_machines").upsert({ user_id: owner, sandbox_id: sb.sandboxId, updated_at: new Date().toISOString() }).then(() => undefined, () => undefined);
+  else await supabaseAdmin.from("browser_sessions").upsert({ conversation_id: conversationId, sandbox_id: sb.sandboxId, updated_at: new Date().toISOString() }).then(() => undefined, () => undefined);
   const ready = setup(sb);
-  sessions.set(conversationId, { sandboxId: sb.sandboxId, ready });
+  sessions.set(key, { sandboxId: sb.sandboxId, ready });
   try {
     await ready;
   } catch (err) {
-    sessions.delete(conversationId);
+    sessions.delete(key);
     await sb.kill().catch(() => undefined);
     throw err;
   }
@@ -104,7 +126,8 @@ export async function browserAction(conversationId: string, command: Record<stri
   const sb = await sandboxFor(conversationId, opts);
   // The command travels as a file, never through shell quoting.
   const file = `${DIR}/cmd-${Date.now().toString(36)}.json`;
-  await sb.files.write(file, JSON.stringify(command));
+  // Each chat drives its own tab; on the shared Air Dots machine that keeps dots off each other's page.
+  await sb.files.write(file, JSON.stringify({ ...command, tab: conversationId }));
   const out = await sb.commands
     .run(`curl -s -m 55 -X POST --data-binary @${file} http://127.0.0.1:7777/ ; rm -f ${file}`, { timeoutMs: 60_000 })
     .catch((err: { stdout?: string; message?: string }) => ({ stdout: err.stdout ?? "", error: err.message }));
@@ -112,7 +135,7 @@ export async function browserAction(conversationId: string, command: Record<stri
     return JSON.parse(out.stdout) as Snapshot;
   } catch {
     // The daemon died (a page crashed Chromium): forget the session so the next call starts fresh.
-    sessions.delete(conversationId);
+    for (const [k, v] of sessions) if (v.sandboxId === sb.sandboxId) sessions.delete(k);
     return { ok: false, error: "The browser stopped responding — try again (it will restart)." };
   }
 }
@@ -124,4 +147,19 @@ export async function closeBrowser(conversationId: string): Promise<void> {
   await Sandbox.connect(s.sandboxId, { apiKey: env.e2bApiKey })
     .then((sb) => sb.kill())
     .catch(() => undefined);
+}
+
+/** Team Console "Pause computer": pause the person's Air Dots machine (work and sign-ins kept). */
+export async function pauseAirMachine(userId: string): Promise<boolean> {
+  if (!env.e2bApiKey) return false;
+  const id = await rememberedMachine(userId);
+  for (const [k, v] of sessions) if (k === `user:${userId}` || v.sandboxId === id) sessions.delete(k);
+  if (!id) return false;
+  const sb = await Sandbox.connect(id, { apiKey: env.e2bApiKey }).catch(() => null);
+  if (!sb) return false;
+  return (sb as unknown as { pause: () => Promise<unknown> }).pause().then(() => true).catch(() => false);
+}
+
+export async function airMachineId(userId: string): Promise<string | null> {
+  return rememberedMachine(userId);
 }
