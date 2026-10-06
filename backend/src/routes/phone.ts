@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import { endPhoneCall, handlePhoneTurn } from "../services/phone/runtime.js";
-import { answerTrunk, samePathSecret, type TrunkName } from "../services/phone/trunk.js";
+import { answerTrunk, pickUp, samePathSecret, type TrunkName } from "../services/phone/trunk.js";
 import { liveSession } from "../services/phone/live.js";
 import { transcribeAudio, synthesizeSpeech } from "../services/voiceService.js";
 import { getPhoneConfig, getUserPhoneSettings, listPresence, loadPhoneConfig, registerPresence, setUserPhoneSettings } from "../services/phone/store.js";
@@ -45,6 +45,7 @@ const turnBody = z.object({
   SpeechResult: z.string().optional(),
   sessionId: z.string().optional(),
   CallSid: z.string().optional(),
+  trunk: z.string().max(20).optional(),
 });
 
 /** Sarvam and Exotel both land here. Audio stays on their side. Friday only sees the words. */
@@ -56,8 +57,18 @@ phoneRouter.post(
     const from = body.from ?? body.From ?? "";
     const text = (body.text ?? body.transcript ?? body.SpeechResult ?? "").trim();
     if (!text) throw new HttpError(400, "Empty turn.");
-    const result = await handlePhoneTurn(from, text, body.sessionId ?? body.CallSid);
+    const result = await handlePhoneTurn(from, text, body.sessionId ?? body.CallSid, undefined, body.trunk ?? "pipecat");
     res.json(publicTurn(result));
+  }),
+);
+
+/** The voice bridge picked up a call: who is it, and what does Friday say first? */
+phoneRouter.post(
+  "/answer",
+  asyncHandler(async (req, res) => {
+    assertGateway(req);
+    const body = z.object({ from: z.string().max(40), to: z.string().max(40).default(""), sessionId: z.string().min(1).max(120), trunk: z.string().max(20).default("pipecat") }).parse(req.body ?? {});
+    res.json(await pickUp(body.trunk, body));
   }),
 );
 

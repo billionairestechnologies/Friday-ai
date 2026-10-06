@@ -86,7 +86,9 @@ export async function dialAccount(to: string): Promise<{ mode: "browser" | "phon
     const key = process.env.EXOTEL_API_KEY ?? "";
     const callerId = process.env.EXOTEL_CALLER_ID ?? "";
     if (!sid || !token || !key || !callerId) return { mode: "browser", trunk: "browser" };
-    const body = new URLSearchParams({ From: plan.to, CallerId: callerId, CallType: "trans", Url: plan.url });
+    // EXOTEL_FLOW_URL = an Exotel app flow with the Voicebot applet pointed at the Pipecat bridge (the
+    // natural Gemini Live voice). Without it, our own ExoML hook speaks with Exotel's TTS.
+    const body = new URLSearchParams({ From: plan.to, CallerId: callerId, CallType: "trans", Url: process.env.EXOTEL_FLOW_URL || plan.url });
     const res = await fetch(`https://${key}:${token}@api.exotel.com/v1/Accounts/${sid}/Calls/connect`, { method: "POST", body }).catch(() => null);
     return { mode: res?.ok ? "phone" : "browser", trunk: res?.ok ? "exotel" : "browser" };
   }
@@ -115,6 +117,35 @@ export async function dialAccount(to: string): Promise<{ mode: "browser" | "phon
   return { mode: res?.ok ? "phone" : "browser", trunk: res?.ok ? "twilio" : "browser" };
 }
 
+/**
+ * The phone was picked up (or rang in). A call Friday placed (Call now, a callback, an urgent ask) has
+ * its greeting waiting; on an outbound leg the person is "To" (Twilio/Telnyx) or "From" (Exotel
+ * connect). Otherwise caller ID decides: a known number opens a call, an unknown one hears one line.
+ */
+export async function pickUp(trunk: string, inbound: { from: string; to: string; sessionId: string }): Promise<{ speak: string; hangup: boolean; known: boolean }> {
+  for (const number of [inbound.to, inbound.from]) {
+    if (!number) continue;
+    const dial = await pendingDialFor(number);
+    if (dial) {
+      await answerDial(dial.id, inbound.sessionId, trunk);
+      return { speak: dial.greeting || "Friday here.", hangup: false, known: true };
+    }
+  }
+  const user = await userForNumber(inbound.from);
+  if (!user) return { speak: UNKNOWN_CALLER, hangup: true, known: false };
+  await openCallRecord({ userId: user.id, externalId: inbound.sessionId, trunk, direction: "inbound", from: inbound.from });
+  return { speak: "Friday here.", hangup: false, known: true };
+}
+
+/** TwiML that hands the call's audio to the Pipecat bridge (airdots/pipecat). */
+export function renderTwilioStream(inbound: { from: string; to: string; sessionId: string }) {
+  const ws = process.env.PIPECAT_WS_URL ?? "";
+  const params = [["from", inbound.from], ["to", inbound.to], ["trunk", "twilio"]]
+    .map(([k, v]) => `<Parameter name="${k}" value="${xmlEscape(v ?? "")}"/>`)
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Connect><Stream url="${xmlEscape(ws)}">${params}</Stream></Connect></Response>`;
+}
+
 export async function answerTrunk(trunk: TrunkName, body: Record<string, unknown>) {
   const inbound = readInbound(body);
   const reply = (speak: string, hangup: boolean) =>
@@ -127,20 +158,11 @@ export async function answerTrunk(trunk: TrunkName, body: Record<string, unknown
   }
 
   if (!inbound.text) {
-    // Picked up. A call Friday placed (Call now, a callback, an urgent ask) has its greeting waiting;
-    // on an outbound leg the person is "To" (Twilio/Telnyx) or "From" (Exotel connect).
-    for (const number of [inbound.to, inbound.from]) {
-      if (!number) continue;
-      const dial = await pendingDialFor(number);
-      if (dial) {
-        await answerDial(dial.id, inbound.sessionId, trunk);
-        return reply(dial.greeting || "Friday here.", false);
-      }
-    }
-    const user = await userForNumber(inbound.from);
-    if (!user) return reply(UNKNOWN_CALLER, true);
-    await openCallRecord({ userId: user.id, externalId: inbound.sessionId, trunk, direction: "inbound", from: inbound.from });
-    return reply("Friday here.", false);
+    // With the Pipecat voice bridge configured, Twilio streams the audio there (Gemini Live voice)
+    // instead of <Say>/<Gather>; the bridge calls /api/phone/answer and /turn itself.
+    if (trunk === "twilio" && process.env.PIPECAT_WS_URL) return renderTwilioStream(inbound);
+    const picked = await pickUp(trunk, inbound);
+    return reply(picked.speak, picked.hangup);
   }
 
   const { handlePhoneTurn } = await import("./runtime.js");
