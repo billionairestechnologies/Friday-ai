@@ -11,6 +11,7 @@ const { startAutomationScheduler, stopAutomationScheduler } = await import("./se
 const { startCampaignScheduler } = await import("./services/console/campaignService.js");
 const { startGrantExpirySweep } = await import("./services/console/plansService.js");
 const { startPlanRolloverSweep } = await import("./services/billing/planSchedule.js");
+const { startRenewalReminders } = await import("./services/billing/renewalReminders.js");
 const { startStatusMonitor } = await import("./services/status/statusService.js");
 const { startTurnSweeper, stopTurnSweeper } = await import("./services/jobs/sweeper.js");
 const { drainTurns } = await import("./services/jobs/turns.js");
@@ -26,6 +27,7 @@ const server = app.listen(env.port, () => {
   startCampaignScheduler();
   startGrantExpirySweep();
   startPlanRolloverSweep();
+  startRenewalReminders();
   startStatusMonitor();
   startTurnSweeper();
 });
