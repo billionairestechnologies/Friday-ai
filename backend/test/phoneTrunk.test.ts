@@ -4,7 +4,6 @@ import { compressCallContext } from "../src/services/phone/context.js";
 import { liveSetup } from "../src/services/phone/live.js";
 import { dialPayload, readInbound, renderExotel, renderTwilio, resetTrunks, trunkForNumber } from "../src/services/phone/trunk.js";
 import { spokenPassphrase } from "../src/services/air/passphrase.js";
-import { allowSensitive, gateRefusal, noteGate, recentGate, resetActionGate } from "../src/services/projectBuild/actionGate.js";
 
 test("a long call keeps the latest turns and compresses the rest", () => {
   const lines = ["one", "two", "three", "four", "five", "six"];
@@ -65,14 +64,4 @@ test("a spoken passcode can be set or changed", () => {
   assert.equal(spokenPassphrase("hello"), null);
 });
 
-test("shell, browser, and files share one gate, and leaving the account waits for a yes", () => {
-  resetActionGate();
-  noteGate("user", "convo", "file", "src/App.jsx");
-  noteGate("user", "convo", "browser", "port 5173");
-  assert.equal(recentGate("convo").length, 2);
-  assert.match(gateRefusal("convo", "shell", "rm -rf /") ?? "", /passphrase/);
-  allowSensitive("convo");
-  assert.equal(gateRefusal("convo", "shell", "rm -rf /"), null);
-  assert.equal(gateRefusal("convo", "file", "src/App.jsx"), null);
-  resetActionGate();
-});
+

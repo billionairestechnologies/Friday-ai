@@ -41,6 +41,7 @@ import {
 } from "./promptContext.js";
 import { loadMemoryPrompt } from "../memoryService.js";
 import { buildToolset, toolUsePrompt } from "../agent/toolset.js";
+import { wrapForAir } from "../air/tools.js";
 import type { FridayTool } from "../agent/tools/types.js";
 import { DEEP_RESEARCH_ROUNDS, runToolLoop, supportsTools, type ToolLoopResult } from "../agent/toolLoop.js";
 import { DEEP_RESEARCH_PROMPT } from "../agent/toolset.js";
@@ -898,6 +899,9 @@ export async function streamMessage(
         imageTool({ lastImageUrl: lastGeneratedImageUrl(historyWithImages), attachedImage: currentImageAttachment?.dataUrl ?? null }),
       ];
       if (projectId && projectFiles.length) tools.push(projectSearchTool(projectId, projectFiles));
+      // Air Dots: every tool goes through the gate (recorded; pay/send/delete wait for a yes) and the
+      // model reports the job's state with air_report instead of the loop guessing from its words.
+      if (turnOrigin === "air") tools.splice(0, tools.length, ...wrapForAir(tools));
       // Deep Research fans out: parallel research helpers (agent/tools/research.ts).
       if (research) tools.push(researchAgentsTool(candidates.filter(supportsTools)));
       const imageMarkdown: string[] = [];

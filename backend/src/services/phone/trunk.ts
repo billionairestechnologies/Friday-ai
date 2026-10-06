@@ -1,32 +1,15 @@
 import { timingSafeEqual } from "node:crypto";
-import { compressCallContext } from "./context.js";
+import { answerDial, endCallRecord, openCallRecord, pendingDialFor, userForNumber } from "./calls.js";
+import { UNKNOWN_CALLER } from "./policy.js";
 
 export type TrunkName = "exotel" | "twilio" | "telnyx";
-
-const history = new Map<string, string[]>();
-const waiting = new Map<string, string>();
 
 function last10(value: string) {
   return value.replace(/\D/g, "").slice(-10);
 }
 
-export function queueCallback(phoneDigits: string, text: string) {
-  const key = last10(phoneDigits);
-  if (!key) return;
-  waiting.set(key, text.slice(0, 500));
-}
-
-export function takeCallback(phoneDigits: string) {
-  const key = last10(phoneDigits);
-  const text = key ? waiting.get(key) : undefined;
-  if (key && text) waiting.delete(key);
-  return text ?? null;
-}
-
-export function resetTrunks() {
-  history.clear();
-  waiting.clear();
-}
+/** Calls, transcripts and pending greetings live in air_calls now (phone/calls.ts). Kept for tests. */
+export function resetTrunks() {}
 
 export function samePathSecret(given: string | undefined) {
   const expected = process.env.PHONE_GATEWAY_SECRET ?? "";
@@ -73,17 +56,18 @@ export function renderTwilio(speak: string, hangup: boolean) {
   return `<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="speech" action="${xmlEscape(url)}" method="POST" speechTimeout="auto">${say}</Gather></Response>`;
 }
 
-type Inbound = { from: string; text: string; sessionId: string; event: string };
+type Inbound = { from: string; to: string; text: string; sessionId: string; event: string };
 
 export function readInbound(body: Record<string, unknown>): Inbound {
   const data = (body.data ?? {}) as { event_type?: string; payload?: Record<string, unknown> };
   const payload = data.payload ?? {};
   const transcription = (payload.transcription_data ?? body.transcription_data ?? {}) as { transcript?: string };
   const from = String(body.From ?? body.from ?? payload.from ?? payload.caller_id_number ?? "");
+  const to = String(body.To ?? body.to ?? payload.to ?? payload.called_number ?? "");
   const text = String(body.SpeechResult ?? body.speechResult ?? body.text ?? body.transcript ?? transcription.transcript ?? "").trim();
   const sessionId = String(body.CallSid ?? body.CallSid ?? body.call_sid ?? payload.call_control_id ?? body.sessionId ?? from);
   const event = String(data.event_type ?? body.CallStatus ?? body.Status ?? "");
-  return { from, text, sessionId, event };
+  return { from, to, text, sessionId, event };
 }
 
 export function dialPayload(to: string) {
@@ -133,32 +117,35 @@ export async function dialAccount(to: string): Promise<{ mode: "browser" | "phon
 
 export async function answerTrunk(trunk: TrunkName, body: Record<string, unknown>) {
   const inbound = readInbound(body);
-  const ended = /hangup|completed|canceled|busy|no-answer/i.test(inbound.event);
-  if (ended) {
-    const { endPhoneCall } = await import("./runtime.js");
-    const seconds = Number(body.Duration ?? body.DialCallDuration ?? body.duration ?? 0) || 0;
-    if (inbound.sessionId) await endPhoneCall(inbound.sessionId, seconds);
-    const speak = "";
-    return trunk === "telnyx" ? { action: "hangup", speak } : trunk === "twilio" ? renderTwilio("Goodbye.", true) : renderExotel("Goodbye.", true);
+  const reply = (speak: string, hangup: boolean) =>
+    trunk === "telnyx" ? telnyxCommands(inbound, speak, hangup) : trunk === "twilio" ? renderTwilio(speak, hangup) : renderExotel(speak, hangup);
+
+  if (/hangup|completed|canceled|busy|no-answer|failed/i.test(inbound.event)) {
+    const seconds = Number(body.Duration ?? body.DialCallDuration ?? body.CallDuration ?? body.duration ?? 0) || 0;
+    if (inbound.sessionId) await endCallRecord(inbound.sessionId, seconds);
+    return trunk === "telnyx" ? { action: "hangup", speak: "" } : reply("Goodbye.", true);
   }
 
-  const queued = takeCallback(inbound.from);
   if (!inbound.text) {
-    const speak = queued || "Friday here.";
-    if (trunk === "telnyx") return telnyxCommands(inbound, speak, false);
-    return trunk === "twilio" ? renderTwilio(speak, false) : renderExotel(speak, false);
+    // Picked up. A call Friday placed (Call now, a callback, an urgent ask) has its greeting waiting;
+    // on an outbound leg the person is "To" (Twilio/Telnyx) or "From" (Exotel connect).
+    for (const number of [inbound.to, inbound.from]) {
+      if (!number) continue;
+      const dial = await pendingDialFor(number);
+      if (dial) {
+        await answerDial(dial.id, inbound.sessionId, trunk);
+        return reply(dial.greeting || "Friday here.", false);
+      }
+    }
+    const user = await userForNumber(inbound.from);
+    if (!user) return reply(UNKNOWN_CALLER, true);
+    await openCallRecord({ userId: user.id, externalId: inbound.sessionId, trunk, direction: "inbound", from: inbound.from });
+    return reply("Friday here.", false);
   }
 
-  const lines = history.get(inbound.sessionId) ?? [];
-  lines.push(`Them: ${inbound.text}`);
-  const context = compressCallContext(lines);
   const { handlePhoneTurn } = await import("./runtime.js");
-  const result = await handlePhoneTurn(inbound.from, inbound.text, inbound.sessionId, context);
-  if (result.speak) lines.push(`Friday: ${result.speak}`);
-  history.set(inbound.sessionId, lines.slice(-40));
-  const hangup = result.action === "hangup" || result.action === "release";
-  if (trunk === "telnyx") return telnyxCommands(inbound, result.speak, hangup);
-  return trunk === "twilio" ? renderTwilio(result.speak, hangup) : renderExotel(result.speak, hangup);
+  const result = await handlePhoneTurn(inbound.from, inbound.text, inbound.sessionId, undefined, trunk);
+  return reply(result.speak, result.action === "hangup" || result.action === "release");
 }
 
 async function telnyxCommands(inbound: Inbound, speak: string, hangup: boolean) {

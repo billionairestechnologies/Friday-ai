@@ -71,6 +71,13 @@ async function handle(cmd) {
     case "scroll":
       await page.mouse.wheel(0, cmd.direction === "up" ? -700 : 700);
       break;
+    // The Air Dots screen: the person drives the same page with a mouse or a finger.
+    case "click_at":
+      await page.mouse.click(Math.max(0, Math.min(1280, Number(cmd.x) || 0)), Math.max(0, Math.min(800, Number(cmd.y) || 0)));
+      break;
+    case "type_text":
+      await page.keyboard.type(String(cmd.text ?? "").slice(0, 2000), { delay: 15 });
+      break;
     case "back":
       await page.goBack({ timeout: 15000 }).catch(() => {});
       break;

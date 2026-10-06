@@ -39,13 +39,8 @@ export const DEFAULT_USER_PHONE_SETTINGS: UserPhoneSettings = {
   language: "en",
 };
 
-export const PHONE_BEHAVIOR = [
-  "You are Friday, on a phone call. One turn. Answer, then stop and wait.",
-  "Do not interview. Ask one question only when the job is actually ambiguous, then wait.",
-  "Do not fill silence. Do not keep talking after the answer.",
-  "Short work: do it and say the result in a sentence or two.",
-  "Sending, deleting, or paying needs a spoken yes and their passphrase. Otherwise refuse.",
-].join(" ");
+/** The persona lives in air/prompt.ts so the web, the call and WhatsApp are the same Friday. */
+export { PHONE_PERSONA as PHONE_BEHAVIOR } from "../air/prompt.js";
 
 export const UNKNOWN_CALLER = "This number isn't on a Friday account.";
 
@@ -72,9 +67,9 @@ export function planAllowsPhone(plan: string, config: PhoneConfig): boolean {
   return config.enabledPlanIds.includes(plan);
 }
 
-export function minutesLeft(usedSeconds: number, config: PhoneConfig): number {
+export function minutesLeft(usedSeconds: number, config: PhoneConfig, limitMinutes?: number): number {
   const used = usedSeconds / 60;
-  return Math.max(0, config.hardCapMinutes - used);
+  return Math.max(0, (limitMinutes ?? config.hardCapMinutes) - used);
 }
 
 export function inrForSeconds(seconds: number, config: PhoneConfig): number {
@@ -82,7 +77,7 @@ export function inrForSeconds(seconds: number, config: PhoneConfig): number {
   return Math.round((over / 60) * config.inrPerMinute * 100) / 100;
 }
 
-function quietNow(settings: UserPhoneSettings, now: Date): boolean {
+export function quietNow(settings: UserPhoneSettings, now: Date): boolean {
   if (!settings.quietStart || !settings.quietEnd) return false;
   const mins = now.getHours() * 60 + now.getMinutes();
   const toMins = (hhmm: string) => {
@@ -125,16 +120,21 @@ export function decideTurn(input: {
   settings: UserPhoneSettings;
   machineOnline: boolean;
   now?: Date;
+  /** From the plan's entitlements (airDots + airCallMinutes): Pro 15, Premium 60, others 0. When
+   *  given, these decide — not the older admin config fields enabledPlanIds / hardCapMinutes. */
+  limitMinutes?: number;
+  allowed?: boolean;
 }): TurnDecision {
   const now = input.now ?? new Date();
   const delivery = spokenDelivery(input.text, input.settings, input.config);
   const base = { delivery, callback: input.settings.callback, research: false, build: false, longWork: false, hold: false };
 
   if (!input.knownUser) return { ...base, action: "hangup", speak: UNKNOWN_CALLER };
-  if (!planAllowsPhone(input.plan, input.config)) {
-    return { ...base, action: "hangup", speak: "Phone is on Premium. You can change that in admin." };
+  const allowed = input.allowed ?? planAllowsPhone(input.plan, input.config);
+  if (!allowed || input.limitMinutes === 0) {
+    return { ...base, action: "hangup", speak: "Calls with Friday are on the Pro and Premium plans. You can upgrade on the website." };
   }
-  if (minutesLeft(input.usedSeconds, input.config) <= 0) {
+  if (minutesLeft(input.usedSeconds, input.config, input.limitMinutes) <= 0) {
     return { ...base, action: "hangup", speak: "You've used this month's call minutes." };
   }
   if (quietNow(input.settings, now) && !/\burgent\b/i.test(input.text)) {

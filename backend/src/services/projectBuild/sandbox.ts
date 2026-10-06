@@ -3,7 +3,7 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { loadSecrets } from "./secrets.js";
 import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
-import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
+import { chargeAwake } from "../air/awake.js";
 
 export const PROJECT_DIR = "/home/user/app";
 
@@ -69,12 +69,13 @@ export async function getProject(conversationId: string): Promise<ProjectRow | n
 }
 
 /** Looking at the screen keeps an existing Air Dots machine awake. It does not start a new one. */
-export async function touchSandbox(conversationId: string): Promise<{ awake: boolean }> {
+export async function touchSandbox(conversationId: string, userId?: string): Promise<{ awake: boolean }> {
   const project = await getProject(conversationId);
   if (!project?.sandbox_id || !env.e2bApiKey) return { awake: false };
   try {
     const sandbox = await Sandbox.connect(project.sandbox_id, { apiKey: env.e2bApiKey });
     const air = await conversationIsAir(conversationId);
+    if (air && userId) await chargeAwake(userId, `build:${conversationId}`, AIR_SANDBOX_TTL_MS);
     await sandbox.setTimeout(air ? AIR_SANDBOX_TTL_MS : SANDBOX_TTL_MS);
     return { awake: true };
   } catch {
@@ -154,6 +155,8 @@ export class BuildSandbox {
     if (project?.sandbox_id) {
       try {
         const sandbox = await Sandbox.connect(project.sandbox_id, { apiKey });
+        // Every keep-alive of an Air Dots machine is charged against today's awake minutes.
+        if (air) await chargeAwake(userId, `build:${conversationId}`, timeoutMs);
         await sandbox.setTimeout(timeoutMs).catch(() => {});
         return new BuildSandbox(sandbox, userId, conversationId, false, timeoutMs);
       } catch {
@@ -161,12 +164,7 @@ export class BuildSandbox {
       }
     }
 
-    if (air) {
-      const minutes = Math.round(timeoutMs / 60_000);
-      const cap = (await entitlementsFor(userId)).airAwakeMinutes;
-      const allowance = await consumeDailyAllowance(userId, "air_awake", cap, minutes);
-      if (!allowance.ok) throw new HttpError(402, "Today's Air Dots computer time is used up. It resets at midnight UTC.");
-    }
+    if (air) await chargeAwake(userId, `build:${conversationId}`, timeoutMs);
     const sandbox = await BuildSandbox.createFresh(userId, conversationId, apiKey, project?.files ?? {}, timeoutMs);
     return new BuildSandbox(sandbox, userId, conversationId, true, timeoutMs);
   }
@@ -283,6 +281,14 @@ export class BuildSandbox {
   }
 
   private touch() {
+    // Air Dots machines: each keep-alive is charged against today's awake minutes; once they're gone
+    // the machine is left to pause on its idle timer (the work is kept) instead of being extended.
+    if (this.timeoutMs === AIR_SANDBOX_TTL_MS) {
+      void chargeAwake(this.userId, `build:${this.conversationId}`, this.timeoutMs)
+        .then(() => this.sandbox.setTimeout(this.timeoutMs))
+        .catch(() => {});
+      return;
+    }
     void this.sandbox.setTimeout(this.timeoutMs).catch(() => {});
   }
 

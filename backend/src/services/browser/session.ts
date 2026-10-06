@@ -2,6 +2,8 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { env } from "../../config/env.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { DAEMON_SOURCE } from "./daemon.js";
+import { supabaseAdmin } from "../../config/supabase.js";
+import { chargeAwake } from "../air/awake.js";
 
 /**
  * One real browser per conversation, inside an E2B sandbox (never on our servers: whatever a page
@@ -49,8 +51,28 @@ async function setup(sb: Sandbox): Promise<void> {
   }
 }
 
-async function sandboxFor(conversationId: string): Promise<Sandbox> {
+/** Air Dots conversations pay for browser time from the daily awake minutes, like their sandbox. */
+async function airOwner(conversationId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin.from("conversations").select("user_id, origin").eq("id", conversationId).maybeSingle();
+  const row = data as { user_id?: string; origin?: string } | null;
+  return row?.origin === "air" && row.user_id ? row.user_id : null;
+}
+
+/** The browser's sandbox id is kept in browser_sessions so any instance can reach it (the Air Dots
+ *  screen may be served by a different server than the one the agent's turn ran on). */
+async function rememberedSandbox(conversationId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin.from("browser_sessions").select("sandbox_id").eq("conversation_id", conversationId).maybeSingle();
+  return (data as { sandbox_id?: string } | null)?.sandbox_id ?? null;
+}
+
+async function sandboxFor(conversationId: string, opts: { create?: boolean } = {}): Promise<Sandbox> {
   if (!env.e2bApiKey) throw new HttpError(503, "The browser needs E2B_API_KEY on the server.");
+  const owner = await airOwner(conversationId);
+  if (owner) await chargeAwake(owner, `browser:${conversationId}`, BROWSER_TTL_MS);
+  if (!sessions.has(conversationId)) {
+    const remembered = await rememberedSandbox(conversationId);
+    if (remembered) sessions.set(conversationId, { sandboxId: remembered, ready: Promise.resolve() });
+  }
   const existing = sessions.get(conversationId);
   if (existing) {
     try {
@@ -62,7 +84,9 @@ async function sandboxFor(conversationId: string): Promise<Sandbox> {
       sessions.delete(conversationId);
     }
   }
+  if (opts.create === false) throw new HttpError(404, "No browser is open for this chat yet.");
   const sb = await Sandbox.create({ apiKey: env.e2bApiKey, timeoutMs: BROWSER_TTL_MS });
+  await supabaseAdmin.from("browser_sessions").upsert({ conversation_id: conversationId, sandbox_id: sb.sandboxId, updated_at: new Date().toISOString() }).then(() => undefined, () => undefined);
   const ready = setup(sb);
   sessions.set(conversationId, { sandboxId: sb.sandboxId, ready });
   try {
@@ -76,8 +100,8 @@ async function sandboxFor(conversationId: string): Promise<Sandbox> {
 }
 
 /** Runs one browser action and returns the page snapshot (or a base64 JPEG for "screenshot"). */
-export async function browserAction(conversationId: string, command: Record<string, unknown>): Promise<Snapshot> {
-  const sb = await sandboxFor(conversationId);
+export async function browserAction(conversationId: string, command: Record<string, unknown>, opts: { create?: boolean } = {}): Promise<Snapshot> {
+  const sb = await sandboxFor(conversationId, opts);
   // The command travels as a file, never through shell quoting.
   const file = `${DIR}/cmd-${Date.now().toString(36)}.json`;
   await sb.files.write(file, JSON.stringify(command));

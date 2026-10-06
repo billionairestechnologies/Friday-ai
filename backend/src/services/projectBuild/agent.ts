@@ -747,7 +747,7 @@ export async function runBuildAgent(opts: {
         return `[read ${action.path}]\n${tail(content, 6000)}`;
       }
       if (action.kind === "run") {
-        const refused = gateRefusal(conversationId, "shell", action.cmd);
+        const refused = await gateRefusal(userId, conversationId, "shell", action.cmd);
         if (refused) {
           finish("error", refused);
           return `[run] ${refused}`;
@@ -773,7 +773,7 @@ export async function runBuildAgent(opts: {
         return `[run ${JSON.stringify(action.cmd)}] exit ${out.exitCode}\n${tail(out.output)}`;
       }
       if (action.kind === "start") {
-        const refused = gateRefusal(conversationId, "shell", action.cmd);
+        const refused = await gateRefusal(userId, conversationId, "shell", action.cmd);
         if (refused) {
           finish("error", refused);
           return `[start] ${refused}`;

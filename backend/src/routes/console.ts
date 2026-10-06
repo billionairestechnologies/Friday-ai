@@ -140,13 +140,12 @@ const phoneConfigSchema = z.object({
 });
 
 consoleRouter.get("/phone", can("plans.view"), h(async (_req, res) => {
-  await loadPhoneConfig();
-  res.json({ config: getPhoneConfig(), defaults: DEFAULT_PHONE_CONFIG });
+  res.json({ config: await loadPhoneConfig(true), defaults: DEFAULT_PHONE_CONFIG });
 }));
 
 consoleRouter.put("/phone", can("plans.manage"), h(async (req, res) => {
   const config = phoneConfigSchema.parse(req.body) as PhoneConfig;
-  setPhoneConfig(config);
+  await setPhoneConfig(config);
   res.json({ config: getPhoneConfig() });
 }));
 

@@ -36,12 +36,16 @@ export async function deliverResult(userId: string, email: string | null, text: 
   for (const channel of channels) {
     if (channel === "call") continue;
     queueDelivery(userId, channel, body);
-    if (channel === "email" && config.channels.email && email && env.resendApiKey) {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.resendApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: env.resendFromEmail, to: email, subject: "Friday", text: body }),
-      }).catch(() => undefined);
+    if (channel === "email" && config.channels.email && env.resendApiKey) {
+      // Callers (jobs, the phone) rarely have the address at hand; look it up once here.
+      const to = email ?? (await supabaseAdmin.auth.admin.getUserById(userId).catch(() => ({ data: null }))).data?.user?.email ?? null;
+      if (to) {
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${env.resendApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: env.resendFromEmail, to, subject: "Friday", text: body }),
+        }).catch(() => undefined);
+      }
     }
     if (channel === "telegram" && config.channels.telegram && process.env.TELEGRAM_BOT_TOKEN) {
       const chatId = await telegramChatId(userId);

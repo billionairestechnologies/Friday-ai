@@ -1,141 +1,149 @@
-import { supabaseAdmin } from "../../config/supabase.js";
 import { createConversation } from "../chat/conversations.js";
 import { runTurn } from "../jobs/runTurn.js";
 import { resolveEffectivePlan } from "../quota/tokenQuotaService.js";
-import { assertPassphrase, savePassphrase, spokenPassphrase } from "../air/passphrase.js";
-import { allowSensitive } from "../projectBuild/actionGate.js";
+import { entitlementsFor } from "../quota/entitlements.js";
+import { assertPassphrase, parseSpokenPassphrase, setSpokenPassphrase } from "../air/passphrase.js";
+import { openApproval } from "../air/gate.js";
+import { latestJob, startAirJob } from "../air/jobs.js";
 import { callbackIfWanted } from "./callback.js";
 import { deliverResult } from "./delivery.js";
+import { compressCallContext } from "./context.js";
 import {
-  PHONE_BEHAVIOR,
-  decideTurn,
-  overrunSpeech,
-  type DeliveryChannel,
-  type TurnDecision,
-} from "./policy.js";
-import {
-  addCallSeconds,
-  getPhoneConfig,
-  getUserPhoneSettings,
-  hydrateUserPhone,
-  loadPhoneConfig,
-  machineOnline,
-  registerPresence,
-  usedCallSeconds,
-} from "./store.js";
+  appendTranscript,
+  callByExternalId,
+  endCallRecord,
+  openCallRecord,
+  recentCallContext,
+  setCallConversation,
+  transcriptLines,
+  userForNumber,
+  type CallRow,
+} from "./calls.js";
+import { PHONE_BEHAVIOR, decideTurn, overrunSpeech, type DeliveryChannel, type TurnDecision } from "./policy.js";
+import { getUserPhoneSettings, loadPhoneConfig, machineOnline, registerPresence, usedCallSeconds } from "./store.js";
+
+/**
+ * One spoken turn. Words in, words out: the trunk (Exotel/Twilio/Telnyx <Say>/<Gather>) or Pipecat
+ * with Gemini Live carries the audio. Friday decides the words here, through the same runtime as chat,
+ * so the call shares the person's memory, meter, sandbox and connectors.
+ *
+ * Call state is the air_calls row (phone/calls.ts), keyed by the trunk's call id — not a Map on one
+ * server — so any instance can take the next turn of a call.
+ */
 
 export type PhoneTurnResult = TurnDecision & { sessionId: string; conversationId: string | null; jobId: string | null };
 
-type Session = { id: string; userId: string | null; conversationId: string | null; from: string };
-
-const sessions = new Map<string, Session>();
-
-function digits(value: string) {
-  return value.replace(/\D/g, "").slice(-10);
+function result(decision: TurnDecision, sessionId: string, call: CallRow | null, extra: Partial<PhoneTurnResult> = {}): PhoneTurnResult {
+  return { ...decision, sessionId, conversationId: call?.conversation_id ?? null, jobId: null, ...extra };
 }
 
-async function userForNumber(from: string): Promise<{ id: string; email: string | null } | null> {
-  const needle = digits(from);
-  if (needle.length < 8) return null;
-  const { data, error } = await supabaseAdmin.from("profiles").select("id, phone").not("phone", "is", null);
-  if (error || !data) return null;
-  const row = (data as { id: string; phone: string | null }[]).find((profile) => digits(profile.phone ?? "") === needle);
-  if (!row) return null;
-  return { id: row.id, email: null };
+const SENSITIVE = /\b(pay|send|delete|transfer|purchase|buy|book|order)\b/i;
+
+async function ensureConversation(call: CallRow, build: boolean): Promise<string> {
+  if (call.conversation_id) return call.conversation_id;
+  const title = `Call · ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}`;
+  const created = await createConversation(call.user_id, "auto", undefined, undefined, title, undefined, build ? "build" : "chat", "air");
+  const id = created.id as string;
+  await setCallConversation(call.id, id);
+  call.conversation_id = id;
+  return id;
 }
 
-async function ensureConversation(session: Session, userId: string, build: boolean) {
-  if (session.conversationId) return session.conversationId;
-  const created = await createConversation(userId, "auto", undefined, undefined, "Phone call", undefined, build ? "build" : "chat");
-  session.conversationId = created.id as string;
-  return session.conversationId;
+/** Find this call's record, or start one for a known caller. Unknown numbers get no record. */
+async function callFor(from: string, sessionId: string, trunk: string | undefined): Promise<CallRow | null> {
+  const existing = await callByExternalId(sessionId);
+  if (existing) return existing;
+  const user = await userForNumber(from);
+  if (!user) return null;
+  return openCallRecord({ userId: user.id, externalId: sessionId, trunk: trunk ?? "gateway", direction: "inbound", from });
 }
 
-async function dispatch(userId: string, email: string | null, text: string, channels: DeliveryChannel[]) {
-  await deliverResult(userId, email, text, channels, getPhoneConfig());
-}
+export async function handlePhoneTurn(from: string, text: string, sessionId?: string, _context?: string, trunk?: string): Promise<PhoneTurnResult> {
+  const id = sessionId || `call_${from.replace(/\D/g, "").slice(-10) || "unknown"}`;
+  const config = await loadPhoneConfig();
+  const call = await callFor(from, id, trunk);
+  const settings = await getUserPhoneSettings(call?.user_id ?? "");
 
-export async function handlePhoneTurn(from: string, text: string, sessionId?: string, context?: string): Promise<PhoneTurnResult> {
-  const id = sessionId || `call_${digits(from) || "unknown"}`;
-  const session = sessions.get(id) ?? { id, userId: null, conversationId: null, from };
-  sessions.set(id, session);
-  await loadPhoneConfig();
-  const user = session.userId ? { id: session.userId, email: null } : await userForNumber(from);
-  if (user) session.userId = user.id;
-
-  const config = getPhoneConfig();
-  const settings = user ? getUserPhoneSettings(user.id) : getUserPhoneSettings("");
   let plan = "free";
   let usedSeconds = 0;
-  if (user) {
-    await hydrateUserPhone(user.id);
-    plan = (await resolveEffectivePlan(user.id).catch(() => null))?.plan ?? "free";
-    usedSeconds = usedCallSeconds(user.id);
-    registerPresence(user.id, "call", id);
+  let allowed = false;
+  let limitMinutes = 0;
+  if (call) {
+    const [effective, ents, used] = await Promise.all([
+      resolveEffectivePlan(call.user_id).catch(() => null),
+      entitlementsFor(call.user_id),
+      usedCallSeconds(call.user_id),
+    ]);
+    plan = effective?.plan ?? "free";
+    allowed = ents.airDots;
+    limitMinutes = ents.airCallMinutes;
+    // The call in progress counts too: trunks bill at hang-up, but the cap must hold mid-call.
+    const live = call.direction === "browser" ? 0 : Math.max(0, (Date.now() - new Date(call.created_at).getTime()) / 1000);
+    usedSeconds = used + live;
+    registerPresence(call.user_id, "call", id);
+    await appendTranscript(call.id, "them", text);
   }
 
   const decision = decideTurn({
-    knownUser: Boolean(user),
+    knownUser: Boolean(call),
     plan,
     usedSeconds,
     text,
     config,
     settings,
-    machineOnline: user ? machineOnline(user.id) : false,
+    machineOnline: call ? machineOnline(call.user_id) : false,
+    allowed,
+    limitMinutes,
   });
 
-  if (!user || decision.action === "hangup" || decision.action === "speak") {
-    return { ...decision, sessionId: id, conversationId: session.conversationId, jobId: null };
+  const say = async (speak: string, base: TurnDecision = decision, extra: Partial<PhoneTurnResult> = {}) => {
+    if (call && speak) await appendTranscript(call.id, "friday", speak);
+    return result({ ...base, speak }, id, call, extra);
+  };
+
+  if (!call || decision.action === "hangup") return say(decision.speak);
+
+  // "my passcode is …" / "change my passcode from … to …"
+  const spoken = parseSpokenPassphrase(text);
+  if (spoken) {
+    const reply = await setSpokenPassphrase(call.user_id, spoken).catch((err: unknown) => (err instanceof Error ? err.message : "I couldn't save that passphrase."));
+    return say(reply, { ...decision, action: "speak", hold: false });
   }
 
-  const nextPhrase = spokenPassphrase(text);
-  if (nextPhrase) {
+  // "yes … <passphrase>" before paying / sending / deleting: opens the gate on this call's
+  // conversation for two minutes, and wakes a job that was waiting for this yes.
+  if (/\byes\b/i.test(text) && (SENSITIVE.test(text) || (await waitingForYes(call)))) {
+    const phrase = text.split(/\byes\b/i)[1]?.replace(/^[\s,.:-]+/, "").trim();
     try {
-      await savePassphrase(user.id, nextPhrase);
+      await assertPassphrase(call.user_id, phrase || undefined);
     } catch (err) {
-      return {
-        ...decision,
-        action: "speak",
-        speak: err instanceof Error ? err.message : "I couldn't save that passphrase.",
-        hold: false,
-        sessionId: id,
-        conversationId: session.conversationId,
-        jobId: null,
-      };
+      return say(err instanceof Error ? err.message : "Say your passphrase.", { ...decision, action: "speak", hold: false });
     }
-    return {
-      ...decision,
-      action: "speak",
-      speak: "Saved. I'll ask for it before a payment, a send, or a delete.",
-      hold: false,
-      sessionId: id,
-      conversationId: session.conversationId,
-      jobId: null,
-    };
+    const conversationId = await ensureConversation(call, decision.build);
+    await openApproval(call.user_id, conversationId, "phone");
+    const job = await latestJob(call.user_id, conversationId);
+    if (job?.status === "needs_approval") {
+      await startAirJob(call.user_id, conversationId, `Approved on the phone. Go ahead with: ${job.needs ?? job.summary ?? job.task}`, { source: "approval" });
+      return say("Okay, doing it now. I'll tell you when it's done.", { ...decision, action: "release", hold: false }, { conversationId, jobId: job.id });
+    }
+  } else if (decision.action === "speak") {
+    return say(decision.speak);
   }
 
-  if (/\byes\b/i.test(text) && /\b(pay|send|delete|transfer|purchase)\b/i.test(text)) {
-    const phrase = text.split(/\byes\b/i)[1]?.trim();
-    try {
-      await assertPassphrase(user.id, phrase);
-      const opened = session.conversationId ?? (await ensureConversation(session, user.id, decision.build));
-      allowSensitive(opened);
-    } catch (err) {
-      return {
-        ...decision,
-        action: "speak",
-        speak: err instanceof Error ? err.message : "Say your passphrase.",
-        hold: false,
-        sessionId: id,
-        conversationId: session.conversationId,
-        jobId: null,
-      };
-    }
+  const conversationId = await ensureConversation(call, decision.build);
+  // The person's words plus a short memory of this call and the last few calls (words, not audio).
+  const lines = transcriptLines(call);
+  const earlier = lines.length <= 1 ? await recentCallContext(call.user_id) : null;
+  const content = [earlier, lines.length > 1 ? compressCallContext(lines) : null, text].filter(Boolean).join("\n\n");
+
+  if (decision.action === "release") {
+    // Long work leaves the line and continues as an Air Dot until it is done.
+    const started = await startAirJob(call.user_id, conversationId, content, { source: "phone" }).catch(() => null);
+    return say(decision.speak, decision, { conversationId, jobId: started?.job?.id ?? null });
   }
 
-  const conversationId = await ensureConversation(session, user.id, decision.build);
   const request = {
-    content: context?.trim() || text,
+    content,
     inputMode: "voice" as const,
     think: false,
     behavior: PHONE_BEHAVIOR,
@@ -144,69 +152,30 @@ export async function handlePhoneTurn(from: string, text: string, sessionId?: st
     options: { research: decision.research },
     hadAttachments: false,
   };
+  const pending = runTurn({ userId: call.user_id, conversationId, kind: decision.build ? "build" : "chat", request, attachments: [] });
+  const finished = await Promise.race([pending, new Promise<null>((resolve) => setTimeout(() => resolve(null), config.maxHeldSeconds * 1000))]);
 
-  if (decision.action === "release") {
-    const jobId = conversationId;
-    void runTurn({
-      userId: user.id,
-      conversationId,
-      kind: decision.build ? "build" : decision.research ? "research" : "chat",
-      request,
-      attachments: [],
-    }).then((result) => {
-      if (!result.text.trim()) return;
-      void dispatch(user.id, user.email, result.text, decision.delivery);
-      if (decision.callback) void callbackIfWanted(user.id, result.text);
+  if (!finished) {
+    // Short work that overran: say so, hang up, deliver when it lands.
+    void pending.then(async (late) => {
+      if (!late.text.trim()) return;
+      await deliverResult(call.user_id, null, late.text, decision.delivery as DeliveryChannel[], config);
+      if (decision.callback) await callbackIfWanted(call.user_id, late.text);
     });
-    return { ...decision, sessionId: id, conversationId, jobId };
+    return say(overrunSpeech(decision.delivery), { ...decision, action: "release", hold: false }, { conversationId, jobId: conversationId });
   }
 
-  const pending = runTurn({
-    userId: user.id,
-    conversationId,
-    kind: decision.build ? "build" : "chat",
-    request,
-    attachments: [],
-  });
-  const result = await Promise.race([
-    pending,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), config.maxHeldSeconds * 1000)),
-  ]);
-
-  if (!result) {
-    void pending.then((finished) => {
-      if (!finished.text.trim()) return;
-      void dispatch(user.id, user.email, finished.text, decision.delivery);
-      if (decision.callback) void callbackIfWanted(user.id, finished.text);
-    });
-    return {
-      ...decision,
-      action: "release",
-      speak: overrunSpeech(decision.delivery),
-      hold: false,
-      sessionId: id,
-      conversationId,
-      jobId: conversationId,
-    };
-  }
-
-  const spoken = result.text.trim() || "I didn't catch a result. It's in the app.";
-  void dispatch(user.id, user.email, spoken, decision.delivery);
-  return {
-    ...decision,
-    action: "hold",
-    speak: spoken,
-    hold: true,
-    sessionId: id,
-    conversationId,
-    jobId: null,
-  };
+  const spokenReply = finished.text.trim() || "I didn't get a result. It's in the app.";
+  return say(spokenReply, { ...decision, action: "hold", hold: true }, { conversationId });
 }
 
+async function waitingForYes(call: CallRow): Promise<boolean> {
+  if (!call.conversation_id) return false;
+  const job = await latestJob(call.user_id, call.conversation_id).catch(() => null);
+  return job?.status === "needs_approval";
+}
+
+/** The trunk or gateway says the call ended. */
 export async function endPhoneCall(sessionId: string, seconds: number) {
-  const session = sessions.get(sessionId);
-  if (!session?.userId) return { ok: false };
-  addCallSeconds(session.userId, seconds);
-  sessions.delete(sessionId);
-  return { ok: true, usedSeconds: usedCallSeconds(session.userId) };
+  return endCallRecord(sessionId, seconds);
 }

@@ -7,7 +7,7 @@ import { endPhoneCall, handlePhoneTurn } from "../services/phone/runtime.js";
 import { answerTrunk, samePathSecret, type TrunkName } from "../services/phone/trunk.js";
 import { liveSession } from "../services/phone/live.js";
 import { transcribeAudio, synthesizeSpeech } from "../services/voiceService.js";
-import { getPhoneConfig, getUserPhoneSettings, hydrateUserPhone, listPresence, loadPhoneConfig, registerPresence, setUserPhoneSettings } from "../services/phone/store.js";
+import { getPhoneConfig, getUserPhoneSettings, listPresence, loadPhoneConfig, registerPresence, setUserPhoneSettings } from "../services/phone/store.js";
 import type { DeliveryChannel } from "../services/phone/policy.js";
 
 export const phoneRouter = Router();
@@ -146,8 +146,7 @@ phoneRouter.get(
 phoneRouter.get(
   "/settings",
   asyncHandler(async (req, res) => {
-    await hydrateUserPhone(req.user!.id);
-    res.json(getUserPhoneSettings(req.user!.id));
+    res.json(await getUserPhoneSettings(req.user!.id));
   }),
 );
 
@@ -161,7 +160,6 @@ phoneRouter.put(
       quietEnd: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
       language: z.string().min(2).max(12),
     }).parse(req.body);
-    setUserPhoneSettings(req.user!.id, { ...body, channels: body.channels as DeliveryChannel[] });
-    res.json(getUserPhoneSettings(req.user!.id));
+    res.json(await setUserPhoneSettings(req.user!.id, { ...body, channels: body.channels as DeliveryChannel[] }));
   }),
 );
