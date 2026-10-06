@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
+import { AirWorkspace } from "@/components/air-workspace";
 import { lazy, Suspense, useEffect } from "react";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
@@ -91,7 +92,7 @@ function AirShell() {
   useEffect(() => {
     document.title = "Friday";
   }, [conversationId]);
-  return <Home conversationId={conversationId} origin="air" />;
+  return <AirWorkspace />;
 }
 
 const airRoute = createRoute({
