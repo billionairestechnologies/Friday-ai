@@ -159,9 +159,9 @@ $exe = Join-Path $BinDir 'friday.exe'
 $tmp = Join-Path $BinDir 'friday.exe.download'
 try {
   $ProgressPreference = 'SilentlyContinue'
-  Invoke-WebRequest "$Base/x/download/$platform?version=$version" -OutFile $tmp -UseBasicParsing
+  Invoke-WebRequest "$Base/x/download/$($platform)?version=$($version)" -OutFile $tmp -UseBasicParsing
   Ok 'Downloaded'
-  $expected = (Invoke-RestMethod "$Base/x/sha256/$platform?version=$version").ToString().Trim().ToLower()
+  $expected = (Invoke-RestMethod "$Base/x/sha256/$($platform)?version=$($version)").ToString().Trim().ToLower()
   $actual = (Get-FileHash $tmp -Algorithm SHA256).Hash.ToLower()
   if (-not $expected -or $expected -ne $actual) { throw 'The download did not match its checksum, so it was not installed.' }
   Ok "Verified checksum ($($actual.Substring(0,12))...)"
