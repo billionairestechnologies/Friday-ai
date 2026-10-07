@@ -37,8 +37,12 @@ Production is ONE EC2 instance, not the ECS stack in `AWS_DEPLOY.md`.
    g(){ docker inspect friday | jq -r --arg k "$1" '.[0].Config.Env[]|select(startswith($k+"="))|sub("^[^=]*=";"")'; }
    docker stop friday && docker rename friday friday-old
    docker run -d --name friday --network friday --restart always \
-     -e PORT="$(g PORT)" -e TRUST_PROXY="$(g TRUST_PROXY)" -e REDIS_URL="$(g REDIS_URL)" -e FRIDAY_ENV_JSON="$(g FRIDAY_ENV_JSON)" $IMG
+     -e PORT="$(g PORT)" -e TRUST_PROXY="$(g TRUST_PROXY)" -e REDIS_URL="$(g REDIS_URL)" -e FRIDAY_ENV_JSON="$(g FRIDAY_ENV_JSON)" \
+     -e FRIDAY_X_RELEASES_URL="https://friday-x-releases-095713295449.s3.ap-south-1.amazonaws.com" $IMG
    ```
+   `FRIDAY_X_RELEASES_URL` is NOT in `FRIDAY_ENV_JSON`, so it must be passed on every swap — without it `/x/version` answers
+   "FridayX downloads aren't published yet" and every FridayX installer and `friday update` fails (happened 2026-10-07).
+   Verify with `curl -s https://friday.billionairestechnologies.com/x/version`.
    Never print `docker inspect friday` in full — it contains every secret.
 5. Check `https://friday.billionairestechnologies.com/api/health` (database + redis `ok`). Roll back with
    `docker rm -f friday && docker rename friday-old friday && docker start friday`; when happy, `docker rm friday-old`.
