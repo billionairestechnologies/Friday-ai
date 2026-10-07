@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { formatResetAt, percentUsed, type QuotaResponse, type QuotaStatus } from "@/lib/usage/quota";
+import { usePlan } from "@/lib/usage/planStore";
 
 type Toast = { id: string; message: string; danger: boolean };
 
@@ -97,6 +98,7 @@ export function QuotaAlerts() {
       try {
         const res = await api.get<QuotaResponse>("/usage/quota");
         if (cancelled) return;
+        usePlan.getState().apply(res);
         const { status } = res;
 
         for (const threshold of crossedThresholds("rolling", status.rolling, ROLLING_THRESHOLDS)) {

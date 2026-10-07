@@ -59,6 +59,13 @@ async function request<T>(path: string, options: RequestInit = {}, isRetry = fal
           : "";
     const gateway = res.status === 502 || res.status === 503 || res.status === 504;
     const message = gateway ? "Can't reach Friday right now — check your connection and try again in a moment." : fromBody;
+    if (res.status === 403 && message && /passphrase/i.test(message) && !isRetry && typeof window !== "undefined") {
+      const phrase = window.prompt("Say your passphrase to pay, send, or delete.");
+      if (phrase) {
+        const headers = { ...(options.headers as Record<string, string>), "x-friday-passphrase": phrase };
+        return request<T>(path, { ...options, headers }, true);
+      }
+    }
     throw new ApiError(res.status, message || `Request failed: ${res.status}`);
   }
   return body as T;
@@ -69,5 +76,6 @@ export const api = {
   post: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "POST", body: data instanceof FormData ? data : JSON.stringify(data ?? {}) }),
   patch: <T>(path: string, data?: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(data ?? {}) }),
+  put: <T>(path: string, data?: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(data ?? {}) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };

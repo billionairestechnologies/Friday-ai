@@ -25,6 +25,13 @@ export type BillingConfig = {
 export type Entitlements = {
   buildMode: boolean;
   fridayX: boolean;
+  airDots: boolean;
+  airCallMinutes: number;
+  airAwakeMinutes: number;
+  voice: boolean;
+  canvas: boolean;
+  images: boolean;
+  connectors: number;
   buildMaxRounds: number;
   deepResearchPerDay: number;
   documentsPerDay: number;

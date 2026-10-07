@@ -42,10 +42,17 @@ export type FinanceSettings = {
   free_cost_budget_inr: number;
   /** E2B sandbox running cost, ₹ per hour of Build time. */
   e2b_cost_per_hour_inr: number;
+  /**
+   * How a user's plan is consumed. `list` burns by each model's published price, and never slower
+   * than the pack rate. `pack` burns every model at the flat supplier rate.
+   */
+  consumption_basis?: "list" | "pack";
+  /** Auto mode steps down to a cheaper model once this share of a quota window is used. */
+  conserve_from_pct?: number;
   updated_at?: string;
 };
 
-export const FINANCE_DEFAULTS = { blended_cost_per_m_inr: 25, target_cost_share_pct: 40, free_cost_budget_inr: 25, e2b_cost_per_hour_inr: 4.4 };
+export const FINANCE_DEFAULTS = { blended_cost_per_m_inr: 25, target_cost_share_pct: 40, free_cost_budget_inr: 25, e2b_cost_per_hour_inr: 4.4, consumption_basis: "list" as const, conserve_from_pct: 80 };
 
 /** Provider-published cache economics, used only when a model row leaves the cache price empty. */
 const CACHE_READ_DEFAULT: Record<string, number> = { anthropic: 0.1, scalemax: 0.1, openai: 0.5, openrouter: 0.5, gemini: 0.25 };
@@ -84,6 +91,8 @@ export const loadFinanceSettings = memoAsync(60_000, async (): Promise<FinanceSe
     target_cost_share_pct: Number(data?.target_cost_share_pct ?? FINANCE_DEFAULTS.target_cost_share_pct),
     free_cost_budget_inr: Number(data?.free_cost_budget_inr ?? FINANCE_DEFAULTS.free_cost_budget_inr),
     e2b_cost_per_hour_inr: Number(data?.e2b_cost_per_hour_inr ?? FINANCE_DEFAULTS.e2b_cost_per_hour_inr),
+    consumption_basis: data?.consumption_basis === "pack" ? "pack" : "list",
+    conserve_from_pct: Number(data?.conserve_from_pct ?? FINANCE_DEFAULTS.conserve_from_pct),
     updated_at: (data?.updated_at as string | undefined) ?? undefined,
   };
 });
@@ -150,6 +159,35 @@ export function effectiveCostRatesUsd(row: ModelPricing | null, s: FinanceSettin
   return null;
 }
 
+/** USD per 1M at the flat pack (₹250 / 10M = ₹25 / 1M). 0 when the pack is switched off. */
+export function packUsdPerM(s: FinanceSettings): number {
+  return s.blended_cost_per_m_inr > 0 ? s.blended_cost_per_m_inr / s.usd_to_inr : 0;
+}
+
+/**
+ * The rates a user's plan burns at. These are the cost fields saved in Team Console → Finance,
+ * the same numbers on the model row. `effectiveCostRatesUsd` is separate: that is what we pay,
+ * which stays the pack unless the row's own-cost switch is on.
+ * With basis `pack`, every model burns the flat supplier rate instead.
+ */
+export function consumptionRatesUsd(row: ModelPricing | null, s: FinanceSettings): { rates: CostRatesUsd; source: "list" | "pack" | "model" } | null {
+  const pack = packUsdPerM(s);
+  const own = hasTokenCost(row);
+  const basis = s.consumption_basis === "pack" ? "pack" : "list";
+  if (basis === "list" && own) return { rates: costRatesUsd(row, s), source: row.cost_override ? "model" : "list" };
+  if (pack > 0) return { rates: { input: pack, output: pack, cacheRead: pack, cacheWrite: pack }, source: "pack" };
+  if (own) return { rates: costRatesUsd(row, s), source: "list" };
+  return null;
+}
+
+/** How many pack-tokens one input token of this model costs the plan. 1 = the pack rate. */
+export function consumptionWeight(row: ModelPricing | null, s: FinanceSettings): number {
+  const pack = packUsdPerM(s);
+  const rates = consumptionRatesUsd(row, s);
+  if (!rates || pack <= 0) return 1;
+  return rates.rates.input / pack;
+}
+
 /** What we charge per 1M tokens in INR: the explicit sell price, or cost × FX × (1 + default markup). */
 export function sellRatesInr(row: ModelPricing, s: FinanceSettings) {
   const cost = costRatesUsd(row, s);
@@ -187,29 +225,34 @@ export function priceTokens(row: ModelPricing, t: TokenCounts, s: FinanceSetting
 }
 
 /** Prices one call for the ledger. Unpriced models keep the old per-provider estimate, flagged. */
-export async function priceUsage(providerSlug: string, modelId: string, usage: TokenUsage): Promise<{ costUsd: number; sellInr: number | null; priced: boolean }> {
+function costAt(rates: CostRatesUsd, t: TokenCounts): number {
+  const cached = Math.min(t.cached, t.input);
+  const written = Math.min(t.cacheWrite, t.input - cached);
+  return round(((t.input - cached - written) * rates.input + cached * rates.cacheRead + written * rates.cacheWrite + t.output * rates.output) / 1_000_000, 8);
+}
+
+/** Prices one call for the ledger. `costUsd` is what we pay (the pack, unless the model overrides it). `listCostUsd` is the published price of the same tokens. */
+export async function priceUsage(providerSlug: string, modelId: string, usage: TokenUsage): Promise<{ costUsd: number; sellInr: number | null; priced: boolean; listCostUsd: number | null }> {
   try {
     const [rows, s] = await Promise.all([loadPricing(), loadFinanceSettings()]);
     const row = findPricing(rows, providerSlug, modelId);
     const eff = effectiveCostRatesUsd(row, s);
+    const t = { input: usage.promptTokens, output: usage.completionTokens, cached: usage.cachedTokens ?? 0, cacheWrite: usage.cacheWriteTokens ?? 0 };
+    const listCostUsd = hasTokenCost(row) ? costAt(costRatesUsd(row, s), t) : null;
     if (eff) {
-      const t = { input: usage.promptTokens, output: usage.completionTokens, cached: usage.cachedTokens ?? 0, cacheWrite: usage.cacheWriteTokens ?? 0 };
       if (eff.source === "model" && hasTokenCost(row)) {
         const p = priceTokens(row, t, s);
-        return { costUsd: p.costUsd, sellInr: p.sellInr, priced: true };
+        return { costUsd: p.costUsd, sellInr: p.sellInr, priced: true, listCostUsd };
       }
-      const cached = Math.min(t.cached, t.input);
-      const written = Math.min(t.cacheWrite, t.input - cached);
-      const r = eff.rates;
-      const costUsd = round(((t.input - cached - written) * r.input + cached * r.cacheRead + written * r.cacheWrite + t.output * r.output) / 1_000_000, 8);
+      const costUsd = costAt(eff.rates, t);
       // Value at our prices: the model's own sell rates when it has them, else cost × markup.
       const sellInr = hasTokenCost(row) ? priceTokens(row, t, s).sellInr : round(costUsd * s.usd_to_inr * (1 + s.default_markup_pct / 100), 6);
-      return { costUsd, sellInr, priced: true };
+      return { costUsd, sellInr, priced: true, listCostUsd };
     }
   } catch {
     /* pricing table unavailable — fall through to the estimate */
   }
-  return { costUsd: estimateCostCents(providerSlug, usage) / 100, sellInr: null, priced: false };
+  return { costUsd: estimateCostCents(providerSlug, usage) / 100, sellInr: null, priced: false, listCostUsd: null };
 }
 
 // ── Admin editing ─────────────────────────────────────────────────────────────────────────────
@@ -259,6 +302,11 @@ export async function saveFinanceSettings(input: Partial<FinanceSettings>, userI
   bounded("target_cost_share_pct", 1, 100, "Target cost share");
   bounded("free_cost_budget_inr", 0, 100_000, "Free-user cost budget");
   bounded("e2b_cost_per_hour_inr", 0, 10_000, "E2B cost per hour");
+  bounded("conserve_from_pct", 50, 100, "Conserve-from percent");
+  if (input.consumption_basis !== undefined) {
+    if (input.consumption_basis !== "list" && input.consumption_basis !== "pack") throw new HttpError(400, "Consumption basis is list or pack");
+    row.consumption_basis = input.consumption_basis;
+  }
   const { error } = await supabaseAdmin.from("finance_settings").upsert(row);
   if (error) throw new HttpError(500, error.message);
   invalidatePricing();

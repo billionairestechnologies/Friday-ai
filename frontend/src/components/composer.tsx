@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
+import { BorderBeam } from "border-beam";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { useChat } from "@/lib/chat/store";
 
@@ -12,6 +13,8 @@ type ComposerProps = {
   placeholder?: string;
   /** Build workspace: no voice-agent mode (mic dictation still works), Build models only. */
   buildWorkspace?: boolean;
+  /** Air Dots: keep a beam on the box while Friday is on the line. */
+  air?: boolean;
 };
 
 export function Composer({
@@ -21,6 +24,7 @@ export function Composer({
   disabled,
   placeholder,
   buildWorkspace,
+  air,
 }: ComposerProps) {
   const think = useChat((s) => s.think);
   const setThink = useChat((s) => s.setThink);
@@ -50,6 +54,7 @@ export function Composer({
         </motion.div>
       )}
     </AnimatePresence>
+    <BorderBeam size="line" colorVariant="ocean" theme="auto" active={streaming || Boolean(air)} strength={streaming ? 1 : 0.45}>
     <PromptInputBox
       isLoading={streaming}
       disabled={disabled}
@@ -66,8 +71,9 @@ export function Composer({
       onStop={onStop}
       onSend={onSend}
       buildWorkspace={buildWorkspace}
-      placeholder={placeholder ?? "What do you want to know?"}
+      placeholder={placeholder ?? (air ? "Tell Friday what to take care of" : "What do you want to know?")}
     />
+    </BorderBeam>
     </>
   );
 }

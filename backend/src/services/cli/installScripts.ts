@@ -152,7 +152,11 @@ if (-not $version) { throw "Couldn't find the latest version. Try again in a min
 Ok "Latest version is $version"
 
 Note 'Downloading...'
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ("friday-x-" + [Guid]::NewGuid().ToString('N') + '.exe')
+# Download beside the install folder, not into %TEMP%: an unsigned .exe written to Temp and moved out is a
+# dropper pattern Defender watches for. The extension stays off until the checksum passes.
+New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
+$exe = Join-Path $BinDir 'friday.exe'
+$tmp = Join-Path $BinDir 'friday.exe.download'
 try {
   $ProgressPreference = 'SilentlyContinue'
   Invoke-WebRequest "$Base/x/download/$($platform)?version=$($version)" -OutFile $tmp -UseBasicParsing
@@ -161,8 +165,10 @@ try {
   $actual = (Get-FileHash $tmp -Algorithm SHA256).Hash.ToLower()
   if (-not $expected -or $expected -ne $actual) { throw 'The download did not match its checksum, so it was not installed.' }
   Ok "Verified checksum ($($actual.Substring(0,12))...)"
-  New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
-  Move-Item -Force $tmp (Join-Path $BinDir 'friday.exe')
+  # A running friday.exe can't be overwritten but can be renamed, so updating never fails with "access denied".
+  if (Test-Path "$exe.old") { Remove-Item -Force "$exe.old" -ErrorAction SilentlyContinue }
+  if (Test-Path $exe) { Rename-Item -Force $exe 'friday.exe.old' }
+  Move-Item -Force $tmp $exe
 } finally { if (Test-Path $tmp) { Remove-Item -Force $tmp } }
 Ok "Installed to $BinDir"
 
@@ -187,13 +193,114 @@ if ([Environment]::UserInteractive -and -not $env:FRIDAY_X_NO_LAUNCH) {
 }
 `;
 
+// Pure CMD on purpose. The first version shelled out to `powershell -ExecutionPolicy Bypass -Command "irm … | iex"`;
+// a .cmd that downloads and pipes a script into PowerShell with the execution policy bypassed is the textbook
+// malware "download cradle", so Microsoft Defender flagged it ("Threats found") and Windows refused to start it
+// ("Access is denied.") on a real install on 2026-10-06. This one uses only curl.exe and certutil -hashfile, both
+// built into Windows 10 1803+ / 11, never touches PowerShell, never writes an .exe to %TEMP%, and verifies the
+// checksum before the binary is put in place. Labels + goto instead of ( ) blocks so a PATH containing
+// "Program Files (x86)" can't break the parser. No backticks: this file is a JS template literal.
 const CMD = String.raw`@echo off
-rem FridayX installer for Windows CMD — runs the PowerShell installer.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm __API__/x/install.ps1 | iex"
-if errorlevel 1 (
-  echo FridayX install failed. See the message above.
-  exit /b 1
-)
+rem FridayX installer for Windows CMD - https://__BASE__/x/install.cmd
+setlocal EnableExtensions DisableDelayedExpansion
+set "BASE=__API__"
+set "VERSION=%~1"
+if "%VERSION%"=="" set "VERSION=latest"
+set "ROOT=%USERPROFILE%\.friday"
+if defined FRIDAY_X_HOME set "ROOT=%FRIDAY_X_HOME%"
+set "BIN=%ROOT%\bin"
+set "EXE=%BIN%\friday.exe"
+set "PART=%BIN%\friday.exe.download"
+
+echo.
+echo   FridayX
+echo   Friday coding agent for your terminal and editor
+echo.
+
+where curl.exe >nul 2>&1 || goto :nocurl
+set "PLATFORM=windows-x64"
+if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "PLATFORM=windows-arm64"
+if /i "%PROCESSOR_ARCHITEW6432%"=="ARM64" set "PLATFORM=windows-arm64"
+echo   + Detected Windows (%PLATFORM%)
+
+if /i not "%VERSION%"=="latest" goto :haveversion
+set "VERSION="
+for /f "delims=" %%v in ('curl.exe -fsSL "%BASE%/x/version"') do set "VERSION=%%v"
+:haveversion
+if "%VERSION%"=="" goto :noversion
+echo   + Latest version is %VERSION%
+
+if not exist "%BIN%" mkdir "%BIN%" || goto :nodir
+if exist "%PART%" del /f /q "%PART%" >nul 2>&1
+echo   - Downloading...
+curl.exe -fL --progress-bar -o "%PART%" "%BASE%/x/download/%PLATFORM%?version=%VERSION%" || goto :nodownload
+echo   + Downloaded
+
+set "EXPECTED="
+for /f "delims=" %%h in ('curl.exe -fsSL "%BASE%/x/sha256/%PLATFORM%?version=%VERSION%"') do set "EXPECTED=%%h"
+set "ACTUAL="
+for /f "delims=" %%h in ('certutil -hashfile "%PART%" SHA256 ^| findstr /v ":"') do set "ACTUAL=%%h"
+set "ACTUAL=%ACTUAL: =%"
+if "%EXPECTED%"=="" goto :badsum
+if /i not "%EXPECTED%"=="%ACTUAL%" goto :badsum
+echo   + Verified checksum (%ACTUAL:~0,12%...)
+
+rem A running friday.exe can't be overwritten but it can be renamed, so an update never fails on "in use".
+if exist "%EXE%.old" del /f /q "%EXE%.old" >nul 2>&1
+if exist "%EXE%" move /y "%EXE%" "%EXE%.old" >nul 2>&1
+move /y "%PART%" "%EXE%" >nul || goto :nomove
+echo   + Installed to %BIN%
+
+rem User PATH via the registry (setx would cut a long PATH at 1024 characters).
+set "UPATH="
+for /f "skip=2 tokens=2,*" %%a in ('reg query HKCU\Environment /v Path 2^>nul') do set "UPATH=%%b"
+echo ";%UPATH%;" | find /i ";%BIN%;" >nul && goto :pathdone
+if "%UPATH%"=="" goto :pathnew
+reg add HKCU\Environment /v Path /t REG_EXPAND_SZ /d "%UPATH%;%BIN%" /f >nul
+goto :pathbroadcast
+:pathnew
+reg add HKCU\Environment /v Path /t REG_EXPAND_SZ /d "%BIN%" /f >nul
+:pathbroadcast
+rem setx on a harmless variable makes Windows tell new terminals that the environment changed.
+setx FRIDAY_X_HOME "%ROOT%" >nul 2>&1
+:pathdone
+echo   + Added to your PATH - just type friday from now on
+
+echo.
+echo   FridayX %VERSION% is ready.
+echo   Sign in once with your Friday account, then it remembers you.
+echo.
+rem Keep PATH for THIS window after endlocal so "friday" works straight away.
+endlocal & set "PATH=%PATH%;%BIN%" & set "FRIDAY_X_EXE=%EXE%"
+if defined FRIDAY_X_NO_LAUNCH goto :eof
+echo   Starting FridayX...
+echo.
+"%FRIDAY_X_EXE%"
+goto :eof
+
+:nocurl
+echo   FridayX install failed: curl.exe was not found (it ships with Windows 10 1803 and later).
+exit /b 1
+:noversion
+echo   FridayX install failed: couldn't find the latest version. Check your internet and try again in a minute.
+exit /b 1
+:nodir
+echo   FridayX install failed: couldn't create %BIN%.
+exit /b 1
+:nodownload
+if exist "%PART%" del /f /q "%PART%" >nul 2>&1
+echo   FridayX install failed: the download didn't finish. Check your internet and try again.
+exit /b 1
+:badsum
+if exist "%PART%" del /f /q "%PART%" >nul 2>&1
+echo   FridayX install failed: the download didn't match its checksum, so it was not installed.
+exit /b 1
+:nomove
+if exist "%EXE%.old" if not exist "%EXE%" move /y "%EXE%.old" "%EXE%" >nul 2>&1
+echo   FridayX install failed: Windows wouldn't let us write %EXE%.
+echo   If Windows Security just showed "Threats found", open Windows Security - Protection history,
+echo   and send the details to Friday support so we can clear it with Microsoft.
+exit /b 1
 `;
 
 function fill(template: string, apiBase: string): string {
