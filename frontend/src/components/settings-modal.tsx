@@ -9,7 +9,6 @@ import {
   CreditCard,
   Lock,
   Palette,
-  Phone,
   Plug,
   Shield,
   SlidersHorizontal,
@@ -46,7 +45,6 @@ const NAV = [
       { id: "appearance", label: "Appearance", icon: Palette },
       { id: "behavior", label: "Behavior", icon: SlidersHorizontal },
       { id: "voice", label: "Voice", icon: AudioLines },
-      { id: "phone", label: "Phone", icon: Phone },
       { id: "notifications", label: "Notifications", icon: Bell },
       { id: "friday-x", label: "FridayX", icon: Terminal },
     ],
@@ -135,7 +133,6 @@ export function SettingsModal() {
               {tab === "appearance" && <AppearancePane />}
               {tab === "behavior" && <BehaviorPane />}
               {tab === "voice" && <VoicePane />}
-              {tab === "phone" && <PhonePane />}
               {tab === "notifications" && <NotificationsPane />}
               {tab === "friday-x" && <FridayXPane />}
               {tab === "billing" && <BillingPane />}
@@ -1200,88 +1197,6 @@ function NotificationsPane() {
           {error && <p className="text-sm text-danger">{error}</p>}
         </div>
       )}
-    </div>
-  );
-}
-
-function PhonePane() {
-  const [channels, setChannels] = useState<string[]>(["app", "email"]);
-  const [callback, setCallback] = useState(false);
-  const [quietStart, setQuietStart] = useState("");
-  const [quietEnd, setQuietEnd] = useState("");
-  const [language, setLanguage] = useState("en");
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    api
-      .get<{ channels: string[]; callback: boolean; quietStart: string | null; quietEnd: string | null; language: string }>("/phone/settings")
-      .then((res) => {
-        setChannels(res.channels);
-        setCallback(res.callback);
-        setQuietStart(res.quietStart ?? "");
-        setQuietEnd(res.quietEnd ?? "");
-        setLanguage(res.language);
-      })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Couldn't load phone settings."));
-  }, []);
-
-  async function save() {
-    setError(null);
-    setSaved(false);
-    try {
-      await api.put("/phone/settings", {
-        channels,
-        callback,
-        quietStart: quietStart || null,
-        quietEnd: quietEnd || null,
-        language,
-      });
-      setSaved(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save.");
-    }
-  }
-
-  function toggleChannel(id: string) {
-    setChannels((current) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id]));
-  }
-
-  return (
-    <div>
-      <h2 className="mb-1 text-lg font-semibold">Phone</h2>
-      <p className="mb-4 text-sm text-muted">Where a finished call should land, and when Friday should stay quiet.</p>
-      <div className="grid gap-2">
-        {["app", "email", "telegram", "whatsapp"].map((id) => (
-          <label key={id} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={channels.includes(id)} onChange={() => toggleChannel(id)} />
-            {id}
-          </label>
-        ))}
-      </div>
-      <label className="mt-4 flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={callback} onChange={(e) => setCallback(e.target.checked)} />
-        Call back when a long job finishes
-      </label>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <label className="text-xs text-muted">
-          Quiet from
-          <input value={quietStart} placeholder="22:00" onChange={(e) => setQuietStart(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm" />
-        </label>
-        <label className="text-xs text-muted">
-          Quiet until
-          <input value={quietEnd} placeholder="07:00" onChange={(e) => setQuietEnd(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm" />
-        </label>
-      </div>
-      <label className="mt-4 block text-xs text-muted">
-        Language
-        <input value={language} onChange={(e) => setLanguage(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm" />
-      </label>
-      <button type="button" onClick={() => void save()} className="mt-4 h-9 rounded-full bg-foreground px-4 text-sm text-background">
-        Save
-      </button>
-      {saved && <p className="mt-2 text-xs text-muted">Saved.</p>}
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </div>
   );
 }

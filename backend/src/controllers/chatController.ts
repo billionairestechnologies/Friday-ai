@@ -7,7 +7,6 @@ import { runTurn } from "../services/jobs/runTurn.js";
 import { requestStop } from "../services/jobs/turns.js";
 import { readEvents } from "../services/projectBuild/events.js";
 import { getOwnedConversation } from "../services/chat/conversations.js";
-import { entitlementsFor } from "../services/quota/entitlements.js";
 
 const pageSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -26,19 +25,14 @@ const createConversationSchema = z
     title: z.string().trim().max(200).optional(),
     projectId: z.string().uuid().optional(),
     workspace: z.enum(["chat", "build"]).optional().default("chat"),
-    origin: z.enum(["web", "air"]).optional().default("web"),
   })
   .refine((data) => data.mode !== "single" || (data.providerSlug && data.modelId), {
     message: "providerSlug and modelId are required for single mode",
   });
 
 export async function createConversation(req: Request, res: Response) {
-  const { mode, providerSlug, modelId, title, projectId, workspace, origin } = createConversationSchema.parse(req.body);
-  if (origin === "air" && !(await entitlementsFor(req.user!.id)).airDots) {
-    res.status(403).json({ error: "Air Dots isn't on your plan." });
-    return;
-  }
-  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title, projectId, workspace, origin);
+  const { mode, providerSlug, modelId, title, projectId, workspace } = createConversationSchema.parse(req.body);
+  const conversation = await chatService.createConversation(req.user!.id, mode, providerSlug, modelId, title, projectId, workspace);
   res.status(201).json({ conversation });
 }
 
@@ -127,8 +121,6 @@ const sendMessageSchema = z
   });
 
 export async function streamMessage(req: Request, res: Response) {
-  const { registerPresence } = await import("../services/phone/store.js");
-  if (req.user) registerPresence(req.user.id, "web");
   const { content, inputMode, think, behavior, webSearch, canvas, research, skillId, effort, permissionMode, repo, attachments } = sendMessageSchema.parse(req.body);
 
   res.status(200);
@@ -205,8 +197,6 @@ export async function live(req: Request, res: Response) {
 
 export async function stopMessage(req: Request, res: Response) {
   stopGeneration(req.params.id!, req.user!.id);
-  const { haltAirJob } = await import("../services/air/jobs.js");
-  haltAirJob(req.params.id!);
   // The turn may be running on another instance — its heartbeat sees this flag and stops it.
   await requestStop(req.params.id!, req.user!.id).catch(() => undefined);
   res.status(204).end();

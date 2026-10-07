@@ -2,9 +2,9 @@
 
 Friday is the product. **Air Dots** is the always-on computer inside it, and the call that drives it.
 
-The person they talk to is Friday. The website button says **Call now**. That surface is **On Air**. This used to be called Friday line. The name is Air Dots, and this folder is `airdots`.
+The person they talk to is Friday. The website button says **Call now**. That surface is **On Air**. This folder used to be called Friday line. The name of the feature is Air Dots. The folder path stays `friday-line` so the repo link does not move.
 
-Built on branch `v3`: the web page, jobs, the gate, calls, the voice bridge and the channels. What is left is configuring real numbers and keys — see [TODO.md](TODO.md) → *To go live*.
+Nothing here is wired into the site yet.
 
 ## Read this order
 
@@ -14,7 +14,6 @@ Built on branch `v3`: the web page, jobs, the gate, calls, the voice bridge and 
 4. [models/](models/README.md) — session, job, sandbox presence, delivery, entitlements
 5. [flows/](flows/README.md) — discussion, hold or release, making a job
 6. [diagrams/](diagrams/README.md) — the earlier drawings, still useful under the new name
-7. [pipecat/](pipecat/README.md) — the voice bridge (Pipecat + Gemini Live) in front of Exotel / Twilio / Telnyx
 
 ## Locked decisions
 

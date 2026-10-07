@@ -15,19 +15,8 @@ const context = await browser.newContext({
   userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
   locale: "en-IN",
 });
-// One browser per machine, one tab per Air Dot ("tab" = its conversation): every dot shares the same
-// cookies and sign-ins (log in once), but each keeps its own page.
-const tabs = new Map();
-let tab = "";
 let page = await context.newPage();
-tabs.set("", page);
-context.on("page", (p) => { page = p; tabs.set(tab, p); });
-async function useTab(name) {
-  tab = String(name || "");
-  let p = tabs.get(tab);
-  if (!p || p.isClosed()) { p = await context.newPage(); tabs.set(tab, p); }
-  page = p;
-}
+context.on("page", (p) => { page = p; });
 
 async function settle() {
   await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
@@ -62,7 +51,6 @@ async function snapshot() {
 const el = (ref) => page.locator('[data-friday-ref="' + String(ref).replace(/[^0-9]/g, "") + '"]').first();
 
 async function handle(cmd) {
-  await useTab(cmd.tab);
   switch (cmd.action) {
     case "open":
       await page.goto(cmd.url, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -82,13 +70,6 @@ async function handle(cmd) {
       break;
     case "scroll":
       await page.mouse.wheel(0, cmd.direction === "up" ? -700 : 700);
-      break;
-    // The Air Dots screen: the person drives the same page with a mouse or a finger.
-    case "click_at":
-      await page.mouse.click(Math.max(0, Math.min(1280, Number(cmd.x) || 0)), Math.max(0, Math.min(800, Number(cmd.y) || 0)));
-      break;
-    case "type_text":
-      await page.keyboard.type(String(cmd.text ?? "").slice(0, 2000), { delay: 15 });
       break;
     case "back":
       await page.goBack({ timeout: 15000 }).catch(() => {});

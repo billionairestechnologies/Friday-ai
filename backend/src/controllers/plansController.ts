@@ -55,7 +55,7 @@ const catalogSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).max(100).optional(),
 });
 
-/** Edit a plan's price, copy, limits and which features it includes. The next request already uses the save. */
+/** Edit a plan's price, copy, limits and entitlements — the Plans page and quota system follow within a minute. */
 export async function saveCatalog(req: Request, res: Response) {
   const planId = z.enum(["free", "pro", "premium", "enterprise"]).parse(req.params.planId);
   const body = catalogSchema.parse(req.body);

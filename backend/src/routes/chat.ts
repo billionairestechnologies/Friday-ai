@@ -1,7 +1,6 @@
 import { Router } from "express";
 import * as controller from "../controllers/chatController.js";
 import { requireAuth } from "../middleware/auth.js";
-import { requirePassphrase } from "../middleware/passphrase.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { env } from "../config/env.js";
 import { concurrencyLimit, rateLimit } from "../middleware/rateLimit.js";
@@ -34,8 +33,8 @@ const chatConcurrencyLimit = concurrencyLimit("chat-stream", env.rateLimits.chat
 chatRouter.post("/conversations", asyncHandler(controller.createConversation));
 chatRouter.patch("/conversations/:id", asyncHandler(controller.updateConversation));
 chatRouter.get("/conversations", asyncHandler(controller.listConversations));
-chatRouter.delete("/conversations", requirePassphrase, asyncHandler(controller.deleteAllConversations));
-chatRouter.delete("/conversations/:id", requirePassphrase, asyncHandler(controller.deleteConversation));
+chatRouter.delete("/conversations", asyncHandler(controller.deleteAllConversations));
+chatRouter.delete("/conversations/:id", asyncHandler(controller.deleteConversation));
 chatRouter.get("/conversations/:id/messages", asyncHandler(controller.listMessages));
 chatRouter.get("/search", asyncHandler(controller.search));
 chatRouter.post("/conversations/:id/share", asyncHandler(controller.share));

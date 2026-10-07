@@ -11,7 +11,7 @@ import { verifyUnsubscribeToken } from "../services/console/mail.js";
 /** User-facing side of the Team Console: What's New popups, support tickets, unsubscribe, inbound support mail. */
 
 export async function pendingUpdates(req: Request, res: Response) {
-  const { platform } = z.object({ platform: z.enum(["web", "android", "ios", "air", "whatsapp", "telegram"]).default("web") }).parse(req.query);
+  const { platform } = z.object({ platform: z.enum(["web", "android", "ios"]).default("web") }).parse(req.query);
   res.json({ updates: await updates.pendingForUser(req.user!.id, platform) });
 }
 

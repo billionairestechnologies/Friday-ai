@@ -3,10 +3,6 @@ export type QuotaBucket = { used: number; limit: number; resetAt: string };
 export type QuotaStatus = {
   plan: "free" | "pro" | "premium";
   isEnterprise: boolean;
-  /** When the current paid plan ends (newer servers). */
-  planRenewsAt?: string | null;
-  /** A lower plan already bought, starting when the current one ends (newer servers). */
-  scheduledPlan?: { plan: "pro" | "premium"; startsAt: string | null } | null;
   rolling: QuotaBucket | null;
   weekly: QuotaBucket;
   monthly: QuotaBucket | null;
@@ -41,7 +37,6 @@ const EVENT_LABELS: Record<string, string> = {
   // Cost-based breakdown (what the usage actually cost, by feature).
   chat: "Chat",
   build: "Build",
-  air: "Air Dots",
   research: "Deep Research",
   teamup: "Team Up",
   spark: "Spark",

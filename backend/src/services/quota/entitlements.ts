@@ -51,16 +51,16 @@ function secondsUntilUtcMidnight(now = new Date()): number {
  * first, give it back if that went over — two parallel requests can't both take the last unit.
  * Fails open without Redis, same as the token quota (a Redis outage must not take features down).
  */
-export async function consumeDailyAllowance(userId: string, feature: string, limit: number, amount = 1): Promise<{ ok: boolean; used: number; limit: number }> {
-  if (limit <= 0 || amount <= 0) return { ok: false, used: 0, limit };
+export async function consumeDailyAllowance(userId: string, feature: string, limit: number): Promise<{ ok: boolean; used: number; limit: number }> {
+  if (limit <= 0) return { ok: false, used: 0, limit };
   const redis = await getRedisClient().catch(() => null);
   if (!redis) return { ok: true, used: 0, limit };
   const day = new Date().toISOString().slice(0, 10);
   const key = `allow:${feature}:${userId}:${day}`;
-  const used = await redis.incrBy(key, amount);
-  if (used === amount) await redis.expire(key, secondsUntilUtcMidnight());
+  const used = await redis.incr(key);
+  if (used === 1) await redis.expire(key, secondsUntilUtcMidnight());
   if (used > limit) {
-    await redis.decrBy(key, amount);
+    await redis.decr(key);
     return { ok: false, used: limit, limit };
   }
   return { ok: true, used, limit };

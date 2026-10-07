@@ -130,7 +130,6 @@ function UserDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
               {user.crmContact && (<><span className="text-muted">CRM</span><span><Badge tone={statusTone(user.crmContact.kind)}>{user.crmContact.kind}</Badge> {user.crmContact.stage_id}</span></>)}
             </div>
           </Card>
-          <AirCard userId={user.id} canManage={canManage} />
           {canManage && (
             <Card>
               <div className="mb-3 text-sm font-semibold">Manage</div>
@@ -168,50 +167,5 @@ function UserDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
         </div>
       )}
     </Drawer>
-  );
-}
-
-type AirStatus = {
-  enabled: boolean;
-  computer: { sandboxId: string | null; awake: boolean; awakeUntil: string | null };
-  awake: { usedMinutes: number; capMinutes: number };
-  calls: { usedMinutes: number; limitMinutes: number; phone: string | null };
-  passphrase: { set: boolean; lockedUntil: string | null; failures: number };
-  channels: { channel: string; linkedAt: string }[];
-  dots: { id: string; name: string }[];
-  jobs: { id: string; task: string; status: string; rounds: number; created_at: string }[];
-};
-
-/** A person's Air Dots: their computer, minutes, passphrase and channels, with pause / unlock. */
-function AirCard({ userId, canManage }: { userId: string; canManage: boolean }) {
-  const { data, setData } = useResource<AirStatus>(`/console/users/${userId}/air`);
-  if (!data) return null;
-  const reload = async () => setData(await api.get<AirStatus>(`/console/users/${userId}/air`));
-  const running = data.jobs.filter((j) => j.status === "running").length;
-  return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-sm font-semibold">Air Dots</div>
-        <Badge tone={data.enabled ? "green" : "neutral"}>{data.enabled ? "On this plan" : "Not on this plan"}</Badge>
-      </div>
-      <div className="grid grid-cols-2 gap-y-2 text-sm">
-        <span className="text-muted">Computer</span>
-        <span>{!data.computer.sandboxId ? "None yet" : data.computer.awake ? `Awake until ${new Date(data.computer.awakeUntil!).toLocaleTimeString()}` : "Paused"}</span>
-        <span className="text-muted">Awake today</span><span>{data.awake.usedMinutes} / {data.awake.capMinutes} min</span>
-        <span className="text-muted">Call minutes</span><span>{data.calls.usedMinutes} / {data.calls.limitMinutes} this month</span>
-        <span className="text-muted">Passphrase</span>
-        <span>{!data.passphrase.set ? "Not set" : data.passphrase.lockedUntil ? `Locked until ${new Date(data.passphrase.lockedUntil).toLocaleTimeString()}` : `Set${data.passphrase.failures ? ` · ${data.passphrase.failures} wrong tries` : ""}`}</span>
-        <span className="text-muted">Channels</span><span>{data.channels.length ? data.channels.map((c) => c.channel).join(", ") : "None linked"}</span>
-        <span className="text-muted">Dots</span><span>{data.dots.length ? data.dots.map((d) => d.name).join(", ") : "—"}</span>
-        <span className="text-muted">Jobs</span><span>{running ? `${running} running` : "None running"}{data.jobs[0] ? ` · last: ${data.jobs[0].status.replace("_", " ")}` : ""}</span>
-      </div>
-      {canManage && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => void act(async () => { await api.post(`/console/users/${userId}/air/pause`, {}); await reload(); }, "Paused — jobs stopped, work kept")}>Pause computer</Button>
-          {data.passphrase.lockedUntil && <Button size="sm" onClick={() => void act(async () => { await api.post(`/console/users/${userId}/air/unlock`, {}); await reload(); }, "Unlocked")}>Unlock passphrase</Button>}
-          {data.passphrase.set && <Button size="sm" variant="ghost" onClick={() => void act(async () => { await api.post(`/console/users/${userId}/air/clear-passphrase`, {}); await reload(); }, "Passphrase cleared — they can set a new one")}>Clear passphrase</Button>}
-        </div>
-      )}
-    </Card>
   );
 }
