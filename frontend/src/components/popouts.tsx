@@ -393,7 +393,7 @@ export function LoginPopout() {
             onClick={() => {
               setBusy(true);
               void api
-                .get<{ url: string }>("/auth/google/start")
+                .get<{ url: string }>(`/auth/google/start?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`)
                 .then((res) => window.location.assign(res.url))
                 .catch((err) => {
                   setError(err instanceof Error ? err.message : "Couldn't start Google sign-in");
@@ -415,7 +415,7 @@ export function LoginPopout() {
             onClick={() => {
               setBusy(true);
               void api
-                .get<{ url: string }>("/auth/github/start")
+                .get<{ url: string }>(`/auth/github/start?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`)
                 .then((res) => window.location.assign(res.url))
                 .catch((err) => {
                   setError(err instanceof Error ? err.message : "Couldn't start GitHub sign-in");

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { safeReturnTo } from "../utils/safeReturnTo.js";
 import { env } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { supabasePublic } from "../config/supabasePublic.js";
@@ -19,7 +20,7 @@ export function buildGoogleLoginUrl(returnTo?: string | null): string {
     JSON.stringify({
       purpose: "login",
       nonce: randomBytes(16).toString("hex"),
-      returnTo: returnTo || "/",
+      returnTo: safeReturnTo(returnTo),
     }),
     "utf8",
   ).toString("base64url");
@@ -43,7 +44,7 @@ export function parseGoogleLoginState(state: string): { returnTo: string } {
       returnTo?: unknown;
     };
     if (parsed.purpose !== "login") throw new Error("wrong purpose");
-    return { returnTo: typeof parsed.returnTo === "string" ? parsed.returnTo : "/" };
+    return { returnTo: safeReturnTo(parsed.returnTo) };
   } catch {
     throw new HttpError(400, "Invalid Google sign-in state");
   }

@@ -21,6 +21,7 @@ import {
   googleLoginConfigured,
   parseGoogleLoginState,
 } from "../services/googleAuth.js";
+import { safeReturnTo } from "../utils/safeReturnTo.js";
 import { buildGithubLoginUrl, completeGithubLogin, githubLoginConfigured } from "../services/githubAuth.js";
 import { acceptPolicy, POLICY_VERSION, type Platform } from "../services/policyService.js";
 import { invalidateAuthedUser } from "../middleware/auth.js";
@@ -367,7 +368,7 @@ export async function deleteAccount(req: Request, res: Response) {
 
 /** Google sign-in is started at GET /auth/google/start and completed by the callback. */
 export async function startGoogleLogin(req: Request, res: Response) {
-  const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
+  const returnTo = safeReturnTo(req.query.returnTo);
   res.json({ url: buildGoogleLoginUrl(returnTo), enabled: googleLoginConfigured() });
 }
 
@@ -411,7 +412,7 @@ export async function googleSignIn(_req: Request, res: Response) {
  *  since a classic GitHub OAuth App only supports one registered callback URL — the one
  *  already used for the repo-connector flow. That handler branches on state.purpose. */
 export async function startGithubLogin(req: Request, res: Response) {
-  const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
+  const returnTo = safeReturnTo(req.query.returnTo);
   res.json({ url: buildGithubLoginUrl(returnTo), enabled: githubLoginConfigured() });
 }
 
