@@ -1253,8 +1253,8 @@ sequenceDiagram
       </div>
       <pre class="mermaid-src" data-id="25">
 flowchart TB
-  TAG["git tag ide-vX.Y.Z"] --&gt; CI["GitHub Actions: friday-x-ide.yml&lt;br/&gt;matrix of 8 platforms"]
-  subgraph PERPLAT["For each platform (darwin, linux, alpine, win32 x x64/arm64)"]
+  TAG["git tag ide-vX.Y.Z"] --&gt; CI["GitHub Actions: friday-x-ide.yml&lt;br/&gt;matrix of the 3 published platforms"]
+  subgraph PERPLAT["For each published platform (darwin-arm64, linux-x64, win32-x64)"]
     F["scripts/fetch-agent.mjs&lt;br/&gt;download friday for that platform&lt;br/&gt;from the Friday release server&lt;br/&gt;verify SHA-256"]
     B["npm run package:target&lt;br/&gt;vsce package --target"]
     F --&gt; B

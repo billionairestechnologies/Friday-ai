@@ -1,6 +1,6 @@
 flowchart TB
-  TAG["git tag ide-vX.Y.Z"] --> CI["GitHub Actions: friday-x-ide.yml<br/>matrix of 8 platforms"]
-  subgraph PERPLAT["For each platform (darwin, linux, alpine, win32 x x64/arm64)"]
+  TAG["git tag ide-vX.Y.Z"] --> CI["GitHub Actions: friday-x-ide.yml<br/>matrix of the 3 published platforms"]
+  subgraph PERPLAT["For each published platform (darwin-arm64, linux-x64, win32-x64)"]
     F["scripts/fetch-agent.mjs<br/>download friday for that platform<br/>from the Friday release server<br/>verify SHA-256"]
     B["npm run package:target<br/>vsce package --target"]
     F --> B

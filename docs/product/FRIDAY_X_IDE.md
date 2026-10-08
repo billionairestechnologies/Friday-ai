@@ -53,8 +53,11 @@ The server enforces the `fridayX` entitlement on every request (`middleware/cliA
 The Marketplace supports **per-platform extension builds**. Each build contains the agent in `resources/native-binary/`
 (with a `VERSION` file), so installing the extension is the only download and the first run starts in milliseconds, offline.
 
-- Build: `node scripts/fetch-agent.mjs <target>` then `npm run package:target -- <target>` (targets: `darwin-arm64`,
-  `darwin-x64`, `linux-x64`, `linux-arm64`, `alpine-x64`, `alpine-arm64`, `win32-x64`, `win32-arm64`). CI does all eight.
+- Build: `node scripts/fetch-agent.mjs <target>` then `npm run package:target -- <target>` (VS Code targets: `darwin-arm64`,
+  `darwin-x64`, `linux-x64`, `linux-arm64`, `alpine-x64`, `alpine-arm64`, `win32-x64`, `win32-arm64`). The release server has
+  binaries for **`darwin-arm64`, `linux-x64`, `win32-x64` only** (checked 2026-10-08; the rest answer 403), so CI builds those three.
+  Intel Macs, ARM Linux/Windows and Alpine get no build until their `friday-<platform>` binaries are uploaded to the releases
+  bucket; then add the target to the matrix in `friday-x-ide.yml`.
 - Local dev build: `npm run bundle:local` copies the CLI installed on this machine, then `vsce package --target <yours>`.
 - Resolution order at start (`binary.ts#bestLocal`): newest of {downloaded copy in extension storage, bundled copy,
   `~/.friday/bin/friday`}. `fridayX.executable` (absolute path) overrides everything.
@@ -132,7 +135,7 @@ Without VS Code, the pieces are testable on their own:
 
 ## Publishing
 
-CI: `.github/workflows/friday-x-ide.yml` builds the eight platform packages on changes under `ide/` and publishes on a tag
+CI: `.github/workflows/friday-x-ide.yml` builds the three published platform packages on changes under `ide/` and publishes on a tag
 `ide-vX.Y.Z` when the secrets exist (`VSCE_PAT`, `OVSX_PAT`). Nothing publishes without them.
 
 1. Create the publisher `billionaires-technologies` at <https://marketplace.visualstudio.com/manage> (the ID must equal
@@ -147,7 +150,8 @@ CI: `.github/workflows/friday-x-ide.yml` builds the eight platform packages on c
 - Inline accept/reject needs a manual pass in real VS Code (built against the documented API; not click-tested here).
 - No effort/thinking toggle, bookmarks or export (present in some other agent UIs).
 - Commands run inside the agent's own shell (visible as IN/OUT cards), not in a VS Code terminal.
-- Windows/Linux builds are produced by CI; only `darwin-arm64` was run locally.
+- Only `darwin-arm64` was run locally; the Linux and Windows packages are built by CI (it builds them; they were not run).
+- No build for Intel Macs, ARM Linux/Windows or Alpine until those agent binaries are published.
 
 ## Third-party
 
