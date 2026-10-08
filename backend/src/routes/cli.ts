@@ -15,6 +15,7 @@ import {
   startDeviceAuthorization,
 } from "../services/cli/deviceAuth.js";
 import { createTicket } from "../services/console/supportService.js";
+import { markSeen, pendingForUser } from "../services/console/announcementService.js";
 import { connectedAppsSummary, handleMcpRequest, pluginCatalog } from "../services/cli/mcpServer.js";
 import { AUTO_MODEL, assertFridayX, cliSettings, cliStatus, cliUser, listCliModels, runCompletion, type CompletionRequest } from "../services/cli/gateway.js";
 
@@ -198,6 +199,26 @@ cliRouter.get(
       cliStatus(userId),
     ]);
     res.json({ user: { id: userId, email: data.user?.email ?? null, name: profile.data?.full_name ?? null }, ...status });
+  }),
+);
+
+// What's New for editors: the same published updates the web app shows (same audience rules, same "seen once per
+// account" ledger), so an announcement published in the Console reaches the IDE panel without a client release.
+cliRouter.get(
+  "/updates",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    res.json({ updates: await pendingForUser(req.user!.id, "web") });
+  }),
+);
+
+cliRouter.post(
+  "/updates/seen",
+  requireCliAuth,
+  asyncHandler(async (req, res) => {
+    const body = z.object({ ids: z.array(z.string().uuid()).max(10), clickedId: z.string().uuid().optional() }).parse(req.body ?? {});
+    await markSeen(req.user!.id, body.ids, body.clickedId);
+    res.json({ ok: true });
   }),
 );
 

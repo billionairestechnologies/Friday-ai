@@ -5,58 +5,166 @@
       "id": "overview",
       "title": "Overview",
       "diagrams": [
-        { "id": "02", "slug": "what-system-can-do", "title": "What the system can do" },
-        { "id": "03", "slug": "what-users-can-do", "title": "What users can do" },
-        { "id": "10", "slug": "go-live-checklist", "title": "Go-live checklist" }
+        {
+          "id": "02",
+          "slug": "what-system-can-do",
+          "title": "What the system can do"
+        },
+        {
+          "id": "03",
+          "slug": "what-users-can-do",
+          "title": "What users can do"
+        },
+        {
+          "id": "10",
+          "slug": "go-live-checklist",
+          "title": "Go-live checklist"
+        }
       ]
     },
     {
       "id": "platform",
       "title": "Platform",
       "diagrams": [
-        { "id": "01", "slug": "system-architecture", "title": "System architecture" },
-        { "id": "05", "slug": "how-login-works", "title": "How login works (web, mobile, terminal)" },
-        { "id": "08", "slug": "data-model", "title": "Data model" },
-        { "id": "09", "slug": "identity-and-access", "title": "Identity and access" }
+        {
+          "id": "01",
+          "slug": "system-architecture",
+          "title": "System architecture"
+        },
+        {
+          "id": "05",
+          "slug": "how-login-works",
+          "title": "How login works (web, mobile, terminal)"
+        },
+        {
+          "id": "08",
+          "slug": "data-model",
+          "title": "Data model"
+        },
+        {
+          "id": "09",
+          "slug": "identity-and-access",
+          "title": "Identity and access"
+        }
       ]
     },
     {
       "id": "chat-and-agents",
       "title": "Chat and agents",
       "diagrams": [
-        { "id": "04", "slug": "how-chat-works", "title": "How chat works (agent loop)" },
-        { "id": "11", "slug": "agent-tool-loop", "title": "Agent tool loop" },
-        { "id": "12", "slug": "build-mode-coding-agent", "title": "Build Mode coding agent + GitHub PRs" },
-        { "id": "13", "slug": "automations", "title": "Automations scheduler" },
-        { "id": "14", "slug": "mcp-servers", "title": "MCP servers" },
-        { "id": "07", "slug": "how-connectors-work", "title": "How connectors and MCP tools work" },
-        { "id": "18", "slug": "documents-library-skills", "title": "Documents, Library and skills" }
+        {
+          "id": "04",
+          "slug": "how-chat-works",
+          "title": "How chat works (agent loop)"
+        },
+        {
+          "id": "11",
+          "slug": "agent-tool-loop",
+          "title": "Agent tool loop"
+        },
+        {
+          "id": "12",
+          "slug": "build-mode-coding-agent",
+          "title": "Build Mode coding agent + GitHub PRs"
+        },
+        {
+          "id": "13",
+          "slug": "automations",
+          "title": "Automations scheduler"
+        },
+        {
+          "id": "14",
+          "slug": "mcp-servers",
+          "title": "MCP servers"
+        },
+        {
+          "id": "07",
+          "slug": "how-connectors-work",
+          "title": "How connectors and MCP tools work"
+        },
+        {
+          "id": "18",
+          "slug": "documents-library-skills",
+          "title": "Documents, Library and skills"
+        }
       ]
     },
     {
       "id": "money-and-limits",
       "title": "Money and limits",
       "diagrams": [
-        { "id": "16", "slug": "plans-entitlements-quota", "title": "Plans, entitlements and the credit meter" },
-        { "id": "06", "slug": "how-billing-works", "title": "How Razorpay billing works" }
+        {
+          "id": "16",
+          "slug": "plans-entitlements-quota",
+          "title": "Plans, entitlements and the credit meter"
+        },
+        {
+          "id": "06",
+          "slug": "how-billing-works",
+          "title": "How Razorpay billing works"
+        }
       ]
     },
     {
       "id": "company",
       "title": "Company back office",
       "diagrams": [
-        { "id": "15", "slug": "team-console", "title": "Team Console (back office)" },
-        { "id": "17", "slug": "status-and-reports", "title": "Status page, incidents, problem and crash reports" }
+        {
+          "id": "15",
+          "slug": "team-console",
+          "title": "Team Console (back office)"
+        },
+        {
+          "id": "17",
+          "slug": "status-and-reports",
+          "title": "Status page, incidents, problem and crash reports"
+        }
       ]
     },
     {
       "id": "friday-x",
       "title": "FridayX (terminal and editor agent)",
       "diagrams": [
-        { "id": "19", "slug": "friday-x-architecture", "title": "FridayX architecture" },
-        { "id": "20", "slug": "friday-x-device-login", "title": "FridayX sign-in (device code)" },
-        { "id": "21", "slug": "friday-x-gateway-metering", "title": "FridayX gateway and metering" },
-        { "id": "22", "slug": "friday-x-install-release", "title": "FridayX install and release" }
+        {
+          "id": "19",
+          "slug": "friday-x-architecture",
+          "title": "FridayX architecture"
+        },
+        {
+          "id": "20",
+          "slug": "friday-x-device-login",
+          "title": "FridayX sign-in (device code)"
+        },
+        {
+          "id": "21",
+          "slug": "friday-x-gateway-metering",
+          "title": "FridayX gateway and metering"
+        },
+        {
+          "id": "22",
+          "slug": "friday-x-install-release",
+          "title": "FridayX install and release"
+        },
+        {
+          "id": "23",
+          "slug": "friday-x-vscode-architecture",
+          "title": "FridayX for VS Code: architecture"
+        },
+        {
+          "id": "24",
+          "slug": "friday-x-vscode-chat-turn",
+          "title": "FridayX for VS Code: one chat turn"
+        },
+        {
+          "id": "25",
+          "slug": "friday-x-vscode-release",
+          "title": "FridayX for VS Code: build and publish"
+        },
+        {
+          "id": "26",
+          "slug": "friday-x-vscode-data",
+          "title": "FridayX for VS Code: where data and tokens live"
+        }
       ]
     }
   ]

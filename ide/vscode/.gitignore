@@ -1,3 +1,5 @@
 node_modules/
 out/
 *.vsix
+resources/native-binary/
+media/fx.js

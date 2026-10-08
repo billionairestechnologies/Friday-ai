@@ -143,10 +143,10 @@ mindmap
       Share read-only links
     Business
       Teams roles budgets
-      Credit meter incl Team Up and Friday X
+      Credit meter incl Team Up and FridayX
       Razorpay checkout
       Audit log of connector use
-    Friday X
+    FridayX
       Terminal agent - friday
       VS Code extension
       JetBrains and Zed via ACP
@@ -187,9 +187,9 @@ flowchart TB
   User --&gt; Pay[Pay Pro or Business via Razorpay]
   User --&gt; Data[Download or delete my data]
   User --&gt; Usage[See usage - percent used and reset time]
-  User --&gt; FX[Use Friday X in the terminal or an editor]
+  User --&gt; FX[Use FridayX in the terminal or an editor]
   FX --&gt; Install[One-line install, then friday login in the browser]
-  Settings --&gt; Devices[Settings - Friday X - signed-in devices, sign out]
+  Settings --&gt; Devices[Settings - FridayX - signed-in devices, sign out]
 
   Settings --&gt; Account[Account profile]
   Settings --&gt; Appearance[Appearance]
@@ -220,7 +220,7 @@ flowchart TD
   F --&gt;|Yes| G[Smoke test: signup OTP, chat, tool call, file]
   G --&gt; H[Smoke test: memory, automation run now, share link, MCP add]
   H --&gt; I[Build Mode: small app + GitHub import PR]
-  I --&gt; FX1[Friday X: set FRIDAY_X_RELEASES_URL, tag a release, install with the one-liner]
+  I --&gt; FX1[FridayX: set FRIDAY_X_RELEASES_URL, tag a release, install with the one-liner]
   FX1 --&gt; FX2[friday login, friday models, one prompt - check the Usage bar moved]
   FX2 --&gt; J[Production live]
       </pre>
@@ -242,7 +242,7 @@ flowchart TB
     IOS[iOS - SwiftUI]
     Console[Team Console /admin - staff RBAC]
     Public[Public pages - /status /plans /share /p pages]
-    FX[Friday X - terminal CLI, VS Code, JetBrains, Zed]
+    FX[FridayX - terminal CLI, VS Code, JetBrains, Zed]
   end
 
   subgraph api [Friday API - Express TypeScript]
@@ -262,7 +262,7 @@ flowchart TB
     ConnR["/api/connectors /api/mcp /api/memory"]
     OrgR["/api/organizations /usage /projects /voice"]
     PagesR["/api/pages - live docs, sheets, slides"]
-    XR["/api/x - Friday X device login, models, metered gateway"]
+    XR["/api/x - FridayX device login, models, metered gateway"]
     InstR["/x - installers, version, checksums"]
     FinR["Console: Finance (cost vs sell, P&amp;L, profit controls) + Mailbox (mail hosting)"]
   end
@@ -291,7 +291,7 @@ flowchart TB
     Pay[Razorpay checkout + webhook]
     Mail[Resend - OTP, support, campaigns, alerts]
     Mailcow[Mailcow - company domains and mailboxes]
-    Releases[(Release bucket + CDN - Friday X binaries)]
+    Releases[(Release bucket + CDN - FridayX binaries)]
   end
 
   Browser &amp; Android &amp; IOS --&gt; MW
@@ -346,7 +346,7 @@ sequenceDiagram
   participant Mail as Resend
   participant G as Google
   participant DB as Supabase Auth
-  participant CLI as Friday X (terminal / editor)
+  participant CLI as FridayX (terminal / editor)
 
   alt Email and password
     U-&gt;&gt;FE: Email + password
@@ -367,7 +367,7 @@ sequenceDiagram
   else Company SSO
     U-&gt;&gt;FE: Continue with Company SSO
     FE-&gt;&gt;SSO: SSO_ENTRY_URL
-  else Terminal or editor (Friday X)
+  else Terminal or editor (FridayX)
     U-&gt;&gt;CLI: friday login
     CLI-&gt;&gt;API: POST /api/x/oauth2/device/code
     CLI-&gt;&gt;U: Opens /device, shows a code
@@ -502,7 +502,7 @@ erDiagram
   cli_tokens {
     uuid id
     text token_hash "SHA-256 only"
-    text name "Friday X on this device"
+    text name "FridayX on this device"
     text client "cli or ide"
     timestamptz last_used_at
     timestamptz revoked_at
@@ -861,11 +861,11 @@ flowchart TB
     E3[Documents per day + Library storage]
     E4[Custom skills, Team Up size, MCP servers, automations]
     E5[Priority support tickets]
-    E6[Friday X - terminal and editor agent, on or off per plan, package or person]
+    E6[FridayX - terminal and editor agent, on or off per plan, package or person]
   end
   Ent --&gt; E1 &amp; E2 &amp; E3 &amp; E4 &amp; E5 &amp; E6
 
-  subgraph meter ["Usage meter in CREDITS - what a call really costs us. Web, mobile and Friday X share it"]
+  subgraph meter ["Usage meter in CREDITS - what a call really costs us. Web, mobile and FridayX share it"]
     Pre[Pre-flight: reserve credits]
     Prompt[Charge the real prompt before the model runs]
     Round[Charge each tool-loop / Build round atomically]
@@ -1004,16 +1004,16 @@ flowchart LR
       <div class="diagram" id="render-17"></div>
     </section>
 
-    <h2 class="group">Friday X (terminal and editor agent)</h2>
+    <h2 class="group">FridayX (terminal and editor agent)</h2>
     <section>
-      <h2>19. Friday X architecture</h2>
+      <h2>19. FridayX architecture</h2>
       <div class="actions">
         <button onclick="downloadSvg('19','19-friday-x-architecture.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('19','19-friday-x-architecture.png')">Download PNG</button>
       </div>
       <pre class="mermaid-src" data-id="19">
 flowchart TB
-  subgraph clients [Friday X clients - same engine everywhere]
+  subgraph clients [FridayX clients - same engine everywhere]
     CLI["friday - terminal agent (cli/)"]
     VS["VS Code extension (ide/vscode)"]
     JB["JetBrains, Zed and other ACP editors (friday agent stdio)"]
@@ -1048,14 +1048,14 @@ flowchart TB
 
   Web["Web, Android and iOS apps - same plan, same meter"]
   Meter -. one usage bar .- Web
-  Console["Team Console - edit plans, models, who gets Friday X"] --&gt; Ent
+  Console["Team Console - edit plans, models, who gets FridayX"] --&gt; Ent
   Console --&gt; Models
       </pre>
       <div class="diagram" id="render-19"></div>
     </section>
 
     <section>
-      <h2>20. Friday X sign-in (device code)</h2>
+      <h2>20. FridayX sign-in (device code)</h2>
       <div class="actions">
         <button onclick="downloadSvg('20','20-friday-x-device-login.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('20','20-friday-x-device-login.png')">Download PNG</button>
@@ -1078,7 +1078,7 @@ sequenceDiagram
   API--&gt;&gt;W: Which client is asking
   U-&gt;&gt;W: Check the code matches, Approve (or Deny)
   W-&gt;&gt;API: POST /auth/device/approve
-  API-&gt;&gt;API: Friday X entitlement checked
+  API-&gt;&gt;API: FridayX entitlement checked
   API-&gt;&gt;DB: status = approved (compare-and-set)
   loop every 5 s
     C-&gt;&gt;API: POST /oauth2/token (device_code)
@@ -1088,13 +1088,13 @@ sequenceDiagram
   API-&gt;&gt;DB: Claim once, store hash(fxt_ token)
   API--&gt;&gt;C: access_token fxt_...
   C-&gt;&gt;C: Save token, then every request carries it
-  Note over U,DB: Settings, Friday X lists every signed-in device. Sign out revokes the token at once.
+  Note over U,DB: Settings, FridayX lists every signed-in device. Sign out revokes the token at once.
       </pre>
       <div class="diagram" id="render-20"></div>
     </section>
 
     <section>
-      <h2>21. Friday X gateway and metering</h2>
+      <h2>21. FridayX gateway and metering</h2>
       <div class="actions">
         <button onclick="downloadSvg('21','21-friday-x-gateway-metering.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('21','21-friday-x-gateway-metering.png')">Download PNG</button>
@@ -1127,7 +1127,7 @@ flowchart TB
     </section>
 
     <section>
-      <h2>22. Friday X install and release</h2>
+      <h2>22. FridayX install and release</h2>
       <div class="actions">
         <button onclick="downloadSvg('22','22-friday-x-install-release.svg')">Download SVG</button>
         <button class="secondary" onclick="downloadPng('22','22-friday-x-install-release.png')">Download PNG</button>
@@ -1162,6 +1162,149 @@ flowchart LR
   Run -. "friday update" .-&gt; Ver
       </pre>
       <div class="diagram" id="render-22"></div>
+    </section>
+
+    <section>
+      <h2>23. FridayX for VS Code: architecture</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('23','23-friday-x-vscode-architecture.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('23','23-friday-x-vscode-architecture.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="23">
+flowchart LR
+  subgraph VS["VS Code window"]
+    direction TB
+    WV["Chat panel (webview)&lt;br/&gt;main.js + fx.js orbs and mascots"]
+    EXT["Extension host (TypeScript)&lt;br/&gt;controller, auth, binary, acp"]
+    ED["Editor&lt;br/&gt;diff review, reveal edits, open file"]
+    KC[("OS keychain&lt;br/&gt;SecretStorage: fxt_ token")]
+    WV &lt;--&gt;|postMessage| EXT
+    EXT --&gt; ED
+    EXT --&gt; KC
+  end
+  subgraph LOCAL["Your machine"]
+    AG["friday agent stdio&lt;br/&gt;bundled in the extension&lt;br/&gt;(same engine as the CLI)"]
+    FS["Project files + shell&lt;br/&gt;(agent tools, permission prompts)"]
+    HOME["~/.friday&lt;br/&gt;settings, skills, plugins, MCP, history&lt;br/&gt;(shared with the CLI)"]
+  end
+  subgraph SRV["Friday server  /api/x"]
+    GW["Model gateway&lt;br/&gt;+ credit meter"]
+    AUTH["Device sign-in&lt;br/&gt;/oauth2/device/code, /oauth2/token"]
+    ME["/me usage windows&lt;br/&gt;/updates What's New"]
+    REL["/x/version, /x/download, /x/sha256&lt;br/&gt;(agent updates)"]
+  end
+  EXT &lt;--&gt;|"ACP over stdio (JSON-RPC)"| AG
+  AG --&gt; FS
+  AG --&gt; HOME
+  AG --&gt;|"Bearer fxt_ token"| GW
+  EXT --&gt; AUTH
+  EXT --&gt; ME
+  EXT --&gt; REL
+      </pre>
+      <div class="diagram" id="render-23"></div>
+    </section>
+
+    <section>
+      <h2>24. FridayX for VS Code: one chat turn</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('24','24-friday-x-vscode-chat-turn.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('24','24-friday-x-vscode-chat-turn.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="24">
+sequenceDiagram
+  actor U as User
+  participant W as Chat panel (webview)
+  participant E as Extension host
+  participant A as friday agent (ACP)
+  participant G as Friday gateway
+  participant D as VS Code editor
+
+  U-&gt;&gt;W: Type a message (+ pasted image, @file)
+  W-&gt;&gt;E: send(text, attachments)
+  E-&gt;&gt;E: Add editor context (folder, open file, selection, problems)
+  E-&gt;&gt;A: session/prompt (context block + files + text)
+  A-&gt;&gt;G: Chat completion with tools (Bearer fxt_)
+  G--&gt;&gt;A: Streamed tokens (credits metered)
+  A--&gt;&gt;E: session/update agent_thought_chunk / agent_message_chunk
+  E--&gt;&gt;W: update events
+  W--&gt;&gt;U: Orb "Thinking", streamed answer
+  A--&gt;&gt;E: tool_call (edit) + diff
+  A-&gt;&gt;E: session/request_permission
+  E-&gt;&gt;D: Open diff (Accept / Reject in title bar)
+  E--&gt;&gt;W: Permission card with the same diff
+  U-&gt;&gt;D: Accept (or Reject, or answer in chat)
+  D-&gt;&gt;E: answer
+  E--&gt;&gt;A: selected option
+  A-&gt;&gt;A: Write file, run command, spawn subagent
+  A--&gt;&gt;E: tool_call_update (output streams, subagent id)
+  E--&gt;&gt;W: Step cards, mascots while a subagent works
+  A--&gt;&gt;E: stopReason end_turn
+  E-&gt;&gt;G: GET /me (usage meter refresh)
+  E--&gt;&gt;W: usage percent + reset time
+      </pre>
+      <div class="diagram" id="render-24"></div>
+    </section>
+
+    <section>
+      <h2>25. FridayX for VS Code: build and publish</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('25','25-friday-x-vscode-release.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('25','25-friday-x-vscode-release.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="25">
+flowchart TB
+  TAG["git tag ide-vX.Y.Z"] --&gt; CI["GitHub Actions: friday-x-ide.yml&lt;br/&gt;matrix of 8 platforms"]
+  subgraph PERPLAT["For each platform (darwin, linux, alpine, win32 x x64/arm64)"]
+    F["scripts/fetch-agent.mjs&lt;br/&gt;download friday for that platform&lt;br/&gt;from the Friday release server&lt;br/&gt;verify SHA-256"]
+    B["npm run package:target&lt;br/&gt;vsce package --target"]
+    F --&gt; B
+    B --&gt; V["friday-x-TARGET-X.Y.Z.vsix&lt;br/&gt;(extension + bundled agent, about 60 MB)"]
+  end
+  CI --&gt; F
+  V --&gt; M["VS Code Marketplace&lt;br/&gt;vsce publish (VSCE_PAT)"]
+  V --&gt; O["Open VSX&lt;br/&gt;ovsx publish (OVSX_PAT)&lt;br/&gt;Cursor, Windsurf, VSCodium"]
+  M --&gt; USER["User installs once&lt;br/&gt;Marketplace delivers the right platform build"]
+  O --&gt; USER
+  USER --&gt; RUN["First run: no download, agent starts in ms"]
+  REL[("Friday release server&lt;br/&gt;/x/version")] -.-&gt;|"newer agent? silent background download&lt;br/&gt;into extension storage, 'Restart FridayX'"| RUN
+      </pre>
+      <div class="diagram" id="render-25"></div>
+    </section>
+
+    <section>
+      <h2>26. FridayX for VS Code: where data and tokens live</h2>
+      <div class="actions">
+        <button onclick="downloadSvg('26','26-friday-x-vscode-data.svg')">Download SVG</button>
+        <button class="secondary" onclick="downloadPng('26','26-friday-x-vscode-data.png')">Download PNG</button>
+      </div>
+      <pre class="mermaid-src" data-id="26">
+flowchart LR
+  subgraph SECRET["Secret, never in settings or the webview"]
+    T["fxt_ token&lt;br/&gt;OS keychain via SecretStorage&lt;br/&gt;one per server URL"]
+  end
+  subgraph EXTSTORE["Extension storage (globalStorage)"]
+    BIN["bin/friday-X.Y.Z&lt;br/&gt;(only if a newer agent was downloaded)"]
+    PRIV["home/ (only when fridayX.isolateFromCli is on)"]
+  end
+  subgraph WS["Per workspace"]
+    MODE["mode: ask / plan / auto&lt;br/&gt;workspaceState"]
+  end
+  subgraph CLIHOME["~/.friday (shared with the CLI by default)"]
+    CFG["config.toml, skills, plugins, MCP servers"]
+    SES["Chat history (sessions) + rewind snapshots"]
+  end
+  subgraph TMP["Temp"]
+    IMG["friday-x/images/pasted-*.png&lt;br/&gt;(attached to the agent by path)"]
+  end
+  T --&gt;|"FRIDAY_X_TOKEN (environment only)"| AGENT["friday agent process"]
+  BIN --&gt; AGENT
+  AGENT --&gt; CFG
+  AGENT --&gt; SES
+  MODE --&gt;|"/always-approve, session/set_mode"| AGENT
+  IMG --&gt; AGENT
+  AGENT --&gt;|"HTTPS Bearer"| SERVER["Friday server&lt;br/&gt;entitlement checked on every request"]
+      </pre>
+      <div class="diagram" id="render-26"></div>
     </section>
   </main>
 </body>

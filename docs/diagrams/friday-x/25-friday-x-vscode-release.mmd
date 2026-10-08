@@ -1,0 +1,15 @@
+flowchart TB
+  TAG["git tag ide-vX.Y.Z"] --> CI["GitHub Actions: friday-x-ide.yml<br/>matrix of 8 platforms"]
+  subgraph PERPLAT["For each platform (darwin, linux, alpine, win32 x x64/arm64)"]
+    F["scripts/fetch-agent.mjs<br/>download friday for that platform<br/>from the Friday release server<br/>verify SHA-256"]
+    B["npm run package:target<br/>vsce package --target"]
+    F --> B
+    B --> V["friday-x-TARGET-X.Y.Z.vsix<br/>(extension + bundled agent, about 60 MB)"]
+  end
+  CI --> F
+  V --> M["VS Code Marketplace<br/>vsce publish (VSCE_PAT)"]
+  V --> O["Open VSX<br/>ovsx publish (OVSX_PAT)<br/>Cursor, Windsurf, VSCodium"]
+  M --> USER["User installs once<br/>Marketplace delivers the right platform build"]
+  O --> USER
+  USER --> RUN["First run: no download, agent starts in ms"]
+  REL[("Friday release server<br/>/x/version")] -.->|"newer agent? silent background download<br/>into extension storage, 'Restart FridayX'"| RUN

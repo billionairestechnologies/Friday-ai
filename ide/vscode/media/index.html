@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{csp}} data:; style-src {{csp}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="{{css}}" />
+  <title>FridayX</title>
+</head>
+<body>
+  <header id="bar">
+    <div id="title">New chat</div>
+    <div class="spacer"></div>
+    <button id="btnHistory" class="icon" title="Past chats" aria-label="Past chats"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.2 1.5"/></svg></button>
+    <button id="btnNew" class="icon" title="New chat" aria-label="New chat"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
+  </header>
+
+  <section id="history" hidden></section>
+  <section id="manage" hidden></section>
+  <main id="thread" aria-live="polite"></main>
+  <section id="gate" hidden></section>
+  <div id="account"></div>
+
+  <footer id="composer">
+    <div id="notices"></div>
+    <div id="usage" hidden></div>
+    <div id="queue"></div>
+    <div id="box">
+      <div id="chips"></div>
+      <textarea id="input" rows="1" placeholder="Ask FridayX to build, fix or explain…  (@ to add a file, / for commands)"></textarea>
+      <div id="menu" hidden></div>
+      <div id="tools">
+        <button id="btnAttach" class="tool" title="Attach a file" aria-label="Attach a file">+</button>
+        <button id="btnSlash" class="tool" title="Commands, plugins, MCP, skills and settings" aria-label="Commands">/</button>
+        <div class="spacer"></div>
+        <span id="note"></span>
+        <button id="modeBtn" class="chipbtn" title="How FridayX asks before changing things"></button>
+        <button id="btnSend" class="send" title="Send (Enter)" aria-label="Send">&#8593;</button>
+      </div>
+      <div id="pop" hidden></div>
+    </div>
+    <div id="meta"><button id="modelBtn" class="chipbtn flat" title="Switch model"></button></div>
+  </footer>
+
+  <script nonce="{{nonce}}">window.FRIDAY_LOGO = "{{logo}}";</script>
+  <script nonce="{{nonce}}" src="{{fx}}"></script>
+  <script nonce="{{nonce}}" src="{{js}}"></script>
+</body>
+</html>

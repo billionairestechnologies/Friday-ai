@@ -1,0 +1,30 @@
+sequenceDiagram
+  actor U as User
+  participant W as Chat panel (webview)
+  participant E as Extension host
+  participant A as friday agent (ACP)
+  participant G as Friday gateway
+  participant D as VS Code editor
+
+  U->>W: Type a message (+ pasted image, @file)
+  W->>E: send(text, attachments)
+  E->>E: Add editor context (folder, open file, selection, problems)
+  E->>A: session/prompt (context block + files + text)
+  A->>G: Chat completion with tools (Bearer fxt_)
+  G-->>A: Streamed tokens (credits metered)
+  A-->>E: session/update agent_thought_chunk / agent_message_chunk
+  E-->>W: update events
+  W-->>U: Orb "Thinking", streamed answer
+  A-->>E: tool_call (edit) + diff
+  A->>E: session/request_permission
+  E->>D: Open diff (Accept / Reject in title bar)
+  E-->>W: Permission card with the same diff
+  U->>D: Accept (or Reject, or answer in chat)
+  D->>E: answer
+  E-->>A: selected option
+  A->>A: Write file, run command, spawn subagent
+  A-->>E: tool_call_update (output streams, subagent id)
+  E-->>W: Step cards, mascots while a subagent works
+  A-->>E: stopReason end_turn
+  E->>G: GET /me (usage meter refresh)
+  E-->>W: usage percent + reset time

@@ -17,6 +17,7 @@ docs/
 | Testing a branch | [operations/V2_TEST_AND_OPS_GUIDE.md](operations/V2_TEST_AND_OPS_GUIDE.md) |
 | Mail hosting | [operations/MAIL_HOSTING.md](operations/MAIL_HOSTING.md) |
 | Planning | [product/UPGRADE_ROADMAP.md](product/UPGRADE_ROADMAP.md) |
+| Working on the VS Code extension | [product/FRIDAY_X_IDE.md](product/FRIDAY_X_IDE.md) (architecture, ACP facts, publishing), diagrams 23–26 |
 | Showing someone the system | [diagrams/README.md](diagrams/README.md) (index) and `diagrams/BOSS_PACK.html` |
 
 ## Repo map
@@ -27,7 +28,7 @@ docs/
 | `frontend/` | React 19 + Vite web app, incl. the Team Console (`/admin`) |
 | `android/` · `ios/` | Native apps (Kotlin/Compose, SwiftUI) |
 | `cli/` | **FridayX CLI** — terminal coding agent (Rust, Apache-2.0 fork; see its own LICENSE/NOTICE) |
-| `ide/` | **FridayX IDE extensions** — VS Code first, then JetBrains and other ACP editors; same Friday login, models and credits as the CLI |
+| `ide/` | **FridayX for VS Code** — chat panel extension ([FRIDAY_X_IDE.md](product/FRIDAY_X_IDE.md)); JetBrains/Zed use the CLI over ACP. Same Friday models and credits as the CLI |
 | `supabase/` | SQL migrations, applied in order |
 | `infra/` | AWS CloudFormation + deploy script |
 | `scripts/` | Repo tooling (migration verifier, preview shell generator) |

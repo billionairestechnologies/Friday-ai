@@ -7,8 +7,8 @@ next start: no extension update.
 
 | Editor | How | Status |
 |---|---|---|
-| **VS Code** (and forks: Cursor, Windsurf, VSCodium) | the extension in [`vscode/`](vscode) | built, packages to a `.vsix` |
-| **JetBrains IDEs** (IntelliJ, PyCharm, WebStorm, GoLand, Rider, …) | Agent Client Protocol (ACP): add FridayX as a custom agent | works with the CLI today |
+| **VS Code** (and forks: Cursor, Windsurf, VSCodium) | the extension in [`vscode/`](vscode): a FridayX chat panel in the sidebar | built, packages to a `.vsix` |
+| **JetBrains IDEs** (IntelliJ, PyCharm, WebStorm, GoLand, Rider, …) | Agent Client Protocol (ACP): add FridayX as a custom agent | works with the CLI today; no dedicated plugin (VS Code is the supported editor extension) |
 | **Zed** | ACP custom agent | works with the CLI today |
 | **Neovim, Emacs, others with ACP** | ACP custom agent | works with the CLI today |
 

@@ -68,3 +68,8 @@ Against a mock Friday server behind a proxy that refuses every outside connectio
 `AGENTS.md` / `CLAUDE.md` / `FRIDAY.md` reaching the model, a streamed answer, ACP initialize, self-update with a
 checksum, and a tampered download refused. The client asks the server for exactly: models, settings, user, token,
 chat completions. Not yet verified: live provider keys, a real deployment, signed binaries.
+
+
+## Editor extension
+
+The VS Code extension (`ide/vscode`) is documented in [FRIDAY_X_IDE.md](FRIDAY_X_IDE.md).

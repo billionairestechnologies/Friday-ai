@@ -1,0 +1,44 @@
+name: FridayX IDE extensions
+
+# Builds the VS Code extension (one .vsix per platform) on every change under ide/, and publishes
+# them when a tag `ide-v<version>` is pushed. Publishing needs the secrets below; without them the build still
+# runs and the artifacts are attached to the run, so nothing is ever published by accident.
+#   VSCE_PAT         VS Code Marketplace token (publisher: billionaires-technologies)
+#   OVSX_PAT         Open VSX token (Cursor, Windsurf, VSCodium read from here)
+
+on:
+  push:
+    branches: [main]
+    paths: ["ide/**", ".github/workflows/friday-x-ide.yml"]
+    tags: ["ide-v*"]
+  pull_request:
+    paths: ["ide/**"]
+
+jobs:
+  # One package per platform, each with the `friday` agent inside (resources/native-binary), so the Marketplace
+  # delivers the right engine with the extension and the first run needs no download. The binary is fetched from the
+  # Friday release server at build time and its SHA-256 is verified there.
+  vscode:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, alpine-x64, alpine-arm64, win32-x64, win32-arm64]
+    defaults: { run: { working-directory: ide/vscode } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: node scripts/fetch-agent.mjs ${{ matrix.target }}
+      - run: npm run package:target -- ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with: { name: "friday-x-vsix-${{ matrix.target }}", path: ide/vscode/*.vsix }
+      - name: Publish to VS Code Marketplace
+        if: startsWith(github.ref, 'refs/tags/ide-v') && env.VSCE_PAT != ''
+        run: npx vsce publish --no-dependencies --packagePath *.vsix
+        env: { VSCE_PAT: "${{ secrets.VSCE_PAT }}" }
+      - name: Publish to Open VSX
+        if: startsWith(github.ref, 'refs/tags/ide-v') && env.OVSX_PAT != ''
+        run: npx ovsx publish *.vsix -p "$OVSX_PAT" --target ${{ matrix.target }}
+        env: { OVSX_PAT: "${{ secrets.OVSX_PAT }}" }

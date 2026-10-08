@@ -1,0 +1,25 @@
+flowchart LR
+  subgraph SECRET["Secret, never in settings or the webview"]
+    T["fxt_ token<br/>OS keychain via SecretStorage<br/>one per server URL"]
+  end
+  subgraph EXTSTORE["Extension storage (globalStorage)"]
+    BIN["bin/friday-X.Y.Z<br/>(only if a newer agent was downloaded)"]
+    PRIV["home/ (only when fridayX.isolateFromCli is on)"]
+  end
+  subgraph WS["Per workspace"]
+    MODE["mode: ask / plan / auto<br/>workspaceState"]
+  end
+  subgraph CLIHOME["~/.friday (shared with the CLI by default)"]
+    CFG["config.toml, skills, plugins, MCP servers"]
+    SES["Chat history (sessions) + rewind snapshots"]
+  end
+  subgraph TMP["Temp"]
+    IMG["friday-x/images/pasted-*.png<br/>(attached to the agent by path)"]
+  end
+  T -->|"FRIDAY_X_TOKEN (environment only)"| AGENT["friday agent process"]
+  BIN --> AGENT
+  AGENT --> CFG
+  AGENT --> SES
+  MODE -->|"/always-approve, session/set_mode"| AGENT
+  IMG --> AGENT
+  AGENT -->|"HTTPS Bearer"| SERVER["Friday server<br/>entitlement checked on every request"]

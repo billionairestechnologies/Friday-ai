@@ -1,0 +1,29 @@
+flowchart LR
+  subgraph VS["VS Code window"]
+    direction TB
+    WV["Chat panel (webview)<br/>main.js + fx.js orbs and mascots"]
+    EXT["Extension host (TypeScript)<br/>controller, auth, binary, acp"]
+    ED["Editor<br/>diff review, reveal edits, open file"]
+    KC[("OS keychain<br/>SecretStorage: fxt_ token")]
+    WV <-->|postMessage| EXT
+    EXT --> ED
+    EXT --> KC
+  end
+  subgraph LOCAL["Your machine"]
+    AG["friday agent stdio<br/>bundled in the extension<br/>(same engine as the CLI)"]
+    FS["Project files + shell<br/>(agent tools, permission prompts)"]
+    HOME["~/.friday<br/>settings, skills, plugins, MCP, history<br/>(shared with the CLI)"]
+  end
+  subgraph SRV["Friday server  /api/x"]
+    GW["Model gateway<br/>+ credit meter"]
+    AUTH["Device sign-in<br/>/oauth2/device/code, /oauth2/token"]
+    ME["/me usage windows<br/>/updates What's New"]
+    REL["/x/version, /x/download, /x/sha256<br/>(agent updates)"]
+  end
+  EXT <-->|"ACP over stdio (JSON-RPC)"| AG
+  AG --> FS
+  AG --> HOME
+  AG -->|"Bearer fxt_ token"| GW
+  EXT --> AUTH
+  EXT --> ME
+  EXT --> REL

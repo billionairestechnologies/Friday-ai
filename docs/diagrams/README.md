@@ -60,6 +60,10 @@ diagram. Or take the zip: **[friday-ai-diagrams.zip](./friday-ai-diagrams.zip)**
 | 20 | FridayX sign-in (device code) | [png](./friday-x/20-friday-x-device-login.png) | [svg](./friday-x/20-friday-x-device-login.svg) | [mmd](./friday-x/20-friday-x-device-login.mmd) |
 | 21 | FridayX gateway and metering | [png](./friday-x/21-friday-x-gateway-metering.png) | [svg](./friday-x/21-friday-x-gateway-metering.svg) | [mmd](./friday-x/21-friday-x-gateway-metering.mmd) |
 | 22 | FridayX install and release | [png](./friday-x/22-friday-x-install-release.png) | [svg](./friday-x/22-friday-x-install-release.svg) | [mmd](./friday-x/22-friday-x-install-release.mmd) |
+| 23 | FridayX for VS Code: architecture | [png](./friday-x/23-friday-x-vscode-architecture.png) | [svg](./friday-x/23-friday-x-vscode-architecture.svg) | [mmd](./friday-x/23-friday-x-vscode-architecture.mmd) |
+| 24 | FridayX for VS Code: one chat turn | [png](./friday-x/24-friday-x-vscode-chat-turn.png) | [svg](./friday-x/24-friday-x-vscode-chat-turn.svg) | [mmd](./friday-x/24-friday-x-vscode-chat-turn.mmd) |
+| 25 | FridayX for VS Code: build and publish | [png](./friday-x/25-friday-x-vscode-release.png) | [svg](./friday-x/25-friday-x-vscode-release.svg) | [mmd](./friday-x/25-friday-x-vscode-release.mmd) |
+| 26 | FridayX for VS Code: where data and tokens live | [png](./friday-x/26-friday-x-vscode-data.png) | [svg](./friday-x/26-friday-x-vscode-data.svg) | [mmd](./friday-x/26-friday-x-vscode-data.mmd) |
 
 ## Regenerating
 
@@ -69,4 +73,4 @@ node scripts/build-diagrams.mjs --all      # re-render everything
 node scripts/build-diagrams.mjs --no-render   # index, pack and zip only (no browser needed)
 ```
 
-Written briefing: [`../architecture/PLATFORM_BRIEFING.md`](../architecture/PLATFORM_BRIEFING.md) · FridayX: [`../product/FRIDAY_X.md`](../product/FRIDAY_X.md) · Roadmap: [`../product/UPGRADE_ROADMAP.md`](../product/UPGRADE_ROADMAP.md)
+Written briefing: [`../architecture/PLATFORM_BRIEFING.md`](../architecture/PLATFORM_BRIEFING.md) · Friday X: [`../product/FRIDAY_X.md`](../product/FRIDAY_X.md) · Roadmap: [`../product/UPGRADE_ROADMAP.md`](../product/UPGRADE_ROADMAP.md)

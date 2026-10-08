@@ -1,31 +1,154 @@
 {
   "name": "friday-x",
   "displayName": "FridayX",
-  "description": "Friday's coding agent in your editor. Uses your Friday account, plan, models and usage meter.",
-  "version": "0.1.0",
+  "description": "FridayX in VS Code: Friday's coding agent in a chat panel beside your code. Same engine as the friday CLI, your Friday account, plan and models.",
+  "version": "0.2.0",
   "publisher": "billionaires-technologies",
   "license": "Apache-2.0",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["AI", "Programming Languages", "Other"],
-  "keywords": ["friday", "ai", "coding agent", "assistant"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "friday",
+    "fridayx",
+    "ai",
+    "coding agent",
+    "assistant",
+    "agent",
+    "chat",
+    "copilot",
+    "autocomplete",
+    "refactor",
+    "debug",
+    "mcp",
+    "skills",
+    "plugins",
+    "claude",
+    "gpt"
+  ],
   "main": "./out/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
-      { "command": "fridayX.open", "title": "FridayX: Open", "icon": "$(sparkle)" },
-      { "command": "fridayX.sendSelection", "title": "FridayX: Send Selection to FridayX" },
-      { "command": "fridayX.sendFile", "title": "FridayX: Send Current File to FridayX" },
-      { "command": "fridayX.login", "title": "FridayX: Sign In" },
-      { "command": "fridayX.logout", "title": "FridayX: Sign Out" },
-      { "command": "fridayX.install", "title": "FridayX: Install or Update" }
+      {
+        "command": "fridayX.open",
+        "title": "FridayX: Open",
+        "icon": {
+          "light": "media/logo.png",
+          "dark": "media/logo.png"
+        }
+      },
+      {
+        "command": "fridayX.openInEditor",
+        "title": "FridayX: Open in New Tab",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "fridayX.openTerminal",
+        "title": "FridayX: Open Terminal UI (CLI)"
+      },
+      {
+        "command": "fridayX.newChat",
+        "title": "FridayX: New Chat",
+        "icon": "$(add)"
+      },
+      {
+        "command": "fridayX.sendSelection",
+        "title": "FridayX: Add Selection to Chat"
+      },
+      {
+        "command": "fridayX.sendFile",
+        "title": "FridayX: Add Current File to Chat"
+      },
+      {
+        "command": "fridayX.login",
+        "title": "FridayX: Sign In"
+      },
+      {
+        "command": "fridayX.logout",
+        "title": "FridayX: Sign Out"
+      },
+      {
+        "command": "fridayX.restart",
+        "title": "FridayX: Restart Agent"
+      },
+      {
+        "command": "fridayX.install",
+        "title": "FridayX: Check for Agent Update"
+      },
+      {
+        "command": "fridayX.acceptEdit",
+        "title": "FridayX: Accept Edit",
+        "icon": "$(check)"
+      },
+      {
+        "command": "fridayX.rejectEdit",
+        "title": "FridayX: Reject Edit",
+        "icon": "$(close)"
+      }
     ],
     "keybindings": [
-      { "command": "fridayX.open", "key": "ctrl+alt+f", "mac": "cmd+alt+f" },
-      { "command": "fridayX.sendSelection", "key": "ctrl+alt+k", "mac": "cmd+alt+k", "when": "editorHasSelection" }
+      {
+        "command": "fridayX.open",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f"
+      },
+      {
+        "command": "fridayX.sendSelection",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "fridayX.newChat",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n"
+      }
     ],
     "menus": {
-      "editor/title": [{ "command": "fridayX.open", "group": "navigation" }],
-      "editor/context": [{ "command": "fridayX.sendSelection", "when": "editorHasSelection", "group": "friday" }]
+      "editor/title": [
+        {
+          "command": "fridayX.open",
+          "group": "navigation@1"
+        },
+        {
+          "command": "fridayX.acceptEdit",
+          "when": "resourceScheme == fridayx",
+          "group": "navigation@1"
+        },
+        {
+          "command": "fridayX.rejectEdit",
+          "when": "resourceScheme == fridayx",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "fridayX.sendSelection",
+          "when": "editorHasSelection",
+          "group": "friday"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "fridayX.sendFile",
+          "group": "friday"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "fridayX.openInEditor",
+          "when": "view == fridayX.chat",
+          "group": "navigation"
+        }
+      ]
     },
     "configuration": {
       "title": "FridayX",
@@ -37,26 +160,79 @@
         },
         "fridayX.executable": {
           "type": "string",
-          "default": "friday",
-          "description": "Path to the friday executable (default: the one on your PATH, or ~/.friday/bin)."
+          "default": "",
+          "description": "Advanced: absolute path to a friday executable to use instead of the one FridayX downloads and manages itself."
         },
-        "fridayX.openInEditorArea": {
+        "fridayX.isolateFromCli": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep FridayX's settings, skills, plugins, MCP servers and chat history separate from the terminal CLI (~/.friday). Off by default: the editor and the terminal share them."
+        },
+        "fridayX.revealEdits": {
           "type": "boolean",
           "default": true,
-          "description": "Open the FridayX terminal beside your editor instead of in the bottom panel."
+          "description": "Show files in the editor as FridayX edits them (without taking focus from the chat)."
+        },
+        "fridayX.reviewInEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open an edit as a diff in the editor, with Accept and Reject in its title bar, when FridayX asks to change a file."
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "fridayX",
+          "title": "FridayX",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "fridayX": [
+        {
+          "type": "webview",
+          "id": "fridayX.chat",
+          "name": "FridayX",
+          "icon": "media/icon.svg"
+        }
+      ]
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/build-fx.mjs",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "npm run compile",
+    "bundle:local": "node scripts/fetch-agent.mjs --local",
+    "package:target": "vsce package --no-dependencies --target",
+    "build:fx": "node scripts/build-fx.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.5.0"
+  },
+  "icon": "media/logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/billionairestechnologies/Friday-ai",
+    "directory": "ide/vscode"
+  },
+  "homepage": "https://friday.billionairestechnologies.com/x",
+  "galleryBanner": {
+    "color": "#0B0B0F",
+    "theme": "dark"
+  },
+  "pricing": "Free",
+  "bugs": {
+    "url": "https://github.com/billionairestechnologies/Friday-ai/issues"
   }
 }
