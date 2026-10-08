@@ -136,7 +136,11 @@ Without VS Code, the pieces are testable on their own:
 ## Publishing
 
 **Status (2026-10-08):** live on the VS Code Marketplace as `billionairestechnologies.friday-x` 0.2.0 for `darwin-arm64`,
-`linux-x64` and `win32-x64`, uploaded by hand from the packages CI built. Open VSX (Cursor, Windsurf, VSCodium) is not set up yet.
+`linux-x64` and `win32-x64`, uploaded by hand from the packages CI built.
+**Open VSX (Cursor, Windsurf, VSCodium) is deliberately not published (owner decision 2026-10-08, revisit later).** The namespace
+`billionairestechnologies` exists but is unverified, and extensions in an unverified namespace stay inactive until an ownership
+claim is approved (the claim form asks for a GitHub account with 12 months of public history; the owner's account dates from
+March 2026). The workflow's `openvsx` option stays in place but is unused.
 
 How a platform build is added by hand (no token needed): publisher page → the extension's **⋮ → Update** → pick that platform's
 `.vsix`. **New extension** only works for the very first upload; for an existing extension it fails with "already exists".
