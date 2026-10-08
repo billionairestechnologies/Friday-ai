@@ -135,15 +135,37 @@ Without VS Code, the pieces are testable on their own:
 
 ## Publishing
 
-CI: `.github/workflows/friday-x-ide.yml` builds the three published platform packages on changes under `ide/` and publishes on a tag
-`ide-vX.Y.Z` when the secrets exist (`VSCE_PAT`, `OVSX_PAT`). Nothing publishes without them.
+**Status (2026-10-08):** live on the VS Code Marketplace as `billionairestechnologies.friday-x` 0.2.0 for `darwin-arm64`,
+`linux-x64` and `win32-x64`, uploaded by hand from the packages CI built. Open VSX (Cursor, Windsurf, VSCodium) is not set up yet.
 
-1. Create the publisher `billionairestechnologies` at <https://marketplace.visualstudio.com/manage> (the ID must equal
-   `publisher` in `package.json`; it is permanent).
-2. Create a PAT with scope **Marketplace → Manage**, "All accessible organizations". **Microsoft retires global PATs on
-   1 Dec 2026**; move CI to Entra ID workload identity (`vsce publish --azure-credential`) before then.
-3. Open VSX: create an account/token and run `ovsx create-namespace billionairestechnologies` once.
-4. `git tag ide-v0.2.0 && git push --tags`.
+How a platform build is added by hand (no token needed): publisher page → the extension's **⋮ → Update** → pick that platform's
+`.vsix`. **New extension** only works for the very first upload; for an existing extension it fails with "already exists".
+Each upload verifies for a few minutes (Linux took ~10).
+
+CI: `.github/workflows/friday-x-ide.yml` builds the three published platform packages on changes under `ide/` (artifacts are
+downloadable from the run). It publishes automatically on a tag `ide-vX.Y.Z`, or from **Actions → Run workflow → publish =
+vscode | openvsx | both**, but only for a marketplace whose secret exists (`VSCE_PAT`, `OVSX_PAT`); both publishes use
+`--skip-duplicate`, so a re-run is harmless. (The first version of this workflow checked the secret from the step's own `env`,
+which GitHub does not expose to that step's `if`; the tokens are now job-level.)
+
+To enable the automatic path:
+1. VS Code Marketplace: Azure DevOps PAT with scope **Marketplace → Manage**, "All accessible organizations", stored as
+   `VSCE_PAT`. **Microsoft retires global PATs on 1 Dec 2026**; move CI to Entra ID workload identity
+   (`vsce publish --azure-credential`) before then.
+2. Open VSX: sign in at open-vsx.org with GitHub, accept the publisher agreement, create a token, store it as `OVSX_PAT`, and
+   run once `npx ovsx create-namespace billionairestechnologies -p <token>`.
+3. `git tag ide-v0.2.1 && git push --tags` (bump `version` in `package.json` first; a version can't be replaced).
+
+The listing README is end-user copy (the repo is private, so there are no repository/bugs links and no relative images;
+screenshots would need to be hosted on a public URL).
+
+## Missing platforms
+
+The extension bundles the agent, so a platform needs a published `friday-<platform>` binary in the releases bucket first. Today
+only `darwin-arm64`, `linux-x64` and `windows-x64` exist (`friday-x-release.yml`; free GitHub runners). Intel Mac, Linux ARM,
+Windows ARM and Alpine need new CLI builds (cross-compiling `x86_64-apple-darwin` on the arm64 Mac runner is the likeliest
+quick win). A CLI release also moves `latest.json` for every CLI user, so run it deliberately. After the binary exists, add the
+target to the matrix in `friday-x-ide.yml` and upload that platform's package.
 
 ## Known gaps
 
