@@ -203,10 +203,10 @@
   "scripts": {
     "compile": "tsc -p ./ && node scripts/build-fx.mjs",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --no-dependencies",
+    "package": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "npm run compile",
     "bundle:local": "node scripts/fetch-agent.mjs --local",
-    "package:target": "vsce package --no-dependencies --target",
+    "package:target": "vsce package --no-dependencies --allow-missing-repository --target",
     "build:fx": "node scripts/build-fx.mjs"
   },
   "devDependencies": {
@@ -221,18 +221,10 @@
     "typescript": "^5.5.0"
   },
   "icon": "media/logo.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/billionairestechnologies/Friday-ai",
-    "directory": "ide/vscode"
-  },
-  "homepage": "https://friday.billionairestechnologies.com/x",
+  "homepage": "https://friday.billionairestechnologies.com",
   "galleryBanner": {
     "color": "#0B0B0F",
     "theme": "dark"
   },
-  "pricing": "Free",
-  "bugs": {
-    "url": "https://github.com/billionairestechnologies/Friday-ai/issues"
-  }
+  "pricing": "Free"
 }

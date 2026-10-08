@@ -39,7 +39,7 @@ jobs:
         with: { name: "friday-x-vsix-${{ matrix.target }}", path: ide/vscode/*.vsix }
       - name: Publish to VS Code Marketplace
         if: startsWith(github.ref, 'refs/tags/ide-v') && env.VSCE_PAT != ''
-        run: npx vsce publish --no-dependencies --packagePath *.vsix
+        run: npx vsce publish --no-dependencies --allow-missing-repository --packagePath *.vsix
         env: { VSCE_PAT: "${{ secrets.VSCE_PAT }}" }
       - name: Publish to Open VSX
         if: startsWith(github.ref, 'refs/tags/ide-v') && env.OVSX_PAT != ''
