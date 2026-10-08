@@ -138,11 +138,11 @@ Without VS Code, the pieces are testable on their own:
 CI: `.github/workflows/friday-x-ide.yml` builds the three published platform packages on changes under `ide/` and publishes on a tag
 `ide-vX.Y.Z` when the secrets exist (`VSCE_PAT`, `OVSX_PAT`). Nothing publishes without them.
 
-1. Create the publisher `billionaires-technologies` at <https://marketplace.visualstudio.com/manage> (the ID must equal
+1. Create the publisher `billionairestechnologies` at <https://marketplace.visualstudio.com/manage> (the ID must equal
    `publisher` in `package.json`; it is permanent).
 2. Create a PAT with scope **Marketplace → Manage**, "All accessible organizations". **Microsoft retires global PATs on
    1 Dec 2026**; move CI to Entra ID workload identity (`vsce publish --azure-credential`) before then.
-3. Open VSX: create an account/token and run `ovsx create-namespace billionaires-technologies` once.
+3. Open VSX: create an account/token and run `ovsx create-namespace billionairestechnologies` once.
 4. `git tag ide-v0.2.0 && git push --tags`.
 
 ## Known gaps

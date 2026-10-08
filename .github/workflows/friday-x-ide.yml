@@ -3,7 +3,7 @@ name: FridayX IDE extensions
 # Builds the VS Code extension (one .vsix per published platform) on every change under ide/, and publishes
 # them when a tag `ide-v<version>` is pushed. Publishing needs the secrets below; without them the build still
 # runs and the artifacts are attached to the run, so nothing is ever published by accident.
-#   VSCE_PAT         VS Code Marketplace token (publisher: billionaires-technologies)
+#   VSCE_PAT         VS Code Marketplace token (publisher: billionairestechnologies)
 #   OVSX_PAT         Open VSX token (Cursor, Windsurf, VSCodium read from here)
 
 on:

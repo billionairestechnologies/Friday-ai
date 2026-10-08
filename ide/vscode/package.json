@@ -3,7 +3,7 @@
   "displayName": "FridayX",
   "description": "FridayX in VS Code: Friday's coding agent in a chat panel beside your code. Same engine as the friday CLI, your Friday account, plan and models.",
   "version": "0.2.0",
-  "publisher": "billionaires-technologies",
+  "publisher": "billionairestechnologies",
   "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.90.0"
