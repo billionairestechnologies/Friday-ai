@@ -8,6 +8,8 @@ export type LiveSnapshot = {
   text: string;
   think: string;
   status: AssistantStatus;
+  /** Date.now() of the last time `status` actually changed — see ChatMessage.statusSince. */
+  statusSince: number;
   cites: Citation[];
   agents: AgentStatus[];
   error?: string;
@@ -49,6 +51,7 @@ function emit(chatId: string) {
           text: draft.text,
           think: draft.think,
           status: draft.status,
+          statusSince: draft.statusSince,
           cites: draft.cites.slice(),
           agents: draft.agents.slice(),
           error: draft.error,
@@ -79,6 +82,7 @@ export function startLive(
     text: "",
     think: "",
     status,
+    statusSince: Date.now(),
     cites: [],
     agents: [],
     canvasOn,
@@ -105,6 +109,7 @@ export function applyLive(chatId: string, acc: StreamAcc) {
   if (!draft) return;
   if (acc.text) draft.text += acc.text;
   if (acc.think) draft.think += acc.think;
+  if (acc.status && acc.status !== draft.status) draft.statusSince = Date.now();
   if (acc.status) draft.status = acc.status;
   if (acc.status === "building") draft.buildStarted = true;
   if (acc.cites.length) {
@@ -228,6 +233,7 @@ export function overlayLive(
       citations: live.cites.length ? live.cites : m.citations,
       agents: live.agents.length ? live.agents : m.agents,
       status: live.status,
+      statusSince: live.statusSince,
       error: live.error ?? m.error,
       streaming: true,
       // Search can now auto-trigger server-side even when the Search toggle was off (see

@@ -78,7 +78,7 @@ export function LiveChainOfThought({ message }: { message: ChatMessage }) {
   // useSimulatedProgress's own comment for why the percentage is faked (same approach the
   // reference product's own "Creating your image" loader uses).
   const generatingImage = streaming && status === "generating_image";
-  const imageProgress = useSimulatedProgress(generatingImage);
+  const imageProgress = useSimulatedProgress(generatingImage, message.statusSince);
 
   const live = streaming && !failed;
   const label = failed

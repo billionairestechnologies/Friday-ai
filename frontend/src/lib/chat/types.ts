@@ -117,6 +117,11 @@ export type ChatMessage = {
   streaming?: boolean;
   error?: string;
   status?: AssistantStatus;
+  /** When `status` last changed (Date.now()) — lets a percentage/elapsed-time readout derive its
+   *  value from real wall-clock time instead of local component state, so switching away to another
+   *  chat and back doesn't visually restart it (the live-stream module survives the remount; a
+   *  useState counter inside the component doesn't). */
+  statusSince?: number;
   usedThink?: boolean;
   usedSearch?: boolean;
   usedCanvas?: boolean;

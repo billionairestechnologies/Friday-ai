@@ -184,26 +184,33 @@ export function useElapsedSeconds(active: boolean): number {
  * from the image API (it's one blocking call that either returns a finished image or fails), so
  * this fakes a decelerating climb the same way most "AI is generating..." UIs do (Gemini's own
  * included): fast at first, slowing as it approaches the ceiling, and never actually reaching
- * 100 until the real result arrives and the caller stops rendering this state. Resets to 0 each
- * time `active` goes from false to true.
+ * 100 until the real result arrives and the caller stops rendering this state.
+ *
+ * Derived purely from real elapsed time since `since` (live-stream.ts's `statusSince`, which lives
+ * in a module-level Map, not component state) rather than accumulated in a local counter. Confirmed
+ * live: the old version used `useState` + `setInterval` seeded at 0 on mount, so switching to
+ * another chat while an image was generating and back unmounted/remounted this component and the
+ * percentage visibly restarted from 0% — even though the actual generation (tracked server-side and
+ * in live-stream.ts) never restarted. Being a pure function of wall-clock time fixes that: whatever
+ * `since` the remounted component reads, the percentage picks up from the correct, continuous value.
  */
-export function useSimulatedProgress(active: boolean, ceiling = 92): number {
-  const [pct, setPct] = useState(0);
+function pctForElapsed(elapsedMs: number, ceiling: number): number {
+  if (elapsedMs <= 0) return 0;
+  // Closed form of the old recurrence pct += (ceiling - pct) * 0.08 every 220ms.
+  const steps = elapsedMs / 220;
+  return Math.round(ceiling * (1 - Math.pow(0.92, steps)));
+}
+
+export function useSimulatedProgress(active: boolean, since?: number, ceiling = 92): number {
+  const [, forceTick] = useState(0);
+  const start = since ?? Date.now();
 
   useEffect(() => {
     if (!active) return;
-    setPct(0);
-    const id = window.setInterval(() => {
-      setPct((prev) => {
-        if (prev >= ceiling) return prev;
-        const remaining = ceiling - prev;
-        // Decelerating step: big jumps early, tiny creeps near the ceiling.
-        const step = Math.max(0.5, remaining * 0.08);
-        return Math.min(ceiling, prev + step);
-      });
-    }, 220);
+    const id = window.setInterval(() => forceTick((n) => n + 1), 220);
     return () => window.clearInterval(id);
-  }, [active, ceiling]);
+  }, [active]);
 
-  return Math.round(pct);
+  if (!active) return 0;
+  return Math.min(ceiling, pctForElapsed(Date.now() - start, ceiling));
 }
