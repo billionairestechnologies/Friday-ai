@@ -7,7 +7,7 @@ import { useBuildSessions } from "@/lib/build-mode/sessions";
 import { LiveChainOfThought } from "@/components/chain-of-thought-live";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { saveFile } from "@/lib/chat/download";
+import { saveFile, saveRemoteImage, soleImageIn } from "@/lib/chat/download";
 import { StreamingMarkdown } from "@/lib/chat/markdown";
 import { overlayLive, useLiveStream } from "@/lib/chat/live-stream";
 import { shouldShowPlan, toolOnlySteps } from "@/lib/chat/planning";
@@ -319,7 +319,12 @@ function MessageActions({ text }: { text: string }) {
         aria-label="Download response"
         className="flex size-8 items-center justify-center rounded-md text-subtle opacity-0 transition-[opacity,background-color,color] duration-150 group-hover/msg:opacity-100 hover:bg-chip hover:text-foreground"
         onClick={async () => {
-          const ok = await saveFile("friday-reply.md", text, "text/markdown;charset=utf-8");
+          // A reply that's only a generated image (the common case for image-tool output) should
+          // save as the actual picture, not the raw `![]()` markdown as a .md file.
+          const sole = soleImageIn(text);
+          const ok = sole
+            ? await saveRemoteImage(sole.url, sole.alt)
+            : await saveFile("friday-reply.md", text, "text/markdown;charset=utf-8");
           if (ok) {
             setSaved(true);
             window.setTimeout(() => setSaved(false), 1200);

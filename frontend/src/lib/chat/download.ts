@@ -112,3 +112,32 @@ export async function saveFile(
     return false;
   }
 }
+
+export function imageFilename(alt?: string) {
+  const base = sanitizeFilename(alt?.trim() || "friday-image");
+  return /\.(png|jpe?g|webp|gif)$/i.test(base) ? base : `${base}.png`;
+}
+
+// A markdown/attachment image's `src` is a remote (http/https) URL, not a data: URL — saveFile's
+// generic string branch would write the literal URL text to disk, not the picture. Fetch it into
+// real bytes first. This is the fix for "downloading a generated image saves a .md file": the only
+// download control used to save the raw markdown/text content regardless of whether it was an image.
+export async function saveRemoteImage(src: string, alt?: string): Promise<boolean> {
+  const filename = imageFilename(alt);
+  try {
+    const blob = await (await fetch(src)).blob();
+    return await saveFile(filename, blob, blob.type || "image/png");
+  } catch {
+    window.open(src, "_blank", "noopener");
+    return false;
+  }
+}
+
+// Matches a reply that is *only* a generated image (optionally with surrounding whitespace) —
+// e.g. the `![prompt](https://...)` markdown the image tool writes as the whole message content.
+const SOLE_IMAGE_RE = /^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/;
+
+export function soleImageIn(text: string): { alt: string; url: string } | null {
+  const m = SOLE_IMAGE_RE.exec(text.trim());
+  return m ? { alt: m[1], url: m[2] } : null;
+}

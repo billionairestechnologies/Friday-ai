@@ -67,7 +67,7 @@ import { getOwnedConversation, insertAssistantMessage, insertUserMessage } from 
 import { resolveAttachmentDataUrl } from "../attachmentStorage.js";
 import type { BuildEffort, BuildPlan, BuildStep, ConversationMode, StreamEvent } from "./types.js";
 import { planSatisfiesTier } from "../quota/tierConfig.js";
-import { consumeDailyAllowance, entitlementsFor } from "../quota/entitlements.js";
+import { consumeDailyAllowance, entitlementsFor, refundDailyAllowance } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
 import { activeSkillPrompt, getSkill, listSkills, skillMenu, type Skill } from "../skills/skillService.js";
 import type { GeneratedFile } from "../documents/documentService.js";
@@ -443,7 +443,27 @@ export async function streamMessage(
         correctionSourceUrl = correction.imageUrl;
       }
     }
+    // "Edit" wording with no attachment on THIS message ("make the image darker") means the target
+    // is the last image Friday generated earlier in the chat, not the one (if any) already resolved
+    // above. Falls through to the normal tool-loop path (which has its own, equally correct
+    // lastImageUrl lookup via the generate_image tool) when there's no earlier image to edit, rather
+    // than misreporting a hard image-service failure for what's really "nothing to edit yet".
+    if (imageIntent?.kind === "edit" && !currentImageAttachment && !correctionSourceUrl) {
+      correctionSourceUrl = lastGeneratedImageUrl(historyWithImages);
+      if (!correctionSourceUrl) imageIntent = null;
+    }
     if (imageIntent) {
+      const imageAllowance = await consumeDailyAllowance(userId, "image_generation", (await entitlementsPromise).imagesPerDay);
+      if (!imageAllowance.ok) {
+        onEvent({
+          t: "err",
+          c: imageAllowance.limit > 0
+            ? `You've used today's ${imageAllowance.limit} generated images — they reset at midnight UTC, or upgrade for more.`
+            : "Image generation isn't included in your plan. Upgrade to create images.",
+        });
+        onEvent({ t: "done" });
+        return;
+      }
       onEvent({ t: "status", s: "generating_image" });
       const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment, correctionSourceUrl);
       if (generated) {
@@ -460,6 +480,7 @@ export async function streamMessage(
         onEvent({ t: "done" });
         return;
       }
+      await refundDailyAllowance(userId, "image_generation").catch(() => {});
       // Was confidently detected as an image request (explicit generate/edit wording, or a
       // correction right after a real generated image — see imageIntent.ts) — a failure here
       // should say so plainly, not silently fall through and answer the raw text as an ordinary
@@ -878,7 +899,11 @@ export async function streamMessage(
       // wants a picture (see agent/tools/image.ts) — so it never answers with drawing code instead.
       const tools = [
         ...(await (toolsetPromise ?? buildToolset(userId))),
-        imageTool({ lastImageUrl: lastGeneratedImageUrl(historyWithImages), attachedImage: currentImageAttachment?.dataUrl ?? null }),
+        imageTool({
+          lastImageUrl: lastGeneratedImageUrl(historyWithImages),
+          attachedImage: currentImageAttachment?.dataUrl ?? null,
+          imagesPerDay: (await entitlementsPromise).imagesPerDay,
+        }),
       ];
       if (projectId && projectFiles.length) tools.push(projectSearchTool(projectId, projectFiles));
       // Deep Research fans out: parallel research helpers (agent/tools/research.ts).

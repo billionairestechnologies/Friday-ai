@@ -27,7 +27,14 @@ export function detectImageIntent(message: string, hasImageAttachment: boolean):
   const text = message.trim();
   if (!text) return null;
 
-  if (hasImageAttachment && (EDIT_VERB.test(text) || EDIT_PHRASE.test(text))) {
+  // EDIT_PHRASE explicitly names "this/that/the image" as the thing being changed, so it's
+  // unambiguous even with no fresh attachment on this message ("make the image darker" after an
+  // earlier generated image) — the caller resolves which image from conversation history. Confirmed
+  // live: without this, that wording fell through to GENERATE_VERB_NEAR_NOUN below (it also matches
+  // a generate verb near "image") and produced a brand-new, unrelated image instead of an edit.
+  // EDIT_VERB alone ("recolor it", "retouch") has no image noun, so it stays gated on an actual
+  // attachment to avoid false positives on ordinary text ("transform this paragraph").
+  if (EDIT_PHRASE.test(text) || (hasImageAttachment && EDIT_VERB.test(text))) {
     return { kind: "edit", prompt: text };
   }
 
@@ -41,10 +48,13 @@ export function detectImageIntent(message: string, hasImageAttachment: boolean):
   return null;
 }
 
-// Exactly matches the caption index.ts prepends to a real generated/edited image's reply — used
-// to recognize "the last assistant turn was a real generated image" without needing a separate DB
-// column, by reading the same conversation history already fetched for the prompt.
-const GENERATED_IMAGE_REPLY = /^(Here you go:|Here's the edited image:)/;
+// Recognizes "the last assistant turn was a real generated image" without needing a separate DB
+// column, by reading the same conversation history already fetched for the prompt. Matches either
+// the caption index.ts prepends on the regex-shortcut path, OR a bare `![...]()` markdown image
+// anywhere in the reply — the generate_image TOOL path (agent/tools/image.ts, used in the normal
+// tool-loop turn) writes the image with no caption at all, so requiring the caption missed every
+// tool-generated image and silently dropped short corrections ("no, make it blue") that followed one.
+const GENERATED_IMAGE_REPLY = /^(Here you go:|Here's the edited image:)|!\[[^\]]*\]\(https?:\/\/[^)\s]+\)/;
 
 /**
  * Confirmed live in production (2026-09-23): a user got a wrong generated image back (asked for

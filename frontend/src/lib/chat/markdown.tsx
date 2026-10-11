@@ -1,10 +1,11 @@
-import { memo, useRef, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { Check, Copy, Download } from "lucide-react";
-import { filenameForLang, saveFile } from "@/lib/chat/download";
+import { Check, Copy, Download, X } from "lucide-react";
+import { filenameForLang, saveFile, saveRemoteImage } from "@/lib/chat/download";
 import { cn } from "@/lib/utils";
 import { MermaidBlock } from "@/components/mermaid-block";
 
@@ -81,28 +82,106 @@ function CodeBlock({ lang, text, children }: { lang?: string; text: string; chil
   );
 }
 
+/** Full-size view: click any generated/attached image to open it over a blurred backdrop, with its
+ *  own download button (fetches real image bytes, unlike the message-level "Download response"
+ *  action) and Escape/backdrop-click to close. */
+function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.img
+          src={src}
+          alt={alt ?? ""}
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="max-h-[90vh] max-w-[92vw] cursor-default rounded-2xl object-contain shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+          onClick={(e) => e.stopPropagation()}
+        />
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Download image"
+            onClick={(e) => {
+              e.stopPropagation();
+              void saveRemoteImage(src, alt);
+            }}
+            className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-colors hover:bg-white/20"
+          >
+            <Download className="size-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-colors hover:bg-white/20"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
 /** Fades a markdown image in once it's actually loaded instead of popping in abruptly the
  *  instant `src` resolves — same fade timing as the streamed-text chunks above, for a generated
  *  image (the one place a markdown `![]()` reliably appears in this app today) landing right
  *  after the "Creating your image" indicator disappears. A subtle pulse placeholder fills the
- *  gap while the browser fetches it. */
+ *  gap while the browser fetches it. Click opens a full-size lightbox; hover reveals a download
+ *  button that saves the actual image bytes. */
 function FadeInImage({ src, alt }: { src?: string; alt?: string }) {
   const [loaded, setLoaded] = useState(false);
+  const [open, setOpen] = useState(false);
+  if (!src) return null;
   return (
-    <span className="relative my-2 block w-fit max-w-full overflow-hidden rounded-2xl">
-      {!loaded && (
-        <span className="absolute inset-0 block animate-pulse rounded-2xl bg-white/5" aria-hidden />
-      )}
-      <motion.img
-        src={src}
-        alt={alt ?? ""}
-        onLoad={() => setLoaded(true)}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: loaded ? 1 : 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="block h-auto max-h-[420px] w-auto max-w-[min(100%,420px)] rounded-2xl object-contain"
-      />
-    </span>
+    <>
+      <span className="group relative my-2 block w-fit max-w-full overflow-hidden rounded-2xl">
+        {!loaded && (
+          <span className="absolute inset-0 block animate-pulse rounded-2xl bg-white/5" aria-hidden />
+        )}
+        <motion.img
+          src={src}
+          alt={alt ?? ""}
+          onLoad={() => setLoaded(true)}
+          onClick={() => setOpen(true)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: loaded ? 1 : 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="block h-auto max-h-[420px] w-auto max-w-[min(100%,420px)] cursor-zoom-in rounded-2xl object-contain"
+        />
+        {loaded && (
+          <button
+            type="button"
+            aria-label="Download image"
+            onClick={(e) => {
+              e.stopPropagation();
+              void saveRemoteImage(src, alt);
+            }}
+            className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/50 text-white opacity-0 backdrop-blur transition-opacity duration-150 group-hover:opacity-100"
+          >
+            <Download className="size-3.5" />
+          </button>
+        )}
+      </span>
+      {open && <ImageLightbox src={src} alt={alt} onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
