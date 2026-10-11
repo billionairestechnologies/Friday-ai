@@ -12,7 +12,29 @@ Production is ONE EC2 instance, not the ECS stack in `AWS_DEPLOY.md`.
 - Image: ECR `friday-build-app:<12-char commit>`, built in CodeBuild project `friday-build-image`
   (stack `friday-build`). The EC2 role can pull from ECR but cannot read the source S3 bucket.
 
-## Deploy a new version
+## Auto-deploy (default path)
+
+Every push to `main` that passes CI (`.github/workflows/ci.yml`, job `deploy`) builds the image in
+CodeBuild and swaps the `friday` container on this instance automatically via SSM — no manual steps
+below are needed for an ordinary code change. It auto-rolls back to the previous container (renamed
+`friday-old` during the swap) if the post-swap health check (`$HEALTH_URL`) doesn't come back healthy
+within ~60s, same as the manual rollback in step 5 below.
+
+GitHub Actions authenticates via OIDC to IAM role `friday-github-actions-deploy` (trust restricted to
+`repo:billionairestechnologies/Friday-ai:ref:refs/heads/main`; no long-lived AWS keys stored in GitHub),
+with an inline policy scoped to exactly: `codebuild:StartBuild`/`BatchGetBuilds` on `friday-build-image`,
+`s3:*` on the `friday-build-sourcebucket-*` bucket, `ssm:SendCommand`/`GetCommandInvocation` scoped to
+instance `i-0414cc992c753285f`, and `cloudformation:DescribeStacks`. The role ARN lives in the repo
+secret `AWS_DEPLOY_ROLE_ARN`.
+
+**Database migrations are never auto-applied** — the workflow only posts a `::warning::` if a push
+touches `supabase/migrations/`. Apply new migrations by hand (step 3 below) before or after the
+auto-deploy lands, same care as always (back up first).
+
+To redo a deploy manually (debugging the pipeline, or a migration needs to go first), the steps below
+are exactly what the `deploy` job automates.
+
+## Deploy a new version (manual — what the auto-deploy job does under the hood)
 
 1. Merge to `main`, run `npm run verify`.
 2. Build the image (from the repo root, AWS profile with access):

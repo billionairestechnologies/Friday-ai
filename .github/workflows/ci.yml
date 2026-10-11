@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -44,3 +48,130 @@ jobs:
 
       - name: Build backend
         run: npm --prefix backend run build
+
+  # Auto-deploy to the live EC2 box on every push to main, after verify passes. There is no ECS/
+  # Fargate stack in production (see docs/operations/EC2_DEPLOY.md) — this does the same four manual
+  # steps that doc describes (build image in CodeBuild, swap the `friday` container on the instance
+  # via SSM, reusing its existing env vars) but on every push instead of by hand. The swap script
+  # itself auto-rolls back to the previous container if the post-swap health check fails, so a bad
+  # deploy self-heals without a human watching. Database migrations are NEVER auto-applied here
+  # (0057-style unit conversions etc. need a backup + a human looking at the SQL first) — this job
+  # only warns if a push touched supabase/migrations so nobody forgets to apply it by hand.
+  deploy:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_REGION: ap-south-1
+      INSTANCE_ID: i-0414cc992c753285f
+      PROJECT: friday-build-image
+      ECR_REPO: 095713295449.dkr.ecr.ap-south-1.amazonaws.com/friday-build-app
+      RELEASES_URL: https://friday-x-releases-095713295449.s3.ap-south-1.amazonaws.com
+      HEALTH_URL: https://friday.billionairestechnologies.com/api/health
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Warn if this push touched a migration (apply it by hand, see EC2_DEPLOY.md)
+        run: |
+          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            CHANGED=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations || true)
+            if [ -n "$CHANGED" ]; then
+              echo "::warning::This push includes migration file(s) — apply them on the server by hand (docs/operations/EC2_DEPLOY.md step 3), they are NOT auto-applied:"
+              echo "$CHANGED"
+            fi
+          fi
+
+      - name: Upload source and start the CodeBuild image build
+        id: build
+        run: |
+          set -euo pipefail
+          TAG=$(git rev-parse --short=12 HEAD)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          BUCKET=$(aws cloudformation describe-stacks --stack-name friday-build \
+            --query "Stacks[0].Outputs[?OutputKey=='SourceBucket'].OutputValue" --output text)
+          git archive --format=zip -o source.zip HEAD
+          aws s3 cp source.zip "s3://$BUCKET/source.zip"
+          BUILD_ID=$(aws codebuild start-build --project-name "$PROJECT" \
+            --environment-variables-override "name=IMAGE_TAG,value=$TAG,type=PLAINTEXT" \
+            --query "build.id" --output text)
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the image build to finish
+        run: |
+          set -euo pipefail
+          BUILD_ID="${{ steps.build.outputs.build_id }}"
+          for i in $(seq 1 60); do
+            STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" --query "builds[0].buildStatus" --output text)
+            echo "build status: $STATUS"
+            [ "$STATUS" = "IN_PROGRESS" ] || break
+            sleep 15
+          done
+          if [ "$STATUS" != "SUCCEEDED" ]; then
+            echo "::error::CodeBuild did not succeed (status: $STATUS) — not deploying."
+            exit 1
+          fi
+
+      - name: Swap the production container over SSM (auto-rolls back on failed health check)
+        id: swap
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.build.outputs.tag }}"
+          SCRIPT=$(cat <<SCRIPT_EOF
+          set -e
+          IMG="$ECR_REPO:$TAG"
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${ECR_REPO%%/*}
+          docker pull "\$IMG"
+          g(){ docker inspect friday | jq -r --arg k "\$1" '.[0].Config.Env[]|select(startswith(\$k+"="))|sub("^[^=]*=";"")'; }
+          PORT_V="\$(g PORT)"; TRUST_V="\$(g TRUST_PROXY)"; REDIS_V="\$(g REDIS_URL)"; ENVJSON_V="\$(g FRIDAY_ENV_JSON)"
+          docker rm -f friday-old >/dev/null 2>&1 || true
+          docker stop friday
+          docker rename friday friday-old
+          docker run -d --name friday --network friday --restart always \
+            -e PORT="\$PORT_V" -e TRUST_PROXY="\$TRUST_V" -e REDIS_URL="\$REDIS_V" -e FRIDAY_ENV_JSON="\$ENVJSON_V" \
+            -e FRIDAY_X_RELEASES_URL="$RELEASES_URL" "\$IMG"
+          OK=0
+          for i in \$(seq 1 15); do
+            sleep 4
+            if curl -fsS --max-time 8 "$HEALTH_URL" >/tmp/health.out 2>/tmp/health.err; then OK=1; break; fi
+          done
+          if [ "\$OK" != "1" ]; then
+            echo "HEALTH CHECK FAILED after deploy, rolling back" >&2
+            cat /tmp/health.out /tmp/health.err 2>/dev/null >&2 || true
+            docker rm -f friday
+            docker rename friday-old friday
+            docker start friday
+            exit 1
+          fi
+          echo "DEPLOY OK: \$IMG is live and healthy"
+          docker rm -f friday-old
+          SCRIPT_EOF
+          )
+          PARAMS=$(jq -n --arg s "$SCRIPT" '{commands: [$s]}')
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Friday auto-deploy $TAG (from GitHub Actions)" \
+            --parameters "$PARAMS" \
+            --query "Command.CommandId" --output text)
+          echo "ssm command: $COMMAND_ID"
+          for i in $(seq 1 40); do
+            STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query "Status" --output text 2>/dev/null || echo "Pending")
+            [ "$STATUS" = "Pending" ] || [ "$STATUS" = "InProgress" ] || break
+            sleep 10
+          done
+          echo "swap status: $STATUS"
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query "{out:StandardOutputContent,err:StandardErrorContent}" --output text || true
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::Deploy swap failed or was rolled back on the server — check the output above."
+            exit 1
+          fi
