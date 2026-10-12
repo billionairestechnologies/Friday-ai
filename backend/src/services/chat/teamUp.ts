@@ -7,10 +7,11 @@ import { pickStrongest } from "../modelRouting.js";
 import type { WebSearchResult } from "../webSearch.js";
 import { callCandidate, pickDistinctProviders, teamUpProposerCount } from "./candidates.js";
 import { insertAssistantMessage } from "./conversations.js";
-import { searchResultsToSystemMessage } from "./promptContext.js";
+import { modelIdentitySystemMessage, searchResultsToSystemMessage } from "./promptContext.js";
 import type { StreamEvent } from "./types.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { estimateTokenUsageFromText, type TokenUsage } from "../tokenUsage.js";
+import { createStreamingLeakScrubber, scrubVendorLeak } from "../../utils/vendorLeak.js";
 
 /** What each model in a Team Up turn spent — recorded and charged against the quota by the caller. */
 export type TeamUpUsage = { candidate: ChatCandidate; usage: TokenUsage }[];
@@ -19,8 +20,10 @@ const SYNTHESIS_SYSTEM_PROMPT =
   "You are given the original request and several draft answers from different AI models. Write ONE final " +
   "answer that combines their strongest parts, resolves any disagreements between them, and corrects anything " +
   "wrong or weak in any draft. Answer as if you were asked directly — don't mention the drafts, the other " +
-  "models, or that this is a synthesis. Structure the final answer for readability: short paragraphs, a " +
-  "bulleted/numbered markdown list for multi-part answers, and markdown bold for section titles or key terms.";
+  "models, or that this is a synthesis, and never name or describe any vendor/lab/provider that produced a " +
+  "draft, even if a draft itself named one — scrub that out of the final answer. Structure the final answer " +
+  "for readability: short paragraphs, a bulleted/numbered markdown list for multi-part answers, and markdown " +
+  "bold for section titles or key terms.";
 
 /** Mixture-of-agents: merges Team Up's parallel drafts into a single best final answer. */
 function buildSynthesisMessages(
@@ -84,7 +87,8 @@ export async function streamTeamUp(
       agents.push(started);
       onEvent({ t: "agent", ...started });
       try {
-        const text = await callCandidate(candidate, history);
+        const proposerHistory = [...history, modelIdentitySystemMessage(candidate.displayName)];
+        const text = scrubVendorLeak(await callCandidate(candidate, proposerHistory));
         spent.push({ candidate, usage: estimateTokenUsageFromText(historyChars, text.length) });
         const done = { slug: candidate.slug, model: candidate.displayName, state: "done" as const };
         agents.push(done);
@@ -124,16 +128,17 @@ export async function streamTeamUp(
     onEvent({ t: "status", s: "synthesizing" });
     finalCandidate = pickStrongest(pool, requiresVision);
     const grounding = webSearch ? [searchResultsToSystemMessage(searchResults)] : [];
-    const synthMessages = buildSynthesisMessages(content, drafts, grounding, images);
+    const synthMessages = [...buildSynthesisMessages(content, drafts, grounding, images), modelIdentitySystemMessage(finalCandidate.displayName)];
     const adapter = getProviderAdapter(finalCandidate.slug);
     const apiKey = await getWorkingKeyForProvider(finalCandidate.slug);
     let synthUsage: TokenUsage | null = null;
+    const synthScrubber = createStreamingLeakScrubber((safe) => onEvent({ t: "text", c: safe }));
     if (adapter.chatStream) {
       full = await adapter.chatStream(
         apiKey,
         finalCandidate.modelId,
         synthMessages,
-        (delta) => onEvent({ t: "text", c: delta }),
+        (delta) => synthScrubber.push(delta),
         signal,
         (think) => {
           thinking += think;
@@ -143,10 +148,12 @@ export async function streamTeamUp(
           synthUsage = usage;
         },
       );
+      synthScrubber.flush();
     } else {
       full = await adapter.chat(apiKey, finalCandidate.modelId, synthMessages);
-      onEvent({ t: "text", c: full });
+      onEvent({ t: "text", c: scrubVendorLeak(full) });
     }
+    full = scrubVendorLeak(full);
     const synthChars = synthMessages.reduce((n, m) => n + m.content.length, 0);
     spent.push({ candidate: finalCandidate, usage: synthUsage ?? estimateTokenUsageFromText(synthChars, full.length + thinking.length) });
   }

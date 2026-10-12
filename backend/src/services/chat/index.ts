@@ -26,6 +26,7 @@ import { detectNeedsLiveSearch, shouldProbeForLiveSearch } from "./liveSearchInt
 import { detectImageIntent, findImageCorrection, isShortEnoughForCorrection, type ImageIntent } from "./imageIntent.js";
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { rehostGeneratedImage } from "../providers/imageHosting.js";
+import { createStreamingLeakScrubber, scrubVendorLeak } from "../../utils/vendorLeak.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDocs.js";
@@ -920,6 +921,10 @@ export async function streamMessage(
       // An explicitly chosen skill is already pinned — don't also offer the menu (it would compete).
       const menu = activeSkill ? "" : skillMenu(await skillsPromise);
       const guidance = toolUsePrompt(tools, menu) + (research ? `\n\n${DEEP_RESEARCH_PROMPT}` : "");
+      const toolLoopScrubber = createStreamingLeakScrubber((safe) => {
+        full += safe;
+        onEvent({ t: "text", c: safe });
+      });
       toolRun = await runToolLoop({
         candidates: candidates.filter(supportsTools),
         history: withToolPreamble(history, guidance),
@@ -953,13 +958,19 @@ export async function streamMessage(
             onEvent({ t: "cite", u: url, title });
           },
         },
-        onText: (delta) => {
-          if (!full) mark("first token");
-          full += delta;
-          onEvent({ t: "text", c: delta });
-        },
+        onText: (() => {
+          let markedFirstToken = false;
+          return (delta: string) => {
+            if (!markedFirstToken) {
+              markedFirstToken = true;
+              mark("first token");
+            }
+            toolLoopScrubber.push(delta);
+          };
+        })(),
         onStep: (step) => onEvent({ t: "step", ...step }),
       });
+      toolLoopScrubber.flush();
       if (!toolRun.candidate) {
         if (toolRun.error) console.warn(`[chat] tool path unavailable, falling back: ${toolRun.error}`);
         toolRun = null;
@@ -985,21 +996,26 @@ export async function streamMessage(
 
     // Failover + hedging (see hedgedStream.ts): a slow first candidate is raced against the next one.
     const HEDGE_MS = Number(process.env.FRIDAY_HEDGE_MS ?? 2200);
+    const hedgeScrubber = createStreamingLeakScrubber((safe) => onEvent({ t: "text", c: safe }));
+    let markedFirstToken = false;
     const streamed = toolRun ? null : await streamWithHedging({
       candidates,
       history,
       signal,
       hedgeAfterMs: mode === "single" ? 0 : HEDGE_MS,
       onText: (delta) => {
-        if (!full) mark("first token");
-        full += delta;
-        onEvent({ t: "text", c: delta });
+        if (!markedFirstToken) {
+          markedFirstToken = true;
+          mark("first token");
+        }
+        hedgeScrubber.push(delta);
       },
       onThink: (delta) => {
         thinking += delta;
         onEvent({ t: "think", c: delta });
       },
     });
+    hedgeScrubber.flush();
     if (streamed?.candidate) {
       usedCandidate = streamed.candidate;
       full = streamed.text || full;
@@ -1011,6 +1027,13 @@ export async function streamMessage(
       if (streamed.hedged) console.log(`[chat] hedged: ${streamed.candidate.slug}/${streamed.candidate.modelId} answered first`);
     }
     if (streamed) lastError = streamed.lastError;
+
+    // Final safety net: toolRun.text/streamed.text are each the PROVIDER's own raw accumulated
+    // string (not the already-scrubbed `full` built up via the live onText callbacks above), and
+    // both branches overwrite `full` with that raw value — so this is the one point guaranteed to
+    // run after whichever branch produced the final text, before it's persisted/replayed into
+    // future history. See utils/vendorLeak.ts.
+    full = scrubVendorLeak(full);
 
     // Real-traffic model uptime for /status: did the model that handled this turn actually answer?
     const outcomeModel = usedCandidate ?? candidates[0];
