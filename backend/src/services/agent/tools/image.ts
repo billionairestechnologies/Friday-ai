@@ -1,5 +1,6 @@
 import { getWorkingKeyForProvider } from "../../providerService.js";
 import { editImage, generateImage } from "../../providers/scalemaxImages.js";
+import { rehostGeneratedImage } from "../../providers/imageHosting.js";
 import { recordUsageEvent } from "../../usageService.js";
 import { consumeDailyAllowance, refundDailyAllowance } from "../../quota/entitlements.js";
 import { str, type FridayTool } from "./types.js";
@@ -87,6 +88,7 @@ export function imageTool(opts: { lastImageUrl: string | null; attachedImage: st
         await refundDailyAllowance(ctx.userId, "image_generation").catch(() => {});
         throw err;
       }
+      url = await rehostGeneratedImage(ctx.userId, url);
       ctx.onImage?.(url, prompt.slice(0, 120));
       void recordUsageEvent(ctx.userId, "image_generation", 1, { kind: edit ? "edit" : "generate", viaTools: true });
       return "Done — the image is now shown to the user above your reply. Don't repeat its link or write image markdown; add at most one short sentence.";

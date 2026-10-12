@@ -25,6 +25,7 @@ import {
 import { detectNeedsLiveSearch, shouldProbeForLiveSearch } from "./liveSearchIntent.js";
 import { detectImageIntent, findImageCorrection, isShortEnoughForCorrection, type ImageIntent } from "./imageIntent.js";
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
+import { rehostGeneratedImage } from "../providers/imageHosting.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDocs.js";
@@ -155,6 +156,7 @@ async function extractDocumentText(attachments: ChatImage[]): Promise<string | n
  * caller can fall through to the normal chat path instead of hard-failing the turn.
  */
 async function tryGenerateOrEditImage(
+  userId: string,
   intent: ImageIntent,
   sourceAttachment?: ChatImage,
   correctionSourceUrl?: string | null,
@@ -162,12 +164,15 @@ async function tryGenerateOrEditImage(
   if (!intent) return null;
   try {
     const apiKey = await getWorkingKeyForProvider("scalemax");
+    let url: string;
     if (intent.kind === "edit") {
-      if (sourceAttachment) return await editImage(apiKey, intent.prompt, { dataUrl: sourceAttachment.dataUrl });
-      if (correctionSourceUrl) return await editImage(apiKey, intent.prompt, { url: correctionSourceUrl });
-      return null;
+      if (sourceAttachment) url = await editImage(apiKey, intent.prompt, { dataUrl: sourceAttachment.dataUrl });
+      else if (correctionSourceUrl) url = await editImage(apiKey, intent.prompt, { url: correctionSourceUrl });
+      else return null;
+    } else {
+      url = await generateImage(apiKey, intent.prompt);
     }
-    return await generateImage(apiKey, intent.prompt);
+    return await rehostGeneratedImage(userId, url);
   } catch (err) {
     console.error("[chat] image generation failed:", err instanceof Error ? err.message : err);
     void recordProviderIssue({ raw: err instanceof Error ? err.message : String(err), provider: "scalemax" });
@@ -465,7 +470,7 @@ export async function streamMessage(
         return;
       }
       onEvent({ t: "status", s: "generating_image" });
-      const generated = await tryGenerateOrEditImage(imageIntent, currentImageAttachment, correctionSourceUrl);
+      const generated = await tryGenerateOrEditImage(userId, imageIntent, currentImageAttachment, correctionSourceUrl);
       if (generated) {
         const caption = imageIntent.kind === "edit" ? "Here's the edited image:" : "Here you go:";
         const markdown = `${caption}\n\n![${content.slice(0, 120)}](${generated})`;
