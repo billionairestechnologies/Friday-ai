@@ -187,7 +187,7 @@ export class BuildSandbox {
 
   /** The public preview URL for a port this sandbox is serving on. */
   previewUrl(port: number): string {
-    return `https://${this.sandbox.getHost(port)}`;
+    return `https://${this.sandbox.getHost(this.publicPort(port))}`;
   }
 
   /** Destroys the sandbox for good (kill, not pause) and forgets it — the files stay in our database. */
@@ -252,6 +252,12 @@ export class BuildSandbox {
   async write(path: string, content: string) {
     this.touch();
     await this.withReconnect(() => this.sandbox.files.write(`${PROJECT_DIR}/${path}`, content));
+    // The agent's own file content never reflects the allowedHosts patch below (it's injected
+    // server-side, invisible to the model). An unrelated edit to the SAME vite config file — made
+    // from the model's stale, unpatched copy — silently wipes that patch back out, so the dev
+    // server starts refusing the public *.e2b.app host again on its next self-restart even though
+    // nothing about "running the server" happened this turn. Re-apply immediately after every write.
+    if (/^vite\.config\.(ts|js|mjs|mts)$/.test(path)) await this.allowPreviewHosts().catch(() => {});
   }
 
   async read(path: string): Promise<string> {
@@ -337,6 +343,73 @@ export class BuildSandbox {
     }
   }
 
+  /**
+   * The port the SANDBOX's public hostname actually points at for a given dev-server port — a tiny
+   * host-rewriting proxy (`ensureHostProxy`), never the dev server itself. This is the permanent fix
+   * for Vite/webpack-dev-server/etc "Blocked request" pages: instead of depending on the project's own
+   * config (which a model edit can silently wipe — see `write()`) or on each framework's own
+   * allowlist feature (which not all of them even have), nothing public-facing ever reaches the dev
+   * server with any Host header other than `localhost:<port>`, the one every dev server always trusts.
+   */
+  publicPort(port: number): number {
+    return port + 20000;
+  }
+
+  /**
+   * (Re)starts the host-rewriting proxy for `port`: listens on `publicPort(port)`, forwards every
+   * request (and WebSocket upgrade, for HMR) to `127.0.0.1:<port>` with the Host header rewritten to
+   * `localhost:<port>`. Pure Node core modules — no package to install, nothing that can go missing.
+   */
+  async ensureHostProxy(port: number): Promise<void> {
+    const pub = this.publicPort(port);
+    const file = `/tmp/friday-hostproxy-${pub}.mjs`;
+    const logFile = `/tmp/friday-hostproxy-${pub}.log`;
+    const pidFile = `/tmp/friday-hostproxy-${pub}.pid`;
+    const script = `
+import http from "node:http";
+import net from "node:net";
+const TARGET_PORT = ${port};
+const PUBLIC_PORT = ${pub};
+const hostHeader = "localhost:" + TARGET_PORT;
+const server = http.createServer((req, res) => {
+  const headers = { ...req.headers, host: hostHeader };
+  const proxyReq = http.request({ host: "127.0.0.1", port: TARGET_PORT, path: req.url, method: req.method, headers }, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+  proxyReq.on("error", () => { if (!res.headersSent) res.writeHead(502); res.end("proxy error"); });
+  req.pipe(proxyReq);
+});
+server.on("upgrade", (req, clientSocket, head) => {
+  const serverSocket = net.connect(TARGET_PORT, "127.0.0.1", () => {
+    const headerLines = Object.entries(req.headers).map(([k, v]) => (k.toLowerCase() === "host" ? "host: " + hostHeader : k + ": " + v));
+    serverSocket.write(req.method + " " + req.url + " HTTP/1.1\\r\\n" + headerLines.join("\\r\\n") + "\\r\\n\\r\\n");
+    if (head && head.length) serverSocket.write(head);
+    serverSocket.pipe(clientSocket);
+    clientSocket.pipe(serverSocket);
+  });
+  serverSocket.on("error", () => clientSocket.destroy());
+  clientSocket.on("error", () => serverSocket.destroy());
+});
+server.listen(PUBLIC_PORT, "0.0.0.0");
+`;
+    await this.sandbox.commands
+      .run(`test -f ${pidFile} && kill -TERM -$(cat ${pidFile}) 2>/dev/null; sleep 0.2; fuser -k ${pub}/tcp >/dev/null 2>&1; true`)
+      .catch(() => {});
+    await this.sandbox.files.write(file, script);
+    const launch = `echo $$ > ${pidFile}; exec node ${file} > ${logFile} 2>&1`;
+    await this.sandbox.commands.run(`setsid bash -c ${JSON.stringify(launch)}`, { background: true });
+  }
+
+  /** True once the proxy on `publicPort(port)` answers (i.e. the public preview URL will actually work). */
+  async proxyUp(port: number): Promise<boolean> {
+    const probe = await this.sandbox.commands
+      .run(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${this.publicPort(port)}/ || true`, { timeoutMs: 8000 })
+      .catch(() => null);
+    const code = Number(probe?.stdout.trim() ?? 0);
+    return code >= 200 && code < 500;
+  }
+
   /** Starts a long-running server in the background and waits until it answers on `port`. */
   async start(cmd: string, port: number): Promise<{ ready: boolean; url: string | null; log: string }> {
     this.touch();
@@ -366,12 +439,24 @@ export class BuildSandbox {
         .catch(() => null);
       const code = Number(probe?.stdout.trim() ?? 0);
       if (code >= 200 && code < 500) {
-        // Serving on localhost is not the same as serving the preview URL — make sure the public host is accepted.
+        // The dev server itself answers — now put the host-rewriting proxy in front of it, so the
+        // PUBLIC url is immune to "Blocked request" no matter what the project's own config says.
+        await this.ensureHostProxy(port).catch(() => {});
+        let proxyOk = false;
+        for (let i = 0; i < 6 && !proxyOk; i++) {
+          await new Promise((r) => setTimeout(r, 800));
+          proxyOk = await this.proxyUp(port);
+        }
+        const log = await this.logTail(logFile);
+        if (proxyOk) {
+          return { ready: true, url: `https://${this.sandbox.getHost(this.publicPort(port))}`, log };
+        }
+        // Proxy failed to come up (shouldn't happen — pure Node core modules) — fall back to the old
+        // direct-to-dev-server path and the vite.config patch as a second line of defense.
         if (await this.hostBlocked(port)) {
           await this.allowPreviewHosts().catch(() => {});
           await new Promise((r) => setTimeout(r, 3500)); // Vite restarts itself when its config changes
         }
-        const log = await this.logTail(logFile);
         const stillBlocked = await this.hostBlocked(port);
         return {
           ready: true,
@@ -453,7 +538,7 @@ page.on("pageerror", (e) => errors.push("uncaught: " + String(e.message).slice(0
 page.on("requestfailed", (r) => { if (!/fonts\\.g|google/.test(r.url())) errors.push("request failed: " + r.url().slice(0, 150)); });
 // The PUBLIC preview address — exactly what the user's preview pane loads. localhost is always allowed by the
 // dev server, so checking it hid "Blocked request" pages and proxy problems from the agent.
-let target = "https://${this.sandbox.getHost(port)}/";
+let target = "https://${this.sandbox.getHost(this.publicPort(port))}/";
 try { await page.goto(target, { waitUntil: "networkidle", timeout: 30000 }); }
 catch (e) {
   errors.push("public preview URL failed (" + e.message.slice(0, 120) + ") — fell back to localhost");
@@ -532,8 +617,11 @@ export async function ensurePreview(userId: string, conversationId: string): Pro
   box.useEnv(await loadSecrets(conversationId));
   const { port, start_cmd: startCmd } = project;
 
-  if (!box.fresh && (await box.isServing(port)) && !(await box.hostBlocked(port))) {
-    return { url: box.previewUrl(port), port };
+  if (!box.fresh && (await box.isServing(port))) {
+    // The dev server survived (resumed sandbox) but the host-rewriting proxy is a separate process —
+    // make sure IT is still up too before handing back a URL that routes through it.
+    if (!(await box.proxyUp(port))) await box.ensureHostProxy(port).catch(() => {});
+    if (await box.proxyUp(port)) return { url: box.previewUrl(port), port };
   }
 
   if (project.files["package.json"] || (await box.run("test -f package.json && echo y").then((r) => r.output.includes("y")))) {

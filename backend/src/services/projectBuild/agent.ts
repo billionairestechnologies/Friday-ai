@@ -106,6 +106,7 @@ RULES
 - Make the result genuinely polished: modern responsive UI, real content (no lorem ipsum / placeholder TODOs), sensible structure. Exception: contact details (email, phone, address, social links) the user never actually gave you — invent an obviously-fake placeholder for those specifically (hello@yourdomain.com, +1 (555) 000-0000) rather than a realistic-looking one, so nobody mistakes it for real and ships it; mention in <friday-done> that these are placeholders to swap in.
 - When the project runs correctly, finish with exactly one <friday-done>…</friday-done>. Never claim it works if you did not see it run.
 - NEVER tell the user to run commands themselves ("run npm install", "then npm start"). You run them, with <friday-run>/<friday-start>, and you only say it works after you saw it work.
+- NEVER tell the user it's running at "http://localhost:<port>" — that address is inside the sandbox, not reachable from their browser. The user's live preview panel already shows the real public URL the moment <friday-start> succeeds (it's in that result); if you mention a link at all, use that exact URL, not localhost.
 - If the user asks to change/fix/extend an existing project, edit the existing files (read them first if needed) instead of starting over. Prefer <friday-edit> for small or medium changes to an existing file; use <friday-write> for new files or full rewrites. In an unfamiliar codebase, look around first with <friday-ls> and <friday-grep>.
 - Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below — it describes that repo's conventions, commands and tests. Run the project's tests/linters when they exist before finishing.
 - FRIDAY.md in EVERY project: write it with your first files on a new project, and update it before <friday-done> whenever the project changed. ${FRIDAY_MD_SPEC}`;
@@ -130,6 +131,7 @@ RULES
 - Web apps: prefer Vite with a "dev" script "vite --host 0.0.0.0 --port 5173". Bind servers to 0.0.0.0. Backend/API projects (Express, Flask, FastAPI, …) are fine — start them on a port and verify with curl.
 - Make it genuinely polished: modern responsive UI, real content (no lorem ipsum / TODO placeholders). Exception: contact details the user never gave you — use obviously fake placeholders (hello@yourdomain.com, +1 (555) 000-0000) and say so in the summary.
 - NEVER tell the user to run commands themselves — you run them, and you only say it works after you saw it work.
+- NEVER tell the user it's running at "http://localhost:<port>" — that address is inside the sandbox, not reachable from their browser. The user's live preview panel already shows the real public URL the moment start_server succeeds (it's in that tool's result); if you mention a link at all, use that exact URL, not localhost.
 - Existing projects: edit what's there instead of starting over. Follow any project instruction file (AGENTS.md / FRIDAY.md / CLAUDE.md) shown below and run its tests/linters before finishing.
 - FRIDAY.md in EVERY project: write it with your first batch of files on a new project, and update it before you finish whenever the project changed. ${FRIDAY_MD_SPEC}
 - Between tool calls write at most one short plain sentence about what you're doing. Save the explanation for the finish summary.
@@ -787,7 +789,10 @@ export async function runBuildAgent(opts: {
           appBroken = false;
           step.output = tailText(res.log, SAVED_OUTPUT_CHARS);
           finish("ok", res.log);
-          return `[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}; all pages/scripts/styles load without errors\n${tail(res.log, 1500)}`;
+          // The model only ever sees `port` elsewhere in this conversation (it's the number IT chose
+          // for the start command) — without the real URL here it was guessing "http://localhost:<port>"
+          // in its reply to the user, a link that only resolves inside the sandbox, not their browser.
+          return `[start ${JSON.stringify(action.cmd)}] ready — serving on port ${action.port}; all pages/scripts/styles load without errors. The user's live preview panel is already showing it at ${res.url} — when you tell the user it's running, link to THAT url, never "localhost" (that address is inside the sandbox, not reachable from their browser).\n${tail(res.log, 1500)}`;
         }
         step.output = tailText(res.log, SAVED_OUTPUT_CHARS);
         finish("error", res.log || "The server did not respond in time");
