@@ -153,6 +153,12 @@ jobs:
           fi
           echo "DEPLOY OK: \$IMG is live and healthy"
           docker rm -f friday-old
+          # Every past deploy left its ~420MB image on disk forever (docker pull tags it, nothing ever
+          # untags it) — confirmed hitting 78% disk after ~40 builds piled up, then again after just 4
+          # more. Only touch this repo's own tags, never a blanket prune: the box also runs other
+          # projects (e.g. bt-site) whose images must not be swept up here.
+          docker images "$ECR_REPO" --format '{{.Repository}}:{{.Tag}}' | grep -v ":$TAG\$" | xargs -r docker rmi -f || true
+          docker builder prune -af >/dev/null 2>&1 || true
           SCRIPT_EOF
           )
           PARAMS=$(jq -n --arg s "$SCRIPT" '{commands: [$s]}')
