@@ -548,7 +548,7 @@ function PlansPane() {
               </select>
               <input
                 type="number"
-                placeholder="Custom cap"
+                placeholder="Tokens / month"
                 defaultValue={u.customMonthlyCap ?? ""}
                 onBlur={(e) => {
                   const value = e.target.value.trim();

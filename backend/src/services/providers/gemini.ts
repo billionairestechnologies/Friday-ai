@@ -1,4 +1,5 @@
 import { readSseStream } from "./sse-helpers.js";
+import { usageFromGemini } from "../tokenUsage.js";
 import type { ChatMessage, HealthCheckResult, ProviderAdapter, ProviderModel } from "./types.js";
 import { base64PayloadOf, safeErrorMessage } from "./types.js";
 import { streamGeminiToolTurn } from "./toolCalling.js";
@@ -118,21 +119,11 @@ export const geminiAdapter: ProviderAdapter = {
           /** Gemini's IMPLICIT caching (2.x models, automatic — no explicit cache resource needed)
            *  reports the cached portion here. */
           cachedContentTokenCount?: number;
+          /** Thinking tokens — billed as output but NOT included in candidatesTokenCount. */
+          thoughtsTokenCount?: number;
         };
       };
-      if (body.usageMetadata && onUsage) {
-        const cachedTokens = Number(body.usageMetadata.cachedContentTokenCount ?? 0);
-        onUsage({
-          promptTokens: Number(body.usageMetadata.promptTokenCount ?? 0),
-          completionTokens: Number(body.usageMetadata.candidatesTokenCount ?? 0),
-          totalTokens: Number(
-            body.usageMetadata.totalTokenCount ??
-              Number(body.usageMetadata.promptTokenCount ?? 0) +
-                Number(body.usageMetadata.candidatesTokenCount ?? 0),
-          ),
-          ...(cachedTokens > 0 ? { cachedTokens } : {}),
-        });
-      }
+      if (body.usageMetadata && onUsage) onUsage(usageFromGemini(body.usageMetadata));
       const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
       if (text) {
         full += text;

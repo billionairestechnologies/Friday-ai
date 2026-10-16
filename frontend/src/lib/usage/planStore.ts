@@ -1,6 +1,5 @@
 import { create } from "zustand";
-import { api } from "@/lib/api";
-import type { QuotaResponse } from "./quota";
+import { useQuota } from "./quotaStore";
 
 export type Plan = "free" | "pro" | "premium";
 
@@ -31,11 +30,9 @@ export const usePlan = create<PlanState>((set, get) => ({
   loaded: false,
   load: async () => {
     if (get().loaded) return;
-    try {
-      const res = await api.get<QuotaResponse>("/usage/quota");
-      set({ plan: res.status.plan, isEnterprise: res.status.isEnterprise, loaded: true });
-    } catch {
-      set({ loaded: true });
-    }
+    // Shares the one /usage/quota fetch with the Usage panel and alerts (lib/usage/quotaStore.ts).
+    await useQuota.getState().load(60_000);
+    const res = useQuota.getState().data;
+    set(res ? { plan: res.status.plan, isEnterprise: res.status.isEnterprise, loaded: true } : { loaded: true });
   },
 }));

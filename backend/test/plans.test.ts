@@ -46,16 +46,14 @@ test("entitlement layers: plan ← catalog ← organization ← personal package
 test("catalog rows fall back to code defaults for anything unset", () => {
   const plan = planFromRow({
     id: "pro", name: "Pro+", tagline: "", monthly_price_paise: 149_900, annual_discount_percent: 20, min_seats: 7,
-    features: [], badge: "", highlight: true, weekly_tokens: 3_000_000, rolling_tokens: null, monthly_tokens: null,
+    features: [], badge: "", highlight: true, monthly_tokens: null,
     tokens_per_seat: 99, entitlements: { deepResearchPerDay: 5 }, active: true, sort_order: 1,
   });
   assert.equal(plan.name, "Pro+");
   assert.equal(plan.minSeats, null); // seats only mean something for enterprise
   assert.equal(plan.badge, null);
   assert.ok(plan.features.length > 0);
-  assert.equal(plan.limits.weekly, 3_000_000);
-  assert.equal(plan.limits.rolling, 60_000);
-  assert.equal(plan.limits.monthly, 450_000);
+  assert.equal(plan.limits.monthly, 10_000_000);
   assert.equal(plan.limits.tokensPerSeat, null);
   assert.equal(plan.entitlements.deepResearchPerDay, 5);
   assert.equal(plan.entitlements.buildMaxRounds, DEFAULT_ENTITLEMENTS.pro.buildMaxRounds);

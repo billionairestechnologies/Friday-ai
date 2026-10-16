@@ -12,6 +12,10 @@ export type TokenUsage = {
   /** Portion of promptTokens spent WRITING a new cache entry (Anthropic only, billed once at a
    *  premium over the base input rate — see promptCache.ts). 0/undefined outside a cache write. */
   cacheWriteTokens?: number;
+  /** Thinking/reasoning tokens. Informational only: they are ALREADY inside completionTokens (OpenAI's
+   *  completion_tokens and Anthropic's output_tokens include them; Gemini reports them separately as
+   *  thoughtsTokenCount and usageFromGemini adds them in), so they must never be added on top. */
+  reasoningTokens?: number;
 };
 
 export function emptyTokenUsage(): TokenUsage {
@@ -23,6 +27,7 @@ export function mergeTokenUsage(a: TokenUsage | null | undefined, b: TokenUsage 
   const right = b ?? emptyTokenUsage();
   const cachedTokens = (left.cachedTokens ?? 0) + (right.cachedTokens ?? 0);
   const cacheWriteTokens = (left.cacheWriteTokens ?? 0) + (right.cacheWriteTokens ?? 0);
+  const reasoningTokens = (left.reasoningTokens ?? 0) + (right.reasoningTokens ?? 0);
   return {
     promptTokens: left.promptTokens + right.promptTokens,
     completionTokens: left.completionTokens + right.completionTokens,
@@ -30,7 +35,87 @@ export function mergeTokenUsage(a: TokenUsage | null | undefined, b: TokenUsage 
     estimated: Boolean(left.estimated || right.estimated),
     ...(cachedTokens > 0 ? { cachedTokens } : {}),
     ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
+    ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
   };
+}
+
+/** A non-negative integer from an untrusted usage field; anything else (NaN, negative, string) is 0. */
+function count(value: unknown): number {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
+ * Clamps a usage report into a consistent shape: cached + cache-write never exceed the prompt,
+ * reasoning never exceeds the completion, and total is prompt + completion. A provider's own
+ * total is NOT added on top of its parts (that would double-count) — when it disagrees with the
+ * parts, the parts win because they are what each token class is metered on.
+ */
+export function normalizeUsage(u: TokenUsage): TokenUsage {
+  const promptTokens = count(u.promptTokens);
+  const completionTokens = count(u.completionTokens);
+  const cachedTokens = Math.min(count(u.cachedTokens), promptTokens);
+  const cacheWriteTokens = Math.min(count(u.cacheWriteTokens), promptTokens - cachedTokens);
+  const reasoningTokens = Math.min(count(u.reasoningTokens), completionTokens);
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    ...(u.estimated ? { estimated: true } : {}),
+    ...(cachedTokens > 0 ? { cachedTokens } : {}),
+    ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
+    ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+  };
+}
+
+/** OpenAI-compatible `usage` (OpenAI, OpenRouter, Sarvam, ScaleMax's OpenAI routes). completion_tokens already includes reasoning. */
+export function usageFromOpenAi(u: {
+  prompt_tokens?: unknown;
+  completion_tokens?: unknown;
+  prompt_tokens_details?: { cached_tokens?: unknown } | null;
+  completion_tokens_details?: { reasoning_tokens?: unknown } | null;
+}): TokenUsage {
+  return normalizeUsage({
+    promptTokens: count(u.prompt_tokens),
+    completionTokens: count(u.completion_tokens),
+    totalTokens: 0,
+    cachedTokens: count(u.prompt_tokens_details?.cached_tokens),
+    reasoningTokens: count(u.completion_tokens_details?.reasoning_tokens),
+  });
+}
+
+/**
+ * Gemini `usageMetadata`. candidatesTokenCount EXCLUDES thinking — Google bills thoughtsTokenCount as
+ * output too — so completion = candidates + thoughts. (Before this, Gemini's thinking was never metered.)
+ */
+export function usageFromGemini(m: {
+  promptTokenCount?: unknown;
+  candidatesTokenCount?: unknown;
+  thoughtsTokenCount?: unknown;
+  cachedContentTokenCount?: unknown;
+}): TokenUsage {
+  const thoughts = count(m.thoughtsTokenCount);
+  return normalizeUsage({
+    promptTokens: count(m.promptTokenCount),
+    completionTokens: count(m.candidatesTokenCount) + thoughts,
+    totalTokens: 0,
+    cachedTokens: count(m.cachedContentTokenCount),
+    reasoningTokens: thoughts,
+  });
+}
+
+/** What `cumulative` added since `recorded` (both running totals of one turn), never negative. */
+export function usageDelta(cumulative: TokenUsage, recorded: TokenUsage): TokenUsage {
+  const d = (a?: number, b?: number) => Math.max(0, (a ?? 0) - (b ?? 0));
+  return normalizeUsage({
+    promptTokens: d(cumulative.promptTokens, recorded.promptTokens),
+    completionTokens: d(cumulative.completionTokens, recorded.completionTokens),
+    totalTokens: 0,
+    cachedTokens: d(cumulative.cachedTokens, recorded.cachedTokens),
+    cacheWriteTokens: d(cumulative.cacheWriteTokens, recorded.cacheWriteTokens),
+    reasoningTokens: d(cumulative.reasoningTokens, recorded.reasoningTokens),
+    estimated: cumulative.estimated,
+  });
 }
 
 /** Rough fallback when a provider stream does not report usage. */

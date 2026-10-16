@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { meteredChat } from "../quota/meterContext.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, listChatCandidates } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
@@ -34,7 +35,7 @@ export async function fixCode(
         content: `Language: ${language}\n\nCode:\n\`\`\`${language}\n${code}\n\`\`\`\n\nError when run:\n${error}`,
       },
     ];
-    const raw = await adapter.chat(apiKey, candidate.modelId, messages);
+    const raw = await meteredChat(candidate, messages, () => adapter.chat(apiKey, candidate.modelId, messages), { chargeable: true });
     const fenced = FENCE.exec(raw);
     const fixed = (fenced ? fenced[1] : raw).trim();
     return fixed || null;

@@ -46,8 +46,6 @@ const catalogSchema = z.object({
   features: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
   badge: z.string().trim().max(24).nullable().optional(),
   highlight: z.boolean().optional(),
-  weeklyTokens: positiveInt.nullable().optional(),
-  rollingTokens: positiveInt.nullable().optional(),
   monthlyTokens: positiveInt.nullable().optional(),
   tokensPerSeat: positiveInt.nullable().optional(),
   entitlements: entitlementsSchema.optional(),

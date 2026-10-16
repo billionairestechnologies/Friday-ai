@@ -1,13 +1,12 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { getPlanCatalog, type CatalogPlan } from "../quota/planCatalog.js";
-import { CREDITS_PER_USD } from "../quota/meter.js";
 import { loadFinanceSettings, type FinanceSettings } from "./pricing.js";
 import { listExpenses, occurrencesInWindow } from "./expenses.js";
 
 /**
  * Profit per plan: price vs what one subscriber can cost us at the plan's caps. Costs change (supplier
  * deal, E2B, hosting), so everything here is computed live from Console → Finance and Expenses:
- *   usage cost  — the plan's monthly credits at the current model rates (credits are real cost);
+ *   usage cost  — the plan's monthly token allowance at the blended supplier rate (₹ per 1M);
  *   E2B         — what builders on this plan actually used in the last 30 days (sandbox time × rate);
  *   overhead    — recurring hosting / domains / E2B fees / tools ÷ paying users.
  * `suggested` re-sizes the caps so worst-case usage stays inside the target share of the price.
@@ -27,12 +26,12 @@ export type PlanEconomics = {
   id: string;
   name: string;
   priceInr: number;
-  /** Monthly cap in credits (enterprise: per seat); weekly × 4.3 stands in when there's no monthly cap. */
-  monthlyCredits: number;
-  /** What the monthly cap is worth in model cost, ₹ — the worst case one subscriber can cost us. */
+  /** Monthly allowance in billable tokens (enterprise: per seat). */
+  monthlyTokens: number;
+  /** What the allowance is worth in model cost at the blended rate, ₹ — the worst case one subscriber can cost us. */
   usageCostInr: number;
-  /** The same cap in millions of tokens at the blended rate; null when the blended rate is off. */
-  tokensMillions: number | null;
+  /** The allowance in millions of tokens. */
+  tokensMillions: number;
   e2bAvgInr: number;
   overheadInr: number;
   totalCostInr: number;
@@ -40,11 +39,20 @@ export type PlanEconomics = {
   marginPct: number | null;
   status: "ok" | "tight" | "loss";
   subscribers: number;
-  suggested: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+  suggested: { monthly: number | null; tokensPerSeat: number | null };
 };
 
-const creditsToInr = (credits: number, s: FinanceSettings) => (credits / CREDITS_PER_USD) * s.usd_to_inr;
-const inrToCredits = (inr: number, s: FinanceSettings) => Math.floor((inr / s.usd_to_inr) * CREDITS_PER_USD);
+/**
+ * ₹ per 1M billable tokens: the blended supplier rate from Console → Finance, or ~$1/1M when it is
+ * switched off. Billable tokens already weigh cache reads at a tenth (quota/allowance.ts), roughly
+ * what they cost; if a supplier bills cache reads at the full rate the real worst case is higher —
+ * Finance → Live usage shows the measured cost from the ledger either way.
+ */
+export function inrPerMillionTokens(s: FinanceSettings): number {
+  return s.blended_cost_per_m_inr > 0 ? s.blended_cost_per_m_inr : s.usd_to_inr;
+}
+const tokensToInr = (tokens: number, s: FinanceSettings) => (tokens / 1_000_000) * inrPerMillionTokens(s);
+const inrToTokens = (inr: number, s: FinanceSettings) => Math.floor((inr / inrPerMillionTokens(s)) * 1_000_000);
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Pure: one plan's economics (tested without a database). */
@@ -54,28 +62,19 @@ export function computePlanEconomics(input: PlanEconomicsInput, s: FinanceSettin
   const free = plan.id === "free";
   const priceInr = plan.monthlyPricePaise / 100;
   const { limits } = plan;
-  const monthlyCredits = enterprise ? (limits.tokensPerSeat ?? 0) : (limits.monthly ?? Math.round(limits.weekly * 4.3));
+  const monthlyTokens = enterprise ? (limits.tokensPerSeat ?? 0) : (limits.monthly ?? 0);
 
-  const usageCostInr = creditsToInr(monthlyCredits, s);
+  const usageCostInr = tokensToInr(monthlyTokens, s);
   const overheadInr = free ? 0 : overheadPerPaidUserInr;
   const totalCostInr = usageCostInr + input.e2bAvgInr + overheadInr;
   const marginInr = priceInr - totalCostInr;
   const marginPct = priceInr > 0 ? r2((marginInr / priceInr) * 100) : null;
 
-  // Suggested caps: worst-case usage ≤ target share of the price (Free: its monthly cost budget),
-  // keeping the plan's own 5-hour : weekly : monthly proportions.
+  // Suggested allowance: worst-case usage ≤ target share of the price (Free: its monthly cost budget),
+  // rounded down to a whole 100K tokens so the Plans page shows a clean figure.
   const budgetInr = free ? s.free_cost_budget_inr : (priceInr * s.target_cost_share_pct) / 100;
-  const suggestedMonthly = Math.max(1, inrToCredits(budgetInr, s));
-  const ratio = monthlyCredits > 0 ? suggestedMonthly / monthlyCredits : 1;
-  const scaled = (n: number) => Math.max(1, Math.round(n * ratio));
-  const suggested = enterprise
-    ? { weekly: 0, rolling: 0, monthly: null, tokensPerSeat: suggestedMonthly }
-    : {
-        weekly: free ? Math.max(1, Math.round(suggestedMonthly / 4.3)) : scaled(limits.weekly),
-        rolling: scaled(limits.rolling),
-        monthly: free && limits.monthly == null ? null : suggestedMonthly,
-        tokensPerSeat: null,
-      };
+  const suggestedMonthly = Math.max(100_000, Math.floor(inrToTokens(budgetInr, s) / 100_000) * 100_000);
+  const suggested = enterprise ? { monthly: null, tokensPerSeat: suggestedMonthly } : { monthly: suggestedMonthly, tokensPerSeat: null };
 
   const share = priceInr > 0 ? (usageCostInr / priceInr) * 100 : free ? (usageCostInr / Math.max(1, s.free_cost_budget_inr)) * 100 : 0;
   const status: PlanEconomics["status"] = free
@@ -86,9 +85,9 @@ export function computePlanEconomics(input: PlanEconomicsInput, s: FinanceSettin
     id: plan.id,
     name: plan.name,
     priceInr: r2(priceInr),
-    monthlyCredits,
+    monthlyTokens,
     usageCostInr: r2(usageCostInr),
-    tokensMillions: s.blended_cost_per_m_inr > 0 ? r2(usageCostInr / s.blended_cost_per_m_inr) : null,
+    tokensMillions: r2(monthlyTokens / 1_000_000),
     e2bAvgInr: r2(input.e2bAvgInr),
     overheadInr: r2(overheadInr),
     totalCostInr: r2(totalCostInr),

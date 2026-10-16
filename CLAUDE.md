@@ -18,7 +18,7 @@ Anthropic, Gemini, OpenRouter, ScaleMax, Sarvam, Ollama (+ ElevenLabs voice).
 backend/    Express + TypeScript API (ESM, Node 22). Also serves frontend/dist in production.
 frontend/   React 19 + Vite + TanStack Router + Tailwind SPA
 android/    Kotlin + Jetpack Compose app        ios/  SwiftUI app (XcodeGen project.yml)
-supabase/   SQL migrations 0001…0050 (apply in order; RLS on, backend uses service role)
+supabase/   SQL migrations 0001…0051 (apply in order; RLS on, backend uses service role)
 cli/        FridayX CLI — terminal coding agent `friday` (Rust, Apache-2.0 fork; own LICENSE/NOTICE)
 ide/        FridayX editor integrations: vscode/ extension; JetBrains/Zed use `friday agent stdio` (ACP) — see ide/README.md
 docs/       README.md (index) · architecture/ · operations/ · product/ · diagrams/ (Mermaid .mmd → png/svg)
@@ -105,21 +105,24 @@ Gotchas:
   (`BuildCanvas`: Preview / Files / Terminal) docked on the right.
 - `services/automations/` — schedule math (`schedule.ts`, DST-safe) + service/scheduler (atomic lease).
 - `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/connectorService.ts`.
-- **Usage unit = CREDITS** (`services/quota/meter.ts`, migration 0046): what a call really costs us, 100,000 credits = US$1, priced per call
-  from `effectiveCostRatesUsd` (`finance/pricing.ts`: blended ₹/1M for every model, or a model's own price when `cost_override`; cache
-  reads/writes at their own rates). Every limit (plan windows, org pools, packages, grants, personal caps) is in credits; the DB columns
-  keep their old `*_tokens` names. Users only ever see percent + reset time. Redis keys are `quota:v2:*`. Per-turn guards:
-  `agent/loopGuard.ts` (3–4 identical rounds → stop; a turn may spend ≤80% of the 5-hour window). Test hook: `setRedisClientForTests`
-  (`test/quotaAccounting.test.ts` runs the real accounting on a fake Redis).
+- **Usage = BILLABLE TOKENS per subscription month** (migration 0051, `docs/operations/MONTHLY_ALLOWANCE.md`): Free 1M, Pro 10M,
+  Premium 25M, Enterprise 30M/seat pooled; billable = fresh input + cache writes + output + 10% of cache reads (`quota/allowance.ts`).
+  No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
+  plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
+  idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →
+  per-round rows, retries keep their key); `quota/meterContext.ts` (`withMeter`/`meteredChat`) meters helper calls; refusals are
+  `exhausted|member_cap|suspended|unavailable`. Lifecycle (payments, renewals, upgrades, queued downgrades, expiry, refunds) is in SQL,
+  idempotent per order. `quota/quotaJobs.ts` every 10 min: stale holds, expiries, `quota_audit()`, alerts. Console → Usage ledger.
+  DB tests: `QUOTA_TEST_DATABASE_URL=postgres://… npm --prefix backend test` (real SQL; skipped otherwise). Kill switch: `FRIDAY_DISABLE_QUOTA_JOBS=1`.
 - Profit controls (migration 0047/0048): `finance_settings` blended cost, target cost share, free budget, E2B ₹/hour; Build time booked as
-  `sandbox_second` usage; `finance/planEconomics.ts` (Console → Plans → Profit: usage at cap + E2B + hosting/domains overhead, suggested
-  limits) and `finance/liveUsage.ts` (Console → Finance → Live usage); `token_ledger.feature` powers the cost-based Usage breakdown.
-- `services/quota/` — `tierConfig.ts` (code defaults + pure `decideQuota`), `planCatalog.ts` (the
+  `sandbox_second` usage; `finance/planEconomics.ts` (Console → Plans → Profit: the monthly token allowance at the blended ₹/1M + E2B +
+  hosting/domains overhead, suggested allowance) and `finance/liveUsage.ts` (Console → Finance → Live usage); `token_ledger.feature` powers the Usage breakdown.
+- `services/quota/` — `tierConfig.ts` (plan allowances), `planCatalog.ts` (the
   console-edited `plan_catalog`: prices, copy, limits, **entitlements**; `ENTITLEMENT_DEFS`,
   sanitize/merge), `entitlements.ts` (`entitlementsFor(user)` = plan ← catalog ← org ← personal package;
-  `consumeDailyAllowance`), `tokenQuotaService.ts` (reserve → **`chargeProgress`** each round → reconcile
-  against what was charged; personal monthly caps; meters clamped at 100%). The chat turn charges the real
-  prompt before any model call; `runToolLoop`/`runBuildAgent` take a `budget` callback and stop at the limit.
+  `consumeDailyAllowance`), `tokenQuotaService.ts` (reserve / extend / record / settle over the SQL functions, status, admin
+  adjustments). The chat turn holds the real prompt before any model call; `runToolLoop`/`runBuildAgent` take a `budget`
+  callback (usage + the model that ran) and stop when the balance can't hold the next round.
 - `services/console/` — Team Console backend: `permissions.ts` (catalog, `requireStaff`/`requirePermission`;
   `profiles.role='admin'` = owner), `mail.ts` (Resend, branded HTML, signed unsubscribe), support, CRM,
   tasks, announcements (What's New), campaigns (scheduler + send ledger), `plansService.ts` (packages,

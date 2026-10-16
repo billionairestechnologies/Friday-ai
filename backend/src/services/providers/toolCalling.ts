@@ -1,4 +1,4 @@
-import type { TokenUsage } from "../tokenUsage.js";
+import { usageFromGemini, usageFromOpenAi, type TokenUsage } from "../tokenUsage.js";
 import { readSseStream } from "./sse-helpers.js";
 import type { ChatMessage } from "./types.js";
 import { base64PayloadOf, toAnthropicStyleMessages, toOpenAiStyleMessages } from "./types.js";
@@ -133,6 +133,7 @@ type OpenAiToolChunk = {
     completion_tokens?: number;
     total_tokens?: number;
     prompt_tokens_details?: { cached_tokens?: number };
+    completion_tokens_details?: { reasoning_tokens?: number };
   };
 };
 
@@ -178,17 +179,7 @@ export async function streamOpenAiToolTurn(
   const partial = new Map<number, { id: string; name: string; args: string }>();
   await readSseStream(res.body, (data) => {
     const chunk = data as OpenAiToolChunk;
-    if (chunk.usage) {
-      const promptTokens = Number(chunk.usage.prompt_tokens ?? 0);
-      const completionTokens = Number(chunk.usage.completion_tokens ?? 0);
-      const cachedTokens = Number(chunk.usage.prompt_tokens_details?.cached_tokens ?? 0);
-      usage = {
-        promptTokens,
-        completionTokens,
-        totalTokens: Number(chunk.usage.total_tokens ?? promptTokens + completionTokens),
-        ...(cachedTokens > 0 ? { cachedTokens } : {}),
-      };
-    }
+    if (chunk.usage) usage = usageFromOpenAi(chunk.usage);
     const delta = chunk.choices?.[0]?.delta;
     if (delta?.content) {
       text += delta.content;
@@ -350,7 +341,7 @@ type GeminiToolChunk = {
       parts?: { text?: string; thought?: boolean; functionCall?: { name?: string; args?: Record<string, unknown>; id?: string }; thoughtSignature?: string }[];
     };
   }[];
-  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number; cachedContentTokenCount?: number };
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number; totalTokenCount?: number; cachedContentTokenCount?: number };
 };
 
 export async function streamGeminiToolTurn(
@@ -394,17 +385,7 @@ export async function streamGeminiToolTurn(
   const toolCalls: ToolCall[] = [];
   await readSseStream(res.body, (data) => {
     const chunk = data as GeminiToolChunk;
-    if (chunk.usageMetadata) {
-      const promptTokens = Number(chunk.usageMetadata.promptTokenCount ?? 0);
-      const completionTokens = Number(chunk.usageMetadata.candidatesTokenCount ?? 0);
-      const cachedTokens = Number(chunk.usageMetadata.cachedContentTokenCount ?? 0);
-      usage = {
-        promptTokens,
-        completionTokens,
-        totalTokens: Number(chunk.usageMetadata.totalTokenCount ?? promptTokens + completionTokens),
-        ...(cachedTokens > 0 ? { cachedTokens } : {}),
-      };
-    }
+    if (chunk.usageMetadata) usage = usageFromGemini(chunk.usageMetadata);
     for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
       if (part.functionCall?.name) {
         toolCalls.push({

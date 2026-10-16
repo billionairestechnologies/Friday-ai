@@ -1,4 +1,5 @@
 import { LOOP_STOP_MESSAGE, LoopGuard, TURN_CAP_MESSAGE } from "../agent/loopGuard.js";
+import { QUOTA_STOP_MESSAGE } from "../quota/allowance.js";
 import { getProviderAdapter } from "../providers/registry.js";
 import { recordProviderIssue } from "../status/providerIssues.js";
 import { friendlyProviderError } from "../../utils/providerError.js";
@@ -205,7 +206,7 @@ export async function runBuildAgent(opts: {
   /** Usage meter (see runToolLoop): checked every round with the running token total; a non-null
    *  message stops the build right there instead of billing past the user's limit. */
   /** Called each round with the turn's running usage; a string means "stop now" (limit reached). */
-  budget?: (usage: TokenUsage) => Promise<string | null>;
+  budget?: (usage: TokenUsage, candidate?: ChatCandidate | null) => Promise<string | null>;
   /** Rounds this user's plan allows (entitlement buildMaxRounds); default MAX_ITERATIONS. */
   maxRounds?: number;
   /** The plan the user approved (plan.ts) — executed item by item and kept live as progress.
@@ -1052,7 +1053,8 @@ export async function runBuildAgent(opts: {
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     if (signal?.aborted) break;
     if (iteration > 1 && opts.budget) {
-      const stop = await opts.budget(usage).catch(() => null);
+      // Fail closed: a meter that can't answer stops the build rather than running unmetered.
+      const stop = await opts.budget(usage, usedCandidate).catch(() => QUOTA_STOP_MESSAGE.unavailable);
       if (stop) {
         emitText(stop === TURN_CAP_MESSAGE ? `\n\n${stop}` : `\n\n${stop} Your project is saved — continue once your usage resets or after upgrading.`);
         break;

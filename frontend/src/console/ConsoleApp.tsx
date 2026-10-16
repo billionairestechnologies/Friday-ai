@@ -64,6 +64,7 @@ const Billing = lazy(() => import("./sections/Billing"));
 const Audit = lazy(() => import("./sections/Audit"));
 const StatusSection = lazy(() => import("./sections/Status"));
 const Finance = lazy(() => import("./sections/Finance"));
+const UsageLedger = lazy(() => import("./sections/UsageLedger"));
 const Mailbox = lazy(() => import("./sections/Mailbox"));
 const MailHosting = lazy(() => import("./sections/MailHosting"));
 
@@ -84,6 +85,7 @@ export const SECTIONS: Section[] = [
   { id: "models", label: "Models & keys", icon: Cpu, permission: "providers.view", group: "Admin", component: Models },
   { id: "finance", label: "Finance", icon: Wallet, permission: "finance.view", group: "Admin", component: Finance },
   { id: "billing", label: "Billing & usage", icon: BadgeIndianRupee, permission: "users.view", group: "Admin", component: Billing },
+  { id: "usage", label: "Usage ledger", icon: Gauge, permission: "users.view", group: "Admin", component: UsageLedger },
   { id: "audit", label: "Audit log", icon: ScrollText, permission: "audit.view", group: "Admin", component: Audit },
 ];
 

@@ -665,8 +665,9 @@ private fun usageLabel(type: String): String = when (type) {
     "chat" -> "Chat"; "build" -> "Build"; "research" -> "Deep Research"; "teamup" -> "Team Up"; "spark" -> "Spark"; "automation" -> "Automations"; "code" -> "FridayX"; else -> type
 }
 
-/** Usage — the same windows as the web's Usage pane: weekly, 5-hour, monthly, organization pool and your cap, each with its
- *  reset time and what used it, plus what your plan includes (all from GET /usage/quota). */
+/** Usage — the same balance as the web's Usage pane: this month's tokens (or the organization pool and your cap), when
+ *  they renew and what used them, plus what your plan includes (all from GET /usage/quota). The weekly / 5-hour bars only
+ *  appear for an older server that still sends them. */
 @Composable
 private fun UsageSection(onUpgrade: () -> Unit = {}) {
     var quota by remember { mutableStateOf<UsageQuota?>(null) }
@@ -691,13 +692,24 @@ private fun UsageSection(onUpgrade: () -> Unit = {}) {
                     Text("Upgrade", color = FridayBg, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(FridayText).clickable(onClick = onUpgrade).padding(horizontal = 12.dp, vertical = 5.dp))
                 }
             }
-            UsageBar("Weekly Limit", q.weekly, q.breakdown, null)
-            q.rolling?.let { UsageBar("5-Hour Limit", it, q.rollingBreakdown, "A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once.") }
-            q.monthly?.let { UsageBar("Monthly Limit", it, q.monthlyBreakdown, null) }
-            q.orgPool?.let { UsageBar("Organization Pool (${q.orgSeats} seats)", it, emptyList(), null) }
+            q.monthly?.let { UsageBar("This month", it, q.monthlyBreakdown, "Your tokens renew every month on the day your plan started. Use them whenever you like.") }
+            q.orgPool?.let { UsageBar("Team pool (${q.orgSeats} seats)", it, q.monthlyBreakdown, null) }
+            q.weekly?.let { UsageBar("Weekly Limit", it, q.breakdown, null) }
+            q.rolling?.let { UsageBar("5-Hour Limit", it, q.rollingBreakdown, null) }
             q.memberCap?.let { UsageBar("Your Monthly Cap", it, emptyList(), "A personal sub-limit your org admin set within the shared pool.") }
             q.entitlements?.let { PlanIncludes(it) }
         }
+    }
+}
+
+/** 2,450,000 → "2.45M", 12,300 → "12.3K" (the web's formatTokens). */
+private fun compactTokens(n: Double): String {
+    val v = maxOf(0.0, n)
+    fun trim(x: Double, digits: Int) = String.format(java.util.Locale.US, "%.${digits}f", x).trimEnd('0').trimEnd('.')
+    return when {
+        v >= 1_000_000 -> trim(v / 1_000_000, 2) + "M"
+        v >= 1_000 -> trim(v / 1_000, 1) + "K"
+        else -> v.toLong().toString()
     }
 }
 
@@ -706,7 +718,7 @@ private fun UsageBar(title: String, bucket: UsageBreakdown?, breakdown: List<Usa
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(FridaySurface.copy(alpha = 0.5f)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            Text(if (bucket != null) "${bucket.pct}% used" else "—", color = FridayMuted, fontSize = 13.sp)
+            Text(if (bucket != null) "${compactTokens(bucket.used)} / ${compactTokens(bucket.limit)} · ${bucket.pct}%" else "—", color = FridayMuted, fontSize = 13.sp)
         }
         if (bucket != null && bucket.limit > 0) {
             LinearProgressIndicator(

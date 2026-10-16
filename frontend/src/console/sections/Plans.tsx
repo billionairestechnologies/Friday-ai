@@ -35,7 +35,8 @@ type CatalogPlan = {
   features: string[];
   badge: string | null;
   highlight: boolean;
-  limits: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+  /** monthly = tokens per subscription month; tokensPerSeat = enterprise pool per seat. */
+  limits: { monthly: number | null; tokensPerSeat: number | null };
   entitlements: Record<string, boolean | number>;
   active: boolean;
   sortOrder: number;
@@ -147,12 +148,11 @@ export default function Plans() {
               <div className="text-xs text-muted">{plan.tagline}</div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-xl bg-chip/60 p-3 text-xs">
                 {plan.id === "enterprise" ? (
-                  <span className="col-span-2">{formatNumber(plan.limits.tokensPerSeat ?? 0)} pooled credits / seat / mo · min {plan.minSeats} seats</span>
+                  <span className="col-span-2">{formatNumber(plan.limits.tokensPerSeat ?? 0)} pooled tokens / seat / month · min {plan.minSeats} seats</span>
                 ) : (
                   <>
-                    <span className="text-muted">5-hour</span><span>{formatNumber(plan.limits.rolling)}</span>
-                    <span className="text-muted">Weekly</span><span>{formatNumber(plan.limits.weekly)}</span>
-                    <span className="text-muted">Monthly</span><span>{plan.limits.monthly ? formatNumber(plan.limits.monthly) : "—"}</span>
+                    <span className="text-muted">Monthly tokens</span><span>{plan.limits.monthly ? formatNumber(plan.limits.monthly) : "—"}</span>
+                    <span className="col-span-2 text-subtle">No 5-hour, daily or weekly caps</span>
                   </>
                 )}
               </div>
@@ -223,7 +223,7 @@ export default function Plans() {
                     <li>Plan: <span className="text-foreground capitalize">{p.plan}</span></li>
                     {p.monthly_token_cap && <li>{formatNumber(p.monthly_token_cap)} tokens / month</li>}
                     {p.seats && <li>{formatNumber(p.seats)} seats</li>}
-                    {p.pooled_monthly_tokens && <li>{formatNumber(p.pooled_monthly_tokens)} pooled credits / month</li>}
+                    {p.pooled_monthly_tokens && <li>{formatNumber(p.pooled_monthly_tokens)} pooled tokens / month</li>}
                     {p.features.slice(0, 4).map((f) => <li key={f}>• {f}</li>)}
                   </ul>
                 </Card>
@@ -538,7 +538,7 @@ function PackageEditor({ pkg, defs, catalog, onClose, onSaved }: { pkg: Pkg | "n
         {org ? (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Seats"><Input type="number" min={1} value={f.seats} onChange={(e) => setF({ ...f, seats: e.target.value })} /></Field>
-            <Field label="Pooled credits / month"  hint="Empty = seats × default"><Input type="number" min={1} value={f.pooledMonthlyTokens} onChange={(e) => setF({ ...f, pooledMonthlyTokens: e.target.value })} /></Field>
+            <Field label="Pooled tokens / month"  hint="Empty = seats × the plan's per-seat tokens"><Input type="number" min={1} value={f.pooledMonthlyTokens} onChange={(e) => setF({ ...f, pooledMonthlyTokens: e.target.value })} /></Field>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -620,13 +620,13 @@ function EntitlementsEditor({ defs, value, onChange, inherit }: { defs: Entitlem
 }
 
 function CatalogEditor({ plan, defs, onClose, onSaved }: { plan: CatalogPlan | null; defs: EntitlementDef[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: "", tagline: "", price: "", discount: "10", minSeats: "", badge: "", highlight: false, features: "", weekly: "", rolling: "", monthly: "", perSeat: "", active: true, entitlements: {} as Record<string, boolean | number> });
+  const [f, setF] = useState({ name: "", tagline: "", price: "", discount: "10", minSeats: "", badge: "", highlight: false, features: "", monthly: "", perSeat: "", active: true, entitlements: {} as Record<string, boolean | number> });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!plan) return;
     setF({
       name: plan.name, tagline: plan.tagline, price: plan.monthlyPricePaise ? String(plan.monthlyPricePaise / 100) : "", discount: String(plan.annualDiscountPercent), minSeats: plan.minSeats ? String(plan.minSeats) : "",
-      badge: plan.badge ?? "", highlight: plan.highlight, features: plan.features.join("\n"), weekly: String(plan.limits.weekly || ""), rolling: String(plan.limits.rolling || ""),
+      badge: plan.badge ?? "", highlight: plan.highlight, features: plan.features.join("\n"),
       monthly: plan.limits.monthly ? String(plan.limits.monthly) : "", perSeat: plan.limits.tokensPerSeat ? String(plan.limits.tokensPerSeat) : "", active: plan.active, entitlements: { ...plan.entitlements },
     });
   }, [plan]);
@@ -642,7 +642,7 @@ function CatalogEditor({ plan, defs, onClose, onSaved }: { plan: CatalogPlan | n
           tagline: f.tagline,
           monthlyPricePaise: plan.id === "free" ? 0 : Math.round((Number(f.price) || 0) * 100),
           annualDiscountPercent: Number(f.discount) || 0,
-          ...(enterprise ? { minSeats: num(f.minSeats), tokensPerSeat: num(f.perSeat) } : { weeklyTokens: num(f.weekly), rollingTokens: num(f.rolling), monthlyTokens: num(f.monthly) }),
+          ...(enterprise ? { minSeats: num(f.minSeats), tokensPerSeat: num(f.perSeat) } : { monthlyTokens: num(f.monthly) }),
           badge: f.badge.trim() || null,
           highlight: f.highlight,
           features: f.features.split("\n").map((s) => s.trim()).filter(Boolean),
@@ -676,13 +676,11 @@ function CatalogEditor({ plan, defs, onClose, onSaved }: { plan: CatalogPlan | n
           </div>
         )}
         {enterprise ? (
-          <Field label="Pooled credits per seat / month"><Input type="number" min={1} value={f.perSeat} onChange={(e) => setF({ ...f, perSeat: e.target.value })} /></Field>
+          <Field label="Pooled tokens per seat / month"><Input type="number" min={1} value={f.perSeat} onChange={(e) => setF({ ...f, perSeat: e.target.value })} /></Field>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="5-hour credits"><Input type="number" min={1} value={f.rolling} onChange={(e) => setF({ ...f, rolling: e.target.value })} /></Field>
-            <Field label="Weekly credits (100,000 = $1 of model cost)"><Input type="number" min={1} value={f.weekly} onChange={(e) => setF({ ...f, weekly: e.target.value })} /></Field>
-            <Field label="Monthly credits" hint="Empty = none"><Input type="number" min={1} value={f.monthly} onChange={(e) => setF({ ...f, monthly: e.target.value })} /></Field>
-          </div>
+          <Field label="Tokens per month" hint="Billable tokens (cache reads count 10%). Renews on each subscriber's own monthly date; applies to the current month immediately.">
+            <Input type="number" min={1} value={f.monthly} onChange={(e) => setF({ ...f, monthly: e.target.value })} />
+          </Field>
         )}
         <Field label="Plans page bullets" hint="One per line"><Textarea value={f.features} onChange={(e) => setF({ ...f, features: e.target.value })} className="min-h-[120px]" /></Field>
         <Field label="Unlocks"><EntitlementsEditor defs={defs} value={f.entitlements} onChange={(entitlements) => setF({ ...f, entitlements })} /></Field>
@@ -788,7 +786,7 @@ type Economics = {
     priceInr: number;
     monthlyCredits: number;
     usageCostInr: number;
-    tokensMillions: number | null;
+    tokensMillions: number;
     e2bAvgInr: number;
     overheadInr: number;
     totalCostInr: number;
@@ -796,7 +794,7 @@ type Economics = {
     marginPct: number | null;
     status: "ok" | "tight" | "loss";
     subscribers: number;
-    suggested: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+    suggested: { monthly: number | null; tokensPerSeat: number | null };
   }[];
 };
 
@@ -810,7 +808,7 @@ function ProfitPanel({ canManage, onApplied }: { canManage: boolean; onApplied: 
   const tone = (st: string) => (st === "ok" ? "green" : st === "tight" ? "amber" : "red");
   async function apply(p: Economics["plans"][number]) {
     setBusy(p.id);
-    const body = p.id === "enterprise" ? { tokensPerSeat: p.suggested.tokensPerSeat } : { weeklyTokens: p.suggested.weekly, rollingTokens: p.suggested.rolling, monthlyTokens: p.suggested.monthly };
+    const body = p.id === "enterprise" ? { tokensPerSeat: p.suggested.tokensPerSeat } : { monthlyTokens: p.suggested.monthly };
     const ok = await act(() => api.patch(`/console/plans/catalog/${p.id}`, body), `${p.name} limits updated`);
     setBusy(null);
     if (ok) {
@@ -835,7 +833,7 @@ function ProfitPanel({ canManage, onApplied }: { canManage: boolean; onApplied: 
             </div>
             <div className="text-2xl font-semibold">{p.priceInr ? formatMoney(p.priceInr) : "Free"}<span className="text-sm font-normal text-muted">{p.priceInr ? " / month" : ""}</span></div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-              <dt className="text-muted">Usage at cap</dt><dd className="text-right">{formatMoney(p.usageCostInr)}{p.tokensMillions != null ? ` · ${formatNumber(p.tokensMillions)}M tok` : ""}</dd>
+              <dt className="text-muted">Usage at cap</dt><dd className="text-right">{formatMoney(p.usageCostInr)} · {formatNumber(p.tokensMillions)}M tok</dd>
               <dt className="text-muted">E2B (avg)</dt><dd className="text-right">{formatMoney(p.e2bAvgInr)}</dd>
               <dt className="text-muted">Hosting &amp; domains</dt><dd className="text-right">{formatMoney(p.overheadInr)}</dd>
               <dt className="font-medium">Total cost</dt><dd className="text-right font-medium">{formatMoney(p.totalCostInr)}</dd>
@@ -843,10 +841,10 @@ function ProfitPanel({ canManage, onApplied }: { canManage: boolean; onApplied: 
             </dl>
             <div className="mt-1 border-t border-border pt-2 text-xs text-muted">
               Suggested for {p.id === "free" ? `₹${e.settings.free_cost_budget_inr}` : `${e.settings.target_cost_share_pct}% usage cost`}:{" "}
-              {p.id === "enterprise" ? `${formatNumber(p.suggested.tokensPerSeat ?? 0)} credits / seat` : `5h ${formatNumber(p.suggested.rolling)} · week ${formatNumber(p.suggested.weekly)}${p.suggested.monthly ? ` · month ${formatNumber(p.suggested.monthly)}` : ""} credits`}
+              {p.id === "enterprise" ? `${formatNumber(p.suggested.tokensPerSeat ?? 0)} tokens / seat / month` : `${formatNumber(p.suggested.monthly ?? 0)} tokens / month`}
             </div>
             {canManage && (
-              <Button size="sm" disabled={busy === p.id} onClick={() => void apply(p)}>Apply suggested limits</Button>
+              <Button size="sm" disabled={busy === p.id} onClick={() => void apply(p)}>Apply suggested allowance</Button>
             )}
           </Card>
         ))}

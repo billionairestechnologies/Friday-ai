@@ -1,4 +1,4 @@
-import type { TokenUsage } from "../tokenUsage.js";
+import { usageFromOpenAi, type TokenUsage } from "../tokenUsage.js";
 
 /**
  * Reads an SSE (`data: {...}\n\n`) response body, parsing each event's JSON payload and handing
@@ -45,6 +45,7 @@ type OpenAiCompatibleChunk = {
      *  config needed (unlike Anthropic's explicit cache_control breakpoints). Other OpenAI-
      *  compatible backends that don't cache simply omit this field. */
     prompt_tokens_details?: { cached_tokens?: number };
+    completion_tokens_details?: { reasoning_tokens?: number };
   };
 };
 
@@ -89,18 +90,7 @@ export async function streamOpenAiCompatibleChat(
   let reasoningFull = "";
   await readSseStream(res.body, (data) => {
     const chunk = data as OpenAiCompatibleChunk;
-    if (chunk.usage && onUsage) {
-      const cachedTokens = Number(chunk.usage.prompt_tokens_details?.cached_tokens ?? 0);
-      onUsage({
-        promptTokens: Number(chunk.usage.prompt_tokens ?? 0),
-        completionTokens: Number(chunk.usage.completion_tokens ?? 0),
-        totalTokens: Number(
-          chunk.usage.total_tokens ??
-            Number(chunk.usage.prompt_tokens ?? 0) + Number(chunk.usage.completion_tokens ?? 0),
-        ),
-        ...(cachedTokens > 0 ? { cachedTokens } : {}),
-      });
-    }
+    if (chunk.usage && onUsage) onUsage(usageFromOpenAi(chunk.usage));
     const delta = chunk.choices?.[0]?.delta;
     if (delta?.content) {
       full += delta.content;

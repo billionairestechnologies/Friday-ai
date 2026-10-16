@@ -27,15 +27,9 @@ import { useChat } from "@/lib/chat/store";
 import { VoicePicker } from "@/components/voice-picker";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import {
-  formatResetAt,
-  formatTokens,
-  labelForEventType,
-  percentUsed,
-  type QuotaBreakdownEntry,
-  type QuotaResponse,
-  type QuotaStatus,
-} from "@/lib/usage/quota";
+import { formatResetAt, formatTokens, mainBucket, type QuotaResponse } from "@/lib/usage/quota";
+import { useQuota } from "@/lib/usage/quotaStore";
+import { UsagePanel } from "@/components/usage-panel";
 
 const NAV = [
   {
@@ -417,15 +411,12 @@ const PLAN_DISPLAY_NAME: Record<string, string> = {
 
 function BillingPane() {
   const navigate = useNavigate();
-  const [currentPlan, setCurrentPlan] = useState<QuotaStatus | null>(null);
+  const currentPlan = useQuota((q) => q.data?.status ?? null);
+  const error = useQuota((q) => (q.data ? null : q.error));
   const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .get<QuotaResponse>("/usage/quota")
-      .then((res) => setCurrentPlan(res.status))
-      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load your plan"));
+    void useQuota.getState().load(15_000);
     api
       .get<{ orders: OrderRow[] }>("/billing/orders")
       .then((res) => setOrders(res.orders))
@@ -437,7 +428,9 @@ function BillingPane() {
       ? "Friday Enterprise"
       : PLAN_DISPLAY_NAME[currentPlan.plan]
     : null;
-  const renewsAt = currentPlan?.isEnterprise ? currentPlan.org?.resetAt : currentPlan?.monthly?.resetAt;
+  // A paid plan "renews" when its paid term ends (plan_renews_at); the monthly token allowance renews on its own cycle.
+  const paidThrough = currentPlan?.period?.renewsAt ?? null;
+  const tokensRenew = currentPlan ? mainBucket(currentPlan)?.resetAt ?? null : null;
 
   return (
     <div>
@@ -451,10 +444,14 @@ function BillingPane() {
           <p className="mt-1 text-lg font-semibold">{planName ?? "Loading…"}</p>
           <p className="mt-1 text-sm text-muted">
             {currentPlan && currentPlan.plan === "free" && !currentPlan.isEnterprise
-              ? "Free plan — nothing to renew."
-              : renewsAt
-                ? `Renews ${formatResetAt(renewsAt)}`
-                : ""}
+              ? currentPlan.period?.subscription === "expired"
+                ? "Your paid plan has ended — you're on Free."
+                : "Free plan — nothing to renew."
+              : paidThrough
+                ? `Paid through ${formatResetAt(paidThrough)}`
+                : tokensRenew
+                  ? `Tokens renew ${formatResetAt(tokensRenew)}`
+                  : ""}
           </p>
           <button
             type="button"
@@ -470,7 +467,7 @@ function BillingPane() {
         <div className="rounded-2xl border border-border bg-background p-4">
           <p className="text-xs text-muted">Usage</p>
           <p className="mt-1 text-lg font-semibold">See what you've used</p>
-          <p className="mt-1 text-sm text-muted">Weekly/5-hour limits, resets, and a feature breakdown.</p>
+          <p className="mt-1 text-sm text-muted">Your monthly tokens, when they renew, and where they went.</p>
           <button
             type="button"
             onClick={() => useChat.getState().setSettingsTab("usage")}
@@ -515,135 +512,28 @@ function BillingPane() {
   );
 }
 
-const PLAN_LABEL: Record<QuotaStatus["plan"], string> = { free: "Free", pro: "Pro", premium: "Premium" };
-const DOT_COLORS = ["bg-search", "bg-think", "bg-canvas", "bg-accent", "bg-muted"];
-
-function QuotaBar({
-  title,
-  bucket,
-  help,
-  breakdown,
-}: {
-  title: string;
-  bucket: { used: number; limit: number; resetAt: string };
-  help?: string;
-  breakdown?: QuotaBreakdownEntry[];
-}) {
-  const pct = percentUsed(bucket);
-  return (
-    <div className="rounded-2xl border border-border bg-background p-4">
-      <div className="mb-3 flex items-center gap-1.5">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        {help && <span title={help} className="text-xs text-subtle">ⓘ</span>}
-      </div>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-2xl font-semibold text-foreground">
-          {pct}% <span className="text-sm font-normal text-muted">used</span>
-        </p>
-        <p className="text-right text-xs text-muted">
-          Resets <span className="font-medium text-foreground">{formatResetAt(bucket.resetAt)}</span>
-        </p>
-      </div>
-      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-chip">
-        <div
-          className={cn(
-            "h-full rounded-full transition-[width] duration-300",
-            pct >= 100 ? "bg-danger" : pct >= 80 ? "bg-canvas" : "bg-search",
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      {breakdown && breakdown.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-3 border-t border-border pt-3">
-          {breakdown.map((entry, i) => (
-            <span key={entry.type} className="flex items-center gap-1.5 text-xs text-muted">
-              <span className={cn("size-1.5 rounded-full", DOT_COLORS[i % DOT_COLORS.length])} />
-              {labelForEventType(entry.type)} <span className="font-medium text-foreground">{Math.max(0, entry.percent)}%</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function UsagePane() {
   const navigate = useNavigate();
   const { user } = useCurrentUserState();
-  const [quota, setQuota] = useState<QuotaResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const entitlements = useQuota((q) => q.data?.entitlements ?? null);
   const signedIn = Boolean(user && !user.isDevFallback);
 
-  useEffect(() => {
-    if (!signedIn) return;
-    api
-      .get<QuotaResponse>("/usage/quota")
-      .then((res) => {
-        setQuota(res);
-        setError(null);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load usage"));
-  }, [signedIn]);
-
   if (!signedIn) {
-    return <SimpleNote title="Usage" body="Sign in to track your token limits and usage." />;
+    return <SimpleNote title="Usage" body="Sign in to see your monthly tokens and usage." />;
   }
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Usage</h2>
-        {quota && (
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-chip px-2.5 py-1 text-xs font-medium text-foreground">
-              {quota.status.isEnterprise ? "Enterprise" : PLAN_LABEL[quota.status.plan]} plan
-            </span>
-            {!quota.status.isEnterprise && quota.status.plan !== "premium" && (
-              <button
-                type="button"
-                onClick={() => {
-                  useChat.getState().setDialog(null);
-                  void navigate({ to: "/upgrade" });
-                }}
-                className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90"
-              >
-                Upgrade
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-      {!quota ? (
-        <p className="text-sm text-muted">Loading current usage…</p>
-      ) : (
-        <div className="space-y-3">
-          <QuotaBar title="Weekly Limit" bucket={quota.status.weekly} breakdown={quota.breakdown} />
-          {quota.status.rolling && (
-            <QuotaBar
-              title="5-Hour Limit"
-              bucket={quota.status.rolling}
-              breakdown={quota.rollingBreakdown}
-              help="A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once."
-            />
-          )}
-          {quota.status.monthly && (
-            <QuotaBar title="Monthly Limit" bucket={quota.status.monthly} breakdown={quota.monthlyBreakdown} />
-          )}
-          {quota.status.org && (
-            <QuotaBar
-              title={`Organization Pool (${quota.status.org.seatCount} seats)`}
-              bucket={quota.status.org}
-            />
-          )}
-          {quota.status.memberCap && (
-            <QuotaBar
-              title="Your Monthly Cap"
-              bucket={{ ...quota.status.memberCap, resetAt: quota.status.org?.resetAt ?? new Date().toISOString() }}
-              help="A personal sub-limit your org admin set within the shared pool above."
-            />
-          )}
-          {quota.entitlements && <PlanIncludes e={quota.entitlements} />}
+      <h2 className="mb-4 text-lg font-semibold">Usage</h2>
+      <UsagePanel
+        onUpgrade={() => {
+          useChat.getState().setDialog(null);
+          void navigate({ to: "/upgrade" });
+        }}
+      />
+      {entitlements && (
+        <div className="mt-3">
+          <PlanIncludes e={entitlements} />
         </div>
       )}
     </div>

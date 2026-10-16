@@ -16,6 +16,7 @@ docs/
 | Deploying / on call | [operations/OPERATIONS.md](operations/OPERATIONS.md) (env vars, runbook), [operations/EC2_DEPLOY.md](operations/EC2_DEPLOY.md) (live production), [operations/AWS_DEPLOY.md](operations/AWS_DEPLOY.md) (ECS option) |
 | Testing a branch | [operations/V2_TEST_AND_OPS_GUIDE.md](operations/V2_TEST_AND_OPS_GUIDE.md) |
 | Mail hosting | [operations/MAIL_HOSTING.md](operations/MAIL_HOSTING.md) |
+| Usage metering, plans and quotas | [operations/MONTHLY_ALLOWANCE.md](operations/MONTHLY_ALLOWANCE.md) (policy, ledger, migration 0051, rollback, tests) |
 | Planning | [product/UPGRADE_ROADMAP.md](product/UPGRADE_ROADMAP.md) |
 | Working on the VS Code extension | [product/FRIDAY_X_IDE.md](product/FRIDAY_X_IDE.md) (architecture, ACP facts, publishing), diagrams 23–26 |
 | Showing someone the system | [diagrams/README.md](diagrams/README.md) (index) and `diagrams/BOSS_PACK.html` |

@@ -1,27 +1,56 @@
 import { randomUUID } from "node:crypto";
 import { memoAsync } from "../../utils/ttlMemo.js";
 import { supabaseAdmin } from "../../config/supabase.js";
-import { getRedisClient } from "../redisClient.js";
 import { logger } from "../../utils/logger.js";
-import type { TokenUsage } from "../tokenUsage.js";
-import { priceUsage } from "../finance/pricing.js";
-import { creditsForInputTokens, DEFAULT_RESERVE_RATES } from "./meter.js";
 import {
-  decideQuota,
   ENTERPRISE_MIN_SEATS,
   ENTERPRISE_TOKENS_PER_SEAT,
-  nextMonthlyReset,
-  nextWeeklyReset,
-  PLAN_LIMITS,
+  PLAN_ALLOWANCES,
   planSatisfiesTier,
-  ROLLING_WINDOW_SECONDS,
-  WEEKLY_TTL_SECONDS,
   type Plan,
-  type QuotaDecision,
 } from "./tierConfig.js";
-import { getCatalogPlan, planLimitsFor } from "./planCatalog.js";
+import { getPlanCatalog } from "./planCatalog.js";
+import { snapshotFromRow, type QuotaBlockReason, type QuotaSnapshot } from "./allowance.js";
 
 export type { Plan } from "./tierConfig.js";
+
+/**
+ * Server-side quota enforcement. The balance lives in Postgres (supabase 0051) and every change
+ * goes through a row-locked SQL function, so two requests — on one server or ten — can never spend
+ * the same tokens. Nothing here is cached or kept in Redis: the database IS the balance, and if it
+ * can't be reached a billable request is refused ("unavailable"), never let through unmetered.
+ *
+ * Request lifecycle (UsageMeter in usageMeter.ts wraps the last three for a whole turn):
+ *   checkAndReserve  → hold an estimate before any model is called (refused = HTTP 429/403/503)
+ *   extendHold       → grow the hold when the real prompt / next agent round is known
+ *   recordUsage      → one ledger row per model invocation, idempotent, releases hold as it goes
+ *   settleReservation→ give back whatever hold is left (idempotent)
+ */
+
+// ── RPC transport (injectable so tests run the real SQL on a throwaway Postgres) ──────────────────
+
+export type QuotaRpc = <T = unknown>(fn: string, args: Record<string, unknown>) => Promise<T>;
+
+export class QuotaUnavailableError extends Error {}
+
+const supabaseRpc: QuotaRpc = async <T>(fn: string, args: Record<string, unknown>) => {
+  const { data, error } = await supabaseAdmin.rpc(fn, args);
+  if (error) throw new QuotaUnavailableError(`${fn}: ${error.message}`);
+  return data as T;
+};
+
+let rpc: QuotaRpc = supabaseRpc;
+
+/** Test hook: route the quota SQL functions somewhere else (pass null to restore Supabase). */
+export function setQuotaRpcForTests(next: QuotaRpc | null) {
+  rpc = next ?? supabaseRpc;
+}
+
+export function quotaRpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  return rpc<T>(fn, args);
+}
+
+// ── Plan resolution ──────────────────────────────────────────────────────────────────────────────
 
 export type EffectivePlan = {
   plan: Plan;
@@ -37,7 +66,6 @@ export type EffectivePlan = {
 /** A user's individual `plan` column, plus whether they're covered by an enterprise org's pool
  *  (which takes priority — pooled compute is what they're actually billed against). */
 async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePlan> {
-  // Two independent lookups — run them together (they used to run back to back).
   const [{ data: profile, error }, { data: membership }] = await Promise.all([
     supabaseAdmin.from("profiles").select("plan, plan_renews_at, custom_monthly_cap").eq("id", userId).maybeSingle(),
     supabaseAdmin
@@ -62,9 +90,7 @@ async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePl
     const resolved = Array.isArray(org) ? org[0] : org;
     if (resolved) {
       const seatCount = Math.max(ENTERPRISE_MIN_SEATS, resolved.seat_count ?? ENTERPRISE_MIN_SEATS);
-      const perSeat = resolved.pooled_monthly_tokens == null
-        ? ((await getCatalogPlan("enterprise").catch(() => null))?.limits.tokensPerSeat ?? ENTERPRISE_TOKENS_PER_SEAT)
-        : 0;
+      const perSeat = (await allowanceTable().catch(() => null))?.enterprise_per_seat ?? ENTERPRISE_TOKENS_PER_SEAT;
       enterprise = {
         organizationId: enterpriseRow.organization_id as string,
         seatCount,
@@ -81,369 +107,328 @@ async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePl
   };
 }
 
-/** Resolved once per message by the quota middleware and again by the chat service — memoized briefly
- *  (single-flight) so the second call is free. Plan changes take effect within the TTL. */
+/** Memoized briefly (single-flight) — used for routing/entitlements, never as the balance. */
 export const resolveEffectivePlan = memoAsync(15_000, resolveEffectivePlanUncached, (userId) => userId);
 
-/** Pre-flight hold, in credits: the prompt (~4 chars/token) as fresh input plus a fixed completion buffer,
- *  both at the default rates. The real, model-priced figure replaces it as the turn is metered
- *  (chargeProgress) and reconciled. Counters were raw tokens before the credit meter; the `quota:v2:`
- *  key prefix keeps those stale numbers from being read as credits. */
-export function estimateReservationTokens(promptChars: number, completionBufferTokens = 800): number {
-  const input = creditsForInputTokens(Math.max(1, Math.ceil(promptChars / 4)), DEFAULT_RESERVE_RATES);
-  const output = Math.ceil((completionBufferTokens * DEFAULT_RESERVE_RATES.output * 100_000) / 1_000_000);
-  return Math.max(1, input + output);
+/** The uncached lookup the balance paths use; replaceable in tests (they run the SQL without Supabase). */
+let planLookup: (userId: string) => Promise<EffectivePlan> = resolveEffectivePlanUncached;
+export function setPlanLookupForTests(fn: ((userId: string) => Promise<EffectivePlan>) | null) {
+  planLookup = fn ?? resolveEffectivePlanUncached;
 }
 
-function monthKey(date = new Date()): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-async function rollingWindowUsed(redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>, key: string, now: number) {
-  await redis.zRemRangeByScore(key, "-inf", now - ROLLING_WINDOW_SECONDS * 1000);
-  const members = await redis.zRangeByScore(key, "-inf", "+inf");
-  let sum = 0;
-  for (const member of members) {
-    const tokens = Number(member.slice(member.lastIndexOf(":") + 1));
-    if (Number.isFinite(tokens)) sum += tokens;
-  }
-  return sum;
-}
-
-/** When the oldest usage in the 5-hour window rolls off (the next moment the meter frees up); a full window from now if empty. */
-async function rollingResetAt(redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>, key: string, now: number): Promise<Date> {
-  const oldest = await redis.zRangeWithScores(key, 0, 0).catch(() => []);
-  const score = oldest[0]?.score;
-  return new Date((typeof score === "number" && score > 0 ? score : now) + ROLLING_WINDOW_SECONDS * 1000);
-}
-
-async function counterGet(redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>, key: string): Promise<number> {
-  const value = await redis.get(key);
-  return value ? Number(value) || 0 : 0;
-}
-
-/** INCRBY that also stamps a TTL the first time a key is created — same idiom as the existing
- *  RedisFixedWindowRateLimiter in rateLimit.ts, adapted for variable (token-count) increments
- *  instead of a flat +1, where "count === 1" can't be used to detect a fresh key. */
-async function counterIncr(
-  redis: NonNullable<Awaited<ReturnType<typeof getRedisClient>>>,
-  key: string,
-  by: number,
-  ttlSeconds: number,
-): Promise<number> {
-  const total = await redis.incrBy(key, by);
-  const ttl = await redis.pTTL(key);
-  if (ttl === -1) await redis.expire(key, ttlSeconds);
-  return total;
-}
-
-/**
- * The limits that actually apply to a person. A personal monthly cap (set by a package, an access
- * grant or an admin — profiles.custom_monthly_cap) replaces the plan's monthly ceiling; when it is
- * larger than the plan's own month, the weekly and 5-hour windows scale up with it so a generous
- * custom package isn't silently throttled back to the base plan's weekly pace.
- */
-export function effectiveIndividualLimits(
-  plan: Plan,
-  customMonthlyCap: number | null,
-  // The plan's own limits — from the console-edited catalog (planLimitsFor); code defaults otherwise.
-  base: { rolling: number; weekly: number; monthly: number | null } = {
-    rolling: PLAN_LIMITS[plan].rollingWindowTokens,
-    weekly: PLAN_LIMITS[plan].weeklyTokens,
-    monthly: PLAN_LIMITS[plan].monthlyTokens,
-  },
-) {
-  if (customMonthlyCap == null) return { ...base };
-  const baseMonth = base.monthly ?? Math.round(base.weekly * 4.3);
-  const scale = customMonthlyCap > baseMonth ? customMonthlyCap / baseMonth : 1;
+/** Per-plan allowances as the SQL functions want them: the console catalog over the code defaults. */
+export async function allowanceTable(): Promise<Record<string, number>> {
+  const catalog = await getPlanCatalog().catch(() => null);
+  const of = (id: string) => catalog?.find((p) => p.id === id);
   return {
-    rolling: Math.round(base.rolling * scale),
-    weekly: Math.round(base.weekly * scale),
-    monthly: customMonthlyCap,
+    free: of("free")?.limits.monthly ?? PLAN_ALLOWANCES.free,
+    pro: of("pro")?.limits.monthly ?? PLAN_ALLOWANCES.pro,
+    premium: of("premium")?.limits.monthly ?? PLAN_ALLOWANCES.premium,
+    enterprise_per_seat: of("enterprise")?.limits.tokensPerSeat ?? ENTERPRISE_TOKENS_PER_SEAT,
+    enterprise_min_seats: of("enterprise")?.minSeats ?? ENTERPRISE_MIN_SEATS,
   };
 }
 
+/** Pre-flight hold, in billable tokens: the message (~4 chars/token) plus a completion buffer.
+ *  The real prompt replaces it via extendHold as soon as the turn has built it. */
+export function estimateReservationTokens(promptChars: number, completionBufferTokens = 800): number {
+  return Math.max(1, Math.ceil(Math.max(0, promptChars) / 4) + Math.max(0, completionBufferTokens));
+}
+
+// ── Reservation lifecycle ────────────────────────────────────────────────────────────────────────
+
+export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation" | "code";
+
 export type Reservation = {
-  userId?: string;
-  reserveTokens: number;
-  /** Tokens already counted against the user's windows for this turn (starts at reserveTokens and
-   *  grows as chargeProgress() meters a long turn). reconcileQuota corrects from this. */
-  charged?: number;
-  /** Extra rolling-window members added by chargeProgress (removed again on reconcile). */
-  progressMembers?: string[];
-  /** The limits this turn is metered against. */
-  limits?: { rolling?: number; weekly?: number; monthly?: number | null; org?: number; member?: number | null };
-  plan: Plan;
+  id: string;
+  userId: string;
   organizationId: string | null;
-  rollingMember: string | null;
-  rollingKey: string | null;
-  weekKey: string | null;
-  monthKey: string | null;
-  memberCapKey: string | null;
-  /** True if Redis was unavailable and this reservation was allowed by fail-open — nothing to
-   *  reconcile/refund later since nothing was actually incremented. */
-  degraded: boolean;
+  accountId: string;
+  feature: LedgerFeature;
+  conversationId: string | null;
+  /** The hold as last confirmed by the database. */
+  hold: number;
+  /** The period's allowance when the hold was taken (sizes the per-turn runaway guard). */
+  allowance: number;
+  periodEnd: string;
+  settled: boolean;
 };
 
 export type QuotaCheckResult =
-  | { allowed: true; reservation: Reservation }
-  | { allowed: false; decision: QuotaDecision & { allowed: false }; resetAt: Date };
+  | { allowed: true; reservation: Reservation; snapshot: QuotaSnapshot }
+  | { allowed: false; reason: QuotaBlockReason; resetAt: Date | null; snapshot: QuotaSnapshot | null };
+
+type SqlResult = Record<string, unknown> & { ok?: boolean; reason?: string };
+
+function blockReason(raw: unknown): QuotaBlockReason {
+  return raw === "member_cap" || raw === "suspended" || raw === "exhausted" ? raw : "exhausted";
+}
+
+const isUuid = (v: string | null | undefined) => Boolean(v && /^[0-9a-f-]{36}$/i.test(v));
 
 /**
- * Pre-flight check + reservation for one chat turn. Fails OPEN if Redis is unavailable (matching
- * every other Redis-backed limiter in this codebase — see rateLimit.ts/redisClient.ts) rather
- * than blocking chat entirely on an infra hiccup unrelated to the user's own usage.
+ * Holds `amount` billable tokens before a request is sent upstream. Refused when the balance
+ * can't cover it, the account is suspended, or the ledger is unreachable (fail CLOSED — a database
+ * outage must not become unlimited free usage).
  */
-export async function checkAndReserve(userId: string, reserveTokens: number): Promise<QuotaCheckResult> {
-  const effective = await resolveEffectivePlan(userId);
-  const redis = await getRedisClient();
-  const now = Date.now();
-  const month = monthKey();
-
-  if (!redis) {
-    logger.warn("quota_check_degraded_no_redis", { userId });
-    return {
-      allowed: true,
-      reservation: {
-        reserveTokens,
-        plan: effective.plan,
-        organizationId: effective.enterprise?.organizationId ?? null,
-        rollingMember: null,
-        rollingKey: null,
-        weekKey: null,
-        monthKey: null,
-        memberCapKey: null,
-        degraded: true,
-      },
-    };
-  }
-
-  if (effective.enterprise) {
-    const orgId = effective.enterprise.organizationId;
-    const orgMonthKey = `quota:v2:orgmonth:${orgId}:${month}`;
-    const memberCapKey = effective.customMonthlyCap != null ? `quota:v2:membermonth:${orgId}:${userId}:${month}` : null;
-
-    const orgUsed = await counterGet(redis, orgMonthKey);
-    const memberUsed = memberCapKey ? await counterGet(redis, memberCapKey) : 0;
-
-    const decision = decideQuota({
-      plan: effective.plan,
-      reserveTokens,
-      counters: { rollingTokens: 0, weeklyTokens: 0, monthlyTokens: 0 },
-      enterprise: {
-        pooledMonthlyTokens: effective.enterprise.pooledMonthlyTokens,
-        orgMonthlyUsedTokens: orgUsed,
-        memberMonthlyCap: effective.customMonthlyCap,
-        memberMonthlyUsedTokens: memberUsed,
-      },
+export async function checkAndReserve(
+  userId: string,
+  amount: number,
+  opts: { feature?: LedgerFeature; conversationId?: string | null; reservationId?: string } = {},
+): Promise<QuotaCheckResult> {
+  const id = opts.reservationId ?? randomUUID();
+  try {
+    const effective = await planLookup(userId);
+    const orgId = effective.enterprise?.organizationId ?? null;
+    const row = await rpc<SqlResult>("quota_reserve", {
+      p_reservation: id,
+      p_user: userId,
+      p_org: orgId,
+      p_amount: Math.max(0, Math.ceil(amount)),
+      p_allowances: await allowanceTable(),
+      p_feature: opts.feature ?? "chat",
+      p_conversation: isUuid(opts.conversationId) ? opts.conversationId : null,
     });
-    if (!decision.allowed) {
-      return { allowed: false, decision, resetAt: nextMonthlyReset() };
+    const snapshot = snapshotFromRow(row);
+    if (!row.ok) {
+      const reason = blockReason(row.reason);
+      return { allowed: false, reason, resetAt: reason === "suspended" ? null : new Date(snapshot.periodEnd), snapshot };
     }
-
-    await counterIncr(redis, orgMonthKey, reserveTokens, 45 * 24 * 60 * 60);
-    if (memberCapKey) await counterIncr(redis, memberCapKey, reserveTokens, 45 * 24 * 60 * 60);
-
     return {
       allowed: true,
+      snapshot,
       reservation: {
+        id,
         userId,
-        reserveTokens,
-        charged: reserveTokens,
-        progressMembers: [],
-        limits: { org: effective.enterprise.pooledMonthlyTokens, member: effective.customMonthlyCap },
-        plan: effective.plan,
         organizationId: orgId,
-        rollingMember: null,
-        rollingKey: null,
-        weekKey: null,
-        monthKey: orgMonthKey,
-        memberCapKey,
-        degraded: false,
+        accountId: snapshot.accountId,
+        feature: opts.feature ?? "chat",
+        conversationId: opts.conversationId ?? null,
+        hold: Math.max(0, Math.ceil(amount)),
+        allowance: snapshot.allowance,
+        periodEnd: snapshot.periodEnd,
+        settled: false,
       },
     };
+  } catch (err) {
+    logger.error("quota_reserve_failed", { userId, error: err instanceof Error ? err.message : String(err) });
+    return { allowed: false, reason: "unavailable", resetAt: null, snapshot: null };
   }
+}
 
-  const limits = PLAN_LIMITS[effective.plan];
-  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap, await planLimitsFor(effective.plan).catch(() => undefined));
-  const rollingKey = `quota:v2:roll:${userId}`;
-  const weekKey = `quota:v2:week:${userId}`;
-  const monthTokenKey = eff.monthly != null ? `quota:v2:month:${userId}:${month}` : null;
+export type HoldResult = { ok: true; snapshot: QuotaSnapshot | null } | { ok: false; reason: QuotaBlockReason; snapshot: QuotaSnapshot | null };
 
-  const [rollingUsed, weeklyUsed, monthlyUsed] = await Promise.all([
-    rollingWindowUsed(redis, rollingKey, now),
-    counterGet(redis, weekKey),
-    monthTokenKey ? counterGet(redis, monthTokenKey) : Promise.resolve(0),
-  ]);
-
-  const decision = decideQuota({
-    plan: effective.plan,
-    reserveTokens,
-    counters: { rollingTokens: rollingUsed, weeklyTokens: weeklyUsed, monthlyTokens: monthlyUsed },
-    limitsOverride: eff,
-  });
-  if (!decision.allowed) {
-    const resetAt =
-      decision.reason === "rolling_window"
-        ? await rollingResetAt(redis, rollingKey, now)
-        : decision.reason === "monthly"
-          ? nextMonthlyReset()
-          : nextWeeklyReset();
-    return { allowed: false, decision, resetAt };
+/** Grows a running request's hold to `hold` tokens; refused (nothing changes) if the balance can't cover it. */
+export async function extendHold(reservation: Reservation, hold: number): Promise<HoldResult> {
+  const target = Math.max(0, Math.ceil(hold));
+  if (target <= reservation.hold) return { ok: true, snapshot: null };
+  try {
+    const row = await rpc<SqlResult>("quota_extend_hold", { p_reservation: reservation.id, p_hold: target });
+    const snapshot = snapshotFromRow(row);
+    if (!row.ok) return { ok: false, reason: row.reason === "settled" ? "exhausted" : blockReason(row.reason), snapshot };
+    reservation.hold = target;
+    return { ok: true, snapshot };
+  } catch (err) {
+    logger.error("quota_extend_failed", { reservationId: reservation.id, error: err instanceof Error ? err.message : String(err) });
+    return { ok: false, reason: "unavailable", snapshot: null };
   }
+}
 
-  const rollingMember = `${now}-${randomUUID()}:${reserveTokens}`;
-  await redis.zAdd(rollingKey, [{ score: now, value: rollingMember }]);
-  await redis.expire(rollingKey, ROLLING_WINDOW_SECONDS);
-  await counterIncr(redis, weekKey, reserveTokens, WEEKLY_TTL_SECONDS);
-  if (monthTokenKey) await counterIncr(redis, monthTokenKey, reserveTokens, 45 * 24 * 60 * 60);
+/** One ledger row, as quota_record_usage expects it (see supabase 0051 for the column list). */
+export type UsageEvent = {
+  idempotency_key: string;
+  organization_id: string | null;
+  provider_slug: string;
+  model_id: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cached_tokens: number;
+  cache_write_tokens: number;
+  reasoning_tokens: number;
+  billable_tokens: number;
+  usage_source: "provider" | "estimated" | "none";
+  call_status: "ok" | "partial" | "failed" | "aborted";
+  feature: LedgerFeature;
+  conversation_id: string | null;
+  request_id: string | null;
+  attempt: number | null;
+  streaming: boolean | null;
+  latency_ms: number | null;
+  cost_usd: number | null;
+  sell_inr: number | null;
+  priced: boolean;
+  estimated_cost_cents: number;
+  meter_version: string;
+};
 
-  return {
-    allowed: true,
-    reservation: {
-      userId,
-      reserveTokens,
-      charged: reserveTokens,
-      progressMembers: [],
-      limits: { rolling: eff.rolling, weekly: eff.weekly, monthly: eff.monthly },
-      plan: effective.plan,
-      organizationId: null,
-      rollingMember,
-      rollingKey,
-      weekKey,
-      monthKey: monthTokenKey,
-      memberCapKey: null,
-      degraded: false,
-    },
+export type RecordResult = {
+  /** false = the balance is used up (or the ledger is down): start no further model calls. */
+  ok: boolean;
+  reason?: QuotaBlockReason;
+  duplicate?: boolean;
+  /** Highest usage notice threshold (80/95/100) this record newly crossed, else 0. */
+  crossed: number;
+  snapshot: QuotaSnapshot | null;
+};
+
+/** Writes one usage event exactly once (idempotency_key); throws QuotaUnavailableError if the ledger is unreachable. */
+export async function recordUsage(reservation: Reservation, event: UsageEvent): Promise<RecordResult> {
+  const row = await rpc<SqlResult>("quota_record_usage", { p_reservation: reservation.id, p_event: event });
+  const snapshot = snapshotFromRow(row);
+  reservation.hold = Math.max(0, reservation.hold - (row.duplicate ? 0 : Math.min(reservation.hold, event.billable_tokens)));
+  const crossed = Number(row.crossed ?? 0) || 0;
+  return { ok: Boolean(row.ok), ...(row.ok ? {} : { reason: "exhausted" as const }), duplicate: Boolean(row.duplicate), crossed, snapshot };
+}
+
+/** Releases what's left of the hold. Idempotent; retried, then left to the stale-reservation sweep. */
+export async function settleReservation(reservation: Reservation | undefined, status: "settled" | "failed" = "settled"): Promise<void> {
+  if (!reservation || reservation.settled) return;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await rpc("quota_settle", { p_reservation: reservation.id, p_status: status });
+      reservation.settled = true;
+      reservation.hold = 0;
+      return;
+    } catch (err) {
+      if (attempt === 3) {
+        // The hold stays counted until quota_expire_stale_reservations releases it (2 h idle) — the
+        // customer is briefly under-served, never over-served.
+        logger.error("quota_settle_failed", { reservationId: reservation.id, error: err instanceof Error ? err.message : String(err) });
+      } else {
+        await new Promise((r) => setTimeout(r, 200 * attempt));
+      }
+    }
+  }
+}
+
+// ── Status (dashboards) ──────────────────────────────────────────────────────────────────────────
+
+export type SubscriptionState = "free" | "active" | "expired" | "suspended";
+
+export type QuotaStatus = {
+  plan: Plan;
+  isEnterprise: boolean;
+  period: {
+    accountId: string;
+    start: string;
+    end: string;
+    allowance: number;
+    used: number;
+    adjustments: number;
+    reserved: number;
+    remaining: number;
+    status: "active" | "suspended";
+    subscription: SubscriptionState;
+    renewsAt: string | null;
+    pendingPlan: string | null;
   };
-}
-
-export type ProgressResult = { ok: true } | { ok: false; reason: "rolling_window" | "weekly" | "monthly" | "org_pool" | "member_cap" };
-
-/**
- * Meters a turn WHILE it runs. The pre-flight reservation only covers the message itself; a long
- * turn (history, many tool rounds, a 100-round build) costs far more, and that used to be counted
- * only when the turn ended — so one turn could run well past the limit ("usage goes above 100%").
- * Callers report the turn's running total; the difference is charged atomically (INCRBY returns
- * the new total, so concurrent turns can't both slip past) and { ok: false } means stop now.
- * reconcileQuota later corrects the counters to the exact final figure.
- */
-export async function chargeProgress(reservation: Reservation | undefined, totalTokensSoFar: number): Promise<ProgressResult> {
-  if (!reservation || reservation.degraded || !reservation.limits) return { ok: true };
-  const charged = reservation.charged ?? reservation.reserveTokens;
-  const delta = Math.ceil(totalTokensSoFar - charged);
-  if (delta <= 0) return { ok: true };
-  const redis = await getRedisClient();
-  if (!redis) return { ok: true };
-  reservation.charged = charged + delta;
-  const { limits } = reservation;
-  if (reservation.memberCapKey) {
-    const total = await redis.incrBy(reservation.memberCapKey, delta);
-    if (limits.member != null && total > limits.member) return { ok: false, reason: "member_cap" };
-  }
-  if (reservation.organizationId && reservation.monthKey) {
-    const total = await redis.incrBy(reservation.monthKey, delta);
-    if (limits.org != null && total > limits.org) return { ok: false, reason: "org_pool" };
-    return { ok: true };
-  }
-  const now = Date.now();
-  if (reservation.rollingKey) {
-    const member = `${now}-progress-${randomUUID()}:${delta}`;
-    await redis.zAdd(reservation.rollingKey, [{ score: now, value: member }]);
-    (reservation.progressMembers ??= []).push(member);
-  }
-  const [weekTotal, monthTotal, rollingTotal] = await Promise.all([
-    reservation.weekKey ? redis.incrBy(reservation.weekKey, delta) : Promise.resolve(0),
-    reservation.monthKey ? redis.incrBy(reservation.monthKey, delta) : Promise.resolve(0),
-    reservation.rollingKey ? rollingWindowUsed(redis, reservation.rollingKey, now) : Promise.resolve(0),
-  ]);
-  if (limits.rolling != null && rollingTotal > limits.rolling) return { ok: false, reason: "rolling_window" };
-  if (limits.weekly != null && weekTotal > limits.weekly) return { ok: false, reason: "weekly" };
-  if (limits.monthly != null && monthTotal > limits.monthly) return { ok: false, reason: "monthly" };
-  return { ok: true };
-}
-
-export const QUOTA_STOP_MESSAGE: Record<string, string> = {
-  rolling_window: "You've reached your 5-hour usage limit, so I stopped here.",
-  weekly: "You've reached your weekly usage limit, so I stopped here.",
-  monthly: "You've reached your monthly usage limit, so I stopped here.",
-  org_pool: "Your organization's monthly token pool is used up, so I stopped here.",
-  member_cap: "You've reached the monthly cap your admin set, so I stopped here.",
+  /** Back-compat for the mobile apps (they read monthly/org/memberCap buckets). */
+  monthly: { used: number; limit: number; resetAt: string } | null;
+  rolling: null;
+  weekly: null;
+  org: { used: number; limit: number; seatCount: number; resetAt: string } | null;
+  memberCap: { used: number; limit: number } | null;
 };
 
 /**
- * Post-completion reconciliation: corrects every counter incremented at reservation time by the
- * difference between what was reserved and what the provider actually reported (or 0 if the
- * message never actually reached a model at all — a full refund). Safe to call with
- * `actualTokens = reservation.reserveTokens` (a no-op) and safe on a degraded (no-Redis)
- * reservation (nothing to correct).
+ * What a usage meter shows for a counter: never below 0 and never above the limit (bonuses make
+ * used + adjustments negative; an in-flight call can overrun the last few tokens).
  */
-export async function reconcileQuota(reservation: Reservation, actualTokens: number): Promise<void> {
-  if (reservation.degraded) return;
-  const charged = reservation.charged ?? reservation.reserveTokens;
-  const delta = actualTokens - charged;
-  if (delta === 0 && !reservation.progressMembers?.length) return;
-
-  const redis = await getRedisClient();
-  if (!redis) return; // Redis died between reserve and reconcile — nothing we can safely correct.
-
-  if (reservation.rollingKey && reservation.rollingMember) {
-    await redis.zRem(reservation.rollingKey, [reservation.rollingMember, ...(reservation.progressMembers ?? [])]);
-    if (actualTokens > 0) {
-      const [tsPart] = reservation.rollingMember.split("-");
-      const score = Number(tsPart) || Date.now();
-      // Unique per turn: two turns reconciling in the same millisecond with the same total would
-      // otherwise collapse into one sorted-set member and under-count the window.
-      await redis.zAdd(reservation.rollingKey, [{ score, value: `${tsPart}-corrected-${randomUUID()}:${actualTokens}` }]);
-    }
-  }
-  if (delta !== 0) {
-    if (reservation.weekKey) await redis.incrBy(reservation.weekKey, delta);
-    if (reservation.monthKey) await redis.incrBy(reservation.monthKey, delta);
-    if (reservation.memberCapKey) await redis.incrBy(reservation.memberCapKey, delta);
-  }
-  reservation.charged = actualTokens;
-  reservation.progressMembers = [];
+export function meterValue(used: number, limit: number): number {
+  return Math.max(0, Math.min(Number.isFinite(used) ? used : 0, limit));
 }
 
-/** Fire-and-forget audit row for admin profitability reporting — distinct from usage_events'
- *  broader "token_usage" rows (kept for the existing monthly cost summary) in that this one
- *  carries the per-model input/output split and the original reservation for cross-checking. */
-export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation" | "code";
-
-export async function recordTokenLedger(
-  userId: string,
-  organizationId: string | null,
-  providerSlug: string,
-  modelId: string,
-  usage: TokenUsage,
-  reservedTokens: number,
-  feature: LedgerFeature = "chat",
-): Promise<void> {
-  // Exact cost at today's price for this model (finance/pricing.ts); flagged when no price exists.
-  const price = await priceUsage(providerSlug, modelId, usage);
-  const pricedColumns = { cost_usd: price.costUsd, sell_inr: price.sellInr, priced: price.priced };
-  const base = {
-    user_id: userId,
-    organization_id: organizationId,
-    provider_slug: providerSlug,
-    model_id: modelId,
-    input_tokens: usage.promptTokens,
-    output_tokens: usage.completionTokens,
-    total_tokens: usage.totalTokens,
-    // Both are already part of input_tokens above — these are just its cache breakdown, 0 when
-    // the provider/call reported no prompt-cache activity (see providers/promptCache.ts).
-    cached_tokens: usage.cachedTokens ?? 0,
-    cache_write_tokens: usage.cacheWriteTokens ?? 0,
-    estimated_cost_cents: Math.round(price.costUsd * 100 * 100) / 100,
-    reserved_tokens: reservedTokens,
+export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
+  const effective = await planLookup(userId);
+  const orgId = effective.enterprise?.organizationId ?? null;
+  const row = await rpc<SqlResult>("quota_sync", { p_user: userId, p_org: orgId, p_allowances: await allowanceTable() });
+  const s = snapshotFromRow(row);
+  // Re-read the plan: quota_sync may just have expired a lapsed term.
+  const after = orgId ? effective : await planLookup(userId);
+  const consumed = s.used + s.adjustments;
+  const subscription: SubscriptionState =
+    s.status === "suspended"
+      ? "suspended"
+      : orgId || after.plan !== "free"
+        ? "active"
+        : effective.plan !== "free"
+          ? "expired"
+          : "free";
+  const memberCap = row.member_cap == null ? null : Number(row.member_cap);
+  return {
+    plan: after.plan,
+    isEnterprise: Boolean(orgId),
+    period: {
+      accountId: s.accountId,
+      start: s.periodStart,
+      end: s.periodEnd,
+      allowance: s.allowance,
+      used: s.used,
+      adjustments: s.adjustments,
+      reserved: s.reserved,
+      remaining: Math.max(0, s.remaining),
+      status: s.status,
+      subscription,
+      renewsAt: orgId ? null : after.planRenewsAt,
+      pendingPlan: (row.pending_plan as string | null) ?? null,
+    },
+    monthly: orgId ? null : { used: meterValue(consumed, s.allowance), limit: s.allowance, resetAt: s.periodEnd },
+    rolling: null,
+    weekly: null,
+    org: orgId ? { used: meterValue(consumed, s.allowance), limit: s.allowance, seatCount: effective.enterprise!.seatCount, resetAt: s.periodEnd } : null,
+    memberCap: orgId && memberCap != null ? { used: meterValue(Number(row.member_used ?? 0), memberCap), limit: memberCap } : null,
   };
-  let { error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns, feature });
-  // A server deployed before migration 0048 must still record usage (quota + audit rely on it).
-  if (error && /feature/.test(error.message)) ({ error } = await supabaseAdmin.from("token_ledger").insert({ ...base, ...pricedColumns }));
-  // A server deployed before migration 0040 ran must still record usage (quota + audit rely on it).
-  if (error && /cost_usd|sell_inr|priced/.test(error.message)) ({ error } = await supabaseAdmin.from("token_ledger").insert(base));
-  if (error) logger.warn("token_ledger_insert_failed", { userId, error: error.message });
+}
+
+// ── Admin adjustments (append-only; Team Console + admin API) ────────────────────────────────────
+
+async function accountIdFor(userId: string): Promise<string> {
+  const effective = await planLookup(userId);
+  const row = await rpc<SqlResult>("quota_sync", {
+    p_user: userId,
+    p_org: effective.enterprise?.organizationId ?? null,
+    p_allowances: await allowanceTable(),
+  });
+  return snapshotFromRow(row).accountId;
+}
+
+export type AdjustmentKind = "bonus" | "reset" | "refund" | "correction" | "debit";
+
+/** Positive tokens consume allowance, negative give it back. `key` makes a retried click a no-op. */
+export async function adjustQuota(input: {
+  accountId?: string;
+  userId?: string;
+  tokens: number;
+  kind: AdjustmentKind;
+  reason: string;
+  actorId: string | null;
+  key?: string;
+}): Promise<QuotaSnapshot> {
+  const accountId = input.accountId ?? (input.userId ? await accountIdFor(input.userId) : null);
+  if (!accountId) throw new Error("No quota account to adjust");
+  const row = await rpc<SqlResult>("quota_adjust", {
+    p_account: accountId,
+    p_tokens: Math.trunc(input.tokens),
+    p_kind: input.kind,
+    p_reason: input.reason,
+    p_actor: input.actorId,
+    p_key: input.key ?? `admin:${randomUUID()}`,
+  });
+  return snapshotFromRow(row);
+}
+
+/** Admin "bonus": gives `tokens` extra headroom in the CURRENT period only. */
+export async function grantBonusTokens(userId: string, tokens: number, actorId: string | null = null): Promise<void> {
+  await adjustQuota({ userId, tokens: -Math.abs(tokens), kind: "bonus", reason: "Bonus tokens", actorId });
+}
+
+/** Admin "reset now": gives back everything used this period (recorded as one adjustment — the usage history stays). */
+export async function resetUserQuotaNow(userId: string, actorId: string | null = null): Promise<void> {
+  const accountId = await accountIdFor(userId);
+  const { data } = await supabaseAdmin.from("quota_accounts").select("used, adjustments").eq("id", accountId).maybeSingle();
+  const consumed = Number(data?.used ?? 0) + Number(data?.adjustments ?? 0);
+  if (consumed > 0) await adjustQuota({ accountId, tokens: -consumed, kind: "reset", reason: "Usage reset by admin", actorId });
 }
 
 /** Whether `plan` (individual) or enterprise membership can use a model gated at `minTier`. */
@@ -452,117 +437,4 @@ export async function canUseModelTier(userId: string, minTier: Plan): Promise<bo
   const effective = await resolveEffectivePlan(userId);
   if (effective.enterprise) return true; // spec: enterprise gets "global access to all models"
   return planSatisfiesTier(effective.plan, minTier);
-}
-
-export type QuotaStatus = {
-  plan: Plan;
-  isEnterprise: boolean;
-  rolling: { used: number; limit: number; resetAt: string } | null;
-  weekly: { used: number; limit: number; resetAt: string };
-  monthly: { used: number; limit: number; resetAt: string } | null;
-  org: { used: number; limit: number; seatCount: number; resetAt: string } | null;
-  memberCap: { used: number; limit: number } | null;
-};
-
-/**
- * What a usage meter shows for a counter: never below 0 and never above the limit. A counter CAN go
- * negative — a bonus grant decrements it on purpose (headroom), and a refund can land on a key that
- * already rolled over — and the raw value used to reach the client as "-12% used".
- */
-export function meterValue(used: number, limit: number): number {
-  return Math.max(0, Math.min(Number.isFinite(used) ? used : 0, limit));
-}
-
-/**
- * Admin "master control" — grants extra headroom for the CURRENT period by decrementing
- * whichever counter(s) the user's plan actually enforces (rolling window excluded: it's a
- * moving 5h window, not a fixed bucket, so a bonus there would just get pruned away within
- * hours — the weekly/monthly counters are where a bonus persists meaningfully).
- */
-export async function grantBonusTokens(userId: string, tokens: number): Promise<void> {
-  const effective = await resolveEffectivePlan(userId);
-  const redis = await getRedisClient();
-  if (!redis) throw new Error("Redis is not configured — can't grant bonus tokens");
-  const month = monthKey();
-
-  if (effective.enterprise) {
-    await redis.incrBy(`quota:v2:orgmonth:${effective.enterprise.organizationId}:${month}`, -tokens);
-    return;
-  }
-  await redis.incrBy(`quota:v2:week:${userId}`, -tokens);
-  if (PLAN_LIMITS[effective.plan].monthlyTokens != null) {
-    await redis.incrBy(`quota:v2:month:${userId}:${month}`, -tokens);
-  }
-}
-
-/** Admin "master control" — wipes this user's current-period counters early (weekly + monthly;
- *  the rolling window is left alone since it self-clears within 5 hours regardless). */
-export async function resetUserQuotaNow(userId: string): Promise<void> {
-  const redis = await getRedisClient();
-  if (!redis) throw new Error("Redis is not configured — can't reset quota");
-  const month = monthKey();
-  await redis.del([`quota:v2:week:${userId}`, `quota:v2:month:${userId}:${month}`, `quota:v2:roll:${userId}`]);
-}
-
-/** Full status for the Usage settings panel and the 50/80/90/100% threshold toasts. */
-export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
-  const effective = await resolveEffectivePlan(userId);
-  const redis = await getRedisClient();
-  const now = Date.now();
-  const month = monthKey();
-
-  if (effective.enterprise) {
-    const orgId = effective.enterprise.organizationId;
-    const orgMonthKey = `quota:v2:orgmonth:${orgId}:${month}`;
-    const memberCapKey = effective.customMonthlyCap != null ? `quota:v2:membermonth:${orgId}:${userId}:${month}` : null;
-    const orgUsed = redis ? await counterGet(redis, orgMonthKey) : 0;
-    const memberUsed = redis && memberCapKey ? await counterGet(redis, memberCapKey) : 0;
-    return {
-      plan: effective.plan,
-      isEnterprise: true,
-      rolling: null,
-      weekly: { used: 0, limit: 0, resetAt: nextWeeklyReset().toISOString() },
-      monthly: null,
-      org: {
-        used: meterValue(orgUsed, effective.enterprise.pooledMonthlyTokens),
-        limit: effective.enterprise.pooledMonthlyTokens,
-        seatCount: effective.enterprise.seatCount,
-        resetAt: nextMonthlyReset().toISOString(),
-      },
-      memberCap: effective.customMonthlyCap != null ? { used: meterValue(memberUsed, effective.customMonthlyCap), limit: effective.customMonthlyCap } : null,
-    };
-  }
-
-  const limits = PLAN_LIMITS[effective.plan];
-  const eff = effectiveIndividualLimits(effective.plan, effective.customMonthlyCap, await planLimitsFor(effective.plan).catch(() => undefined));
-  const rollingKey = `quota:v2:roll:${userId}`;
-  const weekKey = `quota:v2:week:${userId}`;
-  const monthTokenKey = eff.monthly != null ? `quota:v2:month:${userId}:${month}` : null;
-
-  const [rollingUsed, weeklyUsed, monthlyUsed] = redis
-    ? await Promise.all([
-        rollingWindowUsed(redis, rollingKey, now),
-        counterGet(redis, weekKey),
-        monthTokenKey ? counterGet(redis, monthTokenKey) : Promise.resolve(0),
-      ])
-    : [0, 0, 0];
-
-  return {
-    plan: effective.plan,
-    isEnterprise: false,
-    // Clamped for display: the counters can sit a few tokens past a limit (the turn that crossed it
-    // is stopped, not undone) — the meter should read "100%", never "103%".
-    rolling: {
-      used: meterValue(rollingUsed, eff.rolling),
-      limit: eff.rolling,
-      resetAt: (redis ? await rollingResetAt(redis, rollingKey, now) : new Date(now + limits.rollingWindowSeconds * 1000)).toISOString(),
-    },
-    weekly: { used: meterValue(weeklyUsed, eff.weekly), limit: eff.weekly, resetAt: nextWeeklyReset().toISOString() },
-    monthly:
-      eff.monthly != null
-        ? { used: meterValue(monthlyUsed, eff.monthly), limit: eff.monthly, resetAt: nextMonthlyReset().toISOString() }
-        : null,
-    org: null,
-    memberCap: null,
-  };
 }

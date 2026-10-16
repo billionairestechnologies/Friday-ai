@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { meteredChat } from "../quota/meterContext.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, listChatCandidates } from "../providerService.js";
 import { rankCandidatesForMessage } from "../modelRouting.js";
@@ -56,7 +57,7 @@ export async function detectBuildIntent(content: string, hasProject: boolean): P
       { role: "user", content: text.slice(0, 1500) },
     ];
     const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), PROBE_TIMEOUT_MS));
-    const raw = await Promise.race([adapter.chat(apiKey, candidate.modelId, probe), timeout]);
+    const raw = await Promise.race([meteredChat(candidate, probe, () => adapter.chat(apiKey, candidate.modelId, probe), { chargeable: false }), timeout]);
     return /^\s*yes/i.test(raw);
   } catch {
     return false;

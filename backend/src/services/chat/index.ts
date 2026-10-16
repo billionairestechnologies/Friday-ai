@@ -73,16 +73,11 @@ import { consumeDailyAllowance, entitlementsFor, refundDailyAllowance } from "..
 import { recordModelOutcome } from "../status/statusService.js";
 import { activeSkillPrompt, getSkill, listSkills, skillMenu, type Skill } from "../skills/skillService.js";
 import type { GeneratedFile } from "../documents/documentService.js";
-import { TURN_CAP_MESSAGE, turnCreditCap } from "../agent/loopGuard.js";
-import { creditsForInputTokens, creditsForUsage, DEFAULT_RESERVE_RATES, meterRatesFor, type MeterRates } from "../quota/meter.js";
-import {
-  chargeProgress,
-  QUOTA_STOP_MESSAGE,
-  reconcileQuota,
-  recordTokenLedger,
-  resolveEffectivePlan,
-  type Reservation,
-} from "../quota/tokenQuotaService.js";
+import { TURN_CAP_MESSAGE, turnTokenCap } from "../agent/loopGuard.js";
+import { checkAndReserve, estimateReservationTokens, resolveEffectivePlan, type Reservation } from "../quota/tokenQuotaService.js";
+import { QUOTA_REASON_TEXT } from "../quota/allowance.js";
+import { UsageMeter, type MeteredModel } from "../quota/usageMeter.js";
+import { withMeter } from "../quota/meterContext.js";
 
 // A failed turn leaves an assistant row that is empty (error kept in metadata) or, from older
 // versions, a raw provider error page. Re-sending those makes the next request invalid or oversized
@@ -197,13 +192,46 @@ function adapterHasTools(slug: string): boolean {
  * the client can show a live "council" of who's answering) and then streams the synthesizer's
  * merged final answer the same way a single model would.
  *
- * `reservation` is the token-quota pre-flight reservation the chat route's `quotaLimit`
- * middleware already made (see quotaLimit.ts) — every exit path below reconciles it in the
- * `finally` block via `reconcileTokens`, which defaults to 0 (a full refund) and is only set to
- * the real total right before the message that actually spent tokens is recorded. Team Up is
- * metered too: every proposer plus the synthesizer is summed into `reconcileTokens`.
+ * `reservation` is the quota hold the chat route's `quotaLimit` middleware already took (see
+ * quotaLimit.ts); without one (a caller that skipped the middleware) the turn reserves for itself
+ * and is refused if the balance can't cover it. Every model invocation of the turn — tool-loop
+ * rounds, Build rounds, Team Up proposers and synthesizer, hedged attempts that lost the race,
+ * helper probes — is written to the usage ledger by the turn's UsageMeter as it happens, and the
+ * reservation is settled when the turn ends, however it ends.
  */
 export async function streamMessage(
+  userId: string,
+  conversationId: string,
+  content: string,
+  inputMode: "text" | "voice",
+  onEvent: (ev: StreamEvent) => void,
+  signal?: AbortSignal,
+  think = false,
+  behavior = "",
+  webSearch = false,
+  canvas = false,
+  attachments: ChatImage[] = [],
+  reservation?: Reservation,
+  options: { research?: boolean; skillId?: string; effort?: BuildEffort; permissionMode?: PermissionMode; repo?: RepoRef } = {},
+): Promise<void> {
+  const feature = options.research ? "research" : reservation?.feature === "automation" ? "automation" : "chat";
+  if (!reservation) {
+    const check = await checkAndReserve(userId, estimateReservationTokens(content.length), { feature, conversationId });
+    if (!check.allowed) {
+      onEvent({ t: "err", c: `${QUOTA_REASON_TEXT[check.reason]}.` });
+      onEvent({ t: "done" });
+      return;
+    }
+    reservation = check.reservation;
+  }
+  const meter = new UsageMeter(reservation, { userId, organizationId: reservation.organizationId, feature, conversationId });
+  await withMeter(meter, () =>
+    streamTurn(meter, userId, conversationId, content, inputMode, onEvent, signal, think, behavior, webSearch, canvas, attachments, reservation, options),
+  );
+}
+
+async function streamTurn(
+  meter: UsageMeter,
   userId: string,
   conversationId: string,
   content: string,
@@ -233,13 +261,10 @@ export async function streamMessage(
   // Deep Research always searches; with a tool-capable model it runs a long multi-source tool loop.
   const research = Boolean(options.research) && attachments.length === 0;
   if (research) webSearch = true;
-  // The quota meter counts CREDITS — what the call really costs (quota/meter.ts) — not raw tokens.
-  // `reconcileTokens` keeps its old name but holds credits. Rates start at the default and are
-  // swapped for the chosen model's priced rates as soon as routing has picked one.
-  let reconcileTokens = 0;
-  let meterRates: MeterRates = DEFAULT_RESERVE_RATES;
-  const setMeterModel = async (c: { slug: string; modelId: string } | undefined) => {
-    if (c) meterRates = await meterRatesFor(c.slug, c.modelId);
+  // The model the next ledger rows are attributed to: whichever routing has settled on so far.
+  let meterModel: MeteredModel = { slug: "unknown", modelId: "unknown" };
+  const setMeterModel = (c: { slug: string; modelId: string } | undefined) => {
+    if (c) meterModel = { slug: c.slug, modelId: c.modelId };
   };
   // Stage timings (FRIDAY_CHAT_TIMING=1) — how long each pre-model step takes before the first token.
   const timingStart = Date.now();
@@ -544,25 +569,30 @@ export async function streamMessage(
       extractedDocText,
     );
 
-    // Meter the real prompt now that it's built: the route's pre-flight reservation only covered the
-    // new message, but the model is about to read the whole history. A turn the user can't afford
-    // stops here, before any model is paid for.
+    // Hold the real prompt now that it's built: the route's pre-flight hold only covered the new
+    // message, but the model is about to read the whole history. A turn the balance can't cover
+    // stops here, before any model is paid for. Team Up sends it to every panel model at once.
     const promptTokens = Math.ceil(history.reduce((n, m) => n + m.content.length, 0) / 4) + 800;
-    const preflight = await chargeProgress(reservation, creditsForInputTokens(promptTokens, meterRates));
-    if (!preflight.ok) {
-      const why = QUOTA_STOP_MESSAGE[preflight.reason]!.replace(", so I stopped here.", ".");
-      onEvent({ t: "err", c: `${why} This chat's history is larger than what's left — a new chat may still fit, or wait for the reset (Settings → Usage).` });
+    const fanOut = mode === "teamup" ? (await entitlementsPromise).teamUpModels + 1 : 1;
+    if (!(await meter.ensureHold(promptTokens * fanOut))) {
+      const why = meter.stopMessage!.replace(", so I stopped here.", ".");
+      onEvent({
+        t: "err",
+        c: meter.stopReason === "unavailable" ? why : `${why} This chat's history is larger than what's left — a new chat may still fit, or check Settings → Usage for when your tokens renew.`,
+      });
       onEvent({ t: "done" });
       return;
     }
-    // One turn may not spend more than a share of the 5-hour window: a runaway loop stops itself
-    // with the work saved instead of draining the whole allowance.
-    const turnCap = turnCreditCap(reservation?.limits?.rolling);
-    const budget = async (spent: TokenUsage) => {
-      const credits = creditsForUsage(spent, meterRates);
-      if (turnCap != null && credits > turnCap) return TURN_CAP_MESSAGE;
-      const r = await chargeProgress(reservation, credits);
-      return r.ok ? null : QUOTA_STOP_MESSAGE[r.reason]!;
+    // Runaway guard (not a usage cap): one turn may spend at most a share of the monthly allowance,
+    // then it pauses with the work saved and the user can say "continue".
+    const turnCap = turnTokenCap(reservation?.allowance);
+    const meterBudget = meter.budget(() => meterModel);
+    const budget = async (spent: TokenUsage, ran?: { slug: string; modelId: string } | null) => {
+      // Rows are filed under the model that actually ran the round (a fallback, not the first pick).
+      if (ran) setMeterModel(ran);
+      const stop = await meterBudget(spent);
+      if (stop) return stop;
+      return turnCap != null && meter.billable > turnCap ? TURN_CAP_MESSAGE : null;
     };
 
     if (mode === "teamup") {
@@ -574,22 +604,11 @@ export async function streamMessage(
         requiresVision: hasImageAttachment && !extractedDocText,
         maxModels: (await entitlementsPromise).teamUpModels,
       });
-      // Every proposer + the synthesizer counts against the quota (Team Up used to be unmetered).
-      if (spent.length > 0) {
-        const plan = await effectivePlanPromise.catch(() => null);
-        for (const [i, { candidate, usage }] of spent.entries()) {
-          reconcileTokens += creditsForUsage(usage, await meterRatesFor(candidate.slug, candidate.modelId));
-          void recordTokenUsage(userId, candidate.slug, candidate.modelId, usage, { conversationId, mode });
-          void recordTokenLedger(
-            userId,
-            plan?.enterprise?.organizationId ?? null,
-            candidate.slug,
-            candidate.modelId,
-            usage,
-            i === 0 ? (reservation?.reserveTokens ?? 0) : 0,
-            "teamup",
-          );
-        }
+      // Every proposer + the synthesizer is its own ledger row.
+      meter.setFeature("teamup");
+      for (const { candidate, usage } of spent) {
+        await meter.recordCall(candidate, usage, { streaming: false });
+        void recordTokenUsage(userId, candidate.slug, candidate.modelId, usage, { conversationId, mode });
       }
       return;
     }
@@ -707,8 +726,9 @@ export async function streamMessage(
     // install → run → live preview) instead of a plain chat reply. Skipped when the user picked
     // Canvas (single-file preview) — Team Up already returned above.
     mark("candidates + tier resolved");
-    await setMeterModel(candidates[0]);
+    setMeterModel(candidates[0]);
     if (await buildIntentPromise) {
+      meter.setFeature("build");
       const entitlements = await entitlementsPromise;
       if (!entitlements.buildMode) {
         onEvent({ t: "err", c: "Build Mode isn't included in your plan. Upgrade to build and run real projects." });
@@ -724,7 +744,7 @@ export async function streamMessage(
         if (pool.length) candidates = rankCandidatesForMessage(pool, content);
       }
       candidates = buildCandidates(candidates, isFrontierModel);
-      await setMeterModel(candidates[0]);
+      setMeterModel(candidates[0]);
       const projectFiles = Object.keys((await getProject(conversationId))?.files ?? {});
       const pendingPlan = await findPendingPlan(conversationId);
       let approvedPlan: BuildPlan | undefined;
@@ -773,9 +793,8 @@ export async function streamMessage(
           await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
           const planner = candidates[0];
           if (planner) {
-            reconcileTokens = creditsForUsage(drafted.usage, await meterRatesFor(planner.slug, planner.modelId));
+            await meter.recordCall(planner, drafted.usage, { streaming: false });
             void recordTokenUsage(userId, planner.slug, planner.modelId, drafted.usage, { conversationId, mode });
-            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0, "build");
           }
           onEvent({ t: "done" });
           return;
@@ -804,19 +823,9 @@ export async function streamMessage(
           void notifyBuildFinished(userId, conversationId, "error");
           return;
         }
-        if (built.candidate) {
-          reconcileTokens = creditsForUsage(built.usage, await meterRatesFor(built.candidate.slug, built.candidate.modelId));
-          void recordTokenUsage(userId, built.candidate.slug, built.candidate.modelId, built.usage, { conversationId, mode });
-          void recordTokenLedger(
-            userId,
-            effectivePlan.enterprise?.organizationId ?? null,
-            built.candidate.slug,
-            built.candidate.modelId,
-            built.usage,
-            reservation?.reserveTokens ?? 0,
-            "build",
-          );
-        }
+        // Whatever the per-round budget hasn't recorded yet (the last round, review/summary estimates).
+        await meter.recordCumulative(built.candidate ?? meterModel, built.usage, { status: built.error ? "partial" : "ok" });
+        if (built.candidate) void recordTokenUsage(userId, built.candidate.slug, built.candidate.modelId, built.usage, { conversationId, mode });
         // E2B bills for the time the sandbox runs — booked as sandbox_second so the P&L and plan economics carry it.
         if (built.build.elapsedMs) void recordUsageEvent(userId, "sandbox_second", Math.round(built.build.elapsedMs / 1000), { conversationId });
         emit({ t: "build", elapsedMs: built.build.elapsedMs, zipBytes: built.build.zipBytes, zipName: built.build.zipName, prUrl: built.build.prUrl, commit: built.build.commit });
@@ -898,7 +907,7 @@ export async function streamMessage(
       const frontier = toolCapable.filter(isFrontierModel);
       candidates = [...(frontier.length ? frontier : toolCapable), ...candidates.filter((c) => !supportsTools(c))];
     }
-    await setMeterModel(candidates[0]);
+    setMeterModel(candidates[0]);
     if (!process.env.FRIDAY_DISABLE_TOOLS && supportsTools(candidates[0]!)) {
       if (research) onEvent({ t: "status", s: "searching" });
       // generate_image joins every tool turn: the model, not a keyword list, decides when the user
@@ -940,7 +949,10 @@ export async function streamMessage(
             onEvent({ t: "step", ...step });
           },
           onUsage: (u) => {
+            // Sub-agents (Deep Research helpers) report when each finishes — recorded right away so
+            // a fan-out can't run past the balance unnoticed until the end of the turn.
             nestedUsage = mergeTokenUsage(nestedUsage, u);
+            void meter.recordCumulative(meterModel, nestedUsage, {}, "nested");
           },
           onImage: (url, alt) => {
             const md = `\n\n![${alt.replace(/[\[\]\n]/g, " ")}](${url})\n\n`;
@@ -971,6 +983,9 @@ export async function streamMessage(
         onStep: (step) => onEvent({ t: "step", ...step }),
       });
       toolLoopScrubber.flush();
+      // Whatever the per-round budget hasn't recorded yet: the final answer round, sub-agents.
+      await meter.recordCumulative(toolRun.candidate ?? meterModel, toolRun.usage, { status: toolRun.error ? "partial" : "ok", streaming: true });
+      await meter.recordCumulative(meterModel, nestedUsage, {}, "nested");
       if (!toolRun.candidate) {
         if (toolRun.error) console.warn(`[chat] tool path unavailable, falling back: ${toolRun.error}`);
         toolRun = null;
@@ -1016,6 +1031,23 @@ export async function streamMessage(
       },
     });
     hedgeScrubber.flush();
+    // One ledger row per model call the reply started: the winner (estimated, and flagged, if the
+    // provider sent no usage), a winner that broke off mid-reply (partial — it was still consumed),
+    // candidates that failed over (no tokens), and hedge losers we aborted for latency (recorded
+    // for cost, not charged to the customer).
+    if (streamed) {
+      const promptChars = history.reduce((sum, message) => sum + message.content.length, 0);
+      for (const attempt of streamed.attempts) {
+        const consumed = attempt.status !== "failed" || attempt.outputChars > 0;
+        const usage = attempt.usage ?? (consumed ? estimateTokenUsageFromText(promptChars, attempt.outputChars) : emptyTokenUsage());
+        await meter.recordCall(attempt.candidate, usage, {
+          status: attempt.status,
+          streaming: true,
+          latencyMs: attempt.latencyMs,
+          chargeable: attempt.won || (attempt.status === "partial" && !streamed.candidate),
+        });
+      }
+    }
     if (streamed?.candidate) {
       usedCandidate = streamed.candidate;
       full = streamed.text || full;
@@ -1049,23 +1081,11 @@ export async function streamMessage(
       const promptChars = history.reduce((sum, message) => sum + message.content.length, 0);
       tokenUsage = estimateTokenUsageFromText(promptChars, full.length + thinking.length);
     }
-    // The actual count is now known — this is what reconcileQuota corrects the pre-flight
-    // reservation to in the finally block below.
-    reconcileTokens = creditsForUsage(tokenUsage, await meterRatesFor(usedCandidate.slug, usedCandidate.modelId));
-
+    // (The usage ledger was written call by call above; usage_events keeps its per-turn summary.)
     void recordTokenUsage(userId, usedCandidate.slug, usedCandidate.modelId, tokenUsage, {
       conversationId,
       mode,
     });
-    void recordTokenLedger(
-      userId,
-      effectivePlan.enterprise?.organizationId ?? null,
-      usedCandidate.slug,
-      usedCandidate.modelId,
-      tokenUsage,
-      reservation?.reserveTokens ?? 0,
-      research ? "research" : "chat",
-    );
 
     const label =
       mode === "auto"
@@ -1096,6 +1116,6 @@ export async function streamMessage(
     await supabaseAdmin.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
     onEvent({ t: "done" });
   } finally {
-    if (reservation) await reconcileQuota(reservation, reconcileTokens);
+    await meter.settle();
   }
 }

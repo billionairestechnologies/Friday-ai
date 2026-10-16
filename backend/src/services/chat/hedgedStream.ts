@@ -24,6 +24,22 @@ export type HedgedResult = {
   usage: TokenUsage | null;
   lastError?: string;
   hedged: boolean;
+  /**
+   * Every model call this reply started, winner included, for the usage ledger: a loser aborted
+   * by the race, a candidate that failed over, a winner that broke off mid-reply. `usage` is the
+   * provider's report when the stream got that far, else null (the caller estimates and flags it).
+   */
+  attempts: AttemptReport[];
+};
+
+export type AttemptReport = {
+  candidate: ChatCandidate;
+  usage: TokenUsage | null;
+  outputChars: number;
+  /** ok = finished and won; partial = output began, then failed; failed = nothing produced; aborted = cancelled (lost the race / user stopped). */
+  status: "ok" | "partial" | "failed" | "aborted";
+  won: boolean;
+  latencyMs: number;
 };
 
 type Attempt = {
@@ -36,6 +52,10 @@ type Attempt = {
   promise: Promise<void>;
   error?: string;
   finished: boolean;
+  startedAt: number;
+  endedAt?: number;
+  /** Characters the provider streamed, kept even when the call later fails (attempt.text is only set on success). */
+  streamedChars: number;
 };
 
 export async function streamWithHedging(opts: {
@@ -74,6 +94,8 @@ export async function streamWithHedging(opts: {
       usage: null,
       finished: false,
       promise: Promise.resolve(),
+      startedAt: Date.now(),
+      streamedChars: 0,
     };
 
     // Called on this attempt's first output. The first attempt to speak becomes the winner and every
@@ -96,12 +118,14 @@ export async function streamWithHedging(opts: {
             candidate.modelId,
             history,
             (delta) => {
+              attempt.streamedChars += delta.length;
               if (!claim()) return;
               attempt.started = true;
               opts.onText(delta);
             },
             controller.signal,
             (delta) => {
+              attempt.streamedChars += delta.length;
               if (!claim()) return;
               attempt.started = true;
               attempt.thinking += delta;
@@ -127,12 +151,25 @@ export async function streamWithHedging(opts: {
         if (/\b(401|403)\b|invalid.{0,20}(api )?key|unauthori[sz]ed/i.test(rawError)) invalidateMemoized();
       } finally {
         attempt.finished = true;
+        attempt.endedAt = Date.now();
         signal?.removeEventListener("abort", onOuterAbort);
       }
     })();
     active.add(attempt);
+    launched.push(attempt);
     return attempt;
   };
+
+  const launched: Attempt[] = [];
+  const reports = (): AttemptReport[] =>
+    launched.map((a) => ({
+      candidate: a.candidate,
+      usage: a.usage,
+      outputChars: Math.max(a.text.length + a.thinking.length, a.streamedChars),
+      status: a === winner && !a.error ? "ok" : a.controller.signal.aborted ? "aborted" : a.started ? "partial" : a.error ? "failed" : "aborted",
+      won: a === winner,
+      latencyMs: (a.endedAt ?? Date.now()) - a.startedAt,
+    }));
 
   launch(candidates[nextIndex++]!);
   let hedgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -156,8 +193,11 @@ export async function streamWithHedging(opts: {
       if (winner) {
         const w: Attempt = winner;
         await w.promise; // the rest of the reply streams through the winner's callbacks
-        if (w.error) return { candidate: null, text: "", thinking: w.thinking, usage: null, lastError: w.error, hedged };
-        return { candidate: w.candidate, text: w.text, thinking: w.thinking, usage: w.usage, hedged };
+        // Losers were aborted on the winner's first token; give their streams a moment to unwind
+        // so whatever usage they did report reaches the ledger.
+        await Promise.race([Promise.all(launched.map((a) => a.promise)), new Promise((r) => setTimeout(r, 1_000))]);
+        if (w.error) return { candidate: null, text: "", thinking: w.thinking, usage: null, lastError: w.error, hedged, attempts: reports() };
+        return { candidate: w.candidate, text: w.text, thinking: w.thinking, usage: w.usage, hedged, attempts: reports() };
       }
 
       // No winner yet: reap failed attempts, and start the next candidate if nothing is left running.
@@ -169,7 +209,7 @@ export async function streamWithHedging(opts: {
       }
       if (active.size === 0) {
         if (signal?.aborted || nextIndex >= candidates.length) {
-          return { candidate: null, text: "", thinking: "", usage: null, lastError, hedged };
+          return { candidate: null, text: "", thinking: "", usage: null, lastError, hedged, attempts: reports() };
         }
         launch(candidates[nextIndex++]!);
       }

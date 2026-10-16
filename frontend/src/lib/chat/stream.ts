@@ -1,6 +1,7 @@
 import { API_BASE_URL, getAccessToken } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth/client";
 import type { StreamEvent } from "./types";
+import { notifyUsageChanged } from "@/lib/usage/quotaStore";
 
 export type OutgoingAttachment = {
   mime: string;
@@ -92,6 +93,7 @@ export async function streamMessage(
     }
     onEvent({ t: "err", c: message });
     onEvent({ t: "done" });
+    if (res.status === 429 || res.status === 403) notifyUsageChanged(0);
     return;
   }
 
@@ -119,4 +121,6 @@ export async function streamMessage(
       }
     }
   }
+  // The turn is over: its tokens are settled server-side — refresh the shared balance.
+  notifyUsageChanged();
 }

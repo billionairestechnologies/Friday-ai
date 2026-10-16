@@ -28,10 +28,10 @@ import { cn } from "@/lib/utils";
 type Tier = "free" | "pro" | "premium";
 
 const FALLBACK_FEATURES: Record<CatalogPlan["id"], string[]> = {
-  free: ["250K tokens a week", "Chat, search, Canvas and images"],
-  pro: ["Everything in Free", "2.5M tokens a week", "Flagship models"],
-  premium: ["Everything in Pro", "6.25M tokens a week", "Reasoning and heavy models"],
-  enterprise: ["Org-pooled usage, no 5-hour lockout", "Per-member caps", "Every model"],
+  free: ["1M tokens every month", "Chat, search, Canvas and images"],
+  pro: ["Everything in Free", "10M tokens every month", "Flagship models"],
+  premium: ["Everything in Pro", "25M tokens every month", "Reasoning and heavy models"],
+  enterprise: ["30M tokens per seat each month, pooled", "Per-member caps", "Every model"],
 };
 
 function tokens(n: number): string {
@@ -97,6 +97,7 @@ function PlanCard({
   busy,
   disabled,
   features,
+  monthlyTokens,
   included,
   models,
   index,
@@ -113,6 +114,8 @@ function PlanCard({
   busy: boolean;
   disabled: boolean;
   features: string[];
+  /** The plan's monthly token allowance, from the catalog (always matches what the server enforces). */
+  monthlyTokens?: number | null;
   included?: string[];
   /** Model display names unlocked AT this tier — live from GET /models. */
   models?: string[];
@@ -148,6 +151,11 @@ function PlanCard({
       >
         {current ? "Current plan" : busy ? "Starting…" : cta}
       </button>
+      {monthlyTokens ? (
+        <p className="mt-4 text-sm font-medium text-foreground">
+          {tokens(monthlyTokens)} tokens every month <span className="font-normal text-muted">· use them whenever you like</span>
+        </p>
+      ) : null}
       <FeatureList items={features} />
       <Chips title="Included" items={included ?? []} />
       <Chips title="Models unlocked" items={models ?? []} />
@@ -235,7 +243,7 @@ export function UpgradePage() {
     const legacy = (id: CatalogPlan["id"], name: string, monthly: number, annualPrice: number, tagline: string, minSeats: number | null = null): CatalogPlan => ({
       id, name, tagline, monthlyPricePaise: monthly, annualPricePaise: annualPrice, annualDiscountPercent: config.annualDiscountPercent,
       minSeats, features: FALLBACK_FEATURES[id], badge: null, highlight: id === "pro",
-      limits: { weekly: 0, rolling: 0, monthly: null, tokensPerSeat: null }, entitlements: {} as Entitlements,
+      limits: { monthly: null, tokensPerSeat: null }, entitlements: {} as Entitlements,
     });
     const pro = config.individual.find((p) => p.id === "pro");
     const premium = config.individual.find((p) => p.id === "premium");
@@ -433,6 +441,7 @@ export function UpgradePage() {
                   busy={busyPlan === plan.id}
                   disabled={signedIn && (free || busyPlan !== null || !canPay)}
                   features={plan.features}
+                  monthlyTokens={plan.limits?.monthly}
                   included={entitlementChips(plan.entitlements)}
                   models={modelsByTier[tier]}
                 />
@@ -477,7 +486,7 @@ export function UpgradePage() {
                 <FeatureList items={enterprise.features} />
                 <Chips title="Included for every member" items={entitlementChips(enterprise.entitlements)} />
                 {enterprise.limits.tokensPerSeat ? (
-                  <p className="mt-4 text-xs text-subtle">Pooled usage for every seat, every month.</p>
+                  <p className="mt-4 text-xs text-subtle">{tokens(enterprise.limits.tokensPerSeat)} tokens per seat, pooled across your team every month.</p>
                 ) : null}
               </motion.div>
             </div>

@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { QUOTA_STOP_MESSAGE } from "../quota/allowance.js";
 import { recordProviderIssue } from "../status/providerIssues.js";
 import { friendlyProviderError } from "../../utils/providerError.js";
 import type { AgentMessage, ToolCall, ToolTurnResult } from "../providers/toolCalling.js";
@@ -77,7 +78,7 @@ export async function runToolLoop(opts: {
    *  tools. Returns a message to stop with (the user's limit is reached) or null to carry on — so
    *  a 12-round research turn can't run far past the plan limit. */
   /** Called each round with the turn's running usage; a string means "stop now" (limit reached). */
-  budget?: (usage: TokenUsage) => Promise<string | null>;
+  budget?: (usage: TokenUsage, candidate?: ChatCandidate | null) => Promise<string | null>;
   /** Adapter + key lookup; injectable for tests. */
   resolve?: (candidate: ChatCandidate) => Promise<{ adapter: ProviderAdapter; apiKey: string }>;
 }): Promise<ToolLoopResult> {
@@ -183,7 +184,8 @@ export async function runToolLoop(opts: {
       result.usage ?? estimateTokenUsageFromText(messages.reduce((n, m) => n + m.content.length, 0), result.text.length),
     );
     if (result.toolCalls.length === 0 || lastRound) break;
-    const stop = opts.budget ? await opts.budget(usage).catch(() => null) : null;
+    // A meter that can't answer stops the loop (fail closed): never keep calling models we can't account for.
+    const stop = opts.budget ? await opts.budget(usage, candidate).catch(() => QUOTA_STOP_MESSAGE.unavailable) : null;
     if (stop) {
       needsBreak = true;
       emit(`_${stop}_`);

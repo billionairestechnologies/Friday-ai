@@ -93,6 +93,8 @@ export async function runWithAutoFix(
   userId: string,
   language: RunLanguage,
   code: string,
+  /** Holds tokens for each fix attempt; a refused hold (allowance used up) ends the loop. */
+  holdForFix?: (tokens: number) => Promise<boolean>,
 ): Promise<AutoRunResult> {
   let currentCode = code;
   const attempts: RunAttempt[] = [];
@@ -103,6 +105,9 @@ export async function runWithAutoFix(
     attempts.push({ code: currentCode, result });
     if (result.ok || i === MAX_FIX_ATTEMPTS) {
       return { ok: result.ok, output: result.output, code: currentCode, attempts };
+    }
+    if (holdForFix && !(await holdForFix(Math.ceil((currentCode.length * 2 + result.output.length) / 4) + 2_000))) {
+      return { ok: false, output: result.output, code: currentCode, attempts };
     }
     const fixed = await fixCode(language, currentCode, result.output);
     if (!fixed || tried.has(fixed)) {
