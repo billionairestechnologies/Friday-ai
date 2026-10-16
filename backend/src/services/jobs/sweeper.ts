@@ -24,8 +24,10 @@ const RESUME_PROMPT =
   "current state (list_files, FRIDAY.md, run `git log --oneline -5` and `git status`), then carry on with the remaining work and finish as usual.";
 
 async function resume(turn: ClaimedTurn) {
-  const reservation = await checkAndReserve(turn.user_id, estimateReservationTokens(RESUME_PROMPT.length)).catch(() => null);
-  if (!reservation?.allowed) return interrupted(turn, "Your usage limit was reached, so it couldn't continue automatically.");
+  const reservation = await checkAndReserve(turn.user_id, estimateReservationTokens(RESUME_PROMPT.length), { feature: turn.kind === "build" ? "build" : "chat", conversationId: turn.conversation_id }).catch(() => null);
+  if (!reservation?.allowed) {
+    return interrupted(turn, reservation?.reason === "unavailable" ? "We couldn't check your usage balance, so it didn't continue automatically." : "Your monthly tokens are used up, so it couldn't continue automatically.");
+  }
   const options = { ...(turn.request.options ?? {}) };
   delete options.repo; // already cloned on the first run
   logger.info("turn_resuming", { conversationId: turn.conversation_id, attempt: turn.resume_count + 1 });

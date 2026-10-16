@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LoopGuard, roundSignature, turnCreditCap } from "../src/services/agent/loopGuard.js";
+import { LoopGuard, roundSignature, turnTokenCap } from "../src/services/agent/loopGuard.js";
 
 test("signature ignores call order and argument key order", () => {
   const a = roundSignature([{ name: "read", args: { path: "a", n: 1 } }, { name: "ls", args: {} }]);
@@ -20,8 +20,8 @@ test("stops after three identical rounds in a row, and any different round reset
   assert.equal(g.record(same), true);
 });
 
-test("per-turn cap is a share of the 5-hour window, none without one", () => {
-  assert.equal(turnCreditCap(60_000), 48_000);
-  assert.equal(turnCreditCap(undefined), null);
-  assert.equal(turnCreditCap(0), null);
+test("per-turn runaway guard is a share of the monthly allowance, none without one", () => {
+  assert.equal(turnTokenCap(10_000_000), 3_000_000);
+  assert.equal(turnTokenCap(undefined), null);
+  assert.equal(turnTokenCap(0), null);
 });

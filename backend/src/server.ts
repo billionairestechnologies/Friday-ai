@@ -13,6 +13,7 @@ const { startGrantExpirySweep } = await import("./services/console/plansService.
 const { startRenewalReminders } = await import("./services/billing/renewalReminders.js");
 const { startStatusMonitor } = await import("./services/status/statusService.js");
 const { startTurnSweeper, stopTurnSweeper } = await import("./services/jobs/sweeper.js");
+const { startQuotaMaintenance } = await import("./services/quota/quotaJobs.js");
 const { drainTurns } = await import("./services/jobs/turns.js");
 const app = createApp();
 const sockets = new Set<Socket>();
@@ -28,6 +29,7 @@ const server = app.listen(env.port, () => {
   startRenewalReminders();
   startStatusMonitor();
   startTurnSweeper();
+  startQuotaMaintenance();
 });
 
 server.on("connection", (socket) => {

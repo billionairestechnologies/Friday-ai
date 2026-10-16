@@ -26,17 +26,17 @@ export async function setUserCustomCap(req: Request, res: Response) {
   res.status(204).send();
 }
 
-const bonusSchema = z.object({ tokens: z.number().int().min(1).max(50_000_000) });
+const bonusSchema = z.object({ tokens: z.number().int().min(1).max(500_000_000) });
 
 export async function grantBonus(req: Request, res: Response) {
   const { tokens } = bonusSchema.parse(req.body);
-  await grantBonusTokens(req.params.userId, tokens);
+  await grantBonusTokens(req.params.userId, tokens, req.user!.id);
   void recordAdminAuditLog(req.user!.id, "user_bonus_tokens_granted", "profile", req.params.userId, { tokens });
   res.status(204).send();
 }
 
 export async function resetQuota(req: Request, res: Response) {
-  await resetUserQuotaNow(req.params.userId);
+  await resetUserQuotaNow(req.params.userId, req.user!.id);
   void recordAdminAuditLog(req.user!.id, "user_quota_reset", "profile", req.params.userId);
   res.status(204).send();
 }

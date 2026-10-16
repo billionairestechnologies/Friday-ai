@@ -8,20 +8,11 @@ import { getProviderAdapter } from "../providers/registry.js";
 import type { ToolCall, ToolSpec } from "../providers/toolCalling.js";
 import { isBuildModel } from "../projectBuild/buildModels.js";
 import { entitlementsFor, resolveEntitlements } from "../quota/entitlements.js";
-import { creditsForInputTokens, creditsForUsage, meterRatesFor } from "../quota/meter.js";
-import {
-  canUseModelTier,
-  checkAndReserve,
-  chargeProgress,
-  estimateReservationTokens,
-  getQuotaStatus,
-  QUOTA_STOP_MESSAGE,
-  recordTokenLedger,
-  reconcileQuota,
-  resolveEffectivePlan,
-} from "../quota/tokenQuotaService.js";
+import { canUseModelTier, checkAndReserve, estimateReservationTokens, getQuotaStatus } from "../quota/tokenQuotaService.js";
+import { UsageMeter } from "../quota/usageMeter.js";
+import { quotaErrorBody } from "../../middleware/quotaLimit.js";
 import { recordProviderIssue } from "../status/providerIssues.js";
-import { estimateTokenUsageFromText, type TokenUsage } from "../tokenUsage.js";
+import { emptyTokenUsage, estimateTokenUsageFromText, type TokenUsage } from "../tokenUsage.js";
 import { recordTokenUsage } from "../usageService.js";
 import {
   completionBody,
@@ -42,19 +33,11 @@ import {
 /**
  * The FridayX model gateway: what the CLI / IDE extensions call instead of a model vendor. One request is
  * one model turn (the harness owns the agent loop and the transcript), and it is metered like every other
- * Friday call — same plan windows, same credits, same ledger — so usage in a terminal drains the exact
+ * Friday call — same monthly allowance, same ledger — so usage in a terminal drains the exact
  * meter the user sees on web and mobile. Provider keys, routing and plan gating all stay server-side.
  */
 
 export const AUTO_MODEL = "friday-x/auto";
-
-const REASON_LABEL: Record<string, string> = {
-  rolling_window: "You've hit your 5-hour usage limit",
-  weekly: "You've hit your weekly usage limit",
-  monthly: "You've hit your monthly usage limit",
-  org_pool: "Your organization's usage pool is used up",
-  member_cap: "You've hit the monthly cap your org admin set for you",
-};
 
 export const FRIDAY_X_NOT_INCLUDED = "FridayX isn't included in your plan. Upgrade your plan, or ask your admin to turn it on, to use it in the terminal and your editor.";
 
@@ -133,20 +116,18 @@ export async function resolveCliModel(userId: string, ref: string): Promise<Chat
 export type CliStatus = {
   plan: string;
   fridayX: boolean;
-  usage: { windows: Array<{ label: string; percent: number; resetsAt: string }> };
+  usage: { windows: Array<{ label: string; percent: number; resetsAt: string; used?: number; limit?: number }> };
 };
 
 const pct = (used: number, limit: number) => (limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0);
 
-/** Percent-and-reset only, same as every other Friday surface — credits and prices never reach a client. */
+/** The same monthly allowance every Friday surface shows (one shared balance), as the client's "windows" list. */
 export async function cliStatus(userId: string): Promise<CliStatus> {
   const [resolved, quota] = await Promise.all([resolveEntitlements(userId), getQuotaStatus(userId)]);
   const windows: CliStatus["usage"]["windows"] = [];
-  if (quota.rolling) windows.push({ label: "5-hour", percent: pct(quota.rolling.used, quota.rolling.limit), resetsAt: quota.rolling.resetAt });
-  if (!quota.isEnterprise) windows.push({ label: "Weekly", percent: pct(quota.weekly.used, quota.weekly.limit), resetsAt: quota.weekly.resetAt });
-  if (quota.monthly) windows.push({ label: "Monthly", percent: pct(quota.monthly.used, quota.monthly.limit), resetsAt: quota.monthly.resetAt });
-  if (quota.org) windows.push({ label: "Team pool", percent: pct(quota.org.used, quota.org.limit), resetsAt: quota.org.resetAt });
-  if (quota.memberCap) windows.push({ label: "Your cap", percent: pct(quota.memberCap.used, quota.memberCap.limit), resetsAt: quota.org?.resetAt ?? quota.weekly.resetAt });
+  if (quota.monthly) windows.push({ label: "This month", percent: pct(quota.monthly.used, quota.monthly.limit), resetsAt: quota.monthly.resetAt, used: quota.monthly.used, limit: quota.monthly.limit });
+  if (quota.org) windows.push({ label: "Team pool", percent: pct(quota.org.used, quota.org.limit), resetsAt: quota.org.resetAt, used: quota.org.used, limit: quota.org.limit });
+  if (quota.memberCap) windows.push({ label: "Your cap", percent: pct(quota.memberCap.used, quota.memberCap.limit), resetsAt: quota.period.end, used: quota.memberCap.used, limit: quota.memberCap.limit });
   return { plan: resolved.plan, fridayX: resolved.entitlements.fridayX, usage: { windows } };
 }
 
@@ -211,8 +192,9 @@ function sendJsonError(res: Response, status: number, message: string, type: str
 }
 
 /**
- * One metered model turn. Order: validate → pick the model → reserve credits (429 BEFORE any bytes are
- * sent) → charge the real prompt → call the provider → reconcile to the exact usage and write the ledger.
+ * One metered model turn. Order: validate → pick the model → hold the prompt + max output from the
+ * monthly allowance (refused BEFORE any bytes are sent) → call the provider → one ledger row with
+ * the provider's usage → settle the hold.
  */
 export async function runCompletion(userId: string, body: CompletionRequest, res: Response, signal: AbortSignal): Promise<void> {
   const messages = toAgentMessages(Array.isArray(body.messages) ? body.messages : []);
@@ -232,20 +214,18 @@ export async function runCompletion(userId: string, body: CompletionRequest, res
 
   const chars = promptChars(messages, tools);
   const completionBuffer = Math.min(Math.max(body.max_completion_tokens ?? body.max_tokens ?? 4_000, 256), 16_000);
-  const check = await checkAndReserve(userId, estimateReservationTokens(chars, completionBuffer));
+  const check = await checkAndReserve(userId, estimateReservationTokens(chars, completionBuffer), { feature: "code" });
   if (!check.allowed) {
-    const retryAfter = Math.max(1, Math.ceil((check.resetAt.getTime() - Date.now()) / 1000));
-    res.setHeader("Retry-After", String(retryAfter));
-    res.setHeader("X-Quota-Reset", check.resetAt.toISOString());
-    return sendJsonError(res, 429, `${REASON_LABEL[check.decision.reason] ?? "Usage limit reached"} — resets ${check.resetAt.toISOString()}.`, "rate_limit_error", `quota_${check.decision.reason}`);
+    const { status, body } = quotaErrorBody(check);
+    if (check.resetAt) {
+      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((check.resetAt.getTime() - Date.now()) / 1000))));
+      res.setHeader("X-Quota-Reset", check.resetAt.toISOString());
+    }
+    return sendJsonError(res, status, body.error, status === 429 ? "rate_limit_error" : status === 403 ? "permission_error" : "api_error", body.code);
   }
   const reservation = check.reservation;
-  const rates = await meterRatesFor(candidate.slug, candidate.modelId);
-  const pre = await chargeProgress(reservation, creditsForInputTokens(Math.ceil(chars / 4), rates));
-  if (!pre.ok) {
-    await reconcileQuota(reservation, 0).catch(() => undefined);
-    return sendJsonError(res, 429, QUOTA_STOP_MESSAGE[pre.reason]!.replace(", so I stopped here.", "."), "rate_limit_error", `quota_${pre.reason}`);
-  }
+  const meter = new UsageMeter(reservation, { userId, organizationId: reservation.organizationId, feature: "code" });
+  const started = Date.now();
 
   const id = `chatcmpl-fx-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const modelName = modelRef(candidate.slug, candidate.modelId);
@@ -297,14 +277,21 @@ export async function runCompletion(userId: string, body: CompletionRequest, res
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
     if (signal.aborted) {
-      // The client went away: charge what it actually consumed (nothing was delivered, estimate from the prompt only).
-      await finalize(userId, candidate, reservation, rates, estimateTokenUsageFromText(chars, text.length));
+      // The client went away mid-call: the prompt was consumed upstream — estimated and flagged.
+      await finalize(userId, candidate, meter, estimateTokenUsageFromText(chars, text.length), { status: "aborted", streaming: stream, latencyMs: Date.now() - started });
       if (!res.writableEnded) res.end();
       return;
     }
     logger.warn("friday_x_provider_failed", { userId, provider: candidate.slug, model: candidate.modelId, error: raw.slice(0, 300) });
     void recordProviderIssue({ raw, userId, provider: candidate.slug });
-    await finalize(userId, candidate, reservation, rates, estimateTokenUsageFromText(chars, text.length));
+    // Failed before any output: the provider rejected the request (nothing billed). After output began: partial, estimated.
+    await finalize(
+      userId,
+      candidate,
+      meter,
+      text.length ? estimateTokenUsageFromText(chars, text.length) : emptyTokenUsage(),
+      { status: text.length ? "partial" : "failed", streaming: stream, latencyMs: Date.now() - started },
+    );
     const friendly = sanitizeUserError(raw);
     if (!wroteHead) return sendJsonError(res, 502, friendly, "api_error", "provider_unavailable");
     send({ error: { message: friendly, type: "api_error", code: "provider_unavailable" } });
@@ -314,7 +301,7 @@ export async function runCompletion(userId: string, body: CompletionRequest, res
 
   // Providers that report no usage get an estimate, flagged — a turn is never metered as free.
   const finalUsage = usage ?? estimateTokenUsageFromText(chars, text.length + JSON.stringify(calls).length);
-  await finalize(userId, candidate, reservation, rates, finalUsage);
+  await finalize(userId, candidate, meter, finalUsage, { status: "ok", streaming: stream, latencyMs: Date.now() - started });
 
   if (!stream) {
     res.json(completionBody(id, modelName, text, calls, finalUsage));
@@ -334,13 +321,11 @@ export async function runCompletion(userId: string, body: CompletionRequest, res
 async function finalize(
   userId: string,
   candidate: ChatCandidate,
-  reservation: Parameters<typeof reconcileQuota>[0],
-  rates: Awaited<ReturnType<typeof meterRatesFor>>,
+  meter: UsageMeter,
   usage: TokenUsage,
+  meta: Parameters<UsageMeter["recordCall"]>[2],
 ): Promise<void> {
-  const credits = creditsForUsage(usage, rates);
-  await reconcileQuota(reservation, credits).catch((err) => logger.warn("friday_x_reconcile_failed", { userId, error: String(err) }));
-  const effective = await resolveEffectivePlan(userId).catch(() => null);
+  await meter.recordCall(candidate, usage, meta).catch((err: unknown) => logger.warn("friday_x_meter_failed", { userId, error: String(err) }));
+  await meter.settle();
   void recordTokenUsage(userId, candidate.slug, candidate.modelId, usage, { mode: "friday-x" });
-  void recordTokenLedger(userId, effective?.enterprise?.organizationId ?? null, candidate.slug, candidate.modelId, usage, reservation.reserveTokens, "code");
 }

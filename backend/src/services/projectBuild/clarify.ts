@@ -1,4 +1,5 @@
 import { getProviderAdapter } from "../providers/registry.js";
+import { meteredChat } from "../quota/meterContext.js";
 import type { ChatMessage } from "../providers/types.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import type { AskQuestion } from "../chat/types.js";
@@ -40,7 +41,7 @@ export async function clarifyRequest(history: ChatMessage[], candidates: ChatCan
       ...history.filter((m) => m.role !== "system").slice(-4),
     ];
     const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("clarify timed out")), CLARIFY_TIMEOUT_MS));
-    const raw = await Promise.race([adapter.chat(apiKey, candidate.modelId, messages), timeout]);
+    const raw = await Promise.race([meteredChat(candidate, messages, () => adapter.chat(apiKey, candidate.modelId, messages), { chargeable: true }), timeout]);
     const json = raw.match(/\{[\s\S]*\}/)?.[0];
     if (!json) return [];
     const parsed = JSON.parse(json) as { questions?: { question?: string; options?: { label?: string; description?: string; recommended?: boolean }[] }[] };

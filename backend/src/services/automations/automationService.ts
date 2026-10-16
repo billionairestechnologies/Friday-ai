@@ -3,7 +3,8 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { isShuttingDown } from "../lifecycle.js";
 import { notifyUser } from "../pushService.js";
-import { checkAndReserve, estimateReservationTokens, reconcileQuota } from "../quota/tokenQuotaService.js";
+import { checkAndReserve, estimateReservationTokens, settleReservation } from "../quota/tokenQuotaService.js";
+import { QUOTA_REASON_TEXT } from "../quota/allowance.js";
 import { createConversation } from "../chat/conversations.js";
 import { streamMessage } from "../chat/index.js";
 import { finishGeneration, registerGeneration } from "../chat/activeGenerations.js";
@@ -208,12 +209,12 @@ export async function executeAutomation(row: Row, opts: { keepSchedule?: boolean
   let reply = "";
   let conversationId: string | undefined;
   try {
-    const quota = await checkAndReserve(row.user_id, estimateReservationTokens(row.prompt.length + (row.research ? 20_000 : 4_000)));
-    if (!quota.allowed) throw new Error("Usage limit reached — this run was skipped. It will try again at the next scheduled time.");
+    const quota = await checkAndReserve(row.user_id, estimateReservationTokens(row.prompt.length + (row.research ? 20_000 : 4_000)), { feature: "automation" });
+    if (!quota.allowed) throw new Error(`${QUOTA_REASON_TEXT[quota.reason]} — this run was skipped. It will try again at the next scheduled time.`);
     try {
       conversationId = await ensureConversation(row);
     } catch (err) {
-      await reconcileQuota(quota.reservation, 0).catch(() => {}); // streamMessage never started → release the hold
+      await settleReservation(quota.reservation); // streamMessage never started → release the hold
       throw err;
     }
     const local = zonedParts(new Date(), row.timezone);

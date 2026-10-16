@@ -363,7 +363,7 @@ cliRouter.post(
   gatewayLimit,
   asyncHandler(async (req, res) => {
     if (typeof req.body !== "object" || req.body === null) throw new HttpError(400, "Send a JSON body.");
-    // Aborts the provider call when the terminal closes or Ctrl-C's — otherwise a cancelled turn keeps spending credits.
+    // Aborts the provider call when the terminal closes or Ctrl-C's — otherwise a cancelled turn keeps spending tokens.
     const controller = new AbortController();
     res.on("close", () => {
       if (!res.writableEnded) controller.abort();

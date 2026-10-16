@@ -8,12 +8,16 @@
 export const LOOP_STOP_MESSAGE =
   "I kept repeating the same step without getting anywhere, so I stopped to avoid wasting your usage. Tell me what to change and I'll try a different approach.";
 
-/** Per-turn spend ceiling message (the turn used a very large share of the user's 5-hour window). */
+/** Per-turn spend ceiling message (one turn used a very large share of the month's allowance). */
 export const TURN_CAP_MESSAGE =
   "This task used a large share of your usage in one go, so I paused here. Your work is saved — say \"continue\" to carry on.";
 
-/** Share of the user's 5-hour window one turn may spend before it pauses. */
-export const TURN_CAP_SHARE = 0.8;
+/**
+ * Share of the monthly allowance one turn may spend before it pauses. A runaway guard, not a usage
+ * cap: the user can say "continue" and spend the rest the same day (Pro: 3M tokens ≈ a dozen
+ * long Build turns' worth in ONE turn before it asks).
+ */
+export const TURN_CAP_SHARE = 0.3;
 
 /** Stable key for one round of tool calls: names + arguments, order-independent, key-order-independent. */
 export function roundSignature(calls: Array<{ name: string; args?: unknown }>): string {
@@ -43,7 +47,7 @@ export class LoopGuard {
   }
 }
 
-/** The credits one turn may spend: a share of the 5-hour window; no cap when the plan has no such window (org pools). */
-export function turnCreditCap(rollingLimit: number | undefined | null): number | null {
-  return rollingLimit && rollingLimit > 0 ? Math.floor(rollingLimit * TURN_CAP_SHARE) : null;
+/** The billable tokens one turn may spend before pausing; none when the allowance is unknown. */
+export function turnTokenCap(allowance: number | undefined | null): number | null {
+  return allowance && allowance > 0 ? Math.floor(allowance * TURN_CAP_SHARE) : null;
 }

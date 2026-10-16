@@ -87,12 +87,15 @@ test("hedging: a slow first candidate is raced by the next; only the winner's te
   assert.deepEqual(out, ["fast"]);
   assert.equal(r.hedged, true);
   assert.equal(aborted, true, "the losing attempt must be cancelled");
+  // Both calls reach the usage ledger: the winner (charged) and the aborted loser (recorded, not charged).
+  assert.deepEqual(r.attempts.map((a) => [a.candidate.slug, a.status, a.won]).sort(), [["fast", "ok", true], ["slow", "aborted", false]]);
 });
 
 test("failover: a candidate that errors before output hands over to the next", async () => {
   const { r, out } = await run({ bad: fake("bad", { delayMs: 5, fail: "bad: 500" }), ok: fake("ok", { delayMs: 5 }) }, ["bad", "ok"], 0);
   assert.equal(r.candidate?.slug, "ok");
   assert.deepEqual(out, ["ok"]);
+  assert.deepEqual(r.attempts.map((a) => [a.status, a.outputChars]), [["failed", 0], ["ok", 2]]);
 });
 
 test("all candidates failing reports the last error and no winner", async () => {

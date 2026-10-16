@@ -1,25 +1,55 @@
 export type QuotaBucket = { used: number; limit: number; resetAt: string };
 
+/** The current subscription period, straight from the server's ledger (GET /usage/quota). */
+export type QuotaPeriod = {
+  accountId: string;
+  start: string;
+  end: string;
+  /** Tokens this period (the plan's monthly allowance, or a package's). */
+  allowance: number;
+  /** Finalized usage recorded in the ledger. */
+  used: number;
+  /** Net admin adjustments: negative = tokens given back (bonus, refund), positive = debited. */
+  adjustments: number;
+  /** Held right now for requests still running. */
+  reserved: number;
+  /** What can still be spent: allowance − used − adjustments − reserved (never below 0). */
+  remaining: number;
+  status: "active" | "suspended";
+  subscription: "free" | "active" | "expired" | "suspended";
+  renewsAt: string | null;
+  pendingPlan: string | null;
+};
+
 export type QuotaStatus = {
   plan: "free" | "pro" | "premium";
   isEnterprise: boolean;
-  /** When the current paid plan ends (newer servers). */
-  planRenewsAt?: string | null;
-  /** A lower plan already bought, starting when the current one ends (newer servers). */
-  scheduledPlan?: { plan: "pro" | "premium"; startsAt: string | null } | null;
-  rolling: QuotaBucket | null;
-  weekly: QuotaBucket;
+  /** Newer servers; older ones only send the buckets below. */
+  period?: QuotaPeriod;
   monthly: QuotaBucket | null;
+  /** Retired (always null since the monthly allowance) — kept so older cached payloads still parse. */
+  rolling: QuotaBucket | null;
+  weekly: QuotaBucket | null;
   org: (QuotaBucket & { seatCount: number }) | null;
   memberCap: { used: number; limit: number } | null;
 };
 
 export type QuotaBreakdownEntry = { type: string; quantity: number; percent: number };
 
+export type UsageReport = {
+  totals: { calls: number; billable: number; input: number; output: number; cached: number; reasoning: number; estimatedBillable: number };
+  byModel: Array<{ model: string; vendor: string; calls: number; billable: number; input: number; output: number; cached: number; reasoning: number; estimatedBillable: number }>;
+  byFeature: Array<{ feature: string; calls: number; billable: number }>;
+  byDay: Array<{ day: string; billable: number }>;
+  recent: Array<{ at: string; model: string; feature: string; input: number; output: number; billable: number; source: string; status: string }>;
+  adjustments: Array<{ at: string; kind: string; tokens: number; reason: string }>;
+};
+
 export type QuotaResponse = {
   status: QuotaStatus;
+  report?: UsageReport;
+  thresholds?: number[];
   breakdown: QuotaBreakdownEntry[];
-  rollingBreakdown: QuotaBreakdownEntry[];
   monthlyBreakdown: QuotaBreakdownEntry[];
   /** What the user's plan / packages unlock (newer servers). */
   entitlements?: import("@/lib/billing/checkout").Entitlements | null;
@@ -27,8 +57,14 @@ export type QuotaResponse = {
 
 export function percentUsed(bucket: { used: number; limit: number } | null): number {
   if (!bucket || bucket.limit <= 0) return 0;
-  // Clamped both ways: an older server could still send a negative counter (bonus grants).
-  return Math.max(0, Math.min(100, Math.round((bucket.used / bucket.limit) * 100)));
+  // Clamped both ways: bonuses can push usage below 0, an in-flight call can overrun the last tokens.
+  return Math.max(0, Math.min(100, Math.floor((bucket.used / bucket.limit) * 100)));
+}
+
+/** The one balance every screen shows: the server's period (or, from an older server, the monthly / org bucket). */
+export function mainBucket(status: QuotaStatus): QuotaBucket | null {
+  if (status.period) return { used: Math.max(0, status.period.used + status.period.adjustments), limit: status.period.allowance, resetAt: status.period.end };
+  return status.org ?? status.monthly ?? null;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -38,7 +74,6 @@ const EVENT_LABELS: Record<string, string> = {
   sandbox_run: "Build",
   attachment_upload: "Attachments",
   image_generation: "Image generation",
-  // Cost-based breakdown (what the usage actually cost, by feature).
   chat: "Chat",
   build: "Build",
   research: "Deep Research",
@@ -62,8 +97,20 @@ export function formatResetAt(iso: string): string {
   });
 }
 
+export function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Compact token count: 2,450,000 → "2.45M", 12,300 → "12.3K". Exact integers stay in the data. */
 export function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1)}K`;
-  return String(Math.round(n));
+  const v = Math.max(0, Math.round(n));
+  const trim = (x: number, digits: number) => x.toFixed(digits).replace(/\.?0+$/, "");
+  if (v >= 1_000_000) return `${trim(v / 1_000_000, 2)}M`;
+  if (v >= 1_000) return `${trim(v / 1_000, 1)}K`;
+  return String(v);
+}
+
+/** "2.45M / 10M tokens". */
+export function formatUsedOf(used: number, limit: number): string {
+  return `${formatTokens(used)} / ${formatTokens(limit)} tokens`;
 }

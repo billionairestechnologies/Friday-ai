@@ -399,7 +399,7 @@ export function TeamPage() {
                             <>
                               <input
                                 type="number"
-                                placeholder="No cap"
+                                placeholder="No cap (tokens)"
                                 defaultValue={m.customMonthlyCap ?? ""}
                                 onChange={(e) => setCapDrafts((prev) => ({ ...prev, [m.userId]: e.target.value }))}
                                 className="h-7 w-28 rounded-full border border-border bg-background px-2 text-xs outline-none"
@@ -415,7 +415,7 @@ export function TeamPage() {
                             </>
                           )}
                           {!canManageMembers && m.customMonthlyCap != null && (
-                            <span className="text-xs text-muted">Cap: {formatTokens(m.customMonthlyCap)} credits/mo</span>
+                            <span className="text-xs text-muted">Cap: {formatTokens(m.customMonthlyCap)} tokens/mo</span>
                           )}
                         </div>
                       ))}

@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "../../config/supabase.js";
-import { CREDITS_PER_USD } from "../quota/meter.js";
+import { inrPerMillionTokens } from "./planEconomics.js";
 import { getPlanCatalog } from "../quota/planCatalog.js";
 import { loadFinanceSettings } from "./pricing.js";
 
@@ -97,10 +97,10 @@ export async function liveUsage(hours = 24) {
   const ids = agg.topUsers.map((u) => u.userId);
   const { data: profiles } = ids.length ? await supabaseAdmin.from("profiles").select("id, full_name, plan").in("id", ids) : { data: [] };
   const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+  // ₹ value of a plan's monthly token allowance at the blended rate (what a spike is measured against).
   const allowance = (plan: string) => {
     const p = catalog.find((c) => c.id === plan);
-    const credits = p ? (p.limits.monthly ?? Math.round(p.limits.weekly * 4.3)) : 0;
-    return (credits / CREDITS_PER_USD) * s.usd_to_inr;
+    return ((p?.limits.monthly ?? 0) / 1_000_000) * inrPerMillionTokens(s);
   };
   const topUsers = agg.topUsers.map((u) => {
     const profile = byId.get(u.userId);

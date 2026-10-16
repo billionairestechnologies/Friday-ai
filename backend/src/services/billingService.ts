@@ -30,7 +30,8 @@ export const INDIVIDUAL_PLANS = [
 // A one-time payment covering 12 months at 10% off the monthly rate, rounded to the nearest
 // rupee — matches the "annual toggle applies a 10% discount" ask. Not a subscription (one-time
 // orders were chosen over Razorpay Subscriptions) — an annual purchase is a single order for a
-// longer period, same as a monthly one is for 30 days.
+// 365-day term, a monthly one for 30 days. Either way the token allowance renews every calendar
+// month of the term, counted from the day it started (supabase 0057: quota_apply_payment).
 export function annualAmountPaise(monthlyAmountPaise: number): number {
   return Math.round(monthlyAmountPaise * 12 * 0.9);
 }
@@ -45,7 +46,7 @@ export const ENTERPRISE_PLAN = {
   name: "Friday Enterprise",
   perSeatMonthlyAmountPaise: 249_900, // ₹2,499/seat/mo
   minSeats: ENTERPRISE_MIN_SEATS,
-  description: `Pooled org-wide tokens (${(ENTERPRISE_TOKENS_PER_SEAT / 1_000_000).toFixed(0)}M/seat/mo), no 5-hour lockout, every model.`,
+  description: `Pooled org-wide tokens (${(ENTERPRISE_TOKENS_PER_SEAT / 1_000_000).toFixed(0)}M/seat each month), every model.`,
 } as const;
 
 type OrderPlanId = "pro" | "premium" | "enterprise" | "package";
@@ -253,6 +254,19 @@ export function verifyRazorpayWebhook(rawBody: Buffer, signature: string | undef
   return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
+type PaymentEntity = { id?: unknown; order_id?: unknown; error_description?: unknown };
+type RefundEntity = { id?: unknown; payment_id?: unknown; amount?: unknown };
+
+/**
+ * Razorpay → plans. Everything that changes what someone can use runs through an idempotent SQL
+ * function keyed on the order (supabase 0057): a webhook Razorpay retries, or delivers twice, can
+ * never extend a term twice or hand out a second allowance. A failure here throws, so the webhook
+ * answers 5xx and Razorpay retries it.
+ *
+ *   payment.captured / order.paid      → quota_apply_payment (renewal / new term / upgrade / queued downgrade)
+ *   payment.failed                     → order marked failed (never a paid one), event logged; nothing is taken away
+ *   refund.processed / payment.refunded→ quota_apply_refund (the refunded days come off the term)
+ */
 export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   const eventType = typeof payload.event === "string" ? payload.event : "unknown";
   const eventId = typeof payload.id === "string" ? payload.id : null;
@@ -267,74 +281,104 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
     if (eventError && eventError.code !== "23505") logger.warn("razorpay_webhook_event_log_failed", { eventError });
   }
 
-  const paymentEntity = (payload.payload as { payment?: { entity?: Record<string, unknown> } } | undefined)?.payment
-    ?.entity;
-  const orderId = typeof paymentEntity?.order_id === "string" ? paymentEntity.order_id : null;
-  const paymentId = typeof paymentEntity?.id === "string" ? paymentEntity.id : null;
-  if (!orderId) return;
+  const entities = payload.payload as { payment?: { entity?: PaymentEntity }; refund?: { entity?: RefundEntity } } | undefined;
+  const paymentEntity = entities?.payment?.entity;
+  const refundEntity = entities?.refund?.entity;
+  const paymentId = typeof paymentEntity?.id === "string" ? paymentEntity.id : typeof refundEntity?.payment_id === "string" ? refundEntity.payment_id : null;
+  let orderId = typeof paymentEntity?.order_id === "string" ? paymentEntity.order_id : null;
 
   const paid = eventType === "payment.captured" || eventType === "order.paid";
   const failed = eventType === "payment.failed";
-  if (!paid && !failed) return;
+  const refunded = eventType === "refund.processed" || eventType === "payment.refunded";
+  if (!paid && !failed && !refunded) return;
+
+  if (!orderId && paymentId) {
+    const { data } = await supabaseAdmin.from("razorpay_orders").select("razorpay_order_id").eq("razorpay_payment_id", paymentId).maybeSingle();
+    orderId = (data?.razorpay_order_id as string | undefined) ?? null;
+  }
+  if (!orderId) return;
 
   const { data: order, error } = await supabaseAdmin
     .from("razorpay_orders")
-    .update({
-      status: paid ? "paid" : "failed",
-      razorpay_payment_id: paymentId,
-      updated_at: new Date().toISOString(),
-    })
+    .select("user_id, organization_id, plan, metadata, status")
     .eq("razorpay_order_id", orderId)
-    .select("user_id, organization_id, plan, metadata")
     .maybeSingle();
-  if (error) {
-    logger.warn("razorpay_order_update_failed", { orderId, error: error.message });
+  if (error) throw new Error(`razorpay order lookup failed: ${error.message}`);
+  if (!order?.user_id) return;
+  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string; packageId?: string } | null) ?? {};
+  const days = metadata.billingCycle === "annual" ? 365 : 30;
+  const plan = order.plan === "business" ? "premium" : (order.plan as string); // "business" is a pre-0016 legacy id
+
+  if (failed) {
+    // An order can collect failed attempts before (or even after) the one that succeeds — a late
+    // failure must never flip a paid order back.
+    await supabaseAdmin.from("razorpay_orders").update({ status: "failed", updated_at: new Date().toISOString() }).eq("razorpay_order_id", orderId).neq("status", "paid");
+    await supabaseAdmin.from("subscription_events").insert({
+      user_id: order.user_id,
+      organization_id: order.organization_id,
+      kind: "payment_failed",
+      plan,
+      order_id: orderId,
+      idempotency_key: `payment_failed:${paymentId ?? orderId}`,
+      details: { reason: typeof paymentEntity?.error_description === "string" ? paymentEntity.error_description.slice(0, 300) : null },
+    }).then(({ error: e }) => {
+      if (e && e.code !== "23505") logger.warn("subscription_event_failed", { orderId, error: e.message });
+    });
     return;
   }
-  if (!paid || !order?.user_id) return;
 
-  // This is the ONLY place a payment actually grants anything — without it, paying just marks
-  // the order row "paid" with no effect on the user's actual limits.
-  const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string; packageId?: string } | null) ?? {};
-  if (metadata.offerId) await recordDiscountUse(metadata.offerId, order.user_id as string, orderId).catch(() => {});
-  const renewsInDays = metadata.billingCycle === "annual" ? 365 : 30;
-  const renewsAt = new Date(Date.now() + renewsInDays * 24 * 60 * 60 * 1000).toISOString();
+  if (refunded) {
+    if (plan === "pro" || plan === "premium") {
+      const { error: refundError } = await supabaseAdmin.rpc("quota_apply_refund", { p_user: order.user_id, p_plan: plan, p_days: days, p_order: orderId });
+      if (refundError) throw new Error(`refund apply failed: ${refundError.message}`);
+    } else {
+      await supabaseAdmin.from("subscription_events").insert({ user_id: order.user_id, organization_id: order.organization_id, kind: "refund", plan, order_id: orderId, idempotency_key: `refund:${orderId}` });
+    }
+    return;
+  }
 
-  if (order.plan === "package" && metadata.packageId) {
-    // The package's own duration/limits/entitlements apply, recorded as an access grant so expiry
-    // and history work exactly like a console-applied package.
+  // Paid. Marking the order is idempotent; granting is keyed on the order inside SQL.
+  const { error: updateError } = await supabaseAdmin
+    .from("razorpay_orders")
+    .update({ status: "paid", razorpay_payment_id: paymentId, updated_at: new Date().toISOString() })
+    .eq("razorpay_order_id", orderId);
+  if (updateError) throw new Error(`razorpay order update failed: ${updateError.message}`);
+  if (metadata.offerId && order.status !== "paid") await recordDiscountUse(metadata.offerId, order.user_id as string, orderId).catch(() => {});
+
+  if (plan === "package" && metadata.packageId) {
+    // Once per order: the package's own duration/limits/entitlements apply, recorded as an access grant.
+    const { error: dup } = await supabaseAdmin.from("subscription_events").insert({
+      user_id: order.user_id,
+      organization_id: order.organization_id,
+      kind: "package",
+      plan: "package",
+      order_id: orderId,
+      idempotency_key: `payment:${orderId}`,
+      details: { packageId: metadata.packageId },
+    });
+    if (dup) {
+      if (dup.code === "23505") return; // already applied
+      throw new Error(`package event failed: ${dup.message}`);
+    }
     await applyPackage(
       metadata.packageId,
       order.organization_id ? { organizationId: order.organization_id as string } : { userId: order.user_id as string },
       `Purchased (order ${orderId})`,
       null,
-    ).catch((err) => logger.warn("razorpay_package_grant_failed", { orderId, error: err instanceof Error ? err.message : String(err) }));
+    );
     return;
   }
 
-  if (order.plan === "pro" || order.plan === "premium" || order.plan === "business") {
-    // "business" is a pre-migration legacy id (see 0016) — treated as premium going forward.
-    const plan = order.plan === "business" ? "premium" : order.plan;
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .update({ plan, plan_renews_at: renewsAt })
-      .eq("id", order.user_id);
-    if (profileError) logger.warn("razorpay_plan_grant_failed", { orderId, error: profileError.message });
+  if (plan === "pro" || plan === "premium") {
+    const { error: applyError } = await supabaseAdmin.rpc("quota_apply_payment", { p_user: order.user_id, p_plan: plan, p_days: days, p_order: orderId });
+    if (applyError) throw new Error(`plan grant failed: ${applyError.message}`);
     return;
   }
 
-  if (order.plan === "enterprise" && order.organization_id) {
+  if (plan === "enterprise" && order.organization_id) {
     const enterprise = await getCatalogPlan("enterprise");
     const seats = Math.max(enterprise.minSeats ?? ENTERPRISE_PLAN.minSeats, metadata.seats ?? ENTERPRISE_PLAN.minSeats);
-    const { error: orgError } = await supabaseAdmin
-      .from("organizations")
-      .update({
-        plan: "enterprise",
-        seat_count: seats,
-        pooled_monthly_tokens: seats * (enterprise.limits.tokensPerSeat ?? ENTERPRISE_TOKENS_PER_SEAT),
-        billing_cycle_anchor: new Date().toISOString(),
-      })
-      .eq("id", order.organization_id);
-    if (orgError) logger.warn("razorpay_enterprise_grant_failed", { orderId, error: orgError.message });
+    const { error: orgError } = await supabaseAdmin.rpc("quota_apply_org_payment", { p_org: order.organization_id, p_user: order.user_id, p_seats: seats, p_order: orderId });
+    if (orgError) throw new Error(`enterprise grant failed: ${orgError.message}`);
   }
 }

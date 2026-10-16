@@ -163,6 +163,8 @@ export async function streamMessage(req: Request, res: Response) {
     // The turn runs to completion whether or not this connection survives (jobs/runTurn.ts): it is
     // registered as running for every instance, logged for live replay on any device, resumed after
     // a restart (Build) and followed by a push notification when nobody was watching at the end.
+    // From here the turn owns the quota reservation and settles it (even if this connection drops).
+    res.locals.quotaHandedOff = true;
     await runTurn({
       userId: req.user!.id,
       conversationId: req.params.id!,

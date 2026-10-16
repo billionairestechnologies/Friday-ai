@@ -1,10 +1,10 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { logger } from "../../utils/logger.js";
 import { invalidateMemoized, memoAsync } from "../../utils/ttlMemo.js";
-import { ENTERPRISE_MIN_SEATS, ENTERPRISE_TOKENS_PER_SEAT, PLAN_LIMITS, type Plan } from "./tierConfig.js";
+import { ENTERPRISE_MIN_SEATS, ENTERPRISE_TOKENS_PER_SEAT, PLAN_ALLOWANCES, type Plan } from "./tierConfig.js";
 
 /**
- * The plan catalog: what each plan costs, what the Plans page says about it, its token limits and
+ * The plan catalog: what each plan costs, what the Plans page says about it, its monthly token allowance and
  * its ENTITLEMENTS (which features it unlocks and how much of each). The Team Console edits it
  * (plan_catalog table, migration 0033); the code below is only the safe default a missing row or
  * column falls back to, so billing and limits keep working before the migration is applied.
@@ -16,7 +16,7 @@ export type CatalogPlanId = Plan | "enterprise";
 
 export const ENTITLEMENT_DEFS = [
   { key: "buildMode", label: "Build Mode", type: "boolean", hint: "Coding agent with a live sandbox" },
-  { key: "fridayX", label: "FridayX (CLI + IDE)", type: "boolean", hint: "Terminal and editor coding agent; uses the same credits" },
+  { key: "fridayX", label: "FridayX (CLI + IDE)", type: "boolean", hint: "Terminal and editor coding agent; uses the same monthly tokens" },
   { key: "voice", label: "Voice", type: "boolean", hint: "Talk in chat" },
   { key: "canvas", label: "Canvas", type: "boolean", hint: "Live preview documents" },
   { key: "images", label: "Images", type: "boolean", hint: "Generate and edit images" },
@@ -94,17 +94,18 @@ export type CatalogPlan = {
   features: string[];
   badge: string | null;
   highlight: boolean;
-  limits: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+  /** monthly = billable tokens per subscription period (individual plans); tokensPerSeat = enterprise pool per seat. */
+  limits: { monthly: number | null; tokensPerSeat: number | null };
   entitlements: Entitlements;
   active: boolean;
   sortOrder: number;
 };
 
 const DEFAULT_CATALOG: CatalogPlan[] = [
-  { id: "free", name: "Free", tagline: "Everything you need to get started.", monthlyPricePaise: 0, features: ["Light daily usage, refreshed every 5 hours and weekly", "Chat, search, Canvas and images", "Build Mode trial projects"], highlight: false },
-  { id: "pro", name: "Pro", tagline: "For daily work, research and building.", monthlyPricePaise: 99_900, features: ["Everything in Free", "Generous usage every 5 hours, week and month", "Flagship models", "Full Build Mode with GitHub PRs", "Deep Research, documents and skills"], highlight: true },
-  { id: "premium", name: "Premium", tagline: "The most capable Friday for power users.", monthlyPricePaise: 199_900, features: ["Everything in Pro", "About 2x Pro's usage, the most for one person", "Reasoning and heavy models", "Longest Build Mode runs", "Largest Team Up panels and Library"], highlight: false },
-  { id: "enterprise", name: "Enterprise", tagline: "Pooled usage, admin controls and priority support for teams.", monthlyPricePaise: 249_900, features: ["Org-pooled monthly usage, no 5-hour lockout", "Per-member caps set by your admins", "Every model, priority handling", "Centralized billing", "Priority support"], highlight: false },
+  { id: "free", name: "Free", tagline: "Everything you need to get started.", monthlyPricePaise: 0, features: ["1M tokens every month", "Chat, search, Canvas and images", "Build Mode trial projects"], highlight: false },
+  { id: "pro", name: "Pro", tagline: "For daily work, research and building.", monthlyPricePaise: 99_900, features: ["Everything in Free", "10M tokens every month, use them whenever you like", "Flagship models", "Full Build Mode with GitHub PRs", "Deep Research, documents and skills"], highlight: true },
+  { id: "premium", name: "Premium", tagline: "The most capable Friday for power users.", monthlyPricePaise: 199_900, features: ["Everything in Pro", "25M tokens every month, the most for one person", "Reasoning and heavy models", "Longest Build Mode runs", "Largest Team Up panels and Library"], highlight: false },
+  { id: "enterprise", name: "Enterprise", tagline: "Pooled usage, admin controls and priority support for teams.", monthlyPricePaise: 249_900, features: ["30M tokens per seat each month, pooled across your team", "Per-member caps set by your admins", "Every model, priority handling", "Centralized billing", "Priority support"], highlight: false },
 ].map((p, i) => ({
   ...p,
   id: p.id as CatalogPlanId,
@@ -118,9 +119,8 @@ const DEFAULT_CATALOG: CatalogPlan[] = [
 }));
 
 function defaultLimits(id: CatalogPlanId): CatalogPlan["limits"] {
-  if (id === "enterprise") return { weekly: 0, rolling: 0, monthly: null, tokensPerSeat: ENTERPRISE_TOKENS_PER_SEAT };
-  const base = PLAN_LIMITS[id];
-  return { weekly: base.weeklyTokens, rolling: base.rollingWindowTokens, monthly: base.monthlyTokens, tokensPerSeat: null };
+  if (id === "enterprise") return { monthly: null, tokensPerSeat: ENTERPRISE_TOKENS_PER_SEAT };
+  return { monthly: PLAN_ALLOWANCES[id], tokensPerSeat: null };
 }
 
 type CatalogRow = {
@@ -133,8 +133,6 @@ type CatalogRow = {
   features: string[];
   badge: string | null;
   highlight: boolean;
-  weekly_tokens: number | null;
-  rolling_tokens: number | null;
   monthly_tokens: number | null;
   tokens_per_seat: number | null;
   entitlements: unknown;
@@ -155,10 +153,7 @@ export function planFromRow(row: CatalogRow): CatalogPlan {
     badge: row.badge || null,
     highlight: Boolean(row.highlight),
     limits: {
-      weekly: Number(row.weekly_tokens ?? fallback.limits.weekly),
-      rolling: Number(row.rolling_tokens ?? fallback.limits.rolling),
-      // Free has no monthly ceiling by default; an admin may add one.
-      monthly: row.monthly_tokens != null ? Number(row.monthly_tokens) : fallback.limits.monthly,
+      monthly: row.id === "enterprise" ? null : row.monthly_tokens != null ? Number(row.monthly_tokens) : fallback.limits.monthly,
       tokensPerSeat: row.id === "enterprise" ? Number(row.tokens_per_seat ?? ENTERPRISE_TOKENS_PER_SEAT) : null,
     },
     entitlements: mergeEntitlements(DEFAULT_ENTITLEMENTS[row.id], row.entitlements as Partial<Entitlements>),
@@ -186,10 +181,10 @@ export async function getCatalogPlan(id: CatalogPlanId): Promise<CatalogPlan> {
   return catalog.find((p) => p.id === id) ?? DEFAULT_CATALOG.find((p) => p.id === id)!;
 }
 
-/** Token limits for an individual plan, as the quota system reads them. */
-export async function planLimitsFor(plan: Plan): Promise<{ rolling: number; weekly: number; monthly: number | null }> {
+/** Monthly allowance (billable tokens) for an individual plan, as the quota system reads it. */
+export async function planAllowanceFor(plan: Plan): Promise<number> {
   const { limits } = await getCatalogPlan(plan);
-  return { rolling: limits.rolling, weekly: limits.weekly, monthly: limits.monthly };
+  return limits.monthly ?? PLAN_ALLOWANCES[plan];
 }
 
 export function annualPricePaise(plan: Pick<CatalogPlan, "monthlyPricePaise" | "annualDiscountPercent">): number {
@@ -205,8 +200,6 @@ export type CatalogInput = Partial<{
   features: string[];
   badge: string | null;
   highlight: boolean;
-  weeklyTokens: number | null;
-  rollingTokens: number | null;
   monthlyTokens: number | null;
   tokensPerSeat: number | null;
   entitlements: Partial<Entitlements>;
@@ -218,8 +211,7 @@ export async function saveCatalogPlan(id: CatalogPlanId, input: CatalogInput, ac
   const row: Record<string, unknown> = { id, updated_by: actorId, updated_at: new Date().toISOString() };
   const map: Record<string, string> = {
     name: "name", tagline: "tagline", monthlyPricePaise: "monthly_price_paise", annualDiscountPercent: "annual_discount_percent",
-    minSeats: "min_seats", features: "features", badge: "badge", highlight: "highlight", weeklyTokens: "weekly_tokens",
-    rollingTokens: "rolling_tokens", monthlyTokens: "monthly_tokens", tokensPerSeat: "tokens_per_seat", active: "active", sortOrder: "sort_order",
+    minSeats: "min_seats", features: "features", badge: "badge", highlight: "highlight", monthlyTokens: "monthly_tokens", tokensPerSeat: "tokens_per_seat", active: "active", sortOrder: "sort_order",
   };
   for (const [key, column] of Object.entries(map)) {
     const value = (input as Record<string, unknown>)[key];

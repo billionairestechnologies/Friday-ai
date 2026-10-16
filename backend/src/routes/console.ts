@@ -3,6 +3,7 @@ import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
 import * as st from "../controllers/statusController.js";
 import * as fin from "../controllers/financeController.js";
+import * as ul from "../controllers/usageLedgerController.js";
 import * as mail from "../controllers/mailController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
@@ -93,6 +94,15 @@ consoleRouter.post("/plans/redemptions/:redemptionId/review", can("plans.review"
 consoleRouter.get("/audit", can("audit.view"), h(c.auditLog));
 
 // Finance: model prices (cost vs sell), the P&L report and expenses.
+// Usage ledger: balances, holds, adjustments, reconciliation (supabase 0057).
+consoleRouter.get("/usage/overview", can("users.view"), h(ul.overview));
+consoleRouter.get("/usage/accounts", can("users.view"), h(ul.accounts));
+consoleRouter.get("/usage/accounts/:accountId", can("users.view"), h(ul.account));
+consoleRouter.post("/usage/accounts/:accountId/adjust", can("users.manage"), h(ul.adjust));
+consoleRouter.post("/usage/accounts/:accountId/status", can("users.manage"), h(ul.setStatus));
+consoleRouter.get("/usage/calls", can("users.view"), h(ul.calls));
+consoleRouter.get("/usage/export.csv", can("users.view"), h(ul.exportCsv));
+consoleRouter.post("/usage/reconcile", can("users.manage"), h(ul.reconcile));
 consoleRouter.get("/finance/live", can("finance.view"), h(fin.live));
 consoleRouter.get("/finance/report", can("finance.view"), h(fin.report));
 consoleRouter.get("/finance/pricing", can("finance.view"), h(fin.pricing));

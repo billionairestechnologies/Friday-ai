@@ -574,8 +574,9 @@ private func usageLabel(_ type: String) -> String {
     }
 }
 
-/// Usage — the same windows as the web's Usage pane: weekly, 5-hour, monthly, organization pool and your cap, each with
-/// its reset time and what used it, plus what your plan includes (all from GET /usage/quota).
+/// Usage — the same balance as the web's Usage pane: this month's tokens (or the organization pool and your cap), when
+/// they renew and what used them, plus what your plan includes (all from GET /usage/quota). The weekly / 5-hour bars
+/// only appear for an older server that still sends them.
 private struct UsagePage: View {
     @EnvironmentObject var vm: FridayViewModel
     @State private var quota: UsageQuota?
@@ -598,10 +599,10 @@ private struct UsagePage: View {
                         }
                     }
                 }
-                bar("Weekly Limit", quota.weekly, quota.breakdown, nil)
-                if let r = quota.rolling { bar("5-Hour Limit", r, quota.rollingBreakdown, "A short rolling window on top of your weekly limit, so one burst can't use up a whole week at once.") }
-                if let m = quota.monthly { bar("Monthly Limit", m, quota.monthlyBreakdown, nil) }
-                if let o = quota.orgPool { bar("Organization Pool (\(quota.orgSeats) seats)", o, [], nil) }
+                if let m = quota.monthly { bar("This month", m, quota.monthlyBreakdown, "Your tokens renew every month on the day your plan started. Use them whenever you like.") }
+                if let o = quota.orgPool { bar("Team pool (\(quota.orgSeats) seats)", o, quota.monthlyBreakdown, nil) }
+                if let w = quota.weekly { bar("Weekly Limit", w, quota.breakdown, nil) }
+                if let r = quota.rolling { bar("5-Hour Limit", r, quota.rollingBreakdown, nil) }
                 if let c = quota.memberCap { bar("Your Monthly Cap", c, [], "A personal sub-limit your org admin set within the shared pool.") }
                 if let e = quota.entitlements { includes(e) }
             } else {
@@ -614,12 +615,25 @@ private struct UsagePage: View {
         }
     }
 
+    /// 2,450,000 → "2.45M", 12,300 → "12.3K" (the web's formatTokens).
+    private func compactTokens(_ n: Double) -> String {
+        let v = max(0, n)
+        func trim(_ x: Double, _ digits: Int) -> String {
+            var s = String(format: "%.\(digits)f", x)
+            while s.contains(".") && (s.hasSuffix("0") || s.hasSuffix(".")) { s.removeLast() }
+            return s
+        }
+        if v >= 1_000_000 { return trim(v / 1_000_000, 2) + "M" }
+        if v >= 1_000 { return trim(v / 1_000, 1) + "K" }
+        return String(Int(v))
+    }
+
     private func bar(_ title: String, _ bucket: UsageBucket?, _ breakdown: [UsageBreakdownEntry], _ help: String?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title).font(.system(size: 15, weight: .medium)).foregroundColor(FridayColor.text)
                 Spacer()
-                Text(bucket.map { "\($0.pct)% used" } ?? "—")
+                Text(bucket.map { "\(compactTokens($0.used)) / \(compactTokens($0.limit)) · \($0.pct)%" } ?? "—")
                     .font(.system(size: 13)).foregroundColor(FridayColor.muted)
             }
             if let bucket, bucket.limit > 0 {

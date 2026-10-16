@@ -52,7 +52,8 @@ export type CatalogPlan = {
   features: string[];
   badge: string | null;
   highlight: boolean;
-  limits: { weekly: number; rolling: number; monthly: number | null; tokensPerSeat: number | null };
+  /** monthly = tokens per subscription month (individual plans); tokensPerSeat = enterprise pool per seat. */
+  limits: { monthly: number | null; tokensPerSeat: number | null };
   entitlements: Entitlements;
 };
 
