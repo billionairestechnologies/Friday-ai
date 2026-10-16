@@ -32,7 +32,7 @@ docs/
 | `supabase/` | SQL migrations, applied in order |
 | `infra/` | AWS CloudFormation + deploy script |
 | `scripts/` | Repo tooling (migration verifier, preview shell generator) |
-| `friday-line/` | Phone session architecture: plan, working models, flows, diagrams. Not wired into the app yet. |
+| `airdots/` | Phone session architecture: plan, working models, flows, diagrams. Not wired into the app yet. |
 
 Keep these in sync when you change architecture: the diagram sources in `diagrams/`, the backend map in
 [CLAUDE.md](../CLAUDE.md), and the briefing in `architecture/`.

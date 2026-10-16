@@ -27,6 +27,8 @@ import { cliRouter } from "./routes/cli.js";
 import { installRouter } from "./routes/install.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { buildRouter } from "./routes/build.js";
+import { airRouter } from "./routes/air.js";
+import { phoneRouter } from "./routes/phone.js";
 import { voiceRouter } from "./routes/voice.js";
 import { sandboxRouter } from "./routes/sandbox.js";
 import { requestContext } from "./middleware/requestContext.js";
@@ -68,6 +70,7 @@ export function createApp() {
   // upload endpoint yet) — base64 inflates size by ~33%, and up to MAX_ATTACHMENTS images can be
   // attached per message, so 2mb was rejecting any real photo outright with a bare 413 before it
   // ever reached chatService's own, more specific vision-support error.
+  app.use(express.urlencoded({ extended: false }));
   app.use(
     express.json({
       limit: "30mb",
@@ -92,6 +95,8 @@ export function createApp() {
   app.use("/api/automations", automationsRouter);
   app.use("/api/mcp", mcpRouter);
   app.use("/api/build", buildRouter);
+  app.use("/api/air", airRouter);
+  app.use("/api/phone", phoneRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/sandbox", sandboxRouter);
   app.use("/api/usage", usageRouter);

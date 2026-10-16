@@ -61,6 +61,7 @@ export async function createConversation(
   title?: string,
   projectId?: string,
   workspace: "chat" | "build" = "chat",
+  origin: "web" | "air" = "web",
 ) {
   let providerRowId: string | null = null;
   if (projectId) await getOwnedProject(userId, projectId);
@@ -90,6 +91,7 @@ export async function createConversation(
       // Only written for build sessions, so ordinary chat creation keeps working on a database
       // where migration 0030 (conversations.workspace) hasn't been applied yet.
       ...(workspace === "build" ? { workspace } : {}),
+      ...(origin === "air" ? { origin } : {}),
     })
     .select()
     .single();

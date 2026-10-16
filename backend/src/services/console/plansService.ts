@@ -4,6 +4,7 @@ import { HttpError } from "../../middleware/errorHandler.js";
 import { resolveEffectivePlan } from "../quota/tokenQuotaService.js";
 import { resolveEntitlements } from "../quota/entitlements.js";
 import { sanitizeEntitlements, type Entitlements } from "../quota/planCatalog.js";
+import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { NEW_USER_DAYS, findUserByEmail, userLabels } from "./directory.js";
 
 /**
@@ -95,6 +96,7 @@ export async function savePackage(input: PackageInput & { id?: string }, actorId
     ? await supabaseAdmin.from("plan_packages").update(row).eq("id", input.id).select().single()
     : await supabaseAdmin.from("plan_packages").insert({ ...row, created_by: actorId }).select().single();
   if (error || !data) throw new HttpError(400, error?.message ?? "Couldn't save the package");
+  invalidateMemoized();
   return data;
 }
 
@@ -196,6 +198,7 @@ export async function grantAccess(input: GrantInput, actorId: string | null) {
     .select()
     .single();
   if (error || !data) throw new HttpError(500, error?.message ?? "Couldn't record the grant");
+  invalidateMemoized();
   return data;
 }
 
@@ -251,6 +254,7 @@ export async function revokeGrant(grantId: string) {
   if (!grant) throw new HttpError(404, "No active grant with that id");
   await revert(grant);
   await supabaseAdmin.from("access_grants").update({ status: "revoked" }).eq("id", grantId);
+  invalidateMemoized();
 }
 
 /** Hourly sweep: expire grants whose end date has passed. */

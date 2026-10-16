@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, useParams } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { Home } from "@/routes/index";
+import { AirWorkspace } from "@/components/air-workspace";
 import { lazy, Suspense, useEffect } from "react";
 import { UpgradePage } from "@/routes/upgrade";
 import { ProjectDetailPage, ProjectsPage } from "@/routes/projects";
@@ -84,6 +85,26 @@ const buildConversationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/build/$conversationId",
   component: BuildShell,
+});
+
+function AirShell() {
+  const { conversationId } = useParams({ strict: false }) as { conversationId?: string };
+  useEffect(() => {
+    document.title = "Friday";
+  }, [conversationId]);
+  return <AirWorkspace conversationId={conversationId} />;
+}
+
+const airRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/air",
+  component: AirShell,
+});
+
+const airConversationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/air/$conversationId",
+  component: AirShell,
 });
 
 // The Team Console (company back office) — hidden, standalone, not linked from the regular app.
@@ -275,6 +296,8 @@ const routeTree = rootRoute.addChildren([
   conversationRoute,
   buildRoute,
   buildConversationRoute,
+  airRoute,
+  airConversationRoute,
   adminRoute,
   adminSectionRoute,
   upgradeRoute,

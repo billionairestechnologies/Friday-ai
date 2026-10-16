@@ -15,6 +15,7 @@ import { useChat, type ServerMessage } from "@/lib/chat/store";
 import { AskCard } from "@/components/ask-panel";
 import { PLAN_MARKER, SuggestBuildCard } from "@/components/plan-approval";
 import { BuildBanner, BuildSteps, ProjectZipCard } from "@/components/build-steps";
+import { FridayThinking } from "@/components/friday-presence";
 import { FileCards } from "@/components/file-card";
 import { useRotatingThinkingLine } from "@/lib/chat/thinking-lines";
 import { stripVisualArtifactForChat } from "@/lib/chat/artifact";
@@ -238,9 +239,7 @@ const AssistantBlock = memo(function AssistantBlock({ message }: { message: Chat
             transition={{ duration: 0.16 }}
             className="typing-pill"
           >
-            <span className="think-dot size-1.5 rounded-full bg-muted" />
-            <span className="think-dot size-1.5 rounded-full bg-muted" />
-            <span className="think-dot size-1.5 rounded-full bg-muted" />
+            <FridayThinking status={message.status} />
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={thinkingLine}

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import type { Entitlements } from "@/lib/billing/checkout";
 import type { QuotaResponse } from "./quota";
 
 export type Plan = "free" | "pro" | "premium";
@@ -16,24 +17,26 @@ type PlanState = {
   plan: Plan;
   isEnterprise: boolean;
   loaded: boolean;
+  /** Null until the first successful quota read. A missing key means the server hasn't shipped that feature flag. */
+  entitlements: Entitlements | null;
+  apply: (res: QuotaResponse) => void;
   load: () => Promise<void>;
 };
 
 /**
- * The viewer's own plan, fetched once and cached for the session — powers the lock icon on
- * tier-gated models in the model picker. Deliberately a single lightweight fetch rather than
- * another poll loop (QuotaAlerts already polls /usage/quota for its own purpose); a plan change
- * mid-session not being reflected until the next reload is an acceptable tradeoff here.
+ * The viewer's plan and which features it includes. QuotaAlerts polls /usage/quota and calls
+ * apply(), so an admin turning Build Mode or Air Dots off shows up on the next poll without a reload.
  */
 export const usePlan = create<PlanState>((set, get) => ({
   plan: "free",
   isEnterprise: false,
   loaded: false,
+  entitlements: null,
+  apply: (res) => set({ plan: res.status.plan, isEnterprise: res.status.isEnterprise, entitlements: res.entitlements ?? null, loaded: true }),
   load: async () => {
     if (get().loaded) return;
     try {
-      const res = await api.get<QuotaResponse>("/usage/quota");
-      set({ plan: res.status.plan, isEnterprise: res.status.isEnterprise, loaded: true });
+      get().apply(await api.get<QuotaResponse>("/usage/quota"));
     } catch {
       set({ loaded: true });
     }

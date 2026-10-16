@@ -7,6 +7,8 @@ import { HttpError } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
 import { ENTERPRISE_MIN_SEATS, ENTERPRISE_TOKENS_PER_SEAT } from "./quota/tierConfig.js";
 import { requireOrgRole } from "./organizationService.js";
+import { applyPlanPurchase, loadPlanState, purchaseBlockedReason } from "./billing/planSchedule.js";
+import { resolveEffectivePlan } from "./quota/tokenQuotaService.js";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -153,6 +155,9 @@ export async function createRazorpayOrder(userId: string, input: CreateOrderInpu
   } else {
     const plan = await getCatalogPlan(input.planId);
     if (!plan.active || plan.monthlyPricePaise <= 0) throw new HttpError(400, "That plan isn't available for purchase");
+    // Don't take money for a plan that would overwrite one already booked to start later.
+    const blocked = purchaseBlockedReason(await loadPlanState(userId), input.planId, new Date());
+    if (blocked) throw new HttpError(409, blocked);
     amountPaise = cycleAmount(plan, input.billingCycle);
     name = `Friday ${plan.name}`;
     description = plan.tagline;
@@ -277,6 +282,9 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   const failed = eventType === "payment.failed";
   if (!paid && !failed) return;
 
+  // Razorpay sends BOTH payment.captured and order.paid for one payment (and retries on timeouts). Only the
+  // update that actually moves the order to "paid" grants anything — a renewal now ADDS days, so applying
+  // it twice would hand out a free month. A failed event never overwrites a paid order.
   const { data: order, error } = await supabaseAdmin
     .from("razorpay_orders")
     .update({
@@ -285,6 +293,7 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
       updated_at: new Date().toISOString(),
     })
     .eq("razorpay_order_id", orderId)
+    .neq("status", "paid")
     .select("user_id, organization_id, plan, metadata")
     .maybeSingle();
   if (error) {
@@ -298,7 +307,6 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string; packageId?: string } | null) ?? {};
   if (metadata.offerId) await recordDiscountUse(metadata.offerId, order.user_id as string, orderId).catch(() => {});
   const renewsInDays = metadata.billingCycle === "annual" ? 365 : 30;
-  const renewsAt = new Date(Date.now() + renewsInDays * 24 * 60 * 60 * 1000).toISOString();
 
   if (order.plan === "package" && metadata.packageId) {
     // The package's own duration/limits/entitlements apply, recorded as an access grant so expiry
@@ -314,12 +322,20 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
 
   if (order.plan === "pro" || order.plan === "premium" || order.plan === "business") {
     // "business" is a pre-migration legacy id (see 0016) — treated as premium going forward.
+    // Upgrade starts now (unused days credited), same plan extends, a downgrade waits for the current
+    // plan to end — see billing/planSchedule.ts.
     const plan = order.plan === "business" ? "premium" : order.plan;
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .update({ plan, plan_renews_at: renewsAt })
-      .eq("id", order.user_id);
-    if (profileError) logger.warn("razorpay_plan_grant_failed", { orderId, error: profileError.message });
+    try {
+      const [pro, premium] = await Promise.all([getCatalogPlan("pro"), getCatalogPlan("premium")]);
+      await applyPlanPurchase(
+        order.user_id as string,
+        { plan, days: renewsInDays, monthlyPricePaise: { pro: pro.monthlyPricePaise, premium: premium.monthlyPricePaise } },
+        orderId,
+      );
+      resolveEffectivePlan.invalidate(order.user_id as string);
+    } catch (err) {
+      logger.warn("razorpay_plan_grant_failed", { orderId, error: err instanceof Error ? err.message : String(err) });
+    }
     return;
   }
 

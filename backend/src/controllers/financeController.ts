@@ -5,6 +5,8 @@ import { HttpError } from "../middleware/errorHandler.js";
 import { recordAdminAuditLog } from "../services/usageService.js";
 import { EXPENSE_CATEGORIES, createExpense, deleteExpense, listExpenses, updateExpense } from "../services/finance/expenses.js";
 import {
+  consumptionRatesUsd,
+  consumptionWeight,
   costRatesUsd,
   deletePricing,
   hasTokenCost,
@@ -39,8 +41,17 @@ export async function pricing(_req: Request, res: Response) {
     const priced = hasTokenCost(r);
     const cost = priced ? costRatesUsd(r, s) : null;
     const sell = priced ? sellRatesInr(r, s) : null;
+    const burn = consumptionRatesUsd(r, s);
     return {
       ...r,
+      usage: burn
+        ? {
+            source: burn.source,
+            inputPerMInr: burn.rates.input * s.usd_to_inr,
+            outputPerMInr: burn.rates.output * s.usd_to_inr,
+            weight: consumptionWeight(r, s),
+          }
+        : null,
       effective: cost && sell
         ? {
             costInputPerMInr: cost.input * s.usd_to_inr,
@@ -110,6 +121,8 @@ export async function settings(req: Request, res: Response) {
     target_cost_share_pct: z.number().optional(),
     free_cost_budget_inr: z.number().optional(),
     e2b_cost_per_hour_inr: z.number().optional(),
+    consumption_basis: z.enum(["list", "pack"]).optional(),
+    conserve_from_pct: z.number().optional(),
   }).parse(req.body);
   const saved = await saveFinanceSettings(input, req.user!.id);
   audit(req, "finance.settings_saved", null, input);
