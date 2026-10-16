@@ -1,6 +1,6 @@
 # Monthly token allowance and usage ledger
 
-Status: built on branch `feature/monthly-token-allowance` (migration `0057`). **Not deployed.**
+Status: on branch `v3` (migrations `0057` and `0058`), which also removed Air Dots. **Not deployed.**
 This is the policy, the design, and the runbook for metering and enforcing usage.
 
 ## 1. Policy
@@ -35,19 +35,20 @@ fresh input = prompt − cache reads − cache writes
 
 ### Subscription lifecycle
 
-Payments are one-time Razorpay orders: 30 days for monthly, 365 days for annual. There is no auto-renew. Every rule below runs in an idempotent SQL function keyed on the order, so a duplicate or retried webhook changes nothing.
+Payments are one-time Razorpay orders: **1 calendar month** for monthly, **12 months** for annual (never "30 days": a term then ends exactly where an allowance period ends, so a short month can't produce a two-day extra period with a fresh allowance). There is no auto-renew. Every rule below runs in an idempotent SQL function keyed on the order, so a duplicate or retried webhook changes nothing.
 
 | Event | What happens |
 |---|---|
 | First purchase (from Free) | New term starts now; fresh period with the full allowance. |
-| Same plan again, still running (renewal) | Term extended from its current end. The running period is **not** reset; the next period starts on its normal date. |
-| Upgrade (Pro → Premium) | New term starts now; fresh period with the new allowance. Remaining Pro days are not carried over, same as before. |
-| Cheaper plan while a pricier one runs (downgrade) | Queued: it starts when the current term ends, with the period anchored at that moment. |
-| Term ends, nothing queued (expiry) | The account drops to Free at the end instant, not at the next request. |
+| Same plan again, still running (renewal) | Term extended by 1 (or 12) months from its current end. The running period is **not** reset; the next period starts on its normal date. |
+| Upgrade (Pro → Premium) | New term starts now; fresh period with the new allowance. The old plan's unused time is credited at the price ratio (e.g. 16 Pro days ≈ 8 Premium days) and added to the end of the new term. |
+| Cheaper plan while a pricier one runs (downgrade) | Queued: it starts when the current term ends, with the period anchored at that moment. The Plans page shows "Switch on <date>" / "Booked". |
+| Term ends, nothing queued (expiry) | The account drops to Free at the end instant, not at the next request. No grace window (it would hand out a fresh period for free); reminders go out 3 days and 1 day before, and an "ended" note within a day after. |
 | Payment failed | The order is marked failed (never a paid order); a `payment_failed` event is logged. Nothing is taken away. |
-| Refund (`refund.processed` / `payment.refunded`) | The refunded order's days come off the term. If that ends it, the account is on Free from now. Tokens already used are not reversed. |
+| Refund (`refund.processed` / `payment.refunded`) | The refunded order's months come off the term. If that ends it, the account is on Free from now. Tokens already used are not reversed. |
 | Cancellation | There is no auto-renew, so the plan simply runs to the end of the paid term. |
 | Annual plan | 12 monthly allowances, each renewing on the purchase date. |
+| A period the paid term ends inside of (an upgrade's credited days, an admin-set term) | That period gets its proportional share of the allowance. New accounts for a term that is already running are anchored so their last period ends with the term. |
 | Enterprise payment | Seats set; pool = seats × per-seat allowance; the org starts a fresh period. |
 | Admin plan change / package / grant | The new allowance applies to the current period immediately. Usage so far stays counted. |
 
@@ -134,7 +135,8 @@ The stored figures are maintained in the same transaction as each insert. `quota
 Owner's decision: **every paid customer gets a fresh period from deploy.**
 
 - Each paid individual and each enterprise org gets an account with `anchor = migration time`, `used = 0`.
-- Paid terms ending within 30 days are extended to `deploy + 30 days`. Longer (annual) terms are kept.
+- Paid terms ending within a month are extended to `deploy + 1 month`. Longer (annual) terms keep their end date, and their periods are anchored so the last one ends exactly with the term.
+- A lower plan booked under v3 (`profiles.scheduled_plan`, migration 0054) becomes the account's queued plan.
 - Free users get their account on their first request after deploy (`anchor` = that moment).
 - Plan catalog: `monthly_tokens` = 1M / 10M / 25M; `tokens_per_seat` = 30M; the weekly and 5-hour columns are set to null (retired). The default feature bullets are rewritten; custom wording is left alone.
 - Personal caps, package caps and custom org pools were stored in credits. They are converted relative to the plan they were sized against, so "2× Pro" stays 2× Pro:
@@ -162,12 +164,14 @@ Rehearse on a staging copy first. Restore a `pg_dump` of production into a scrat
 
 1. Back up (above).
 2. Apply `supabase/migrations/0057_monthly_token_allowance.sql`. The current server keeps working: the new columns are nullable and its catalog fallbacks still apply. Between steps 2 and 3, converted personal caps are briefly read as credits by the old server, which is more generous, never stricter.
+   v3 note: 0051–0056 are already applied in production (they were applied when v3 was tested on 2026-10-07).
 3. Deploy the new image. No new environment variables are required.
 4. Smoke test as a Free test account:
    - Send a chat and check Settings → Usage moves.
    - In Console → Usage ledger, check the account, its rows and "Reconcile now" (no discrepancies).
    - Run one Build turn and one FridayX request.
 5. In Console → Plans, review converted package caps; edit plan bullets if you customised them.
+6. Once the v3 image is confirmed healthy, back up and apply `0058_remove_air_dots.sql`. It drops the parked Air Dots / phone / WhatsApp-Telegram tables and columns; the backup command is in the file header. The v2 image never reads those objects either, so 0058 is safe whichever image is running.
 6. Mobile: the apps already read the new payload. The new "This month" labels reach users with the next store builds.
 
 ### Rollback

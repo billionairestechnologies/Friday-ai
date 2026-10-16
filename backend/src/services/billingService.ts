@@ -7,6 +7,7 @@ import { HttpError } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
 import { ENTERPRISE_MIN_SEATS, ENTERPRISE_TOKENS_PER_SEAT } from "./quota/tierConfig.js";
 import { requireOrgRole } from "./organizationService.js";
+import { resolveEffectivePlan } from "./quota/tokenQuotaService.js";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -30,7 +31,7 @@ export const INDIVIDUAL_PLANS = [
 // A one-time payment covering 12 months at 10% off the monthly rate, rounded to the nearest
 // rupee — matches the "annual toggle applies a 10% discount" ask. Not a subscription (one-time
 // orders were chosen over Razorpay Subscriptions) — an annual purchase is a single order for a
-// 365-day term, a monthly one for 30 days. Either way the token allowance renews every calendar
+// 12-month term, a monthly one for 1 calendar month. Either way the token allowance renews every
 // month of the term, counted from the day it started (supabase 0057: quota_apply_payment).
 export function annualAmountPaise(monthlyAmountPaise: number): number {
   return Math.round(monthlyAmountPaise * 12 * 0.9);
@@ -265,7 +266,7 @@ type RefundEntity = { id?: unknown; payment_id?: unknown; amount?: unknown };
  *
  *   payment.captured / order.paid      → quota_apply_payment (renewal / new term / upgrade / queued downgrade)
  *   payment.failed                     → order marked failed (never a paid one), event logged; nothing is taken away
- *   refund.processed / payment.refunded→ quota_apply_refund (the refunded days come off the term)
+ *   refund.processed / payment.refunded→ quota_apply_refund (the refunded months come off the term)
  */
 export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   const eventType = typeof payload.event === "string" ? payload.event : "unknown";
@@ -306,7 +307,8 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   if (error) throw new Error(`razorpay order lookup failed: ${error.message}`);
   if (!order?.user_id) return;
   const metadata = (order.metadata as { billingCycle?: BillingCycle; seats?: number; offerId?: string; packageId?: string } | null) ?? {};
-  const days = metadata.billingCycle === "annual" ? 365 : 30;
+  // Terms are calendar months (supabase 0057): a term then ends exactly where an allowance period ends.
+  const months = metadata.billingCycle === "annual" ? 12 : 1;
   const plan = order.plan === "business" ? "premium" : (order.plan as string); // "business" is a pre-0016 legacy id
 
   if (failed) {
@@ -329,7 +331,7 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
 
   if (refunded) {
     if (plan === "pro" || plan === "premium") {
-      const { error: refundError } = await supabaseAdmin.rpc("quota_apply_refund", { p_user: order.user_id, p_plan: plan, p_days: days, p_order: orderId });
+      const { error: refundError } = await supabaseAdmin.rpc("quota_apply_refund", { p_user: order.user_id, p_plan: plan, p_months: months, p_order: orderId });
       if (refundError) throw new Error(`refund apply failed: ${refundError.message}`);
     } else {
       await supabaseAdmin.from("subscription_events").insert({ user_id: order.user_id, organization_id: order.organization_id, kind: "refund", plan, order_id: orderId, idempotency_key: `refund:${orderId}` });
@@ -370,8 +372,17 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   }
 
   if (plan === "pro" || plan === "premium") {
-    const { error: applyError } = await supabaseAdmin.rpc("quota_apply_payment", { p_user: order.user_id, p_plan: plan, p_days: days, p_order: orderId });
+    // Prices let an upgrade credit the old plan's unused time at the price ratio.
+    const [pro, premium] = await Promise.all([getCatalogPlan("pro"), getCatalogPlan("premium")]);
+    const { error: applyError } = await supabaseAdmin.rpc("quota_apply_payment", {
+      p_user: order.user_id,
+      p_plan: plan,
+      p_months: months,
+      p_order: orderId,
+      p_prices: { pro: pro.monthlyPricePaise, premium: premium.monthlyPricePaise },
+    });
     if (applyError) throw new Error(`plan grant failed: ${applyError.message}`);
+    resolveEffectivePlan.invalidate(order.user_id as string);
     return;
   }
 

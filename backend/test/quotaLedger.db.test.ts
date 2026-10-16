@@ -252,57 +252,57 @@ test("no daily cap: the whole monthly allowance can go in one day", { skip }, as
 test("subscription lifecycle: subscribe, duplicate webhook, renewal, upgrade, queued downgrade, expiry", { skip }, async () => {
   const user = await newUser("free");
   const t = (iso: string) => iso;
-  const pay = (plan: string, days: number, order: string, now: string) =>
-    one<{ r: { applied: boolean; kind?: string; duplicate?: boolean } }>("select quota_apply_payment($1, $2, $3, $4, $5) as r", [user, plan, days, order, now]).then((x) => x.r);
+  const pay = (plan: string, months: number, order: string, now: string) =>
+    one<{ r: { applied: boolean; kind?: string; duplicate?: boolean } }>("select quota_apply_payment($1, $2, $3, $4, $5) as r", [user, plan, months, order, now]).then((x) => x.r);
   const profile = () => one<{ plan: string; plan_renews_at: Date | null }>("select plan, plan_renews_at from profiles where id = $1", [user]);
 
   // Free user spends some tokens, then subscribes to Pro: a fresh period with the full 10M.
   const f = await reserve(user, 0, t("2027-03-01T00:00:00Z"));
   await record(f.id, 400_000, undefined, t("2027-03-01T00:00:00Z"));
-  assert.equal((await pay("pro", 30, "order_1", t("2027-03-10T00:00:00Z"))).kind, "subscribe");
+  assert.equal((await pay("pro", 1, "order_1", t("2027-03-10T00:00:00Z"))).kind, "subscribe");
   // Razorpay delivers the same webhook again (and once more concurrently).
-  const dups = await Promise.all([pay("pro", 30, "order_1", t("2027-03-10T00:00:01Z")), pay("pro", 30, "order_1", t("2027-03-10T00:00:02Z"))]);
+  const dups = await Promise.all([pay("pro", 1, "order_1", t("2027-03-10T00:00:01Z")), pay("pro", 1, "order_1", t("2027-03-10T00:00:02Z"))]);
   assert.ok(dups.every((d) => d.duplicate));
-  assert.equal((await profile()).plan_renews_at!.toISOString(), "2027-04-09T00:00:00.000Z");
+  assert.equal((await profile()).plan_renews_at!.toISOString(), "2027-04-10T00:00:00.000Z");
   let r = await reserve(user, 0, t("2027-03-10T01:00:00Z"));
   assert.equal(r.allowance, 10_000_000);
   assert.equal(r.used, 0);
   await record(r.id, 6_000_000, undefined, t("2027-03-10T01:00:00Z"));
 
   // Early renewal: the term is extended from its end; the running period is NOT reset.
-  assert.equal((await pay("pro", 30, "order_2", t("2027-03-20T00:00:00Z"))).kind, "renewal");
-  assert.equal((await profile()).plan_renews_at!.toISOString(), "2027-05-09T00:00:00.000Z");
+  assert.equal((await pay("pro", 1, "order_2", t("2027-03-20T00:00:00Z"))).kind, "renewal");
+  assert.equal((await profile()).plan_renews_at!.toISOString(), "2027-05-10T00:00:00.000Z");
   r = await reserve(user, 0, t("2027-03-20T00:00:01Z"));
   assert.equal(r.used, 6_000_000);
 
   // Upgrade to Premium: new term from now, fresh period with 25M.
-  assert.equal((await pay("premium", 30, "order_3", t("2027-03-25T00:00:00Z"))).kind, "upgrade");
+  assert.equal((await pay("premium", 1, "order_3", t("2027-03-25T00:00:00Z"))).kind, "upgrade");
   r = await reserve(user, 0, t("2027-03-25T00:00:01Z"));
   assert.equal(r.plan, "premium");
   assert.equal(r.allowance, 25_000_000);
   assert.equal(r.used, 0);
 
   // Buying Pro while Premium runs queues it for when Premium ends.
-  assert.equal((await pay("pro", 30, "order_4", t("2027-04-01T00:00:00Z"))).kind, "downgrade_queued");
+  assert.equal((await pay("pro", 1, "order_4", t("2027-04-01T00:00:00Z"))).kind, "downgrade_queued");
   assert.equal((await profile()).plan, "premium");
-  // Premium ends 2027-04-24; the next request after that is on Pro, period anchored at the end.
+  // Premium ends 2027-04-25 (one calendar month); the next request after that is on Pro, period anchored at the end.
   r = await reserve(user, 0, t("2027-04-30T00:00:00Z"));
   assert.equal(r.plan, "pro");
-  assert.equal(new Date(r.period_start).toISOString(), "2027-04-24T00:00:00.000Z");
-  assert.equal((await profile()).plan_renews_at!.toISOString(), "2027-05-24T00:00:00.000Z");
+  assert.equal(new Date(r.period_start).toISOString(), "2027-04-25T00:00:00.000Z");
+  assert.equal((await profile()).plan_renews_at!.toISOString(), "2027-05-25T00:00:00.000Z");
 
   // Nobody renews: after the Pro term the account is on Free, from the moment the term ended.
   r = await reserve(user, 0, t("2027-06-10T00:00:00Z"));
   assert.equal(r.plan, "free");
   assert.equal(r.allowance, 1_000_000);
-  assert.equal(new Date(r.period_start).toISOString(), "2027-05-24T00:00:00.000Z");
+  assert.equal(new Date(r.period_start).toISOString(), "2027-05-25T00:00:00.000Z");
   const events = await sql<{ kind: string }>("select kind from subscription_events where user_id = $1 order by created_at", [user]);
   assert.ok(events.some((e) => e.kind === "downgrade_applied") && events.some((e) => e.kind === "expired"));
 });
 
 test("annual plan: 12 monthly allowances, each renewing on the purchase date", { skip }, async () => {
   const user = await newUser("free");
-  await one("select quota_apply_payment($1, 'pro', 365, 'order_annual', '2027-01-15T09:00:00Z')", [user]);
+  await one("select quota_apply_payment($1, 'pro', 12, 'order_annual', '2027-01-15T09:00:00Z')", [user]);
   for (const [now, start] of [["2027-01-20T00:00:00Z", "2027-01-15"], ["2027-02-20T00:00:00Z", "2027-02-15"], ["2027-12-20T00:00:00Z", "2027-12-15"]] as const) {
     const r = await reserve(user, 0, now);
     assert.equal(r.plan, "pro", now);
@@ -314,14 +314,65 @@ test("annual plan: 12 monthly allowances, each renewing on the purchase date", {
   assert.equal((await reserve(user, 0, "2028-01-20T00:00:00Z")).plan, "free");
 });
 
-test("refunds take back the paid days once; tokens already used stay used", { skip }, async () => {
+test("a monthly term ends exactly with its period: no free extra period in short months (February)", { skip }, async () => {
+  const user = await newUser("free");
+  await one("select quota_apply_payment($1, 'pro', 1, 'order_feb', '2027-02-01T00:00:00Z')", [user]);
+  const p = await one<{ plan_renews_at: Date }>("select plan_renews_at from profiles where id = $1", [user]);
+  assert.equal(p.plan_renews_at.toISOString(), "2027-03-01T00:00:00.000Z"); // not Mar 3 (30 days)
+  const inside = await reserve(user, 0, "2027-02-28T23:59:59Z");
+  assert.equal(inside.plan, "pro");
+  const after = await reserve(user, 0, "2027-03-01T00:00:01Z");
+  assert.equal(after.plan, "free");
+  assert.equal(after.allowance, 1_000_000);
+});
+
+test("upgrade credits the unused days at the price ratio, and a period cut short by the term gets its share", { skip }, async () => {
+  const user = await newUser("free");
+  const prices = JSON.stringify({ pro: 99_900, premium: 199_900 });
+  await one("select quota_apply_payment($1, 'pro', 1, 'order_u1', '2027-03-01T00:00:00Z', $2)", [user, prices]);
+  // 16 Pro days left on Mar 16 at half Premium's price → 8 Premium days added after the new month.
+  const up = await one<{ r: { kind: string } }>("select quota_apply_payment($1, 'premium', 1, 'order_u2', '2027-03-16T00:00:00Z', $2) as r", [user, prices]);
+  assert.equal(up.r.kind, "upgrade");
+  const p = await one<{ plan: string; plan_renews_at: Date }>("select plan, plan_renews_at from profiles where id = $1", [user]);
+  assert.equal(p.plan, "premium");
+  // 16 days × ₹999 / ₹1,999 ≈ 7.996 days after Apr 16.
+  const credited = 16 * 86_400_000 * (99_900 / 199_900);
+  const end = Date.parse("2027-04-16T00:00:00Z") + credited;
+  assert.ok(Math.abs(p.plan_renews_at.getTime() - end) < 1_000, p.plan_renews_at.toISOString());
+  assert.equal((await reserve(user, 0, "2027-03-20T00:00:00Z")).allowance, 25_000_000);
+  // Apr 16 → May 16 period, but the term ends ~Apr 24: only that share of the allowance.
+  const tail = await reserve(user, 0, "2027-04-20T00:00:00Z");
+  const share = (p.plan_renews_at.getTime() - Date.parse("2027-04-16T00:00:00Z")) / (Date.parse("2027-05-16T00:00:00Z") - Date.parse("2027-04-16T00:00:00Z"));
+  assert.ok(Math.abs(tail.allowance - 25_000_000 * share) <= 1, String(tail.allowance));
+  assert.ok(tail.allowance < 7_000_000);
+  assert.equal((await reserve(user, 0, "2027-04-25T00:00:00Z")).plan, "free");
+});
+
+test("a plan set by an admin mid-term gets periods that end with the term (full allowance, no proration)", { skip }, async () => {
+  const user = await newUser("pro", "2027-06-20T12:00:00Z");
+  const r = await reserve(user, 0, "2027-06-01T00:00:00Z");
+  assert.equal(new Date(r.period_start).toISOString(), "2027-05-20T12:00:00.000Z");
+  assert.equal(new Date(r.period_end).toISOString(), "2027-06-20T12:00:00.000Z");
+  assert.equal(r.allowance, 10_000_000);
+});
+
+test("renewing on the 31st stays on the 31st (terms follow the anchor, clamped per month)", { skip }, async () => {
+  const user = await newUser("free");
+  await one("select quota_apply_payment($1, 'pro', 1, 'order_31a', '2027-01-31T10:00:00Z')", [user]);
+  await one("select quota_apply_payment($1, 'pro', 1, 'order_31b', '2027-02-10T00:00:00Z')", [user]);
+  const p = await one<{ plan_renews_at: Date }>("select plan_renews_at from profiles where id = $1", [user]);
+  // Jan 31 + 1 month = Feb 28, + 1 more = Mar 28 (renewals extend the current end by calendar months).
+  assert.equal(p.plan_renews_at.toISOString(), "2027-03-28T10:00:00.000Z");
+});
+
+test("refunds take back the paid months once; tokens already used stay used", { skip }, async () => {
   const user = await newUser("free");
   const now = "2027-07-01T00:00:00Z";
-  await one("select quota_apply_payment($1, 'pro', 30, 'order_r1', $2)", [user, now]);
-  await one("select quota_apply_payment($1, 'pro', 30, 'order_r2', $2)", [user, now]); // renewal → 60 days
+  await one("select quota_apply_payment($1, 'pro', 1, 'order_r1', $2)", [user, now]);
+  await one("select quota_apply_payment($1, 'pro', 1, 'order_r2', $2)", [user, now]); // renewal → 2 months
   const r = await reserve(user, 0, now);
   await record(r.id, 2_000_000, undefined, now);
-  const refund = (order: string) => one<{ r: { kind?: string; duplicate?: boolean } }>("select quota_apply_refund($1, 'pro', 30, $2, $3) as r", [user, order, "2027-07-02T00:00:00Z"]).then((x) => x.r);
+  const refund = (order: string) => one<{ r: { kind?: string; duplicate?: boolean } }>("select quota_apply_refund($1, 'pro', 1, $2, $3) as r", [user, order, "2027-07-02T00:00:00Z"]).then((x) => x.r);
   assert.equal((await refund("order_r2")).kind, "term_shortened");
   assert.equal((await refund("order_r2")).duplicate, true);
   assert.equal((await refund("order_r1")).kind, "ended");

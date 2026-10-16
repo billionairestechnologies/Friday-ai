@@ -222,6 +222,17 @@ JSON secret read at startup as `FRIDAY_ENV_JSON` (`config/env.ts#expandJsonEnv`;
 Deploy: `infra/aws/deploy.sh [--env-file infra/aws/app.env]` (deploys the committed HEAD). Lint the
 templates with `cfn-lint infra/aws/*.yaml` (install in a venv — debian's PyYAML blocks a global pip install).
 
+## Branch `v3` (next main) — 2026-10-17
+
+v3 = current main + the monthly token allowance (migration 0057) + v3's per-plan feature switches
+(voice, Canvas, images, connectors) and renewal reminders. **Air Dots (the always-on agent), Friday on the
+phone, the WhatsApp/Telegram doors and the passphrase gate were removed** (owner: focus on Friday, FridayX
+and the IDE; the always-on agent comes back later — its history is in git before commit 31a5477).
+`0058_remove_air_dots.sql` drops their tables/columns; apply it after the v3 image is live. Paid terms are
+calendar months (1 or 12), upgrades credit unused time at the price ratio, a period cut short by a term
+gets a prorated allowance. Main still runs v2 in production; never merge v3 into main or deploy it unless
+the owner says so explicitly.
+
 ## Current state (branch `v2`)
 
 On `feature/build-agent-loop` (not merged yet): Build is ONE model-driven agent loop — the model answers

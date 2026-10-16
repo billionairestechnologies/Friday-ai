@@ -25,9 +25,16 @@
 -- two requests on two servers can never both spend the last tokens. Lock order is always
 -- profile → account → reservation → member row.
 --
+-- Paid terms are counted in calendar MONTHS (1 or 12), never "30 days": a term then ends exactly
+-- where an allowance period ends, so no short extra period with a fresh allowance appears in
+-- between. Any period a term still cuts short (an upgrade's credited days, an older term) gets a
+-- proportional allowance (quota_sync_locked).
+--
 -- Migration policy (decided by the owner, 2026-10-17): every paid individual and enterprise org
--- starts a FRESH monthly period at deploy time with its full allowance; paid individuals whose
--- plan_renews_at is sooner than 30 days out are extended to deploy + 30 days. Historic
+-- starts a FRESH monthly period at deploy time with its full allowance; a paid term ending within a
+-- month is extended to deploy + 1 month, a longer one keeps its end date and its periods are
+-- aligned to it. A lower plan booked under v3 (profiles.scheduled_plan, 0054) becomes the account's
+-- queued plan; 0058 then drops those columns. Historic
 -- token_ledger rows are kept untouched (account_id stays null on them — they never count against
 -- a new-style period). Personal caps and pools were stored in credits (0046); they are converted
 -- once into billable tokens relative to the plan they were sized against (see below).
@@ -54,7 +61,7 @@ create table if not exists public.quota_accounts (
   status text not null default 'active' check (status in ('active', 'suspended')),
   -- A cheaper plan bought while a pricier one is still running starts when the current term ends.
   pending_plan text,
-  pending_days int,
+  pending_months int,
   -- Highest usage notice (80/95/100 %) already sent for the current period.
   notified_threshold int not null default 0,
   created_at timestamptz not null default now(),
@@ -176,6 +183,13 @@ begin
   return n;
 end $$;
 
+-- The latest `p_end − k months` (k ≥ 1) at or before p_now: anchoring periods there makes the last
+-- period of a paid term end exactly when the term does.
+create or replace function public.quota_aligned_anchor(p_end timestamptz, p_now timestamptz)
+returns timestamptz language sql immutable as $$
+  select public.quota_add_months(p_end, -(select min(k) from generate_series(1, 1200) k where public.quota_add_months(p_end, -k) <= p_now))
+$$;
+
 create or replace function public.quota_plan_rank(p_plan text)
 returns int language sql immutable as $$
   select case p_plan when 'premium' then 2 when 'pro' then 1 else 0 end
@@ -213,6 +227,9 @@ create or replace function public.quota_lock_account(p_user uuid, p_org uuid, p_
 returns public.quota_accounts language plpgsql as $$
 declare
   acc_id uuid;
+  v_anchor timestamptz := p_now;
+  v_plan text;
+  v_end timestamptz;
 begin
   if p_org is not null then
     insert into public.quota_accounts (organization_id, period_anchor, period_start, period_end)
@@ -220,8 +237,16 @@ begin
       on conflict (organization_id) do nothing;
     select id into acc_id from public.quota_accounts where organization_id = p_org;
   else
+    -- A paid term that is already running (set by an admin, a grant or a package) gets periods that
+    -- end with it; everyone else starts their first period now.
+    if not exists (select 1 from public.quota_accounts where user_id = p_user) then
+      select plan, plan_renews_at into v_plan, v_end from public.profiles where id = p_user;
+      if v_plan is distinct from 'free' and v_end is not null and v_end > p_now then
+        v_anchor := public.quota_aligned_anchor(v_end, p_now);
+      end if;
+    end if;
     insert into public.quota_accounts (user_id, period_anchor, period_start, period_end)
-      values (p_user, p_now, p_now, public.quota_add_months(p_now, 1))
+      values (p_user, v_anchor, v_anchor, public.quota_add_months(v_anchor, 1))
       on conflict (user_id) do nothing;
     select id into acc_id from public.quota_accounts where user_id = p_user;
   end if;
@@ -268,9 +293,9 @@ begin
     end if;
     old_end := prof.plan_renews_at;
     acc := public.quota_lock_account(p_user, null, p_now);
-    if acc.pending_plan is not null and acc.pending_days is not null then
-      update public.profiles set plan = acc.pending_plan, plan_renews_at = old_end + make_interval(days => acc.pending_days) where id = p_user;
-      update public.quota_accounts set pending_plan = null, pending_days = null where id = acc.id;
+    if acc.pending_plan is not null and acc.pending_months is not null then
+      update public.profiles set plan = acc.pending_plan, plan_renews_at = public.quota_add_months(old_end, acc.pending_months) where id = p_user;
+      update public.quota_accounts set pending_plan = null, pending_months = null where id = acc.id;
       perform public.quota_restart_period(acc.id, old_end, p_now);
       insert into public.subscription_events (user_id, kind, plan, idempotency_key, details)
         values (p_user, 'downgrade_applied', acc.pending_plan, 'downgrade:' || p_user || ':' || old_end, jsonb_build_object('from', prof.plan, 'at', old_end))
@@ -285,23 +310,31 @@ begin
   end loop;
 end $$;
 
--- A verified payment for an individual plan. Exactly once per order (subscription_events key):
---   same plan, still running   → renewal: the term is extended from its current end; the running
---                                period is untouched (its allowance is not granted twice).
---   from Free / higher plan    → new term starting now with a fresh period and the full allowance.
+-- A verified payment for an individual plan (p_months = 1 monthly, 12 annual). Exactly once per
+-- order (subscription_events key):
+--   same plan, still running   → renewal: the term is extended by p_months from its current end; the
+--                                running period is untouched (its allowance is not granted twice).
+--   from Free                  → new term starting now with a fresh period and the full allowance.
+--   higher plan (upgrade)      → new term starting now, fresh period; the old plan's unused time is
+--                                credited at the price ratio (p_prices: {"pro": paise, "premium": paise})
+--                                and added to the end of the new term.
 --   lower plan while running   → queued: starts when the current term ends.
-create or replace function public.quota_apply_payment(p_user uuid, p_plan text, p_days int, p_order text, p_now timestamptz default now())
-returns jsonb language plpgsql as $$
+create or replace function public.quota_apply_payment(
+  p_user uuid, p_plan text, p_months int, p_order text, p_now timestamptz default now(), p_prices jsonb default null
+) returns jsonb language plpgsql as $$
 declare
   ev_id uuid;
   prof record;
   acc public.quota_accounts;
   v_kind text;
+  v_credit interval := interval '0';
+  v_old_price numeric;
+  v_new_price numeric;
 begin
   if p_plan not in ('pro', 'premium') then raise exception 'unsupported plan %', p_plan; end if;
-  if p_days is null or p_days <= 0 then raise exception 'days must be positive'; end if;
+  if p_months is null or p_months <= 0 then raise exception 'months must be positive'; end if;
   insert into public.subscription_events (user_id, kind, plan, order_id, idempotency_key, details)
-    values (p_user, 'payment', p_plan, p_order, 'payment:' || p_order, jsonb_build_object('days', p_days))
+    values (p_user, 'payment', p_plan, p_order, 'payment:' || p_order, jsonb_build_object('months', p_months))
     on conflict (idempotency_key) do nothing
     returning id into ev_id;
   if ev_id is null then
@@ -314,24 +347,31 @@ begin
 
   if prof.plan = p_plan then
     if prof.plan_renews_at is not null then
-      update public.profiles set plan_renews_at = greatest(prof.plan_renews_at, p_now) + make_interval(days => p_days) where id = p_user;
+      update public.profiles set plan_renews_at = public.quota_add_months(greatest(prof.plan_renews_at, p_now), p_months) where id = p_user;
     end if;
     v_kind := 'renewal';
-  elsif public.quota_plan_rank(p_plan) > public.quota_plan_rank(prof.plan) or prof.plan_renews_at is null and prof.plan = 'free' then
-    update public.profiles set plan = p_plan, plan_renews_at = p_now + make_interval(days => p_days) where id = p_user;
-    update public.quota_accounts set pending_plan = null, pending_days = null where id = acc.id;
+  elsif public.quota_plan_rank(p_plan) > public.quota_plan_rank(prof.plan) then
+    if prof.plan <> 'free' and prof.plan_renews_at is not null and prof.plan_renews_at > p_now then
+      v_old_price := nullif((p_prices ->> prof.plan)::numeric, 0);
+      v_new_price := nullif((p_prices ->> p_plan)::numeric, 0);
+      if v_old_price is not null and v_new_price is not null then
+        v_credit := (prof.plan_renews_at - p_now) * (v_old_price / v_new_price)::double precision;
+      end if;
+    end if;
+    update public.profiles set plan = p_plan, plan_renews_at = public.quota_add_months(p_now, p_months) + v_credit where id = p_user;
+    update public.quota_accounts set pending_plan = null, pending_months = null where id = acc.id;
     perform public.quota_restart_period(acc.id, p_now, p_now);
     v_kind := case when prof.plan = 'free' then 'subscribe' else 'upgrade' end;
   else
     update public.quota_accounts set
-      pending_days = case when pending_plan = p_plan then coalesce(pending_days, 0) + p_days else p_days end,
+      pending_months = case when pending_plan = p_plan then coalesce(pending_months, 0) + p_months else p_months end,
       pending_plan = p_plan
     where id = acc.id;
     v_kind := 'downgrade_queued';
   end if;
 
-  update public.subscription_events set details = details || jsonb_build_object('applied_as', v_kind, 'previous_plan', prof.plan) where id = ev_id;
-  return jsonb_build_object('applied', true, 'kind', v_kind);
+  update public.subscription_events set details = details || jsonb_build_object('applied_as', v_kind, 'previous_plan', prof.plan, 'credit', v_credit::text) where id = ev_id;
+  return jsonb_build_object('applied', true, 'kind', v_kind, 'credit', v_credit::text);
 end $$;
 
 -- A verified enterprise payment (once per order): seats are set, the pool becomes seats × the
@@ -353,9 +393,9 @@ begin
   return jsonb_build_object('applied', true);
 end $$;
 
--- A refunded order takes back the paid days it bought (once per order). If that ends the term,
+-- A refunded order takes back the paid months it bought (once per order). If that ends the term,
 -- the person is on Free from now. Tokens already used are not reversed.
-create or replace function public.quota_apply_refund(p_user uuid, p_plan text, p_days int, p_order text, p_now timestamptz default now())
+create or replace function public.quota_apply_refund(p_user uuid, p_plan text, p_months int, p_order text, p_now timestamptz default now())
 returns jsonb language plpgsql as $$
 declare
   ev_id uuid;
@@ -364,7 +404,7 @@ declare
   new_end timestamptz;
 begin
   insert into public.subscription_events (user_id, kind, plan, order_id, idempotency_key, details)
-    values (p_user, 'refund', p_plan, p_order, 'refund:' || p_order, jsonb_build_object('days', p_days))
+    values (p_user, 'refund', p_plan, p_order, 'refund:' || p_order, jsonb_build_object('months', p_months))
     on conflict (idempotency_key) do nothing
     returning id into ev_id;
   if ev_id is null then return jsonb_build_object('applied', false, 'duplicate', true); end if;
@@ -372,20 +412,20 @@ begin
   select plan, plan_renews_at into prof from public.profiles where id = p_user for update;
   acc := public.quota_lock_account(p_user, null, p_now);
   if acc.pending_plan = p_plan then
-    update public.quota_accounts set pending_days = pending_days - p_days where id = acc.id;
-    update public.quota_accounts set pending_plan = null, pending_days = null where id = acc.id and pending_days <= 0;
+    update public.quota_accounts set pending_months = pending_months - p_months where id = acc.id;
+    update public.quota_accounts set pending_plan = null, pending_months = null where id = acc.id and pending_months <= 0;
     return jsonb_build_object('applied', true, 'kind', 'pending_reduced');
   end if;
   if prof.plan <> p_plan or prof.plan_renews_at is null then
     return jsonb_build_object('applied', true, 'kind', 'no_active_term');
   end if;
-  new_end := prof.plan_renews_at - make_interval(days => p_days);
+  new_end := public.quota_add_months(prof.plan_renews_at, -p_months);
   if new_end > p_now then
     update public.profiles set plan_renews_at = new_end where id = p_user;
     return jsonb_build_object('applied', true, 'kind', 'term_shortened');
   end if;
   update public.profiles set plan = 'free', plan_renews_at = null where id = p_user;
-  update public.quota_accounts set pending_plan = null, pending_days = null where id = acc.id;
+  update public.quota_accounts set pending_plan = null, pending_months = null where id = acc.id;
   perform public.quota_restart_period(acc.id, p_now, p_now);
   return jsonb_build_object('applied', true, 'kind', 'ended');
 end $$;
@@ -421,13 +461,18 @@ declare
   v_allowance bigint;
   v_seats int;
   v_pool bigint;
+  v_term_end timestamptz;
 begin
   if p_org is null then
     perform public.quota_expire_due(p_user, p_now);
-    select coalesce(plan, 'free'), custom_monthly_cap into v_plan, v_cap from public.profiles where id = p_user;
+    select coalesce(plan, 'free'), custom_monthly_cap, plan_renews_at into v_plan, v_cap, v_term_end from public.profiles where id = p_user;
     v_plan := coalesce(v_plan, 'free');
     v_allowance := coalesce(v_cap, (p_allowances ->> v_plan)::bigint, 0);
     acc := public.quota_lock_account(p_user, null, p_now);
+    -- A period the paid term ends inside of gets its share of the allowance, not all of it.
+    if v_plan <> 'free' and v_term_end is not null and v_term_end > acc.period_start and v_term_end < acc.period_end then
+      v_allowance := floor(v_allowance * extract(epoch from (v_term_end - acc.period_start)) / extract(epoch from (acc.period_end - acc.period_start)))::bigint;
+    end if;
   else
     select seat_count, pooled_monthly_tokens into v_seats, v_pool from public.organizations where id = p_org;
     v_plan := 'enterprise';
@@ -457,7 +502,7 @@ begin
   end if;
   return public.quota_account_snapshot(acc) || jsonb_build_object(
     'pending_plan', acc.pending_plan,
-    'pending_days', acc.pending_days,
+    'pending_months', acc.pending_months,
     'member_cap', v_member_cap,
     'member_used', coalesce(mem.used, 0)
   );
@@ -841,10 +886,11 @@ begin
   foreach fn in array array[
     'quota_lock_account_by_id(uuid, timestamptz)', 'quota_lock_account(uuid, uuid, timestamptz)',
     'quota_restart_period(uuid, timestamptz, timestamptz)', 'quota_expire_due(uuid, timestamptz)',
-    'quota_apply_payment(uuid, text, int, text, timestamptz)', 'quota_apply_refund(uuid, text, int, text, timestamptz)',
+    'quota_apply_payment(uuid, text, int, text, timestamptz, jsonb)', 'quota_apply_refund(uuid, text, int, text, timestamptz)',
     'quota_apply_org_payment(uuid, uuid, int, text, timestamptz)',
     'quota_sync_locked(uuid, uuid, jsonb, timestamptz)', 'quota_sync(uuid, uuid, jsonb, timestamptz)',
     'quota_expire_all_due(timestamptz)', 'quota_add_months(timestamptz, int)', 'quota_period_index(timestamptz, timestamptz)',
+    'quota_aligned_anchor(timestamptz, timestamptz)',
     'quota_plan_rank(text)', 'quota_account_snapshot(public.quota_accounts)',
     'quota_reserve(uuid, uuid, uuid, bigint, jsonb, text, uuid, timestamptz)', 'quota_extend_hold(uuid, bigint, timestamptz)',
     'quota_record_usage(uuid, jsonb, timestamptz)', 'quota_settle(uuid, text, timestamptz)',
@@ -904,12 +950,32 @@ begin
       pooled_monthly_tokens = case when pooled_monthly_tokens is null then null else pooled_monthly_tokens * 30 end;
   end if;
 
-  -- Fresh period at deploy for every paid individual; no paid term ends sooner than 30 days out.
-  update public.profiles set plan_renews_at = greatest(plan_renews_at, now() + interval '30 days')
-    where plan in ('pro', 'premium') and plan_renews_at is not null;
+  -- Fresh period at deploy for every paid individual. A term ending within a month is extended to
+  -- deploy + 1 month (periods anchored at deploy); a longer term keeps its end, and its periods are
+  -- anchored so the last one ends exactly with it (anchor = end − n months, the latest such ≤ now).
+  update public.profiles set plan_renews_at = public.quota_add_months(now(), 1)
+    where plan in ('pro', 'premium') and plan_renews_at is not null and plan_renews_at < public.quota_add_months(now(), 1);
   insert into public.quota_accounts (user_id, plan, period_anchor, period_start, period_end)
-    select id, plan, now(), now(), public.quota_add_months(now(), 1) from public.profiles where plan in ('pro', 'premium')
+    select p.id, p.plan, a.anchor, a.anchor, public.quota_add_months(a.anchor, 1)
+    from public.profiles p
+    cross join lateral (
+      select case
+        when p.plan_renews_at is null or p.plan_renews_at <= public.quota_add_months(now(), 1) then now()
+        else public.quota_aligned_anchor(p.plan_renews_at, now())
+      end as anchor
+    ) a
+    where p.plan in ('pro', 'premium')
     on conflict (user_id) do nothing;
+  -- v3 (0054) booked lower plans on the profile; they become the account's queued plan.
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'scheduled_plan') then
+    execute $q$
+      update public.quota_accounts a set
+        pending_plan = p.scheduled_plan,
+        pending_months = greatest(1, round(coalesce(p.scheduled_plan_days, 30) / 30.0))::int
+      from public.profiles p
+      where a.user_id = p.id and p.scheduled_plan in ('pro', 'premium') and p.plan in ('pro', 'premium')
+    $q$;
+  end if;
   insert into public.quota_accounts (organization_id, plan, period_anchor, period_start, period_end)
     select id, 'enterprise', now(), now(), public.quota_add_months(now(), 1) from public.organizations where plan = 'enterprise'
     on conflict (organization_id) do nothing;

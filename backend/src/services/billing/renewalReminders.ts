@@ -4,21 +4,18 @@ import { logger } from "../../utils/logger.js";
 import { brandedEmail, fromAddress, mailConfigured, renderMarkdown, sendEmail } from "../console/mail.js";
 import { notifyUser } from "../pushService.js";
 
-function planExpiryGraceMs(): number {
-  return 0;
-}
-
 /**
- * Tells people before their paid plan ends. Since migration 0054 a plan lapses to Free after
- * plan_renews_at (+ a grace window), and checkout sells one-time orders with no auto-renew, so without
- * this the first sign of an ending plan was losing it.
+ * Tells people before their paid plan ends. A plan lapses to Free the moment plan_renews_at passes
+ * (supabase 0057: quota_expire_due — no grace window, which would hand out a fresh allowance for
+ * free) and checkout sells one-time orders with no auto-renew, so without this the first sign of an
+ * ending plan was losing it.
  *
  *   3d     — three days before the end date
  *   1d     — one day before
- *   ended  — once the end date has passed and the plan is in its grace window
+ *   ended  — within a day after it lapsed (from the 'expired' subscription event)
  *
- * A booked lower plan (scheduled_plan) changes the wording: nothing to renew, just "Premium ends on
- * X, Pro starts then". Each reminder is claimed by inserting its plan_reminders row first (primary key
+ * A booked lower plan (quota_accounts.pending_plan) changes the wording: nothing to renew, just
+ * "Premium ends on X, Pro starts then". Each reminder is claimed by inserting its plan_reminders row first (primary key
  * = person + end date + kind), so it sends at most once per period across every instance and restart.
  * Transactional mail: sent even to people who opted out of product email.
  */
@@ -27,10 +24,10 @@ export type ReminderKind = "3d" | "1d" | "ended";
 
 const HOUR = 60 * 60 * 1000;
 
-/** Which reminder is due right now for a plan ending at `end` (null = none). Pure; tested. */
-export function dueReminder(end: Date, now: Date, graceMs: number): ReminderKind | null {
+/** Which before-the-end reminder is due right now for a plan ending at `end` (null = none). Pure; tested. */
+export function dueReminder(end: Date, now: Date): ReminderKind | null {
   const left = end.getTime() - now.getTime();
-  if (left <= 0) return -left < graceMs ? "ended" : null;
+  if (left <= 0) return null;
   if (left <= 24 * HOUR) return "1d";
   if (left <= 72 * HOUR) return "3d";
   return null;
@@ -38,7 +35,7 @@ export function dueReminder(end: Date, now: Date, graceMs: number): ReminderKind
 
 const PLAN_NAME: Record<string, string> = { pro: "Pro", premium: "Premium" };
 
-export function reminderCopy(input: { kind: ReminderKind; plan: string; end: Date; scheduledPlan: string | null; graceHours: number; appUrl: string }) {
+export function reminderCopy(input: { kind: ReminderKind; plan: string; end: Date; scheduledPlan: string | null; appUrl: string }) {
   const name = PLAN_NAME[input.plan] ?? input.plan;
   const when = input.end.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   const plansUrl = `${input.appUrl.replace(/\/+$/, "")}/plans`;
@@ -54,8 +51,8 @@ export function reminderCopy(input: { kind: ReminderKind; plan: string; end: Dat
   if (input.kind === "ended") {
     return {
       subject: `Your ${name} plan has ended`,
-      push: `${name} ended. Renew in the next ${input.graceHours} hours to keep your limits.`,
-      markdown: `Your Friday **${name}** plan ended on **${when}**.\n\nYou keep ${name} limits for **${input.graceHours} more hours**. After that your account moves to Free. Your chats, files and projects stay, only the limits change.\n\nRenew now to keep going without a break.`,
+      push: `${name} ended, so you're on Free now. Renew to get your ${name} tokens back.`,
+      markdown: `Your Friday **${name}** plan ended on **${when}**, so your account is on **Free** now. Your chats, files and projects stay, only the monthly tokens and models change.\n\nRenew ${name} and you get a fresh month of ${name} tokens straight away.`,
       cta: { label: `Renew ${name}`, url: plansUrl },
     };
   }
@@ -63,12 +60,12 @@ export function reminderCopy(input: { kind: ReminderKind; plan: string; end: Dat
   return {
     subject: `Your ${name} plan ends ${inWords}`,
     push: `${name} ends ${inWords} (${when}). Renew to keep your limits.`,
-    markdown: `Your Friday **${name}** plan ends **${inWords}**, on **${when}**.\n\nFriday plans don't renew on their own. Renew before then to keep your ${name} limits and models. If you renew early, the new month is added to the end, so you don't lose any days.\n\nIf you do nothing, your account moves to Free after it ends. Your chats, files and projects stay.`,
+    markdown: `Your Friday **${name}** plan ends **${inWords}**, on **${when}**.\n\nFriday plans don't renew on their own. Renew before then to keep your ${name} tokens and models. If you renew early, the new month is added to the end, so you don't lose any days.\n\nIf you do nothing, your account moves to Free when it ends. Your chats, files and projects stay.`,
     cta: { label: `Renew ${name}`, url: plansUrl },
   };
 }
 
-type Row = { id: string; plan: string; plan_renews_at: string; scheduled_plan?: string | null };
+type Row = { id: string; plan: string; plan_renews_at: string; pending_plan?: string | null };
 
 async function emailFor(userId: string): Promise<string | null> {
   const { data } = await supabaseAdmin.auth.admin.getUserById(userId).catch(() => ({ data: null }));
@@ -77,8 +74,8 @@ async function emailFor(userId: string): Promise<string | null> {
 
 async function sendOne(row: Row, kind: ReminderKind): Promise<boolean> {
   const end = new Date(row.plan_renews_at);
-  // An ended plan with a booked successor rolls over (planSchedule) — the 1d note already said so.
-  if (kind === "ended" && row.scheduled_plan) return false;
+  // An ended plan with a booked successor rolls over (quota_expire_due) — the 1d note already said so.
+  if (kind === "ended" && row.pending_plan) return false;
   // Claim first: the insert either wins (we send) or hits the primary key (someone already did).
   const { error: claimError } = await supabaseAdmin
     .from("plan_reminders")
@@ -91,8 +88,7 @@ async function sendOne(row: Row, kind: ReminderKind): Promise<boolean> {
     kind,
     plan: row.plan,
     end,
-    scheduledPlan: row.scheduled_plan ?? null,
-    graceHours: Math.round(planExpiryGraceMs() / HOUR),
+    scheduledPlan: row.pending_plan ?? null,
     appUrl: env.publicAppUrl,
   });
   const channels: string[] = [];
@@ -123,21 +119,39 @@ async function sendOne(row: Row, kind: ReminderKind): Promise<boolean> {
   return channels.length > 0;
 }
 
-/** One pass: every paid plan ending within 3 days (or just ended, inside the grace window). */
+/** One pass: every paid plan ending within 3 days, and every plan that lapsed in the last day. */
 export async function sendDueRenewalReminders(now = new Date()): Promise<number> {
-  const grace = planExpiryGraceMs();
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("*")
+    .select("id, plan, plan_renews_at")
     .in("plan", ["pro", "premium"])
-    .gt("plan_renews_at", new Date(now.getTime() - grace).toISOString())
+    .gt("plan_renews_at", now.toISOString())
     .lte("plan_renews_at", new Date(now.getTime() + 72 * HOUR).toISOString())
     .limit(1000);
   if (error) throw new Error(error.message);
+  const ending = (data ?? []) as Row[];
+  const { data: pending } = ending.length
+    ? await supabaseAdmin.from("quota_accounts").select("user_id, pending_plan").in("user_id", ending.map((r) => r.id))
+    : { data: [] };
+  const booked = new Map((pending ?? []).map((p) => [p.user_id as string, (p.pending_plan as string | null) ?? null]));
+  const due: Array<{ row: Row; kind: ReminderKind }> = [];
+  for (const row of ending) {
+    const kind = dueReminder(new Date(row.plan_renews_at), now);
+    if (kind) due.push({ row: { ...row, pending_plan: booked.get(row.id) ?? null }, kind });
+  }
+  // Lapsed plans: the expiry itself is the record (quota_expire_due writes one 'expired' event per term).
+  const { data: expired } = await supabaseAdmin
+    .from("subscription_events")
+    .select("user_id, details")
+    .eq("kind", "expired")
+    .gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString())
+    .limit(1000);
+  for (const e of expired ?? []) {
+    const details = (e.details ?? {}) as { from?: string; at?: string };
+    if (e.user_id && details.from && details.at) due.push({ row: { id: e.user_id as string, plan: details.from, plan_renews_at: details.at }, kind: "ended" });
+  }
   let sent = 0;
-  for (const row of (data ?? []) as Row[]) {
-    const kind = dueReminder(new Date(row.plan_renews_at), now, grace);
-    if (!kind) continue;
+  for (const { row, kind } of due) {
     // A person with an active console grant gets their plan from the grant, not a purchase.
     const { count } = await supabaseAdmin.from("access_grants").select("id", { count: "exact", head: true }).eq("user_id", row.id).eq("status", "active");
     if (count) continue;
