@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
-import { requirePassphrase } from "../middleware/passphrase.js";
 import { asyncHandler, HttpError } from "../middleware/errorHandler.js";
 import {
   createRazorpayOrder,
@@ -59,7 +58,6 @@ billingRouter.use(requireAuth);
 
 billingRouter.post(
   "/orders",
-  requirePassphrase,
   asyncHandler(async (req, res) => {
     const input = createOrderSchema.parse(req.body);
     res.status(201).json(await createRazorpayOrder(req.user!.id, input));

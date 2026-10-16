@@ -14,7 +14,6 @@ ide/        FridayX IDE extensions (VS Code first, then JetBrains and other ACP 
 supabase/   SQL migrations, applied in order
 infra/      AWS deploy templates
 docs/       architecture/ · operations/ · product/ · diagrams/ — start at docs/README.md
-airdots/ phone session architecture — plan, models, flows, diagrams
 ```
 
 ## Branching model

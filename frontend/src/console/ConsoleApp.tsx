@@ -14,7 +14,6 @@ import {
   LogOut,
   Mail,
   Megaphone,
-  Phone,
   Menu,
   MessageSquare,
   ScrollText,
@@ -57,7 +56,6 @@ const Tasks = lazy(() => import("./sections/Tasks"));
 const Updates = lazy(() => import("./sections/Updates"));
 const Marketing = lazy(() => import("./sections/Marketing"));
 const Plans = lazy(() => import("./sections/Plans"));
-const PhoneSection = lazy(() => import("./sections/Phone"));
 const UsersSection = lazy(() => import("./sections/Users"));
 const Team = lazy(() => import("./sections/Team"));
 const MailSection = lazy(() => import("./sections/MailSettings"));
@@ -78,7 +76,6 @@ export const SECTIONS: Section[] = [
   { id: "updates", label: "Product updates", icon: Megaphone, permission: "updates.view", group: "Growth", component: Updates },
   { id: "marketing", label: "Email campaigns", icon: Send, permission: "marketing.view", group: "Growth", component: Marketing },
   { id: "plans", label: "Plans & offers", icon: Ticket, permission: "plans.view", group: "Growth", component: Plans },
-  { id: "phone", label: "Phone", icon: Phone, permission: "plans.view", group: "Growth", component: PhoneSection },
   { id: "users", label: "Users", icon: Users, permission: "users.view", group: "Admin", component: UsersSection },
   { id: "team", label: "Team & roles", icon: ShieldCheck, permission: "team.manage", group: "Admin", component: Team },
   { id: "mail-hosting", label: "Mail hosting", icon: Server, permission: "mail.manage", group: "Admin", component: MailHosting },

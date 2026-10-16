@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { z } from "zod";
 import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
 import * as st from "../controllers/statusController.js";
@@ -9,8 +8,6 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { requireAnyPermission, requirePermission as can, requireStaff } from "../services/console/permissions.js";
-import { getPhoneConfig, loadPhoneConfig, recentDeliveries, setPhoneConfig } from "../services/phone/store.js";
-import { DEFAULT_PHONE_CONFIG, type PhoneConfig } from "../services/phone/policy.js";
 
 /** Team Console API — staff only; every route names the permission it needs (see permissions.ts). */
 export const consoleRouter = Router();
@@ -26,25 +23,6 @@ consoleRouter.get("/overview", can("overview.view"), h(c.overview));
 consoleRouter.get("/users", can("users.view"), h(c.listUsers));
 consoleRouter.get("/users/:userId", can("users.view"), h(c.getUser));
 consoleRouter.patch("/users/:userId", can("users.manage"), h(c.updateUser));
-// A person's Air Dots: computer, minutes, passphrase, channels — and pause / unlock (services/air/userAdmin.ts).
-consoleRouter.get("/users/:userId/air", can("users.view"), h(async (req, res) => {
-  const { userAirStatus } = await import("../services/air/userAdmin.js");
-  res.json(await userAirStatus(req.params.userId!));
-}));
-consoleRouter.post("/users/:userId/air/pause", can("users.manage"), h(async (req, res) => {
-  const { pauseUserAir } = await import("../services/air/userAdmin.js");
-  res.json(await pauseUserAir(req.params.userId!));
-}));
-consoleRouter.post("/users/:userId/air/unlock", can("users.manage"), h(async (req, res) => {
-  const { unlockPassphrase } = await import("../services/air/userAdmin.js");
-  await unlockPassphrase(req.params.userId!);
-  res.json({ ok: true });
-}));
-consoleRouter.post("/users/:userId/air/clear-passphrase", can("users.manage"), h(async (req, res) => {
-  const { clearPassphrase } = await import("../services/air/userAdmin.js");
-  await clearPassphrase(req.params.userId!);
-  res.json({ ok: true });
-}));
 
 consoleRouter.get("/team", can("team.manage"), h(c.listTeam));
 consoleRouter.post("/team", can("team.manage"), h(c.inviteMember));
@@ -147,32 +125,3 @@ consoleRouter.get("/mailbox/accounts/:accountId/messages/:uid", can("mailbox.use
 consoleRouter.get("/mailbox/accounts/:accountId/messages/:uid/attachments/:index", can("mailbox.use"), h(mail.attachment));
 consoleRouter.post("/mailbox/accounts/:accountId/actions", can("mailbox.use"), h(mail.act));
 consoleRouter.post("/mailbox/accounts/:accountId/send", can("mailbox.use"), h(mail.send));
-
-const phoneConfigSchema = z.object({
-  enabledPlanIds: z.array(z.string().min(1)).min(1),
-  inrPerMinute: z.number().min(0).max(100),
-  includedMinutes: z.number().int().min(0).max(10_000),
-  hardCapMinutes: z.number().int().min(0).max(10_000),
-  maxHeldSeconds: z.number().int().min(5).max(60),
-  voice: z.enum(["gemini", "sarvam"]).default("gemini"),
-  channels: z.object({ telegram: z.boolean(), whatsapp: z.boolean(), email: z.boolean() }),
-});
-
-consoleRouter.get("/phone", can("plans.view"), h(async (_req, res) => {
-  res.json({ config: await loadPhoneConfig(true), defaults: DEFAULT_PHONE_CONFIG });
-}));
-
-consoleRouter.put("/phone", can("plans.manage"), h(async (req, res) => {
-  const config = phoneConfigSchema.parse(req.body) as PhoneConfig;
-  await setPhoneConfig(config);
-  res.json({ config: getPhoneConfig() });
-}));
-
-consoleRouter.get("/phone/air", can("plans.view"), h(async (_req, res) => {
-  const { airOverview } = await import("../services/air/consoleOverview.js");
-  res.json(await airOverview());
-}));
-
-consoleRouter.get("/phone/deliveries/:userId", can("users.view"), h(async (req, res) => {
-  res.json({ deliveries: recentDeliveries(req.params.userId!) });
-}));

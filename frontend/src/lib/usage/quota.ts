@@ -41,7 +41,6 @@ const EVENT_LABELS: Record<string, string> = {
   // Cost-based breakdown (what the usage actually cost, by feature).
   chat: "Chat",
   build: "Build",
-  air: "Air Dots",
   research: "Deep Research",
   teamup: "Team Up",
   spark: "Spark",

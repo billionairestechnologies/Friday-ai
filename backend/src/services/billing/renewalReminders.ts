@@ -3,7 +3,10 @@ import { supabaseAdmin } from "../../config/supabase.js";
 import { logger } from "../../utils/logger.js";
 import { brandedEmail, fromAddress, mailConfigured, renderMarkdown, sendEmail } from "../console/mail.js";
 import { notifyUser } from "../pushService.js";
-import { planExpiryGraceMs } from "./planSchedule.js";
+
+function planExpiryGraceMs(): number {
+  return 0;
+}
 
 /**
  * Tells people before their paid plan ends. Since migration 0054 a plan lapses to Free after

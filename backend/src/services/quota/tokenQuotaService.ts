@@ -19,7 +19,6 @@ import {
   type Plan,
   type QuotaDecision,
 } from "./tierConfig.js";
-import { rolloverUser, stateFromRow } from "../billing/planSchedule.js";
 import { getCatalogPlan, planLimitsFor } from "./planCatalog.js";
 
 export type { Plan } from "./tierConfig.js";
@@ -27,8 +26,6 @@ export type { Plan } from "./tierConfig.js";
 export type EffectivePlan = {
   plan: Plan;
   planRenewsAt: string | null;
-  /** A lower plan already paid for, starting when this one ends (billing/planSchedule.ts). */
-  scheduledPlan: { plan: "pro" | "premium"; startsAt: string | null } | null;
   customMonthlyCap: number | null;
   enterprise: {
     organizationId: string;
@@ -42,25 +39,13 @@ export type EffectivePlan = {
 async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePlan> {
   // Two independent lookups — run them together (they used to run back to back).
   const [{ data: profile, error }, { data: membership }] = await Promise.all([
-    // "*" rather than a column list: this runs on every message, and naming scheduled_plan before
-    // migration 0054 is applied would fail the lookup and drop everyone to Free.
-    supabaseAdmin.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    supabaseAdmin.from("profiles").select("plan, plan_renews_at, custom_monthly_cap").eq("id", userId).maybeSingle(),
     supabaseAdmin
       .from("organization_memberships")
       .select("organization_id, organizations(plan, seat_count, pooled_monthly_tokens)")
       .eq("user_id", userId),
   ]);
   if (error) logger.warn("quota_profile_lookup_failed", { userId, error: error.message });
-
-  // The period just ended: start the booked plan (or lapse to Free after the grace window) right now
-  // instead of waiting for the 10-minute sweep, then read the row again.
-  if (profile && (profile.plan === "pro" || profile.plan === "premium") && profile.plan_renews_at && new Date(profile.plan_renews_at).getTime() <= Date.now()) {
-    const changed = await rolloverUser(userId, stateFromRow(profile)).catch((err) => {
-      logger.warn("plan_rollover_inline_failed", { userId, error: err instanceof Error ? err.message : String(err) });
-      return false;
-    });
-    if (changed) return resolveEffectivePlanUncached(userId);
-  }
 
   const enterpriseRow = (membership ?? []).find((row) => {
     const org = row.organizations as { plan: string } | { plan: string }[] | null;
@@ -91,10 +76,6 @@ async function resolveEffectivePlanUncached(userId: string): Promise<EffectivePl
   return {
     plan: (profile?.plan as Plan) ?? "free",
     planRenewsAt: profile?.plan_renews_at ?? null,
-    scheduledPlan:
-      profile?.scheduled_plan === "pro" || profile?.scheduled_plan === "premium"
-        ? { plan: profile.scheduled_plan, startsAt: profile.plan_renews_at ?? null }
-        : null,
     customMonthlyCap: profile?.custom_monthly_cap ?? null,
     enterprise,
   };
@@ -428,12 +409,7 @@ export async function reconcileQuota(reservation: Reservation, actualTokens: num
 /** Fire-and-forget audit row for admin profitability reporting — distinct from usage_events'
  *  broader "token_usage" rows (kept for the existing monthly cost summary) in that this one
  *  carries the per-model input/output split and the original reservation for cross-checking. */
-export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation" | "code" | "air";
-
-/** Air Dots spends the same pool. The label is `air` so Finance can see it apart from chat and Build. */
-export function ledgerFeatureFor(origin: string | null | undefined, otherwise: LedgerFeature): LedgerFeature {
-  return origin === "air" ? "air" : otherwise;
-}
+export type LedgerFeature = "chat" | "build" | "research" | "teamup" | "spark" | "automation" | "code";
 
 export async function recordTokenLedger(
   userId: string,
@@ -481,10 +457,6 @@ export async function canUseModelTier(userId: string, minTier: Plan): Promise<bo
 export type QuotaStatus = {
   plan: Plan;
   isEnterprise: boolean;
-  /** When the current paid plan ends (null = no end date / Free). */
-  planRenewsAt?: string | null;
-  /** A lower plan already bought, starting when the current one ends. */
-  scheduledPlan?: EffectivePlan["scheduledPlan"];
   rolling: { used: number; limit: number; resetAt: string } | null;
   weekly: { used: number; limit: number; resetAt: string };
   monthly: { used: number; limit: number; resetAt: string } | null;
@@ -578,8 +550,6 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
   return {
     plan: effective.plan,
     isEnterprise: false,
-    planRenewsAt: effective.planRenewsAt,
-    scheduledPlan: effective.scheduledPlan,
     // Clamped for display: the counters can sit a few tokens past a limit (the turn that crossed it
     // is stopped, not undone) — the meter should read "100%", never "103%".
     rolling: {

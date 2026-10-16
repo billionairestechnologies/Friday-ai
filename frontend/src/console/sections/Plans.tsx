@@ -95,7 +95,7 @@ export default function Plans() {
     <>
       <PageHeader
         title="Plans & offers"
-        description="Each plan's Unlocks list is the feature switch: Build Mode, Air Dots, voice, Canvas, images, and the rest. Save, and the next request already uses it. No app release."
+        description="Each plan's Unlocks list is the feature switch: Build Mode, FridayX, voice, Canvas, images, and the rest. Save, and the next request already uses it. No app release."
         actions={
           canManage && (
             <>

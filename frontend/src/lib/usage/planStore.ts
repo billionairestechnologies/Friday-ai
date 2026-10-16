@@ -25,7 +25,7 @@ type PlanState = {
 
 /**
  * The viewer's plan and which features it includes. QuotaAlerts polls /usage/quota and calls
- * apply(), so an admin turning Build Mode or Air Dots off shows up on the next poll without a reload.
+ * apply(), so an admin turning Build Mode or Canvas off shows up on the next poll without a reload.
  */
 export const usePlan = create<PlanState>((set, get) => ({
   plan: "free",

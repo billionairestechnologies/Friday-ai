@@ -43,7 +43,6 @@ import {
 } from "./promptContext.js";
 import { loadMemoryPrompt } from "../memoryService.js";
 import { buildToolset, toolUsePrompt } from "../agent/toolset.js";
-import { wrapForAir } from "../air/tools.js";
 import type { FridayTool } from "../agent/tools/types.js";
 import { DEEP_RESEARCH_ROUNDS, runToolLoop, supportsTools, type ToolLoopResult } from "../agent/toolLoop.js";
 import { DEEP_RESEARCH_PROMPT } from "../agent/toolset.js";
@@ -80,7 +79,6 @@ import {
   chargeProgress,
   QUOTA_STOP_MESSAGE,
   reconcileQuota,
-  ledgerFeatureFor,
   recordTokenLedger,
   resolveEffectivePlan,
   type Reservation,
@@ -255,12 +253,6 @@ export async function streamMessage(
   const activeSkillPromise = options.skillId ? getSkill(userId, options.skillId).catch(() => null) : Promise.resolve(null);
   try {
     const conversation = await getOwnedConversation(userId, conversationId);
-    const turnOrigin = (conversation as { origin?: string | null }).origin;
-    if (turnOrigin === "air" && !(await entitlementsPromise).airDots) {
-      onEvent({ t: "err", c: "Air Dots isn't on your plan." });
-      onEvent({ t: "done" });
-      return;
-    }
     mark("conversation loaded");
     if (research) {
       const allowance = await consumeDailyAllowance(userId, "deep_research", (await entitlementsPromise).deepResearchPerDay);
@@ -605,7 +597,7 @@ export async function streamMessage(
             candidate.modelId,
             usage,
             i === 0 ? (reservation?.reserveTokens ?? 0) : 0,
-            ledgerFeatureFor(turnOrigin, "teamup"),
+            "teamup",
           );
         }
       }
@@ -793,7 +785,7 @@ export async function streamMessage(
           if (planner) {
             reconcileTokens = creditsForUsage(drafted.usage, await meterRatesFor(planner.slug, planner.modelId));
             void recordTokenUsage(userId, planner.slug, planner.modelId, drafted.usage, { conversationId, mode });
-            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0, ledgerFeatureFor(turnOrigin, "build"));
+            void recordTokenLedger(userId, effectivePlan.enterprise?.organizationId ?? null, planner.slug, planner.modelId, drafted.usage, reservation?.reserveTokens ?? 0, "build");
           }
           onEvent({ t: "done" });
           return;
@@ -832,7 +824,7 @@ export async function streamMessage(
             built.candidate.modelId,
             built.usage,
             reservation?.reserveTokens ?? 0,
-            ledgerFeatureFor(turnOrigin, "build"),
+            "build",
           );
         }
         // E2B bills for the time the sandbox runs — booked as sandbox_second so the P&L and plan economics carry it.
@@ -930,9 +922,6 @@ export async function streamMessage(
         }),
       ];
       if (projectId && projectFiles.length) tools.push(projectSearchTool(projectId, projectFiles));
-      // Air Dots: every tool goes through the gate (recorded; pay/send/delete wait for a yes) and the
-      // model reports the job's state with air_report instead of the loop guessing from its words.
-      if (turnOrigin === "air") tools.splice(0, tools.length, ...wrapForAir(tools));
       // Deep Research fans out: parallel research helpers (agent/tools/research.ts).
       if (research) tools.push(researchAgentsTool(candidates.filter(supportsTools)));
       const imageMarkdown: string[] = [];
@@ -1085,7 +1074,7 @@ export async function streamMessage(
       usedCandidate.modelId,
       tokenUsage,
       reservation?.reserveTokens ?? 0,
-      ledgerFeatureFor(turnOrigin, research ? "research" : buildWorkspace ? "build" : "chat"),
+      research ? "research" : "chat",
     );
 
     const label =

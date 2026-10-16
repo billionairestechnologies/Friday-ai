@@ -17,9 +17,6 @@ export type CatalogPlanId = Plan | "enterprise";
 export const ENTITLEMENT_DEFS = [
   { key: "buildMode", label: "Build Mode", type: "boolean", hint: "Coding agent with a live sandbox" },
   { key: "fridayX", label: "FridayX (CLI + IDE)", type: "boolean", hint: "Terminal and editor coding agent; uses the same credits" },
-  { key: "airDots", label: "Air Dots", type: "boolean", hint: "The computer, the call, WhatsApp and Telegram" },
-  { key: "airCallMinutes", label: "Call minutes / month", type: "number", hint: "0 hides Call now" },
-  { key: "airAwakeMinutes", label: "Sandbox awake minutes / day", type: "number", hint: "Air Dots machine. 0 refuses a new sandbox that day" },
   { key: "voice", label: "Voice", type: "boolean", hint: "Talk in chat" },
   { key: "canvas", label: "Canvas", type: "boolean", hint: "Live preview documents" },
   { key: "images", label: "Images", type: "boolean", hint: "Generate and edit images" },
@@ -40,9 +37,6 @@ export type EntitlementKey = (typeof ENTITLEMENT_DEFS)[number]["key"];
 export type Entitlements = {
   buildMode: boolean;
   fridayX: boolean;
-  airDots: boolean;
-  airCallMinutes: number;
-  airAwakeMinutes: number;
   voice: boolean;
   canvas: boolean;
   images: boolean;
@@ -60,10 +54,10 @@ export type Entitlements = {
 };
 
 export const DEFAULT_ENTITLEMENTS: Record<CatalogPlanId, Entitlements> = {
-  free: { buildMode: true, fridayX: true, airDots: false, airCallMinutes: 0, airAwakeMinutes: 0, voice: true, canvas: true, images: true, connectors: 3, buildMaxRounds: 30, deepResearchPerDay: 3, imagesPerDay: 3, documentsPerDay: 5, customSkills: 3, libraryStorageMb: 500, teamUpModels: 3, mcpServers: 2, automations: 3, prioritySupport: false },
-  pro: { buildMode: true, fridayX: true, airDots: true, airCallMinutes: 15, airAwakeMinutes: 20, voice: true, canvas: true, images: true, connectors: 15, buildMaxRounds: 100, deepResearchPerDay: 40, imagesPerDay: 50, documentsPerDay: 100, customSkills: 25, libraryStorageMb: 10_240, teamUpModels: 5, mcpServers: 10, automations: 20, prioritySupport: false },
-  premium: { buildMode: true, fridayX: true, airDots: true, airCallMinutes: 60, airAwakeMinutes: 45, voice: true, canvas: true, images: true, connectors: 40, buildMaxRounds: 150, deepResearchPerDay: 150, imagesPerDay: 150, documentsPerDay: 300, customSkills: 100, libraryStorageMb: 51_200, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
-  enterprise: { buildMode: true, fridayX: true, airDots: true, airCallMinutes: 60, airAwakeMinutes: 45, voice: true, canvas: true, images: true, connectors: 100, buildMaxRounds: 150, deepResearchPerDay: 300, imagesPerDay: 300, documentsPerDay: 500, customSkills: 200, libraryStorageMb: 102_400, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
+  free: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 3, buildMaxRounds: 30, deepResearchPerDay: 3, imagesPerDay: 3, documentsPerDay: 5, customSkills: 3, libraryStorageMb: 500, teamUpModels: 3, mcpServers: 2, automations: 3, prioritySupport: false },
+  pro: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 15, buildMaxRounds: 100, deepResearchPerDay: 40, imagesPerDay: 50, documentsPerDay: 100, customSkills: 25, libraryStorageMb: 10_240, teamUpModels: 5, mcpServers: 10, automations: 20, prioritySupport: false },
+  premium: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 40, buildMaxRounds: 150, deepResearchPerDay: 150, imagesPerDay: 150, documentsPerDay: 300, customSkills: 100, libraryStorageMb: 51_200, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
+  enterprise: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 100, buildMaxRounds: 150, deepResearchPerDay: 300, imagesPerDay: 300, documentsPerDay: 500, customSkills: 200, libraryStorageMb: 102_400, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
 };
 
 /**

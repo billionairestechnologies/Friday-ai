@@ -10,13 +10,12 @@ import {
   PanelLeft,
   Plus,
   Puzzle,
-  Radio,
   Search,
   Trash2,
   Workflow,
   X,
 } from "lucide-react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { ProfileDock } from "@/components/profile-dock";
 import { BrandWordmark } from "@/components/brand-mark";
 import { BuildSidebar } from "@/components/build-sidebar";
@@ -72,10 +71,7 @@ export function Sidebar() {
   const loadPlan = usePlan((s) => s.load);
   const entitlements = usePlan((s) => s.entitlements);
   const planLoaded = usePlan((s) => s.loaded);
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  const airMode = path === "/air" || path.startsWith("/air/");
   const showBuild = !planLoaded || entitlements == null || entitlements.buildMode !== false;
-  const showAir = planLoaded && entitlements?.airDots === true;
   const showLibrary = !planLoaded || entitlements == null || entitlements.libraryStorageMb !== 0;
   const showAutomations = !planLoaded || entitlements == null || entitlements.automations !== 0;
   const { user } = useCurrentUserState();
@@ -253,7 +249,7 @@ export function Sidebar() {
             <NavRow
               icon={MessageSquare}
               label="Chat"
-              active={!buildMode && !airMode}
+              active={!buildMode}
               onClick={() => {
                 setActiveProjectId(null);
                 newChat();
@@ -270,19 +266,6 @@ export function Sidebar() {
                   setActiveProjectId(null);
                   newChat();
                   void navigate({ to: "/build" });
-                  if (window.innerWidth < 768) setOpen(false);
-                }}
-              />
-            )}
-            {showAir && (
-              <NavRow
-                icon={Radio}
-                label="Air Dots"
-                active={airMode}
-                onClick={() => {
-                  setActiveProjectId(null);
-                  newChat();
-                  void navigate({ to: "/air" });
                   if (window.innerWidth < 768) setOpen(false);
                 }}
               />

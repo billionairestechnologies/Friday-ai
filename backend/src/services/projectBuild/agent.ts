@@ -22,7 +22,6 @@ import { recordAdminAuditLog } from "../usageService.js";
 import { SUMMARY_PROMPT, applySummary, planSummaryCut, renderTranscript, transcriptChars } from "./summarize.js";
 import { approvedPlanNote, isPlanApproval } from "./plan.js";
 import { approvalFor, requestApproval, type PermissionMode } from "./approvals.js";
-import { gateRefusal, noteGate } from "./actionGate.js";
 import { notifyBuildNeedsInput } from "./notify.js";
 import { loadSecrets, redactSecrets } from "./secrets.js";
 
@@ -415,7 +414,6 @@ export async function runBuildAgent(opts: {
     const problems: string[] = [];
     let detail = "";
     try {
-      noteGate(userId, conversationId, "browser", `port ${last.start.port}`);
       const shot = await box.screenshot(last.start.port);
       if (shot.note) detail = shot.note;
       if (shot.consoleErrors.length) problems.push(`Browser console errors:\n${shot.consoleErrors.join("\n")}`);
@@ -656,7 +654,6 @@ export async function runBuildAgent(opts: {
     try {
       await ensureBox();
       if (action.kind === "write") {
-        noteGate(userId, conversationId, "file", action.path);
         const path = safeProjectPath(action.path);
         if (!path) {
           finish("error", "Path is outside the project");
@@ -672,7 +669,6 @@ export async function runBuildAgent(opts: {
         return `[write ${path}] ok (${action.content.length} chars)`;
       }
       if (action.kind === "edit") {
-        noteGate(userId, conversationId, "file", action.path);
         const path = safeProjectPath(action.path);
         const current = path ? await box.read(path).catch(() => null) : null;
         if (!path || current == null) {
@@ -749,12 +745,6 @@ export async function runBuildAgent(opts: {
         return `[read ${action.path}]\n${tail(content, 6000)}`;
       }
       if (action.kind === "run") {
-        const refused = await gateRefusal(userId, conversationId, "shell", action.cmd);
-        if (refused) {
-          finish("error", refused);
-          return `[run] ${refused}`;
-        }
-        noteGate(userId, conversationId, "shell", action.cmd);
         // Live terminal: output streams into the step row while the command runs.
         const live = throttledOutput((output) => {
           step.output = output;
@@ -775,12 +765,6 @@ export async function runBuildAgent(opts: {
         return `[run ${JSON.stringify(action.cmd)}] exit ${out.exitCode}\n${tail(out.output)}`;
       }
       if (action.kind === "start") {
-        const refused = await gateRefusal(userId, conversationId, "shell", action.cmd);
-        if (refused) {
-          finish("error", refused);
-          return `[start] ${refused}`;
-        }
-        noteGate(userId, conversationId, "shell", action.cmd);
         const res = await box.start(action.cmd, action.port);
         res.log = scrub(res.log);
         if (res.ready && res.url) {
