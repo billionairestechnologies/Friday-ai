@@ -462,6 +462,9 @@ test("service layer on real SQL: reserve → meter → settle, status, and two '
   assert.equal(status.period.reserved, 0);
   assert.equal(status.period.remaining, 10_000_000 - 4_150);
   assert.equal(status.monthly?.used, 4_150);
+  // The breakdown must find this period's rows by its exact (microsecond) start, not a rounded copy.
+  const exact = await one<{ r: { totals: { calls: number } } }>("select quota_usage_report($1, $2, $3) as r", [status.period.accountId, user, status.period.periodKey]);
+  assert.equal(exact.r.totals.calls, 2);
   assert.equal(status.rolling, null);
   assert.equal(status.weekly, null);
   assert.deepEqual(await audit(), []);

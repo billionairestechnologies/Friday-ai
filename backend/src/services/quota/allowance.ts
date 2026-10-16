@@ -42,6 +42,11 @@ export type QuotaSnapshot = {
   reserved: number;
   remaining: number;
   periodStart: string;
+  /**
+   * The period start exactly as Postgres stores it (microseconds). Ledger rows are matched on it; the
+   * millisecond ISO above can't be — it found no rows for a period that began at …37.704211.
+   */
+  periodKey: string;
   periodEnd: string;
   status: "active" | "suspended";
 };
@@ -71,6 +76,7 @@ export function snapshotFromRow(row: Record<string, unknown>): QuotaSnapshot {
     reserved: n(row.reserved),
     remaining: n(row.remaining),
     periodStart: new Date(String(row.period_start)).toISOString(),
+    periodKey: String(row.period_start),
     periodEnd: new Date(String(row.period_end)).toISOString(),
     status: row.status === "suspended" ? "suspended" : "active",
   };

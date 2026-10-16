@@ -33,7 +33,7 @@ usageRouter.get(
     const userId = req.user!.id;
     const status = await getQuotaStatus(userId);
     const [report, access] = await Promise.all([
-      usageReport(status.period.accountId, status.period.start, userId, { includeAdjustments: !status.isEnterprise }),
+      usageReport(status.period.accountId, status.period.periodKey, userId, { includeAdjustments: !status.isEnterprise }),
       resolveEntitlements(userId).catch(() => null),
     ]);
     const total = report.byFeature.reduce((sum, f) => sum + f.billable, 0);

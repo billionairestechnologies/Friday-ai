@@ -312,6 +312,8 @@ export type QuotaStatus = {
   period: {
     accountId: string;
     start: string;
+    /** Exact stored period start, for ledger lookups (see QuotaSnapshot.periodKey). */
+    periodKey: string;
     end: string;
     allowance: number;
     used: number;
@@ -362,6 +364,7 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
     period: {
       accountId: s.accountId,
       start: s.periodStart,
+      periodKey: s.periodKey,
       end: s.periodEnd,
       allowance: s.allowance,
       used: s.used,
