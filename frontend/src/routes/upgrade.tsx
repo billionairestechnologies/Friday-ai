@@ -94,6 +94,7 @@ function PlanCard({
   cadence,
   current,
   cta,
+  renewable,
   note,
   onBuy,
   busy,
@@ -112,6 +113,8 @@ function PlanCard({
   cadence: string;
   current: boolean;
   cta: string;
+  /** The current paid plan can be bought again: it extends the term (one-time orders, no auto-renew). */
+  renewable?: boolean;
   note?: string | null;
   onBuy?: () => void;
   busy: boolean;
@@ -145,14 +148,14 @@ function PlanCard({
       </p>
       <button
         type="button"
-        disabled={current || disabled}
+        disabled={(current && !renewable) || disabled}
         onClick={onBuy}
         className={cn(
           "mt-5 h-11 rounded-full text-sm font-semibold transition-opacity disabled:opacity-60",
-          current || !onBuy ? "border border-border text-muted" : "bg-primary text-primary-foreground hover:opacity-90",
+          (current && !renewable) || !onBuy ? "border border-border text-muted" : "bg-primary text-primary-foreground hover:opacity-90",
         )}
       >
-        {current ? "Current plan" : busy ? "Starting…" : cta}
+        {busy ? "Starting…" : current && !renewable ? "Current plan" : cta}
       </button>
       {monthlyTokens ? (
         <p className="mt-4 text-sm font-medium text-foreground">
@@ -314,9 +317,10 @@ export function UpgradePage() {
   const booked = currentPlan?.period?.pendingPlan ?? null;
   const ctaFor = (plan: CatalogPlan): string => {
     if (!signedIn) return plan.monthlyPricePaise <= 0 ? "Sign up free" : `Sign up for ${plan.name}`;
+    if (belowCurrent(plan)) return `Included in your ${currentName}`;
     if (plan.monthlyPricePaise <= 0) return "Free forever";
     if (booked === plan.id) return `Add more ${plan.name}`;
-    if (paidActive && currentPlan && RANK[plan.id] < RANK[currentPlan.plan]) return endsOn ? `Switch on ${endsOn}` : `Switch to ${plan.name}`;
+    if (isCurrent(plan.id)) return `Renew ${plan.name}`;
     return `Upgrade to ${plan.name}`;
   };
   const noteFor = (plan: CatalogPlan): string | null => {
@@ -325,11 +329,15 @@ export function UpgradePage() {
       return endsOn ? `Booked — starts ${endsOn}, when your ${currentPlan.plan} plan ends.` : "Booked — starts when your current plan ends.";
     }
     if (isCurrent(plan.id) && plan.monthlyPricePaise > 0 && endsOn) return `Active until ${endsOn}. Buying again adds to the end.`;
-    if (paidActive && RANK[plan.id] < RANK[currentPlan.plan] && plan.monthlyPricePaise > 0)
-      return `You keep ${currentPlan.plan === "premium" ? "Premium" : "your plan"} until ${endsOn ?? "it ends"}; ${plan.name} starts after that.`;
     if (paidActive && RANK[plan.id] > RANK[currentPlan.plan]) return "Starts now. Your unused days are added to the new plan.";
     return null;
   };
+
+  // A paid subscriber still sees the lower plans, but they can't be bought: they're already covered by
+  // the plan they have (owner decision 2026-10-17). Only higher plans get an Upgrade button.
+  const belowCurrent = (p: CatalogPlan) => Boolean(paidActive && currentPlan && RANK[p.id] < RANK[currentPlan.plan]);
+  const currentName = currentPlan ? ({ pro: "Pro", premium: "Premium", free: "Free" } as Record<string, string>)[currentPlan.plan] : "";
+  const visiblePlans = individual;
 
   const isCurrent = (id: CatalogPlan["id"]) =>
     id === "free" ? !currentPlan || (currentPlan.plan === "free" && !currentPlan.isEnterprise) : Boolean(currentPlan?.plan === id && !currentPlan.isEnterprise);
@@ -451,8 +459,8 @@ export function UpgradePage() {
         {!signedIn && <p className="mt-4 rounded-xl border border-border bg-elevated px-4 py-2 text-sm text-muted">Sign up or log in to pick a plan — tap any plan below.</p>}
 
         {tab === "individual" ? (
-          <div className={cn("mt-10 grid w-full gap-5", individual.length >= 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>
-            {individual.map((plan, i) => {
+          <div className={cn("mt-10 grid w-full gap-5", visiblePlans.length >= 3 ? "md:grid-cols-3" : visiblePlans.length === 2 ? "md:grid-cols-2" : "max-w-md")}>
+            {visiblePlans.map((plan, i) => {
               const tier = plan.id as Tier;
               const free = plan.monthlyPricePaise <= 0;
               return (
@@ -467,10 +475,11 @@ export function UpgradePage() {
                   cadence={free ? "/month" : annual ? "/year" : "/month"}
                   current={signedIn && isCurrent(plan.id)}
                   cta={ctaFor(plan)}
+                  renewable={signedIn && !free && isCurrent(plan.id)}
                   note={noteFor(plan)}
-                  onBuy={!signedIn ? () => openAuth("signup") : free ? undefined : () => buyPlan(tier)}
+                  onBuy={!signedIn ? () => openAuth("signup") : free || belowCurrent(plan) ? undefined : () => buyPlan(tier)}
                   busy={busyPlan === plan.id}
-                  disabled={signedIn && (free || busyPlan !== null || !canPay)}
+                  disabled={signedIn && (free || belowCurrent(plan) || busyPlan !== null || !canPay)}
                   features={plan.features}
                   monthlyTokens={plan.limits?.monthly}
                   included={entitlementChips(plan.entitlements)}
