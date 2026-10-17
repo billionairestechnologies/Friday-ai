@@ -1,3 +1,4 @@
+import * as sess from "../controllers/sessionsController.js";
 import { Router } from "express";
 import * as c from "../controllers/consoleController.js";
 import * as p from "../controllers/plansController.js";
@@ -27,6 +28,9 @@ consoleRouter.get("/overview", can("overview.view"), h(c.overview));
 consoleRouter.get("/users", can("users.view"), h(c.listUsers));
 consoleRouter.get("/users/:userId", can("users.view"), h(c.getUser));
 consoleRouter.patch("/users/:userId", can("users.manage"), h(c.updateUser));
+consoleRouter.get("/users/:userId/sessions", can("users.view"), h(sess.consoleList));
+consoleRouter.post("/users/:userId/sessions/revoke-all", can("users.manage"), h(sess.consoleRevokeAll));
+consoleRouter.delete("/users/:userId/sessions/:sessionId", can("users.manage"), h(sess.consoleRevoke));
 
 consoleRouter.get("/team", can("team.manage"), h(c.listTeam));
 consoleRouter.post("/team", can("team.manage"), h(c.inviteMember));

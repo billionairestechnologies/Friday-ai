@@ -31,6 +31,7 @@ export const ENTITLEMENT_DEFS = [
   { key: "mcpServers", label: "MCP servers", type: "number", hint: "Custom tool servers" },
   { key: "automations", label: "Automations", type: "number", hint: "Scheduled tasks. 0 turns them off" },
   { key: "prioritySupport", label: "Priority support", type: "boolean", hint: "Tickets jump the queue" },
+  { key: "maxDevices", label: "Signed-in devices", type: "number", hint: "Web/phone sessions at once; a new sign-in over the limit signs out the oldest. 0 = no limit" },
 ] as const;
 
 export type EntitlementKey = (typeof ENTITLEMENT_DEFS)[number]["key"];
@@ -51,13 +52,15 @@ export type Entitlements = {
   mcpServers: number;
   automations: number;
   prioritySupport: boolean;
+  /** 0 = no limit (supabase 0068). */
+  maxDevices: number;
 };
 
 export const DEFAULT_ENTITLEMENTS: Record<CatalogPlanId, Entitlements> = {
-  free: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 3, buildMaxRounds: 30, deepResearchPerDay: 3, imagesPerDay: 3, documentsPerDay: 5, customSkills: 3, libraryStorageMb: 500, teamUpModels: 3, mcpServers: 2, automations: 3, prioritySupport: false },
-  pro: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 15, buildMaxRounds: 100, deepResearchPerDay: 40, imagesPerDay: 50, documentsPerDay: 100, customSkills: 25, libraryStorageMb: 10_240, teamUpModels: 5, mcpServers: 10, automations: 20, prioritySupport: false },
-  premium: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 40, buildMaxRounds: 150, deepResearchPerDay: 150, imagesPerDay: 150, documentsPerDay: 300, customSkills: 100, libraryStorageMb: 51_200, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
-  enterprise: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 100, buildMaxRounds: 150, deepResearchPerDay: 300, imagesPerDay: 300, documentsPerDay: 500, customSkills: 200, libraryStorageMb: 102_400, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true },
+  free: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 3, buildMaxRounds: 30, deepResearchPerDay: 3, imagesPerDay: 3, documentsPerDay: 5, customSkills: 3, libraryStorageMb: 500, teamUpModels: 3, mcpServers: 2, automations: 3, prioritySupport: false, maxDevices: 0 },
+  pro: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 15, buildMaxRounds: 100, deepResearchPerDay: 40, imagesPerDay: 50, documentsPerDay: 100, customSkills: 25, libraryStorageMb: 10_240, teamUpModels: 5, mcpServers: 10, automations: 20, prioritySupport: false, maxDevices: 0 },
+  premium: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 40, buildMaxRounds: 150, deepResearchPerDay: 150, imagesPerDay: 150, documentsPerDay: 300, customSkills: 100, libraryStorageMb: 51_200, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true, maxDevices: 0 },
+  enterprise: { buildMode: true, fridayX: true, voice: true, canvas: true, images: true, connectors: 100, buildMaxRounds: 150, deepResearchPerDay: 300, imagesPerDay: 300, documentsPerDay: 500, customSkills: 200, libraryStorageMb: 102_400, teamUpModels: 8, mcpServers: 25, automations: 50, prioritySupport: true, maxDevices: 0 },
 };
 
 /**

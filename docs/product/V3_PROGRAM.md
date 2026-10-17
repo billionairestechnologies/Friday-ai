@@ -63,7 +63,7 @@ through the same `UsageMeter`). Inventory against the brief:
 | 08 | Artifact studio on Pages: targeted NL edits, compare versions, duplicate | 07 | **Merged into v3** (PR #10); no migration |
 | 09 | Reliability: image lineage + exact edit targeting; staged load-test harness (refuses prod) | — | **Merged into v3** (PR #11); needs migration 0064; load test **blocked: no staging** |
 | 10 | Power Skills: manifest, enforced capabilities, evals + publish gate, versions/rollback, Skill Builder | 07 | **PR open** (`feat/v3-10-skills`); needs migration 0065 |
-| 11 | Sessions & devices: registry across web/CLI/IDE, revocation, user device page (policy first) | — | needs owner policy |
+| 11 | Sessions & devices: registry across web/phones/CLI/IDE, instant revocation, Settings → Devices, Console user devices, `maxDevices` plan limit (0 = none by default) | `0068`, `services/sessions/` | **Built** |
 
 ## Blockers that need the owner (not code)
 

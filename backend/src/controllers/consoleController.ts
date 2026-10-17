@@ -14,6 +14,7 @@ import * as tasks from "../services/console/taskService.js";
 import * as overviewService from "../services/console/overviewService.js";
 import { setUserPlan } from "../services/adminUserService.js";
 import { mailConfigured } from "../services/console/mail.js";
+import { revokeOthers } from "../services/sessions/sessionService.js";
 
 /** Team Console API (mounted at /api/console, every route permission-gated in routes/console.ts). */
 
@@ -68,6 +69,8 @@ export async function updateUser(req: Request, res: Response) {
   if (body.suspended !== undefined) {
     if (userId === req.user!.id) throw new HttpError(400, "You can't suspend yourself");
     await overviewService.setSuspended(userId, body.suspended);
+    // A suspended account's open devices stop now, not when their access tokens expire.
+    if (body.suspended) await revokeOthers(userId, null, "admin").catch(() => 0);
     audit(req, body.suspended ? "console.user.suspend" : "console.user.restore", "user", userId);
   }
   res.json({ user: await overviewService.userDetail(userId) });

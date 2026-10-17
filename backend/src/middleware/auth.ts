@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from "express";
 import { supabaseAdmin } from "../config/supabase.js";
 import { HttpError, asyncHandler } from "./errorHandler.js";
 import { memoAsync } from "../utils/ttlMemo.js";
+import { guardSession } from "../services/sessions/sessionService.js";
+import { entitlementsFor } from "../services/quota/entitlements.js";
 
 export interface AuthedUser {
   id: string;
@@ -68,6 +70,17 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
   if (!token) throw new HttpError(401, "Missing bearer token");
   req.authToken = token;
   req.user = await loadUserCached(token);
+  // Sessions & devices (supabase 0068): a device signed out from the Sessions page or the Console
+  // gets 401 here at once, instead of riding its access token until it expires.
+  const userId = req.user.id;
+  await guardSession({
+    token,
+    userId,
+    userAgent: req.headers["user-agent"],
+    platformHeader: req.headers["x-friday-platform"] as string | undefined,
+    ip: req.ip,
+    maxDevices: async () => (await entitlementsFor(userId)).maxDevices ?? 0,
+  });
   next();
 });
 
