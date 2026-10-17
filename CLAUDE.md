@@ -107,6 +107,8 @@ Gotchas:
 - `services/memoryService.ts`, `services/chat/searchAndShare.ts`, `services/connectorService.ts`.
 - **Usage = BILLABLE TOKENS per subscription month** (migration 0057, `docs/operations/MONTHLY_ALLOWANCE.md`): Free 1M, Pro 10M,
   Premium 25M, Enterprise 30M/seat pooled; billable = fresh input + cache writes + output + 10% of cache reads (`quota/allowance.ts`).
+  **× per-model usage multiplier** (migration 0059, `quota/multipliers.ts`, Console → Models & keys → Usage multipliers): append-only
+  versions, scheduled/promo windows, applied value stored on every ledger row (meter `billable-v2`); 0× still records provider cost.
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →

@@ -16,6 +16,7 @@ import {
   type QuotaRpc,
 } from "../src/services/quota/tokenQuotaService.js";
 import { setUsagePricerForTests, UsageMeter } from "../src/services/quota/usageMeter.js";
+import { setMultiplierLoaderForTests } from "../src/services/quota/multipliers.js";
 
 /**
  * The 0057 SQL functions on a real Postgres: locking under concurrency, periods, the subscription
@@ -60,12 +61,14 @@ before(async () => {
   };
   setQuotaRpcForTests(rpc);
   setUsagePricerForTests(async () => ({ costUsd: null, sellInr: null, priced: false }));
+  setMultiplierLoaderForTests(async () => []);
 });
 
 after(async () => {
   setQuotaRpcForTests(null);
   setPlanLookupForTests(null);
   setUsagePricerForTests(null);
+  setMultiplierLoaderForTests(null);
   if (!ADMIN_URL) return;
   await pool.end();
   await admin.query(`drop database if exists ${dbName} with (force)`);

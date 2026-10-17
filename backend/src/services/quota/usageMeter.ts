@@ -2,6 +2,7 @@ import { logger } from "../../utils/logger.js";
 import { priceUsage } from "../finance/pricing.js";
 import { emptyTokenUsage, mergeTokenUsage, normalizeUsage, usageDelta, type TokenUsage } from "../tokenUsage.js";
 import { billableTokens, METER_VERSION, QUOTA_STOP_MESSAGE, type QuotaBlockReason } from "./allowance.js";
+import { applyMultiplier, DEFAULT_MULTIPLIER, multiplierFor } from "./multipliers.js";
 import {
   extendHold,
   QuotaUnavailableError,
@@ -67,6 +68,9 @@ export class UsageMeter {
   private blocked: QuotaBlockReason | null = null;
   /** Flushes run one at a time (helpers record fire-and-forget, so two could otherwise overlap and skip a row). */
   private chain: Promise<unknown> = Promise.resolve();
+  /** Rows join the queue in CALL order: each record waits for the previous one's slot, though its
+   *  lookups (price, multiplier) run in parallel — otherwise a slower lookup reordered the ledger. */
+  private slots: Promise<void> = Promise.resolve();
   /** Records still being prepared/written; settle() waits for them so no row lands after the hold is released. */
   private inflight = new Set<Promise<unknown>>();
 
@@ -77,6 +81,8 @@ export class UsageMeter {
   }
   /** Billable tokens confirmed in the ledger by this meter. */
   billable = 0;
+  /** Multiplier of the latest recorded call — sizes the next agent round's hold in charged tokens. */
+  private lastMultiplier = 1;
 
   constructor(
     readonly reservation: Reservation | undefined,
@@ -99,12 +105,15 @@ export class UsageMeter {
 
   /** Records one model invocation (a zero-usage failed attempt is recorded too, for the audit trail). Returns false when the turn must start no further calls. */
   recordCall(model: MeteredModel, usage: TokenUsage, meta: CallMeta = {}): Promise<boolean> {
-    return this.track(
-      (async () => {
-        this.queue.push(await this.event(model, normalizeUsage(usage), meta));
-        return this.flush();
-      })(),
-    );
+    return this.enqueue(this.event(model, normalizeUsage(usage), meta));
+  }
+
+  private enqueue(prepared: Promise<UsageEvent>): Promise<boolean> {
+    const slot = this.slots.then(async () => {
+      this.queue.push(await prepared);
+    });
+    this.slots = slot.catch(() => undefined);
+    return this.track(slot.then(() => this.flush()));
   }
 
   /**
@@ -117,12 +126,7 @@ export class UsageMeter {
     const delta = usageDelta(cumulative, base);
     if (delta.promptTokens === 0 && delta.completionTokens === 0) return this.flush();
     this.baselines.set(stream, mergeTokenUsage(base, delta));
-    return this.track(
-      (async () => {
-        this.queue.push(await this.event(model, delta, meta));
-        return this.flush();
-      })(),
-    );
+    return this.enqueue(this.event(model, delta, meta));
   }
 
   /**
@@ -150,7 +154,7 @@ export class UsageMeter {
       const total = billableTokens(usage);
       const round = Math.max(1, total - lastTotal);
       lastTotal = total;
-      await this.ensureHold(round);
+      await this.ensureHold(applyMultiplier(round, this.lastMultiplier) || 1);
       return this.stopMessage;
     };
   }
@@ -169,10 +173,19 @@ export class UsageMeter {
   }
 
   private async event(model: MeteredModel, usage: TokenUsage, meta: CallMeta): Promise<UsageEvent> {
-    const priced = await pricer(model.slug, model.modelId, usage).catch(() => ({ costUsd: null, sellInr: null, priced: false }));
+    // Key taken synchronously, at call time, so keys follow call order too.
+    const idempotencyKey = `${this.reservation?.id ?? "unreserved"}:${++this.seq}`;
+    const chargeable = meta.chargeable !== false;
+    const [priced, applied] = await Promise.all([
+      pricer(model.slug, model.modelId, usage).catch(() => ({ costUsd: null, sellInr: null, priced: false })),
+      // Not-chargeable rows (hedge losers, probes) are free regardless of the model's multiplier.
+      chargeable ? multiplierFor(model.slug, model.modelId) : Promise.resolve(DEFAULT_MULTIPLIER),
+    ]);
+    if (chargeable) this.lastMultiplier = applied.multiplier;
+    const base = chargeable ? billableTokens(usage) : 0;
     const zero = usage.promptTokens === 0 && usage.completionTokens === 0;
     return {
-      idempotency_key: `${this.reservation?.id ?? "unreserved"}:${++this.seq}`,
+      idempotency_key: idempotencyKey,
       organization_id: this.ctx.organizationId ?? null,
       provider_slug: model.slug,
       model_id: model.modelId,
@@ -182,7 +195,10 @@ export class UsageMeter {
       cached_tokens: usage.cachedTokens ?? 0,
       cache_write_tokens: usage.cacheWriteTokens ?? 0,
       reasoning_tokens: usage.reasoningTokens ?? 0,
-      billable_tokens: meta.chargeable === false ? 0 : billableTokens(usage),
+      billable_tokens: applyMultiplier(base, applied.multiplier),
+      base_billable_tokens: base,
+      usage_multiplier: applied.multiplier,
+      multiplier_id: applied.id,
       usage_source: zero ? "none" : usage.estimated ? "estimated" : "provider",
       call_status: meta.status ?? "ok",
       feature: this.ctx.feature,

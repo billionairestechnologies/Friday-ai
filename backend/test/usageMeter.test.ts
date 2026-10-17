@@ -8,6 +8,7 @@ import {
   type Reservation,
 } from "../src/services/quota/tokenQuotaService.js";
 import { setUsagePricerForTests, UsageMeter } from "../src/services/quota/usageMeter.js";
+import { setMultiplierLoaderForTests } from "../src/services/quota/multipliers.js";
 import { meteredChat, withMeter } from "../src/services/quota/meterContext.js";
 import { billableTokens } from "../src/services/quota/allowance.js";
 
@@ -105,9 +106,11 @@ beforeEach(() => {
   setQuotaRpcForTests(ledger.rpc);
   setPlanLookupForTests(async () => ({ plan: "pro", planRenewsAt: null, customMonthlyCap: null, enterprise: null }));
   setUsagePricerForTests(async () => ({ costUsd: 0.001, sellInr: null, priced: true }));
+  setMultiplierLoaderForTests(async () => []);
 });
 after(() => {
   setUsagePricerForTests(null);
+  setMultiplierLoaderForTests(null);
   setQuotaRpcForTests(null);
   setPlanLookupForTests(null);
 });
