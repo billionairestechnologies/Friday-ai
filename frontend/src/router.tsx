@@ -123,6 +123,30 @@ const statusRoute = createRoute({
   ),
 });
 
+// Interactive gallery (brief §36) — public and code-split; every result is deterministic code.
+const galleryModule = () => import("@/routes/gallery");
+const GalleryPage = lazy(() => galleryModule().then((m) => ({ default: m.GalleryPage })));
+const ExperiencePage = lazy(() => galleryModule().then((m) => ({ default: m.ExperiencePage })));
+const galleryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/gallery",
+  component: () => (
+    <Suspense fallback={<div className="h-dvh bg-background" />}>
+      <GalleryPage />
+    </Suspense>
+  ),
+});
+const experienceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/gallery/$experienceId",
+  validateSearch: (search: Record<string, unknown>) => ({ p: typeof search.p === "string" ? search.p : undefined }),
+  component: () => (
+    <Suspense fallback={<div className="h-dvh bg-background" />}>
+      <ExperiencePage />
+    </Suspense>
+  ),
+});
+
 // Pages (live docs / sheets / slides) — code-split: the editors (TipTap etc.) only load here.
 const pagesModule = () => import("@/routes/pages");
 const PagesList = lazy(() => pagesModule().then((m) => ({ default: m.PagesListPage })));
@@ -290,6 +314,8 @@ const routeTree = rootRoute.addChildren([
   privacyRoute,
   termsRoute,
   statusRoute,
+  galleryRoute,
+  experienceRoute,
   pagesRoute,
   pageEditorRoute,
   sharedPageRoute,

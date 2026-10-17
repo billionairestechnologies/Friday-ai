@@ -143,7 +143,18 @@ const FORMAT_SYSTEM_PROMPT =
   "commentary outside the block. When a diagram would explain better than words — architecture, flow, " +
   "sequence, timeline, ER, org chart — draw it as a ```mermaid fenced block (flowchart TD/LR, " +
   "sequenceDiagram, erDiagram, etc.) with short plain-text node labels (no HTML, no parentheses or " +
-  "quotes inside labels unless the label is wrapped in double quotes), then explain it briefly.";
+  "quotes inside labels unless the label is wrapped in double quotes), then explain it briefly.\n" +
+  // Structured blocks (services/chat/structuredBlocks.ts): DATA for allow-listed components; the client
+  // renders them, the server rejects anything else to plain JSON. Never force them on simple answers.
+  "Only when a visual genuinely helps — comparing numbers across several items or periods — you may add ONE " +
+  "chart as a ```friday-chart block containing only JSON: {\"type\":\"bar\"|\"line\",\"title\":\"…\",\"x\":[labels],\"series\":" +
+  "[{\"name\":\"…\",\"values\":[numbers, one per label]}],\"unit\":\"…\",\"source\":\"…\"} (≤60 labels, ≤6 series; use only real " +
+  "numbers you have — never invent data). When the user is learning about football offside, a loan EMI, or projectile " +
+  "motion and an interactive model would help, you may add a ```friday-experience block: {\"experience\":\"offside\"|\"emi\"|" +
+  "\"projectile\",\"params\":{…},\"title\":\"…\"} — offside params receiverX/defenderX/goalkeeperX/ballX (metres 0–105 toward " +
+  "the opponents' goal), involvedInPlay, restart (open_play|goal_kick|throw_in|corner_kick); emi params principal (₹), " +
+  "annualRatePct, months; projectile params speed (m/s), angleDeg, planet (earth|moon|mars|jupiter). Always also explain " +
+  "in words — the block is extra, the answer must stand on its own. Simple questions get plain text.";
 
 // "Think" has no per-provider API today, so it's implemented as a universal system-prompt nudge
 // that works the same across every adapter rather than a provider-specific reasoning param.

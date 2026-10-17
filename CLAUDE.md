@@ -121,6 +121,9 @@ Gotchas:
 - Finance actuals (migration 0063): `payment_ledger` (payment/refund/chargeback + Razorpay fee, keyed on Razorpay ids, one payment per order) written
   by the webhook; `finance_revenue()` = cash vs revenue earned straight-line over each payment's term vs deferred; `finance/summary.ts` labels every
   figure actual/entered/calculated/estimate with its formula (Console → Finance → Summary, `GET /console/finance/summary`).
+- Experiences (phase 07): answers may carry ```friday-chart / ```friday-experience JSON DATA blocks for allow-listed components only;
+  `chat/structuredBlocks.ts` rewrites invalid ones to ```json before saving, the web re-validates (`lib/experiences/*`, pure + tested from
+  `backend/test/experiences.test.ts`). `/gallery` (public): offside simulator (Law 11 model), EMI, projectile; state shareable via `?p=`.
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →
