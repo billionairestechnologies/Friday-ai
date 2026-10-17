@@ -10,6 +10,7 @@ const { createApp } = await import("./app.js");
 const { startAutomationScheduler, stopAutomationScheduler } = await import("./services/automations/automationService.js");
 const { startCampaignScheduler } = await import("./services/console/campaignService.js");
 const { startGrantExpirySweep } = await import("./services/console/plansService.js");
+const { expireApplications } = await import("./services/console/programService.js");
 const { startRenewalReminders } = await import("./services/billing/renewalReminders.js");
 const { startStatusMonitor } = await import("./services/status/statusService.js");
 const { startTurnSweeper, stopTurnSweeper } = await import("./services/jobs/sweeper.js");
@@ -26,6 +27,8 @@ const server = app.listen(env.port, () => {
   startAutomationScheduler();
   startCampaignScheduler();
   startGrantExpirySweep();
+  // Programme memberships past their re-verification date (same switch as grant expiry).
+  if (!process.env.FRIDAY_DISABLE_GRANT_EXPIRY) setInterval(() => void expireApplications().catch(() => {}), 60 * 60_000).unref?.();
   startRenewalReminders();
   startStatusMonitor();
   startTurnSweeper();

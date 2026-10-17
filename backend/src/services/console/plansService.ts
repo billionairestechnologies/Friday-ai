@@ -6,6 +6,8 @@ import { resolveEntitlements } from "../quota/entitlements.js";
 import { sanitizeEntitlements, type Entitlements } from "../quota/planCatalog.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { NEW_USER_DAYS, findUserByEmail, userLabels } from "./directory.js";
+import { quotaRpc } from "../quota/tokenQuotaService.js";
+import { announceGrant } from "../quota/credits.js";
 
 /**
  * Plans & Offers. Everything here resolves to ONE primitive — an access grant — which writes the
@@ -305,19 +307,28 @@ export type OfferInput = {
   code?: string;
   name: string;
   description?: string;
-  kind: "plan_grant" | "package" | "discount";
+  kind: "plan_grant" | "package" | "discount" | "credits";
   plan?: "pro" | "premium" | null;
   packageId?: string | null;
   durationDays?: number | null;
   discountPercent?: number | null;
   appliesToPlans?: string[];
-  eligibility: "anyone" | "new_users" | "email_domain" | "student";
+  eligibility: "anyone" | "new_users" | "existing_users" | "email_domain" | "student";
   emailDomains?: string[];
   requiresApproval?: boolean;
   maxRedemptions?: number | null;
   startsAt?: string | null;
   expiresAt?: string | null;
+  /** Kept for older clients; `state` wins when both are sent. */
   active?: boolean;
+  state?: "draft" | "active" | "paused" | "archived";
+  /** Bonus credits a `credits` offer grants, and how many days they last after redemption (supabase 0060/0061). */
+  creditTokens?: number | null;
+  creditDays?: number | null;
+  /** At most one applied redemption per group per person (no stacking). */
+  exclusiveGroup?: string | null;
+  headline?: string;
+  terms?: string;
 };
 
 export function normalizeCode(code: string): string {
@@ -345,7 +356,19 @@ function offerRow(input: Partial<OfferInput>) {
   if (input.maxRedemptions !== undefined) row.max_redemptions = input.maxRedemptions;
   if (input.startsAt !== undefined) row.starts_at = input.startsAt;
   if (input.expiresAt !== undefined) row.expires_at = input.expiresAt;
-  if (input.active !== undefined) row.active = input.active;
+  if (input.active !== undefined && input.state === undefined) {
+    row.active = input.active;
+    row.state = input.active ? "active" : "paused";
+  }
+  if (input.state !== undefined) {
+    row.state = input.state;
+    row.active = input.state === "active";
+  }
+  if (input.creditTokens !== undefined) row.credit_tokens = input.creditTokens;
+  if (input.creditDays !== undefined) row.credit_days = input.creditDays;
+  if (input.exclusiveGroup !== undefined) row.exclusive_group = input.exclusiveGroup?.trim().toLowerCase() || null;
+  if (input.headline !== undefined) row.headline = input.headline;
+  if (input.terms !== undefined) row.terms = input.terms;
   return row;
 }
 
@@ -353,6 +376,7 @@ function validateOffer(input: Partial<OfferInput>) {
   if (input.kind === "plan_grant" && !input.plan) throw new HttpError(400, "Pick the plan this offer grants");
   if (input.kind === "package" && !input.packageId) throw new HttpError(400, "Pick the package this offer grants");
   if (input.kind === "discount" && !input.discountPercent) throw new HttpError(400, "Set the discount percentage");
+  if (input.kind === "credits" && !(input.creditTokens && input.creditTokens > 0)) throw new HttpError(400, "Set how many bonus tokens this offer grants");
   if (input.eligibility === "email_domain" && !(input.emailDomains ?? []).length) throw new HttpError(400, "Add at least one email domain");
 }
 
@@ -375,7 +399,7 @@ export async function saveOffer(input: OfferInput & { id?: string }, actorId: st
 export async function deleteOffer(id: string) {
   const { count } = await supabaseAdmin.from("offer_redemptions").select("id", { count: "exact", head: true }).eq("offer_id", id);
   if (count) {
-    await supabaseAdmin.from("offers").update({ active: false, updated_at: new Date().toISOString() }).eq("id", id);
+    await supabaseAdmin.from("offers").update({ active: false, state: "archived", updated_at: new Date().toISOString() }).eq("id", id);
     return { archived: true };
   }
   const { error } = await supabaseAdmin.from("offers").delete().eq("id", id);
@@ -398,7 +422,7 @@ type OfferRow = Awaited<ReturnType<typeof listOffers>>[number];
 async function loadRedeemableOffer(code: string): Promise<OfferRow> {
   const { data: offer } = await supabaseAdmin.from("offers").select("*").eq("code", normalizeCode(code)).maybeSingle();
   const now = new Date().toISOString();
-  if (!offer || !offer.active) throw new HttpError(404, "That code isn't valid");
+  if (!offer || (offer.state ?? (offer.active ? "active" : "paused")) !== "active") throw new HttpError(404, "That code isn't valid");
   if (offer.starts_at && (offer.starts_at as string) > now) throw new HttpError(400, "That offer hasn't started yet");
   if (offer.expires_at && (offer.expires_at as string) < now) throw new HttpError(400, "That offer has expired");
   if (offer.max_redemptions && (offer.redemption_count as number) >= (offer.max_redemptions as number)) throw new HttpError(400, "That offer has been fully claimed");
@@ -416,6 +440,11 @@ async function checkEligibility(offer: OfferRow, userId: string): Promise<"ok" |
       if (Date.now() - created > NEW_USER_DAYS * 86_400_000) throw new HttpError(403, "This offer is for new accounts only");
       break;
     }
+    case "existing_users": {
+      const created = auth?.user?.created_at ? Date.parse(auth.user.created_at) : Date.now();
+      if (Date.now() - created <= NEW_USER_DAYS * 86_400_000) throw new HttpError(403, "This offer is for existing customers");
+      break;
+    }
     case "email_domain":
       if (!emailMatchesDomains(email, domains)) throw new HttpError(403, "This offer is for specific organisations — your email doesn't qualify");
       break;
@@ -427,35 +456,79 @@ async function checkEligibility(offer: OfferRow, userId: string): Promise<"ok" |
   return offer.requires_approval ? "review" : "ok";
 }
 
-/** Atomically takes one redemption slot (compare-and-set, so a limited offer can't be over-claimed). */
-async function claimSlot(offerId: string): Promise<void> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { data: offer } = await supabaseAdmin.from("offers").select("redemption_count, max_redemptions").eq("id", offerId).single();
-    if (!offer) throw new HttpError(404, "Offer not found");
-    if (offer.max_redemptions && offer.redemption_count >= offer.max_redemptions) throw new HttpError(400, "That offer has been fully claimed");
-    const { data: updated } = await supabaseAdmin
-      .from("offers")
-      .update({ redemption_count: (offer.redemption_count as number) + 1 })
-      .eq("id", offerId)
-      .eq("redemption_count", offer.redemption_count)
-      .select("id")
-      .maybeSingle();
-    if (updated) return;
-  }
-  throw new HttpError(409, "Busy — please try again");
+/** SQL refusals from offer_claim / offer_approve_claim → the message the person sees. */
+function claimError(err: unknown): never {
+  const m = err instanceof Error ? err.message : String(err);
+  if (m.includes("offer_full")) throw new HttpError(400, "That offer has been fully claimed");
+  if (m.includes("offer_expired")) throw new HttpError(400, "That offer has expired");
+  if (m.includes("offer_not_started")) throw new HttpError(400, "That offer hasn't started yet");
+  if (m.includes("offer_not_active") || m.includes("offer_not_found")) throw new HttpError(404, "That code isn't valid");
+  if (m.includes("offer_group_conflict")) throw new HttpError(409, "You already have an offer from this promotion — they can't be combined");
+  if (m.includes("offer_rejected")) throw new HttpError(403, "This offer wasn't approved for your account");
+  if (m.includes("redemption_not_pending") || m.includes("redemption_not_found")) throw new HttpError(404, "No pending request with that id");
+  throw err instanceof Error ? err : new Error(m);
 }
 
-async function applyOffer(offer: OfferRow, userId: string, actorId: string | null) {
-  if (offer.kind === "package" && offer.package_id) {
-    return applyPackage(offer.package_id as string, { userId }, `Offer ${offer.code}`, actorId);
+type Claim = { redemption_id: string; status: "pending" | "claimed" | "applied"; duplicate: boolean };
+
+/**
+ * Applies what an offer gives, for a CLAIMED redemption. Credits are keyed on the redemption id, so
+ * a retry after a crash can't credit twice; plan/package grants replace the person's current grant.
+ */
+async function applyOffer(offer: OfferRow, userId: string, actorId: string | null, redemptionId: string): Promise<Record<string, unknown>> {
+  if (offer.kind === "credits") {
+    const days = (offer.credit_days as number | null) ?? null;
+    const expiresAt = days ? new Date(Date.now() + days * 86_400_000).toISOString() : null;
+    const row = await quotaRpc<Record<string, unknown>>("quota_grant_credits", {
+      p_user: userId,
+      p_org: null,
+      p_tokens: offer.credit_tokens as number,
+      p_expires_at: expiresAt,
+      p_kind: "offer",
+      p_reason: `Offer ${offer.code}`,
+      p_actor: actorId,
+      p_key: `offer:${redemptionId}`,
+      p_requires_approval: false,
+      p_source: "offer",
+    });
+    if (!row.duplicate) await announceGrant(userId, String(row.grant_id), offer.credit_tokens as number, expiresAt);
+    return { kind: "credits", grantId: row.grant_id, tokens: offer.credit_tokens, expiresAt };
   }
-  return grantAccess({ userId, plan: offer.plan as string, durationDays: offer.duration_days as number | null, source: "offer", offerId: offer.id as string, note: `Offer ${offer.code}` }, actorId);
+  const grant =
+    offer.kind === "package" && offer.package_id
+      ? await applyPackage(offer.package_id as string, { userId }, `Offer ${offer.code}`, actorId)
+      : await grantAccess({ userId, plan: offer.plan as string, durationDays: offer.duration_days as number | null, source: "offer", offerId: offer.id as string, note: `Offer ${offer.code}` }, actorId);
+  return { kind: offer.kind, grantId: grant.id, plan: grant.plan, endsAt: grant.ends_at };
+}
+
+/** Claimed → apply → confirm; a failure gives the slot back (offer_release) and surfaces the error. */
+async function applyClaim(offer: OfferRow, userId: string, actorId: string | null, redemptionId: string) {
+  try {
+    const benefit = await applyOffer(offer, userId, actorId, redemptionId);
+    await quotaRpc("offer_confirm", { p_redemption: redemptionId, p_benefit: benefit });
+    return benefit;
+  } catch (err) {
+    await quotaRpc("offer_release", { p_redemption: redemptionId, p_reason: err instanceof Error ? err.message : String(err) }).catch(() => undefined);
+    throw err;
+  }
 }
 
 export type RedeemResult =
   | { status: "applied"; plan: string; endsAt: string | null; message: string }
+  | { status: "credits"; tokens: number; expiresAt: string | null; message: string }
   | { status: "pending"; message: string }
   | { status: "discount"; percent: number; appliesTo: string[]; message: string };
+
+function appliedMessage(offer: OfferRow, benefit: Record<string, unknown>): RedeemResult {
+  if (benefit.kind === "credits") {
+    const tokens = Number(benefit.tokens);
+    const expiresAt = (benefit.expiresAt as string | null) ?? null;
+    return { status: "credits", tokens, expiresAt, message: `${tokens.toLocaleString("en-IN")} bonus tokens added${expiresAt ? ` — use them by ${new Date(expiresAt).toDateString()}` : ""}.` };
+  }
+  const plan = String(benefit.plan ?? offer.plan ?? "");
+  const endsAt = (benefit.endsAt as string | null) ?? null;
+  return { status: "applied", plan, endsAt, message: `You're on ${plan}${endsAt ? ` until ${new Date(endsAt).toDateString()}` : ""}.` };
+}
 
 /** A user redeems a code in the app. */
 export async function redeem(userId: string, code: string, proof: string): Promise<RedeemResult> {
@@ -469,23 +542,21 @@ export async function redeem(userId: string, code: string, proof: string): Promi
       message: `${offer.discount_percent}% off ${((offer.applies_to_plans as string[]) ?? []).join(" / ")} — applied at checkout.`,
     };
   }
-  const { data: existing } = await supabaseAdmin.from("offer_redemptions").select("status").eq("offer_id", offer.id).eq("user_id", userId).maybeSingle();
-  if (existing?.status === "applied") throw new HttpError(400, "You've already used this code");
-  if (existing?.status === "pending") return { status: "pending", message: "Your request is already with our team — you'll hear back by email." };
-  if (existing?.status === "rejected") throw new HttpError(403, "This offer wasn't approved for your account");
-
   const verdict = await checkEligibility(offer, userId);
-  if (verdict === "review") {
-    if (offer.eligibility === "student" && proof.trim().length < 3) {
-      throw new HttpError(400, "Tell us your college/university and course (and your student ID number) so we can verify you");
-    }
-    await supabaseAdmin.from("offer_redemptions").insert({ offer_id: offer.id, user_id: userId, status: "pending", proof: proof.slice(0, 2000) });
-    return { status: "pending", message: "Thanks! Our team will verify this and email you — usually within a day." };
+  if (verdict === "review" && offer.eligibility === "student" && proof.trim().length < 3) {
+    throw new HttpError(400, "Tell us your college/university and course (and your student ID number) so we can verify you");
   }
-  await claimSlot(offer.id as string);
-  const grant = await applyOffer(offer, userId, null);
-  await supabaseAdmin.from("offer_redemptions").upsert({ offer_id: offer.id, user_id: userId, status: "applied", proof: proof.slice(0, 2000) }, { onConflict: "offer_id,user_id" });
-  return { status: "applied", plan: grant.plan as string, endsAt: grant.ends_at as string | null, message: `You're on ${grant.plan}${grant.ends_at ? ` until ${new Date(grant.ends_at as string).toDateString()}` : ""}.` };
+  let claim: Claim;
+  try {
+    claim = await quotaRpc<Claim>("offer_claim", { p_offer: offer.id, p_user: userId, p_review: verdict === "review", p_proof: proof.slice(0, 2000) });
+  } catch (err) {
+    claimError(err);
+  }
+  if (claim.status === "pending") {
+    return { status: "pending", message: claim.duplicate ? "Your request is already with our team — you'll hear back by email." : "Thanks! Our team will verify this and email you — usually within a day." };
+  }
+  if (claim.duplicate) throw new HttpError(400, claim.status === "applied" ? "You've already used this code" : "That code is being applied to your account — refresh in a moment");
+  return appliedMessage(offer, await applyClaim(offer, userId, null, claim.redemption_id));
 }
 
 export async function listRedemptions(status?: string) {
@@ -498,18 +569,28 @@ export async function listRedemptions(status?: string) {
 }
 
 export async function reviewRedemption(redemptionId: string, approve: boolean, note: string, actorId: string) {
-  const { data: redemption } = await supabaseAdmin.from("offer_redemptions").select("*").eq("id", redemptionId).eq("status", "pending").maybeSingle();
-  if (!redemption) throw new HttpError(404, "No pending request with that id");
+  const { data: redemption } = await supabaseAdmin.from("offer_redemptions").select("*").eq("id", redemptionId).maybeSingle();
+  if (!redemption || redemption.status !== "pending") throw new HttpError(404, "No pending request with that id");
   const { data: offer } = await supabaseAdmin.from("offers").select("*").eq("id", redemption.offer_id).maybeSingle();
   if (!offer) throw new HttpError(404, "The offer no longer exists");
   if (approve) {
-    await claimSlot(offer.id as string);
-    await applyOffer(offer, redemption.user_id as string, actorId);
+    let claim: Claim;
+    try {
+      claim = await quotaRpc<Claim>("offer_approve_claim", { p_redemption: redemptionId, p_actor: actorId, p_note: note });
+    } catch (err) {
+      claimError(err);
+    }
+    if (!claim.duplicate) await applyClaim(offer, redemption.user_id as string, actorId, redemptionId);
+  } else {
+    const { data: updated } = await supabaseAdmin
+      .from("offer_redemptions")
+      .update({ status: "rejected", note, reviewed_by: actorId, reviewed_at: new Date().toISOString() })
+      .eq("id", redemptionId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (!updated) throw new HttpError(409, "Someone already decided this request");
   }
-  await supabaseAdmin
-    .from("offer_redemptions")
-    .update({ status: approve ? "applied" : "rejected", note, reviewed_by: actorId, reviewed_at: new Date().toISOString() })
-    .eq("id", redemptionId);
   return { userId: redemption.user_id as string, offer };
 }
 
@@ -538,6 +619,11 @@ export async function discountForCheckout(userId: string, code: string, planId: 
 
 /** Called from the payment webhook once a discounted order is paid. */
 export async function recordDiscountUse(offerId: string, userId: string, orderId: string) {
-  await claimSlot(offerId).catch(() => {});
-  await supabaseAdmin.from("offer_redemptions").upsert({ offer_id: offerId, user_id: userId, status: "applied", order_id: orderId }, { onConflict: "offer_id,user_id" });
+  // The customer has PAID with this discount: record the use even if the cap filled up meanwhile.
+  const claim = await quotaRpc<Claim>("offer_claim", { p_offer: offerId, p_user: userId, p_review: false, p_proof: "" }).catch(() => null);
+  if (claim && !claim.duplicate) await quotaRpc("offer_confirm", { p_redemption: claim.redemption_id, p_benefit: { kind: "discount", orderId } }).catch(() => undefined);
+  await supabaseAdmin.from("offer_redemptions").update({ order_id: orderId }).eq("offer_id", offerId).eq("user_id", userId);
+  if (!claim) {
+    await supabaseAdmin.from("offer_redemptions").upsert({ offer_id: offerId, user_id: userId, status: "applied", order_id: orderId, applied_at: new Date().toISOString() }, { onConflict: "offer_id,user_id" });
+  }
 }

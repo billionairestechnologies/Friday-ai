@@ -46,13 +46,13 @@ type Offer = {
   code: string;
   name: string;
   description: string;
-  kind: "plan_grant" | "package" | "discount";
+  kind: "plan_grant" | "package" | "discount" | "credits";
   plan: string | null;
   package_id: string | null;
   duration_days: number | null;
   discount_percent: number | null;
   applies_to_plans: string[];
-  eligibility: "anyone" | "new_users" | "email_domain" | "student";
+  eligibility: "anyone" | "new_users" | "existing_users" | "email_domain" | "student";
   email_domains: string[];
   requires_approval: boolean;
   max_redemptions: number | null;
@@ -60,7 +60,23 @@ type Offer = {
   starts_at: string | null;
   expires_at: string | null;
   active: boolean;
+  state?: OfferState;
+  credit_tokens: number | null;
+  credit_days: number | null;
+  exclusive_group: string | null;
+  headline: string;
+  terms: string;
 };
+type OfferState = "draft" | "active" | "paused" | "archived";
+/** What the team sees: the stored state, refined by the dates (scheduled / ended). */
+function offerStatus(o: Offer): { label: string; tone: string } {
+  const state = o.state ?? (o.active ? "active" : "paused");
+  if (state !== "active") return { label: state, tone: state === "draft" ? "blue" : "neutral" };
+  if (o.starts_at && Date.parse(o.starts_at) > Date.now()) return { label: "scheduled", tone: "blue" };
+  if (o.expires_at && Date.parse(o.expires_at) <= Date.now()) return { label: "ended", tone: "neutral" };
+  if (o.max_redemptions && o.redemption_count >= o.max_redemptions) return { label: "fully used", tone: "amber" };
+  return { label: "active", tone: "green" };
+}
 type Grant = {
   id: string;
   user: { name: string; email: string | null } | null;
@@ -183,7 +199,7 @@ export default function Plans() {
                     <div className="truncate font-semibold">{o.name}</div>
                     <div className="text-xs text-muted">{describeOffer(o, d.packages)}</div>
                   </button>
-                  <Badge tone={o.active ? "green" : "neutral"}>{o.active ? "active" : "off"}</Badge>
+                  <Badge tone={offerStatus(o).tone}>{offerStatus(o).label}</Badge>
                 </div>
                 <button
                   type="button"
@@ -288,13 +304,15 @@ export default function Plans() {
 
 function describeOffer(o: Offer, packages: Pkg[]): string {
   const what =
-    o.kind === "discount"
+    o.kind === "credits"
+      ? `${formatNumber(o.credit_tokens ?? 0)} bonus tokens${o.credit_days ? ` for ${o.credit_days} days` : ""}`
+      : o.kind === "discount"
       ? `${o.discount_percent}% off ${o.applies_to_plans.join("/")}`
       : o.kind === "package"
         ? `Package: ${packages.find((p) => p.id === o.package_id)?.name ?? "—"}`
         : `${o.plan?.[0]?.toUpperCase()}${o.plan?.slice(1)} for ${o.duration_days ? `${o.duration_days} days` : "no end date"}`;
-  const who = { anyone: "anyone", new_users: "new users", email_domain: `@${o.email_domains.join(", @")}`, student: "students" }[o.eligibility];
-  return `${what} · ${who}`;
+  const who = { anyone: "anyone", new_users: "new users", existing_users: "existing customers", email_domain: `@${o.email_domains.join(", @")}`, student: "students" }[o.eligibility];
+  return `${what} · ${who}${o.exclusive_group ? ` · group ${o.exclusive_group}` : ""}`;
 }
 
 function ReviewRow({ r, onDone }: { r: Redemption; onDone: () => void }) {
@@ -333,7 +351,8 @@ function ReviewRow({ r, onDone }: { r: Redemption; onDone: () => void }) {
 function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "new" | null; packages: Pkg[]; onClose: () => void; onSaved: () => void }) {
   const blank = {
     code: "", name: "", description: "", kind: "plan_grant" as Offer["kind"], plan: "pro", packageId: "", durationDays: "30", discountPercent: "20",
-    appliesToPlans: ["pro", "premium"], eligibility: "anyone" as Offer["eligibility"], emailDomains: "", requiresApproval: false, maxRedemptions: "", startsAt: "", expiresAt: "", active: true,
+    appliesToPlans: ["pro", "premium"], eligibility: "anyone" as Offer["eligibility"], emailDomains: "", requiresApproval: false, maxRedemptions: "", startsAt: "", expiresAt: "",
+    state: "draft" as OfferState, creditTokens: "1000000", creditDays: "90", exclusiveGroup: "", headline: "", terms: "",
   };
   const [f, setF] = useState(blank);
   const [busy, setBusy] = useState(false);
@@ -344,7 +363,9 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
       setF({
         code: offer.code, name: offer.name, description: offer.description, kind: offer.kind, plan: offer.plan ?? "pro", packageId: offer.package_id ?? "", durationDays: offer.duration_days ? String(offer.duration_days) : "",
         discountPercent: String(offer.discount_percent ?? 20), appliesToPlans: offer.applies_to_plans, eligibility: offer.eligibility, emailDomains: offer.email_domains.join(", "), requiresApproval: offer.requires_approval,
-        maxRedemptions: offer.max_redemptions ? String(offer.max_redemptions) : "", startsAt: toLocalInput(offer.starts_at), expiresAt: toLocalInput(offer.expires_at), active: offer.active,
+        maxRedemptions: offer.max_redemptions ? String(offer.max_redemptions) : "", startsAt: toLocalInput(offer.starts_at), expiresAt: toLocalInput(offer.expires_at),
+        state: offer.state ?? (offer.active ? "active" : "paused"), creditTokens: offer.credit_tokens ? String(offer.credit_tokens) : "1000000", creditDays: offer.credit_days ? String(offer.credit_days) : "",
+        exclusiveGroup: offer.exclusive_group ?? "", headline: offer.headline ?? "", terms: offer.terms ?? "",
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offer]);
@@ -370,7 +391,12 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
           maxRedemptions: f.maxRedemptions ? Number(f.maxRedemptions) : null,
           startsAt: fromLocalInput(f.startsAt),
           expiresAt: fromLocalInput(f.expiresAt),
-          active: f.active,
+          state: f.state,
+          creditTokens: f.kind === "credits" ? Number(f.creditTokens) : null,
+          creditDays: f.kind === "credits" && f.creditDays ? Number(f.creditDays) : null,
+          exclusiveGroup: f.exclusiveGroup.trim() || null,
+          headline: f.headline,
+          terms: f.terms,
         }),
       existing ? "Offer saved" : "Offer created",
     );
@@ -408,8 +434,14 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
         </div>
         <Field label="Description" hint="Shown to the team"><Input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <Field label="What it gives">
-          <Segmented value={f.kind} onChange={(kind) => setF({ ...f, kind })} options={[{ value: "plan_grant", label: "Plan access" }, { value: "package", label: "A package" }, { value: "discount", label: "Checkout discount" }]} />
+          <Segmented value={f.kind} onChange={(kind) => setF({ ...f, kind })} options={[{ value: "plan_grant", label: "Plan access" }, { value: "credits", label: "Bonus credits" }, { value: "package", label: "A package" }, { value: "discount", label: "Checkout discount" }]} />
         </Field>
+        {f.kind === "credits" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Bonus tokens" hint="Added on top of the monthly allowance"><Input type="number" min={1} value={f.creditTokens} onChange={(e) => setF({ ...f, creditTokens: e.target.value })} /></Field>
+            <Field label="Valid for (days)" hint="From redemption · empty = no expiry"><Input type="number" min={1} value={f.creditDays} onChange={(e) => setF({ ...f, creditDays: e.target.value })} /></Field>
+          </div>
+        )}
         {f.kind === "plan_grant" && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Plan"><Select value={f.plan} onChange={(e) => setF({ ...f, plan: e.target.value })} options={[{ value: "pro", label: "Pro" }, { value: "premium", label: "Premium" }]} /></Field>
@@ -437,7 +469,7 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
           <Select
             value={f.eligibility}
             onChange={(e) => setF({ ...f, eligibility: e.target.value as Offer["eligibility"] })}
-            options={[{ value: "anyone", label: "Anyone with the code" }, { value: "new_users", label: "New accounts only (14 days)" }, { value: "email_domain", label: "Specific email domains (partners, companies)" }, { value: "student", label: "Students" }]}
+            options={[{ value: "anyone", label: "Anyone with the code" }, { value: "new_users", label: "New accounts only (14 days)" }, { value: "existing_users", label: "Existing customers only" }, { value: "email_domain", label: "Specific email domains (partners, companies)" }, { value: "student", label: "Students" }]}
           />
         </Field>
         {(f.eligibility === "email_domain" || f.eligibility === "student") && (
@@ -451,7 +483,14 @@ function OfferEditor({ offer, packages, onClose, onSaved }: { offer: Offer | "ne
           <Field label="Starts"><Input type="datetime-local" value={f.startsAt} onChange={(e) => setF({ ...f, startsAt: e.target.value })} /></Field>
           <Field label="Ends"><Input type="datetime-local" value={f.expiresAt} onChange={(e) => setF({ ...f, expiresAt: e.target.value })} /></Field>
         </div>
-        <Toggle checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="Active" />
+        <Field label="Stacking group" hint="People can redeem only ONE offer per group (e.g. launch). Empty = combines with anything.">
+          <Input value={f.exclusiveGroup} onChange={(e) => setF({ ...f, exclusiveGroup: e.target.value })} placeholder="launch" />
+        </Field>
+        <Field label="Headline" hint="Shown to the customer when they redeem"><Input value={f.headline} onChange={(e) => setF({ ...f, headline: e.target.value })} placeholder="1M bonus tokens to celebrate our launch" /></Field>
+        <Field label="Terms"><Textarea value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} placeholder="One per account. Credits expire 90 days after redemption." className="min-h-[64px]" /></Field>
+        <Field label="Status">
+          <Segmented value={f.state} onChange={(state) => setF({ ...f, state })} options={[{ value: "draft", label: "Draft" }, { value: "active", label: "Active" }, { value: "paused", label: "Paused" }, { value: "archived", label: "Archived" }]} />
+        </Field>
       </div>
     </Drawer>
   );
