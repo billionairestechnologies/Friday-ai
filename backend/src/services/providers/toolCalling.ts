@@ -26,6 +26,9 @@ export type ToolCall = {
   args: Record<string, unknown>;
   /** Gemini's opaque thoughtSignature — must be echoed back on the functionCall part. */
   signature?: string;
+  /** The reply hit the output-token limit while this call's arguments were still streaming, so
+   *  `args` is incomplete (usually `{}`) — the loop must not run it, only tell the model to go smaller. */
+  incomplete?: boolean;
 };
 
 export type AssistantToolMessage = { role: "assistant"; content: string; toolCalls: ToolCall[] };
@@ -68,6 +71,12 @@ export function reasoningParams(dialect: "openai" | "openrouter" | "gemini", mod
 }
 
 export type ToolTurnResult = { text: string; toolCalls: ToolCall[]; usage: TokenUsage | null };
+
+/** A reply cut off at max tokens can only have cut its LAST tool call (they stream one after another). */
+function markCutOff(toolCalls: ToolCall[], cutOff: boolean): ToolCall[] {
+  if (cutOff && toolCalls.length) toolCalls[toolCalls.length - 1]!.incomplete = true;
+  return toolCalls;
+}
 
 function isToolResult(m: AgentMessage): m is ToolResultMessage {
   return m.role === "tool";
@@ -127,6 +136,7 @@ type OpenAiToolChunk = {
       content?: string | null;
       tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[];
     };
+    finish_reason?: string | null;
   }[];
   usage?: {
     prompt_tokens?: number;
@@ -177,9 +187,11 @@ export async function streamOpenAiToolTurn(
   let text = "";
   let usage: TokenUsage | null = null;
   const partial = new Map<number, { id: string; name: string; args: string }>();
+  let cutOff = false;
   await readSseStream(res.body, (data) => {
     const chunk = data as OpenAiToolChunk;
     if (chunk.usage) usage = usageFromOpenAi(chunk.usage);
+    if (chunk.choices?.[0]?.finish_reason === "length") cutOff = true;
     const delta = chunk.choices?.[0]?.delta;
     if (delta?.content) {
       text += delta.content;
@@ -201,7 +213,7 @@ export async function streamOpenAiToolTurn(
     .sort(([a], [b]) => a - b)
     .filter(([, c]) => c.name)
     .map(([i, c]) => ({ id: c.id || `call_${i}`, name: c.name, args: parseArgs(c.args) }));
-  return { text, toolCalls, usage };
+  return { text, toolCalls: markCutOff(toolCalls, cutOff), usage };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -276,12 +288,14 @@ export async function streamAnthropicToolTurn(
   let text = "";
   const tracker = new AnthropicUsageTracker();
   const blocks = new Map<number, { id: string; name: string; json: string }>();
+  let cutOff = false;
   await readSseStream(res.body, (data) => {
     const type = data.type;
     if (type === "message_start") {
       tracker.ingest((data.message as { usage?: Record<string, unknown> } | undefined)?.usage);
     } else if (type === "message_delta") {
       tracker.ingest(data.usage as Record<string, unknown> | undefined);
+      if ((data.delta as { stop_reason?: string } | undefined)?.stop_reason === "max_tokens") cutOff = true;
     } else if (type === "content_block_start") {
       const block = data.content_block as { type?: string; id?: string; name?: string } | undefined;
       if (block?.type === "tool_use") {
@@ -303,7 +317,7 @@ export async function streamAnthropicToolTurn(
     .sort(([a], [b]) => a - b)
     .filter(([, b]) => b.name)
     .map(([i, b]) => ({ id: b.id || `toolu_${i}`, name: b.name, args: parseArgs(b.json) }));
-  return { text, toolCalls, usage: tracker.snapshot() };
+  return { text, toolCalls: markCutOff(toolCalls, cutOff), usage: tracker.snapshot() };
 }
 
 // ---------------------------------------------------------------------------------------------

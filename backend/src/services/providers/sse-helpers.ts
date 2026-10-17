@@ -4,17 +4,40 @@ import { usageFromOpenAi, type TokenUsage } from "../tokenUsage.js";
  * Reads an SSE (`data: {...}\n\n`) response body, parsing each event's JSON payload and handing
  * it to `onEvent`. Stops on a `[DONE]` sentinel or stream end. Shared by every SSE-based provider
  * (OpenAI-compatible chat/completions, Anthropic messages, Gemini streamGenerateContent).
+ *
+ * Idle watchdog: a provider that stalls mid-stream without closing the socket used to leave the
+ * turn spinning forever ("Writing…" for minutes, nothing in the logs). No bytes for
+ * STREAM_IDLE_MS now fails the read with a "stream stalled" error the callers already handle
+ * (fall through to the next model, or end the turn with a friendly error). Anthropic pings every
+ * few seconds and the others stream steadily, so the only legit long silence is a reasoning model
+ * thinking — the default leaves ample room for that.
  */
+export const STREAM_IDLE_MS = Math.max(15_000, Number(process.env.FRIDAY_STREAM_IDLE_MS) || 180_000);
+
 export async function readSseStream(
   body: ReadableStream<Uint8Array>,
   onEvent: (data: Record<string, unknown>) => void,
+  idleMs: number = STREAM_IDLE_MS,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
 
   while (true) {
-    const { done, value } = await reader.read();
+    let timer: NodeJS.Timeout | undefined;
+    const idle = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`stream stalled: no data from the provider for ${Math.round(idleMs / 1000)}s`)), idleMs);
+    });
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await Promise.race([reader.read(), idle]);
+    } catch (err) {
+      void reader.cancel().catch(() => {});
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+    const { done, value } = chunk;
     if (done) break;
     buf += decoder.decode(value, { stream: true });
     const parts = buf.split("\n\n");

@@ -37,6 +37,26 @@ export function compactToolResults(messages: AgentMessage[], budget = CONTEXT_BU
 }
 const MAX_RESULT_CHARS = 32_000;
 const TOOL_TIMEOUT_MS = 45_000;
+/** Output room per round. The provider default (8192) is too small for a long report written in one
+ *  create_document / create_page call: the arguments got cut off mid-JSON, parsed as `{}`, the tool
+ *  failed and the model silently tried again — minutes of a spinner with nothing on screen. Same
+ *  value as Build Mode; models that cap lower get one retry at the old default. */
+const CHAT_TOOL_MAX_TOKENS = 16_000;
+const FALLBACK_MAX_TOKENS = 8_192;
+const MAX_TOKENS_REJECTED = /max_tokens|max_output|maximum.*tokens/i;
+
+/** What the live row says while a tool call's arguments are still streaming in (before it runs). */
+const PREPARING_LABEL: Record<string, string> = {
+  create_document: "Writing the document — long reports take a minute or two",
+  create_page: "Writing the page — long pages take a minute or two",
+  update_page: "Rewriting the page",
+  run_code: "Writing code",
+};
+export const preparingLabel = (name: string) => PREPARING_LABEL[name] ?? `Preparing ${name.replace(/_/g, " ")}`;
+
+export const CUT_OFF_RESULT =
+  "Error: this call was cut off at the output limit before its arguments were complete, so it did NOT run. " +
+  "Make it smaller: write a shorter version, or create it in parts (e.g. create the document with the first sections, then add the rest with further calls).";
 
 export type ToolLoopResult = {
   candidate: ChatCandidate | null;
@@ -98,6 +118,24 @@ export async function runToolLoop(opts: {
   const toolNames: string[] = [];
   let candidate: ChatCandidate | null = null;
   const loopGuard = new LoopGuard();
+  let maxTokens = CHAT_TOOL_MAX_TOKENS;
+  // Rows opened by onToolStart while a call's arguments stream in, claimed in order by the calls that opened them.
+  let preparing: { name: string; step: BuildStep }[] = [];
+  const openPreparing = (name: string) => {
+    const step: BuildStep = { id: `t${++stepSeq}`, kind: "tool", label: preparingLabel(name), state: "running", startedAt: Date.now() };
+    steps.push(step);
+    preparing.push({ name, step });
+    onStep({ ...step });
+  };
+  /** Closes rows no call claimed (the stream died, or the loop stopped before running them) so none spins forever. */
+  const settlePreparing = (detail: string) => {
+    for (const { step } of preparing) {
+      step.state = "error";
+      step.detail = detail;
+      onStep({ ...step });
+    }
+    preparing = [];
+  };
 
   // Between rounds the model often narrates ("Let me check…"); keep paragraphs separated.
   let needsBreak = false;
@@ -116,9 +154,18 @@ export async function runToolLoop(opts: {
 
   const runCall = async (call: ToolCall): Promise<string> => {
     const tool = byName.get(call.name);
-    const step: BuildStep = { id: `t${++stepSeq}`, kind: "tool", label: tool ? tool.label(call.args) : `Unknown tool ${call.name}`, state: "running" };
-    steps.push(step);
+    const claimed = preparing.findIndex((p) => p.name === call.name);
+    const step: BuildStep = claimed >= 0 ? preparing.splice(claimed, 1)[0]!.step : { id: `t${++stepSeq}`, kind: "tool", label: "", state: "running" };
+    if (claimed < 0) steps.push(step);
+    step.label = tool && !call.incomplete ? tool.label(call.args) : tool ? preparingLabel(call.name) : `Unknown tool ${call.name}`;
+    step.state = "running";
     onStep({ ...step });
+    if (call.incomplete) {
+      step.state = "error";
+      step.detail = "Too long — cut off at the output limit; asking the model to split it";
+      onStep({ ...step });
+      return CUT_OFF_RESULT;
+    }
     if (!tool) {
       step.state = "error";
       step.detail = "Unknown tool";
@@ -148,33 +195,49 @@ export async function runToolLoop(opts: {
     let result: ToolTurnResult | null = null;
     let lastError: string | undefined;
     let emittedThisRound = false;
-    for (const c of order) {
-      try {
-        const { adapter, apiKey } = await resolve(c);
-        if (!adapter.chatStreamWithTools) continue;
-        result = await adapter.chatStreamWithTools(
-          apiKey,
-          c.modelId,
-          messages,
-          { tools: specs, toolChoice: lastRound ? "none" : "auto", signal: ctx.signal },
-          (delta) => {
-            emittedThisRound = true;
-            emit(delta);
-          },
-        );
-        candidate = c;
-        break;
-      } catch (err) {
-        const rawError = `${c.slug}: ${err instanceof Error ? err.message : "failed"}`;
-        console.warn(`[agent] ${rawError.slice(0, 300)}`);
-        lastError = friendlyProviderError(rawError);
-        void recordProviderIssue({ raw: rawError, provider: c.slug });
-        if (emittedThisRound) candidate = c; // part of the reply is already on screen — it's this model's
-        if (emittedThisRound || candidate) break; // can't switch models mid-reply / mid-conversation
+    models: for (const c of order) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { adapter, apiKey } = await resolve(c);
+          if (!adapter.chatStreamWithTools) continue models;
+          result = await adapter.chatStreamWithTools(
+            apiKey,
+            c.modelId,
+            messages,
+            {
+              tools: specs,
+              toolChoice: lastRound ? "none" : "auto",
+              signal: ctx.signal,
+              maxTokens,
+              // A live row the moment a call starts: a long document is otherwise minutes of silence.
+              onToolStart: openPreparing,
+            },
+            (delta) => {
+              emittedThisRound = true;
+              emit(delta);
+            },
+          );
+          candidate = c;
+          break models;
+        } catch (err) {
+          const rawError = `${c.slug}: ${err instanceof Error ? err.message : "failed"}`;
+          settlePreparing("Interrupted");
+          if (attempt === 0 && !emittedThisRound && maxTokens > FALLBACK_MAX_TOKENS && MAX_TOKENS_REJECTED.test(rawError)) {
+            maxTokens = FALLBACK_MAX_TOKENS;
+            continue;
+          }
+          console.warn(`[agent] ${rawError.slice(0, 300)}`);
+          lastError = friendlyProviderError(rawError);
+          void recordProviderIssue({ raw: rawError, provider: c.slug });
+          if (emittedThisRound) candidate = c; // part of the reply is already on screen — it's this model's
+          if (emittedThisRound || candidate) break models; // can't switch models mid-reply / mid-conversation
+          continue models;
+        }
       }
     }
     if (!result) {
       // Nothing at all happened yet → let the caller fall back to the plain streaming path.
+      settlePreparing("Interrupted");
       if (round === 1 && !emittedThisRound) return { candidate: null, text: "", usage, steps, toolCallCount, toolNames, error: lastError ?? "No tool-capable model responded" };
       return { candidate, text, usage, steps, toolCallCount, toolNames, error: lastError };
     }
@@ -202,11 +265,13 @@ export async function runToolLoop(opts: {
     toolNames.push(...result.toolCalls.map((c) => c.name));
     messages.push({ role: "assistant", content: result.text, toolCalls: result.toolCalls });
     const outputs = await Promise.all(result.toolCalls.map(runCall));
+    settlePreparing("Not run");
     result.toolCalls.forEach((call, i) => {
       messages.push({ role: "tool", toolCallId: call.id, name: call.name, content: outputs[i]! });
     });
     needsBreak = true;
   }
 
+  settlePreparing("Not run");
   return { candidate, text, usage, steps, toolCallCount, toolNames };
 }

@@ -5,7 +5,7 @@ import { recordProviderIssue } from "../status/providerIssues.js";
 import { friendlyProviderError } from "../../utils/providerError.js";
 import type { AgentMessage, ToolTurnResult } from "../providers/toolCalling.js";
 import type { ChatMessage } from "../providers/types.js";
-import { compactToolResults, supportsTools } from "../agent/toolLoop.js";
+import { CUT_OFF_RESULT, compactToolResults, supportsTools } from "../agent/toolLoop.js";
 import { getWorkingKeyForProvider, type ChatCandidate } from "../providerService.js";
 import { emptyTokenUsage, estimateTokenUsageFromText, mergeTokenUsage, type TokenUsage } from "../tokenUsage.js";
 import type { AskQuestion, BuildEffort, BuildMeta, BuildPlan, BuildStep, StreamEvent } from "../chat/types.js";
@@ -1121,7 +1121,15 @@ export async function runBuildAgent(opts: {
         const action = toolCallToAction(call, extNames);
         const liveKind = LIVE_KIND[call.name];
         const live = liveKind && liveQueue[0] && (liveQueue[0].kind === (liveKind === "edit" ? "write" : liveKind)) ? liveQueue.shift()! : null;
-        if (action.kind === "done") {
+        if (call.incomplete) {
+          // Cut off at the output limit mid-arguments: running it would write a truncated/empty file.
+          if (live) {
+            live.state = "error";
+            live.detail = "Too long — cut off at the output limit";
+            onEvent({ t: "step", ...live });
+          }
+          outputs.push(`[${call.name}] ${CUT_OFF_RESULT.replace(/^Error: /, "")} For a big file: write a smaller first version, then add to it with edit_file.`);
+        } else if (action.kind === "done") {
           doneIndex = i;
           outputs.push("");
         } else if (action.kind === "progress") {
