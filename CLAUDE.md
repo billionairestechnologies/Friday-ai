@@ -126,6 +126,9 @@ Gotchas:
   `backend/test/experiences.test.ts`). `/gallery` (public): offside simulator (Law 11 model), EMI, projectile; state shareable via `?p=`.
 - Pages edits (phase 08): `pages/pageEdits.ts#applyEdits` is the ONE edit path for update_page — exact-text (refuses ambiguous unless `occurrence`),
   section-by-heading, cells, per-slide `slide_edits`; unrelated content is never touched. `GET /pages/:id/diff`, `POST /pages/:id/duplicate`.
+- Images (migration 0064): `generate_image` edits name their source (attachment / last / `image` + number from the chat's numbered list;
+  ambiguous → ask); every result is a new `image_assets` row with parent + version. Load tests: `scripts/load/load-test.mjs` (staging only, see
+  `docs/operations/LOAD_TESTING.md`).
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →
