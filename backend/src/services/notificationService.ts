@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase.js";
+import { enqueueJob } from "./jobs/queue.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
 import { notifyUser } from "./pushService.js";
@@ -40,7 +41,12 @@ export async function notify(userId: string, n: NotifyInput): Promise<{ created:
   const created = (data ?? []).length > 0;
   if (!created) return { created: false }; // already notified (retry / duplicate)
   await notifyUser(userId, { title: n.title, body: n.body }).catch(() => undefined);
-  if (n.email) await emailUser(userId, n).catch((err) => logger.error("notification_email_failed", { kind: n.kind, error: err instanceof Error ? err.message : String(err) }));
+  // Email goes through the job queue (retries with backoff; deduped per notification).
+  if (n.email) {
+    await enqueueJob("notification_email", { userId, n }, { tenant: `user:${userId}`, idempotencyKey: `email:${n.dedupe}`, maxAttempts: 6 }).catch((err) =>
+      logger.error("notification_email_enqueue_failed", { kind: n.kind, error: err instanceof Error ? err.message : String(err) }),
+    );
+  }
   return { created: true };
 }
 
@@ -63,6 +69,12 @@ async function emailUser(userId: string, n: NotifyInput) {
     unsubscribeUrl: marketing ? unsubscribeUrl(userId) : null,
   });
   await sendEmail({ ...sender, to, subject: n.title, html, ...(marketing ? { headers: { "List-Unsubscribe": `<${unsubscribeUrl(userId)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } } : {}) });
+}
+
+/** Job handler for notification_email. */
+export async function runNotificationEmailJob(payload: Record<string, unknown>) {
+  await emailUser(String(payload.userId), payload.n as NotifyInput);
+  return { sent: true };
 }
 
 export type InboxItem = { id: string; kind: string; title: string; body: string; data: Record<string, unknown>; createdAt: string; read: boolean };

@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Ticket,
   Gift,
+  ListChecks,
   GraduationCap,
   Users,
   Wallet,
@@ -69,6 +70,7 @@ const Finance = lazy(() => import("./sections/Finance"));
 const UsageLedger = lazy(() => import("./sections/UsageLedger"));
 const Credits = lazy(() => import("./sections/Credits"));
 const Programs = lazy(() => import("./sections/Programs"));
+const Jobs = lazy(() => import("./sections/Jobs"));
 const Mailbox = lazy(() => import("./sections/Mailbox"));
 const MailHosting = lazy(() => import("./sections/MailHosting"));
 
@@ -88,6 +90,7 @@ export const SECTIONS: Section[] = [
   { id: "mail-hosting", label: "Mail hosting", icon: Server, permission: "mail.manage", group: "Admin", component: MailHosting },
   { id: "mail", label: "Team mail", icon: Mail, permission: "mail.manage", group: "Admin", component: MailSection },
   { id: "status", label: "Status & crashes", icon: Activity, permission: "status.view", group: "Admin", component: StatusSection },
+  { id: "jobs", label: "Jobs", icon: ListChecks, permission: "status.view", group: "Admin", component: Jobs },
   { id: "models", label: "Models & keys", icon: Cpu, permission: "providers.view", group: "Admin", component: Models },
   { id: "finance", label: "Finance", icon: Wallet, permission: "finance.view", group: "Admin", component: Finance },
   { id: "billing", label: "Billing & usage", icon: BadgeIndianRupee, permission: "users.view", group: "Admin", component: Billing },
