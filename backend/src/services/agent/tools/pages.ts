@@ -1,4 +1,5 @@
 import type { SheetSpec, SlideSpec } from "../../documents/render.js";
+import { applyEdits, type EditArgs } from "../../pages/pageEdits.js";
 import { createPage, getPage, updatePage, type DocContent, type Page, type PageKind, type SheetContent, type SlidesContent } from "../../pages/pageService.js";
 import { str, type FridayTool } from "./types.js";
 
@@ -113,17 +114,26 @@ export const updatePageTool: FridayTool = {
     name: "update_page",
     description:
       "Change a Friday page. Pass `version` from your latest read_page (a newer save by the user is never overwritten — read " +
-      "again and redo the change). Smallest change that does the job: doc → `edits` (exact find/replace) or the whole " +
-      "`markdown`; sheet → `cells` (e.g. {sheet:\"Budget\", cell:\"C4\", value:\"=B4*12\"}; row 1 is the header) or whole " +
-      "`sheets`; slides → whole `slides`. `title` renames it.",
+      "again and redo the change). Make the SMALLEST change that does the job and leave everything else as it is: " +
+      "doc → `edits` (exact find/replace; if the text appears more than once, quote more context or pass `occurrence`) or " +
+      "`sections` (replace everything under one heading); sheet → `cells` (e.g. {sheet:\"Budget\", cell:\"C4\", value:\"=B4*12\"}; " +
+      "row 1 is the header); slides → `slide_edits` by slide number as read ({index:2, slide:{…}} replaces only slide 2; " +
+      "delete / insert_after / move_to). Whole `markdown` / `sheets` / `slides` only for a rewrite the user asked for. " +
+      "If an edit is refused as ambiguous, ask the user which one. `title` renames it.",
     parameters: {
       type: "object",
       properties: {
         page_id: { type: "string" },
         version: { type: "number" },
         title: { type: "string" },
-        edits: { type: "array", description: "doc: exact text replacements", items: { type: "object", properties: { find: { type: "string" }, replace: { type: "string" } } } },
+        edits: { type: "array", description: "doc: exact text replacements", items: { type: "object", properties: { find: { type: "string" }, replace: { type: "string" }, occurrence: { type: "number", description: "1-based, when the text appears more than once" } } } },
+        sections: { type: "array", description: "doc: replace the whole section under a heading", items: { type: "object", properties: { heading: { type: "string" }, markdown: { type: "string", description: "new section INCLUDING its heading line" } } } },
         cells: { type: "array", description: "sheet: cell updates", items: { type: "object", properties: { sheet: { type: "string" }, cell: { type: "string" }, value: { type: "string" } } } },
+        slide_edits: {
+          type: "array",
+          description: "slides: per-slide changes, numbered as in read_page (1-based)",
+          items: { type: "object", properties: { index: { type: "number" }, slide: { type: "object" }, delete: { type: "boolean" }, insert_after: { type: "object" }, move_to: { type: "number" } }, required: ["index"] },
+        },
         ...contentProps,
       },
       required: ["page_id", "version"],
@@ -134,39 +144,11 @@ export const updatePageTool: FridayTool = {
     const page = await getPage(ctx.userId, str(args, "page_id"));
     const version = Number(args.version);
     if (version !== page.version) return `The page is now at version ${page.version} (it changed since your read). Call read_page and redo the change on the current content.`;
-    let content: unknown = undefined;
-    if (page.kind === "doc") {
-      let markdown = typeof args.markdown === "string" ? args.markdown : (page.content as DocContent).markdown;
-      for (const e of (Array.isArray(args.edits) ? args.edits : []) as { find?: string; replace?: string }[]) {
-        if (!e.find) continue;
-        if (!markdown.includes(e.find)) return `Text not found: "${e.find.slice(0, 80)}". Nothing was changed — read_page and quote the text exactly.`;
-        markdown = markdown.replace(e.find, e.replace ?? "");
-      }
-      content = { markdown };
-    } else if (page.kind === "sheet") {
-      const sheets = Array.isArray(args.sheets) ? (args.sheets as SheetSpec[]) : structuredClone((page.content as SheetContent).sheets);
-      for (const c of (Array.isArray(args.cells) ? args.cells : []) as { sheet?: string; cell?: string; value?: string }[]) {
-        const sheet = sheets.find((s) => s.name === c.sheet) ?? sheets[0];
-        const ref = c.cell ? parseCellRef(c.cell) : null;
-        if (!sheet || !ref) return `Bad cell reference "${c.cell}". Use A1-style like C4. Nothing was changed.`;
-        if (ref.row === -1) {
-          sheet.columns = sheet.columns ?? [];
-          while (sheet.columns.length <= ref.col) sheet.columns.push("");
-          sheet.columns[ref.col] = c.value ?? "";
-          continue;
-        }
-        sheet.rows = sheet.rows ?? [];
-        while (sheet.rows.length <= ref.row) sheet.rows.push([]);
-        const row = sheet.rows[ref.row]!;
-        while (row.length <= ref.col) row.push("");
-        row[ref.col] = c.value ?? "";
-      }
-      content = { sheets };
-    } else if (Array.isArray(args.slides)) {
-      content = { slides: args.slides, theme_color: (page.content as SlidesContent).theme_color };
-    }
-    const updated = await updatePage(ctx.userId, page.id, { title: str(args, "title") || undefined, content, baseVersion: version, author: "friday" });
-    return `Saved "${updated.title}" as version ${updated.version}. The user's open page refreshes to it.`;
+    const result = applyEdits(page.kind, page.content, args as EditArgs);
+    if (!result.ok) return result.error;
+    const hasContentChange = result.changed.length > 0;
+    const updated = await updatePage(ctx.userId, page.id, { title: str(args, "title") || undefined, content: hasContentChange ? result.content : undefined, baseVersion: version, author: "friday" });
+    return `Saved "${updated.title}" as version ${updated.version}${hasContentChange ? ` (changed: ${result.changed.join(", ")}; everything else kept)` : ""}. The user's open page refreshes to it.`;
   },
 };
 
