@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Gift, RefreshCw } from "lucide-react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useQuota } from "@/lib/usage/quotaStore";
 import {
@@ -70,6 +71,8 @@ export function UsagePanel({ onUpgrade }: { onUpgrade: () => void }) {
 
       {bucket && <BalanceCard data={data} pct={pct} />}
 
+      <CreditsCard balance={period?.credits ?? 0} />
+
       {status.memberCap && (
         <div className="rounded-2xl border border-border bg-background p-4">
           <p className="text-sm font-medium text-foreground">Your cap inside the team pool</p>
@@ -102,9 +105,12 @@ function BalanceCard({ data, pct }: { data: QuotaResponse; pct: number }) {
   const period = status.period;
   const bucket = mainBucket(status)!;
   const remaining = period ? period.remaining : Math.max(0, bucket.limit - bucket.used);
+  const credits = period?.credits ?? 0;
   const notice =
     period?.status === "suspended"
       ? { danger: true, text: "Usage on this account is paused. Please contact support." }
+      : pct >= 100 && credits > 0
+        ? { danger: false, text: `You've used this period's allowance — you're now using your bonus credits (${formatTokens(credits)} left).` }
       : pct >= 100
         ? { danger: true, text: `You've used all of this period's tokens. New requests are paused until your allowance renews on ${formatResetAt(bucket.resetAt)}${status.isEnterprise ? "" : ", or upgrade to continue now"}.` }
         : pct >= 95
@@ -149,6 +155,49 @@ function BalanceCard({ data, pct }: { data: QuotaResponse; pct: number }) {
       </dl>
       {period && <SubscriptionLine period={period} />}
       {notice && <p className={cn("mt-3 rounded-xl px-3 py-2 text-sm", notice.danger ? "border border-border text-danger" : "bg-chip text-foreground")}>{notice.text}</p>}
+    </div>
+  );
+}
+
+type MyCredits = { balance: number; grants: Array<{ id: string; tokens: number; remaining: number; kind: string; expiresAt: string | null; grantedAt: string }> };
+
+/** Bonus credits: on top of the monthly allowance, used after it, soonest-expiring first (GET /usage/credits). */
+function CreditsCard({ balance }: { balance: number }) {
+  const [mine, setMine] = useState<MyCredits | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .get<MyCredits>("/usage/credits")
+      .then((r) => live && setMine(r))
+      .catch(() => live && setMine(null));
+    return () => {
+      live = false;
+    };
+  }, [balance]);
+  const grants = mine?.grants ?? [];
+  if (balance <= 0 && grants.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-border bg-background p-4">
+      <div className="flex items-center gap-2">
+        <Gift className="size-4 text-search" />
+        <p className="text-sm font-medium text-foreground">Bonus credits</p>
+      </div>
+      <p className="mt-2 text-2xl font-semibold text-foreground">
+        {formatTokens(Math.max(balance, mine?.balance ?? 0))} <span className="text-base font-normal text-muted">tokens</span>
+      </p>
+      <p className="mt-1 text-xs text-muted">Used after your monthly tokens run out, the soonest-expiring first. They carry over from month to month.</p>
+      {grants.length > 0 && (
+        <ul className="mt-3 divide-y divide-border text-sm">
+          {grants.map((g) => (
+            <li key={g.id} className="flex items-center justify-between gap-3 py-2">
+              <span className="text-foreground">
+                {formatTokens(g.remaining)} <span className="text-muted">of {formatTokens(g.tokens)}</span>
+              </span>
+              <span className="text-xs text-muted">{g.expiresAt ? `Expires ${formatDay(g.expiresAt)}` : "No expiry"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

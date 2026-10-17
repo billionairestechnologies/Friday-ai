@@ -5,6 +5,7 @@
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   plan text not null default 'free',
+  full_name text,
   plan_renews_at timestamptz,
   custom_monthly_cap bigint,
   created_at timestamptz not null default now()
@@ -15,6 +16,7 @@ create table if not exists public.organizations (
   name text not null default 'Org',
   slug text not null default gen_random_uuid()::text,
   plan text not null default 'free',
+  full_name text,
   seat_count int not null default 3,
   pooled_monthly_tokens bigint,
   billing_cycle_anchor timestamptz not null default now()

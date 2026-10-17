@@ -56,6 +56,8 @@ function crossedThresholds(name: string, bucket: { used: number; limit: number }
 function messageFor(threshold: number, status: QuotaStatus): string {
   const what = status.isEnterprise ? "your team's tokens" : "this month's tokens";
   if (threshold >= 100) {
+    const credits = status.period?.credits ?? 0;
+    if (credits > 0) return `You've used all of ${what} — now using your bonus credits (${credits.toLocaleString()} tokens left).`;
     const resetAt = mainBucket(status)?.resetAt;
     return `You've used all of ${what}. They renew ${resetAt ? formatResetAt(resetAt) : "at the start of your next period"}.`;
   }

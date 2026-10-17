@@ -100,12 +100,21 @@ export function startQuotaMaintenance() {
   // Usage notices (80 / 95 / 100 %): the SQL marks each threshold once per period, so this fires once.
   setUsageNoticeSink((userId, threshold, periodEnd) => {
     const renews = periodEnd ? new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" }) : null;
-    void notifyUser(userId, {
+    void (async () => {
+      // At 100 % with bonus credits left nothing is paused — say so instead of "requests are paused".
+      if (threshold >= 100) {
+        const { data } = await supabaseAdmin.from("quota_accounts").select("credits").eq("user_id", userId).maybeSingle();
+        if (Number(data?.credits ?? 0) > 0) {
+          return notifyUser(userId, { title: "You've used this month's tokens", body: "You're now using your bonus credits. See Settings → Usage for what's left." });
+        }
+      }
+      return notifyUser(userId, {
       title: threshold >= 100 ? "You've used all of this month's tokens" : `You've used ${threshold}% of this month's tokens`,
       body: threshold >= 100
         ? `New requests are paused until your allowance renews${renews ? ` on ${renews}` : ""}, or upgrade to continue now.`
         : `Your allowance renews${renews ? ` on ${renews}` : " at the start of your next period"}. See Settings → Usage for details.`,
-    }).catch(() => undefined);
+      });
+    })().catch(() => undefined);
   });
   const tick = () => void runQuotaMaintenance().catch((err) => logger.error("quota_maintenance_failed", { error: err instanceof Error ? err.message : String(err) }));
   timer = setInterval(tick, INTERVAL_MS);

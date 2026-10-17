@@ -53,6 +53,32 @@ Set in Console → Models & keys → **Usage multipliers** (permission `models.m
 - Known gap: the *first* hold of a turn (`middleware/quotaLimit.ts`) is sized unweighted; agent rounds after it are
   sized at the model's multiplier, and any overrun is recorded in full (`overrun_tokens`) and blocks the next request.
 
+### Bonus credits (migration 0060)
+
+Extra tokens **on top of** the monthly allowance, granted from Console → **Credits** (permissions `credits.view|grant|approve|settings`).
+
+```
+remaining = allowance + credit_drawn + credits − used − adjustments − reserved      (quota_remaining)
+```
+
+- `quota_credit_grants` is append-only: tokens, remaining, expiry (or none), kind, reason, who granted / approved / revoked.
+  `quota_accounts.credits` = Σ remaining of active grants; `credit_drawn` = what credits paid for **this period**.
+- **Order of use:** the month's allowance first; usage past it is paid from credits (soonest expiry first), recorded in
+  `quota_credit_draws` per ledger row. Draws only re-label where tokens came from — the balance formula is the same everywhere.
+- **Carry-over:** a new period resets `used`/`adjustments`/`credit_drawn`; `credits` stays. A grant past its `expires_at`
+  is expired when its account is next locked (`expired_tokens` = what was left).
+- **Approval:** a grant (or a bulk batch's total) above `credit_settings.approval_threshold_tokens` (default 10M) starts
+  `pending` and changes no balance until someone *other than its creator* approves it (`self_approval` refused in SQL).
+- **Revoke** takes back what's left; what was used stays used. **Idempotent:** every grant has a key (per click; bulk =
+  `bulk:<batch>:<user>`), so retries and double clicks credit once.
+- **Bulk:** preview (count, sample, total, unknown emails) → grant to exactly the previewed count (409 if the audience
+  changed). Audience ignores the marketing opt-out (a benefit isn't marketing). Max recipients per batch: `credit_settings`.
+- **Telling the user:** only after the grant is active — a `user_notifications` row (`credit_granted`, shown as a popup
+  in phase 05) and a push. Settings → Usage shows the balance and each grant's expiry (`GET /api/usage/credits`); the
+  100 % notice says "now using your bonus credits" instead of "paused" when credits remain.
+- `quota_audit()` also checks `credits` and `credit_drawn` against the grants and draws.
+- The older per-period "bonus" adjustment (`quota_adjust` kind `bonus`, admin API) still works and still ends with the period.
+
 ### Subscription lifecycle
 
 Payments are one-time Razorpay orders: **1 calendar month** for monthly, **12 months** for annual (never "30 days": a term then ends exactly where an allowance period ends, so a short month can't produce a two-day extra period with a fresh allowance). There is no auto-renew. Every rule below runs in an idempotent SQL function keyed on the order, so a duplicate or retried webhook changes nothing.

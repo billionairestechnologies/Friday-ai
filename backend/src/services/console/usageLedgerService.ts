@@ -24,6 +24,8 @@ type AccountRow = {
   used: number;
   adjustments: number;
   reserved: number;
+  credits?: number;
+  credit_drawn?: number;
   period_start: string;
   period_end: string;
   status: "active" | "suspended";
@@ -40,7 +42,7 @@ async function describe(rows: AccountRow[]) {
   const { data: profiles } = profileIds.length ? await supabaseAdmin.from("profiles").select("id, plan_renews_at").in("id", profileIds) : { data: [] };
   const renews = new Map((profiles ?? []).map((p) => [p.id as string, p.plan_renews_at as string | null]));
   return rows.map((r) => {
-    const n = { allowance: Number(r.allowance), used: Number(r.used), adjustments: Number(r.adjustments), reserved: Number(r.reserved) };
+    const n = { allowance: Number(r.allowance), used: Number(r.used), adjustments: Number(r.adjustments), reserved: Number(r.reserved), credits: Number(r.credits ?? 0), creditDrawn: Number(r.credit_drawn ?? 0) };
     return {
       id: r.id,
       kind: r.organization_id ? "organization" : "individual",
@@ -65,16 +67,17 @@ async function describe(rows: AccountRow[]) {
 export async function usageOverview() {
   const now = Date.now();
   const [accounts, active, discrepancies, estimated, failedCalls, events] = await Promise.all([
-    supabaseAdmin.from("quota_accounts").select("id, allowance, used, adjustments, reserved, status, plan"),
+    supabaseAdmin.from("quota_accounts").select("id, allowance, used, adjustments, reserved, credits, credit_drawn, status, plan"),
     supabaseAdmin.from("quota_reservations").select("id, account_id, user_id, feature, hold, consumed, created_at, heartbeat_at").eq("status", "active").order("heartbeat_at"),
     quotaRpc<Array<{ account_id: string; field: string; stored: number; computed: number }>>("quota_audit", {}).catch((err: Error) => [{ account_id: "", field: `audit failed: ${err.message}`, stored: 0, computed: 0 }]),
     supabaseAdmin.from("token_ledger").select("id", { count: "exact", head: true }).eq("usage_source", "estimated").gt("billable_tokens", 0).gte("created_at", new Date(now - 86_400_000).toISOString()),
     supabaseAdmin.from("token_ledger").select("id", { count: "exact", head: true }).in("call_status", ["failed", "partial"]).gte("created_at", new Date(now - 86_400_000).toISOString()),
     supabaseAdmin.from("subscription_events").select("id, user_id, organization_id, kind, plan, order_id, details, created_at").order("created_at", { ascending: false }).limit(40),
   ]);
-  const rows = (accounts.data ?? []) as Array<{ allowance: number; used: number; adjustments: number; reserved: number; status: string; plan: string }>;
-  const exhausted = rows.filter((r) => remainingOf({ allowance: Number(r.allowance), used: Number(r.used), adjustments: Number(r.adjustments), reserved: Number(r.reserved) }) <= 0).length;
-  const near = rows.filter((r) => percentUsed({ allowance: Number(r.allowance), used: Number(r.used), adjustments: Number(r.adjustments) }) >= 80).length;
+  const rows = (accounts.data ?? []) as Array<{ allowance: number; used: number; adjustments: number; reserved: number; credits: number; credit_drawn: number; status: string; plan: string }>;
+  const bal = (r: (typeof rows)[number]) => ({ allowance: Number(r.allowance), used: Number(r.used), adjustments: Number(r.adjustments), reserved: Number(r.reserved), credits: Number(r.credits ?? 0), creditDrawn: Number(r.credit_drawn ?? 0) });
+  const exhausted = rows.filter((r) => remainingOf(bal(r)) <= 0).length;
+  const near = rows.filter((r) => percentUsed(bal(r)) >= 80).length;
   const reservations = (active.data ?? []) as Array<{ id: string; account_id: string; user_id: string; feature: string; hold: number; consumed: number; created_at: string; heartbeat_at: string }>;
   const stuck = reservations.filter((r) => now - new Date(r.heartbeat_at).getTime() > STUCK_AFTER_MS);
   const eventRows = (events.data ?? []) as Array<{ user_id: string | null; [k: string]: unknown }>;

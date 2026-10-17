@@ -49,9 +49,13 @@ before(async () => {
   url.pathname = `/${dbName}`;
   pool = new pg.Pool({ connectionString: url.toString(), max: 16 });
   await pool.query(await readFile(path.join(here, "fixtures/quota-bootstrap.sql"), "utf8"));
-  const migration = await readFile(path.join(here, "../../supabase/migrations/0057_monthly_token_allowance.sql"), "utf8");
-  await pool.query(migration);
-  await pool.query(migration); // must be safe to run twice
+  // The ledger as production runs it: 0057 + every later migration that redefines its functions.
+  await pool.query("create schema if not exists auth; create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text, created_at timestamptz not null default now())");
+  for (const file of ["0057_monthly_token_allowance.sql", "0059_model_multipliers.sql", "0060_credit_grants.sql"]) {
+    const migration = await readFile(path.join(here, "../../supabase/migrations", file), "utf8");
+    await pool.query(migration);
+    await pool.query(migration); // must be safe to run twice
+  }
 
   const rpc: QuotaRpc = async <T>(fn: string, args: Record<string, unknown>) => {
     const names = Object.keys(args);

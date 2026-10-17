@@ -34,13 +34,14 @@ before(async () => {
   url.pathname = `/${dbName}`;
   pool = new pg.Pool({ connectionString: url.toString(), max: 8 });
   // Supabase's auth.users, as far as the foreign keys need it.
-  await pool.query("create schema if not exists auth; create table if not exists auth.users (id uuid primary key default gen_random_uuid())");
+  await pool.query("create schema if not exists auth; create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text, created_at timestamptz not null default now())");
   await pool.query(await readFile(path.join(here, "fixtures/quota-bootstrap.sql"), "utf8"));
   const m57 = await readFile(path.join(here, "../../supabase/migrations/0057_monthly_token_allowance.sql"), "utf8");
   const m59 = await readFile(path.join(here, "../../supabase/migrations/0059_model_multipliers.sql"), "utf8");
   await pool.query(m57);
   await pool.query(m59);
   await pool.query(m59); // must be safe to run twice
+  await pool.query(await readFile(path.join(here, "../../supabase/migrations/0060_credit_grants.sql"), "utf8"));
   actor = (await pool.query("insert into auth.users default values returning id")).rows[0].id;
 
   const rpc: QuotaRpc = async <T>(fn: string, args: Record<string, unknown>) => {

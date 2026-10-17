@@ -13,7 +13,11 @@ export type QuotaPeriod = {
   adjustments: number;
   /** Held right now for requests still running. */
   reserved: number;
-  /** What can still be spent: allowance − used − adjustments − reserved (never below 0). */
+  /** Unspent bonus credits (on top of the allowance; they outlive the month, each grant has its own expiry). */
+  credits?: number;
+  /** This period's usage that bonus credits paid for (usage past the month's allowance). */
+  creditDrawn?: number;
+  /** What can still be spent: the month's allowance left + bonus credits − requests in progress (never below 0). */
   remaining: number;
   status: "active" | "suspended";
   subscription: "free" | "active" | "expired" | "suspended";
