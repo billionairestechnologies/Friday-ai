@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import * as notifications from "../services/notificationService.js";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { supabaseAdmin } from "../config/supabase.js";
@@ -13,6 +14,46 @@ import { verifyUnsubscribeToken } from "../services/console/mail.js";
 export async function pendingUpdates(req: Request, res: Response) {
   const { platform } = z.object({ platform: z.enum(["web", "android", "ios"]).default("web") }).parse(req.query);
   res.json({ updates: await updates.pendingForUser(req.user!.id, platform) });
+}
+
+const platform = z.enum(["web", "android", "ios"]).default("web");
+
+/** POST /updates/claim — may this tab/device show this version now? (one wins; nothing is marked before display) */
+export async function claimUpdate(req: Request, res: Response) {
+  const body = z.object({ id: z.string().uuid(), version: z.number().int().min(1), platform }).parse(req.body);
+  res.json({ show: await updates.claimDisplay(req.user!.id, body.id, body.version, body.platform) });
+}
+
+/** POST /updates/act — what the person did with a displayed popup. */
+export async function actOnUpdate(req: Request, res: Response) {
+  const body = z.object({ id: z.string().uuid(), version: z.number().int().min(1), state: z.enum(["dismissed", "acknowledged", "clicked"]) }).parse(req.body);
+  await updates.recordAction(req.user!.id, body.id, body.version, body.state);
+  res.json({ ok: true });
+}
+
+export async function notificationInbox(req: Request, res: Response) {
+  const { platform: p } = z.object({ platform }).parse(req.query);
+  const [mine, whatsNew] = await Promise.all([notifications.inbox(req.user!.id), updates.historyForUser(req.user!.id, p)]);
+  res.json({ ...mine, whatsNew });
+}
+
+export async function notificationsRead(req: Request, res: Response) {
+  const body = z.object({ ids: z.array(z.string().uuid()).max(100).optional(), all: z.boolean().optional() }).parse(req.body);
+  await notifications.markRead(req.user!.id, body.all ? "all" : (body.ids ?? []));
+  res.json({ ok: true });
+}
+
+export async function notificationPopups(req: Request, res: Response) {
+  res.json({ popups: await notifications.pendingPopups(req.user!.id) });
+}
+
+export async function claimNotificationPopup(req: Request, res: Response) {
+  res.json({ show: await notifications.claimPopup(req.user!.id, z.string().uuid().parse(req.params.notificationId)) });
+}
+
+export async function acknowledgeNotification(req: Request, res: Response) {
+  await notifications.acknowledge(req.user!.id, z.string().uuid().parse(req.params.notificationId));
+  res.json({ ok: true });
 }
 
 export async function markUpdatesSeen(req: Request, res: Response) {

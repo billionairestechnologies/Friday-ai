@@ -9,7 +9,18 @@ import { rateLimit } from "../middleware/rateLimit.js";
 /** /api/updates — What's New popups for the signed-in user. */
 export const updatesRouter = Router();
 updatesRouter.get("/pending", requireAuth, asyncHandler(c.pendingUpdates));
-updatesRouter.post("/seen", requireAuth, asyncHandler(c.markUpdatesSeen));
+updatesRouter.post("/seen", requireAuth, asyncHandler(c.markUpdatesSeen)); // older app builds
+updatesRouter.post("/claim", requireAuth, asyncHandler(c.claimUpdate));
+updatesRouter.post("/act", requireAuth, asyncHandler(c.actOnUpdate));
+
+/** /api/notifications — the person's inbox and one-time benefit popups (supabase 0060/0062). */
+export const notificationsRouter = Router();
+notificationsRouter.use(requireAuth);
+notificationsRouter.get("/", asyncHandler(c.notificationInbox));
+notificationsRouter.post("/read", asyncHandler(c.notificationsRead));
+notificationsRouter.get("/popups", asyncHandler(c.notificationPopups));
+notificationsRouter.post("/:notificationId/claim", asyncHandler(c.claimNotificationPopup));
+notificationsRouter.post("/:notificationId/ack", asyncHandler(c.acknowledgeNotification));
 
 /** /api/support — the user's own tickets, plus the inbound-email webhook (secret-authenticated). */
 export const supportRouter = Router();

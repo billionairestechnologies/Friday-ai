@@ -3,8 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { logger } from "../../utils/logger.js";
-import { notifyUser } from "../pushService.js";
-import { announceGrant } from "../quota/credits.js";
+import { notify } from "../notificationService.js";
 import { quotaRpc } from "../quota/tokenQuotaService.js";
 import { userLabels } from "./directory.js";
 import { applyPackage, grantAccess } from "./plansService.js";
@@ -255,7 +254,7 @@ async function grantBenefit(applicationId: string, userId: string, title: string
       p_user: userId, p_org: null, p_tokens: b.tokens, p_expires_at: expiresAt, p_kind: "program", p_reason: title,
       p_actor: actorId, p_key: `program:${applicationId}`, p_requires_approval: false, p_source: "program",
     });
-    if (!row.duplicate) await announceGrant(userId, String(row.grant_id), b.tokens, expiresAt);
+    // No separate credit notice: the programme approval message (popup + email) announces it.
     return { kind: "credits", grantId: row.grant_id, tokens: b.tokens, expiresAt };
   }
   const grant =
@@ -265,12 +264,11 @@ async function grantBenefit(applicationId: string, userId: string, title: string
   return { kind: b.kind, grantId: grant.id, plan: grant.plan, endsAt: grant.ends_at };
 }
 
+/** Programme decisions are account notices: inbox + push + email; an approval also pops up once. */
 async function tell(userId: string, kind: string, title: string, body: string, dedupe: string) {
-  await supabaseAdmin
-    .from("user_notifications")
-    .upsert({ user_id: userId, kind, title, body, data: {}, dedupe_key: dedupe }, { onConflict: "dedupe_key", ignoreDuplicates: true })
-    .then(({ error }) => error && logger.error("program_notification_failed", { dedupe, error: error.message }));
-  await notifyUser(userId, { title, body }).catch(() => undefined);
+  await notify(userId, { kind, title, body, dedupe, popup: kind === "program_approved", email: { category: "account", cta: { label: "Open Friday", path: "/?support=programs" } } }).catch((err) =>
+    logger.error("program_notification_failed", { dedupe, error: err instanceof Error ? err.message : String(err) }),
+  );
 }
 
 export type Decision = "approved" | "rejected" | "needs_info";

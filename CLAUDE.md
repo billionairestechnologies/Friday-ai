@@ -114,6 +114,10 @@ Gotchas:
 - Offers v2 + programmes (migration 0061): redemption is claimed atomically in SQL (`offer_claim` → apply → `offer_confirm`, or `offer_release` on failure);
   offer kinds incl. `credits`, states draft/active/paused/archived, `exclusive_group` stacking. `services/console/programService.ts`: student/startup/company
   applications (`/api/programs`, Help & support → Programmes; Console → Programmes), evidence sniffed by magic bytes into the private `program-evidence` bucket.
+- Popups + inbox (migration 0062): What's New items are CLAIMED before display (`POST /updates/claim`, one tab/device wins, once per person per
+  `version`; "Show again" bumps it) and acted on (`/updates/act`: dismissed/acknowledged/clicked, forward-only); CTA links allow-listed (`safeCtaUrl`).
+  `services/notificationService.ts#notify` is the ONE way to tell a user something (inbox row, one-time popup, push, email: 'account' always, 'marketing'
+  honours the opt-out). Web: `whats-new-modal.tsx`, `benefit-popup.tsx`, `inbox-button.tsx` (sidebar bell).
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →

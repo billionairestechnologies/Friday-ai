@@ -1,8 +1,8 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { logger } from "../../utils/logger.js";
-import { notifyUser } from "../pushService.js";
 import { userLabels } from "../console/directory.js";
+import { notify } from "../notificationService.js";
 import { snapshotFromRow, type QuotaSnapshot } from "./allowance.js";
 import { quotaRpc } from "./tokenQuotaService.js";
 
@@ -79,18 +79,28 @@ function grantResult(row: Record<string, unknown>): GrantResult {
   return { ...snapshotFromRow(row), grantId: String(row.grant_id), grantStatus: row.status === "pending" ? "pending" : "active", duplicate: Boolean(row.duplicate) };
 }
 
-/** Tells the person about an ACTIVE grant (never before the ledger committed it): inbox row + push. */
-export async function announceGrant(userId: string | null, grantId: string, tokens: number, expiresAt: string | null): Promise<void> {
+/** Grant kinds that are part of a promotion (email respects the marketing opt-out); the rest are account notices. */
+const MARKETING_KINDS = new Set(["promotional", "campaign"]);
+
+/**
+ * Tells the person about an ACTIVE grant — never before the ledger committed it: a one-time popup,
+ * the inbox, push, and an email (promotional grants honour the marketing opt-out).
+ */
+export async function announceGrant(userId: string | null, grantId: string, tokens: number, expiresAt: string | null, kind: string = "goodwill", popup = true): Promise<void> {
   if (!userId) return;
   const title = `You've received ${formatTokens(tokens)} bonus tokens`;
   const body = expiresAt
     ? `They're added on top of your monthly allowance and are yours until ${new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}.`
     : "They're added on top of your monthly allowance and don't expire.";
-  const { error } = await supabaseAdmin
-    .from("user_notifications")
-    .upsert({ user_id: userId, kind: "credit_granted", title, body, data: { grantId, tokens, expiresAt }, dedupe_key: `credit:${grantId}` }, { onConflict: "dedupe_key", ignoreDuplicates: true });
-  if (error) logger.error("credit_notification_failed", { grantId, error: error.message });
-  await notifyUser(userId, { title, body }).catch(() => undefined);
+  await notify(userId, {
+    kind: "credit_granted",
+    title,
+    body,
+    data: { grantId, tokens, expiresAt },
+    dedupe: `credit:${grantId}`,
+    popup,
+    email: { category: MARKETING_KINDS.has(kind) ? "marketing" : "account", cta: { label: "See your balance", path: "/?settings=usage" } },
+  }).catch((err) => logger.error("credit_notification_failed", { grantId, error: err instanceof Error ? err.message : String(err) }));
 }
 
 export function formatTokens(n: number): string {
@@ -134,7 +144,7 @@ export async function grantCredits(input: GrantInput, actorId: string): Promise<
     sqlError(err);
   }
   const result = grantResult(row);
-  if (result.grantStatus === "active" && !result.duplicate) await announceGrant(input.organizationId ? null : (input.userId ?? null), result.grantId, input.tokens, input.expiresAt);
+  if (result.grantStatus === "active" && !result.duplicate) await announceGrant(input.organizationId ? null : (input.userId ?? null), result.grantId, input.tokens, input.expiresAt, input.kind);
   return result;
 }
 
@@ -147,8 +157,8 @@ export async function approveGrant(grantId: string, approverId: string): Promise
   }
   const result = grantResult(row);
   if (!result.duplicate) {
-    const { data } = await supabaseAdmin.from("quota_credit_grants").select("user_id, tokens, expires_at").eq("id", grantId).maybeSingle();
-    if (data) await announceGrant(data.user_id as string | null, grantId, Number(data.tokens), (data.expires_at as string | null) ?? null);
+    const { data } = await supabaseAdmin.from("quota_credit_grants").select("user_id, tokens, expires_at, kind").eq("id", grantId).maybeSingle();
+    if (data) await announceGrant(data.user_id as string | null, grantId, Number(data.tokens), (data.expires_at as string | null) ?? null, data.kind as string);
   }
   return result;
 }
@@ -260,12 +270,12 @@ export async function grantBulk(input: BulkInput, actorId: string) {
       logger.error("bulk_credit_grant_failed", { batchId: input.batchId, userId: person.id, error: err instanceof Error ? err.message : String(err) });
     }
   }
-  void announceAll(toAnnounce, input.tokens, input.expiresAt);
+  void announceAll(toAnnounce, input.tokens, input.expiresAt, input.kind);
   return { batchId: input.batchId, created, duplicates, failed: failed.length, status: approval ? "pending" : "active" };
 }
 
-async function announceAll(list: Array<{ userId: string; grantId: string }>, tokens: number, expiresAt: string | null) {
-  for (const g of list) await announceGrant(g.userId, g.grantId, tokens, expiresAt).catch(() => undefined);
+async function announceAll(list: Array<{ userId: string; grantId: string }>, tokens: number, expiresAt: string | null, kind: string) {
+  for (const g of list) await announceGrant(g.userId, g.grantId, tokens, expiresAt, kind).catch(() => undefined);
 }
 
 /** Approves every pending grant of a batch (one approver for the whole batch, not its creator). */

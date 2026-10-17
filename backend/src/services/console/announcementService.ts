@@ -22,7 +22,32 @@ export type AnnouncementInput = {
   platforms: Platform[];
   publishAt?: string | null;
   expiresAt?: string | null;
+  /** Higher shows first. */
+  priority?: number;
+  variant?: "modal" | "banner";
+  accent?: "default" | "blue" | "green" | "amber" | "purple" | "red";
+  icon?: "sparkles" | "rocket" | "gift" | "wrench" | "shield" | "megaphone" | "graduation";
+  cta2Label?: string | null;
+  cta2Url?: string | null;
 };
+
+/**
+ * CTA destinations are allow-listed: an in-app path ("/plans", "/?support=programs") or an https
+ * URL. Never javascript:, data:, protocol-relative "//evil" or plain http — the console must not be
+ * able to ship an executable link to every user.
+ */
+export function safeCtaUrl(url: string | null | undefined): string | null {
+  const u = (url ?? "").trim();
+  if (!u) return null;
+  if (u.startsWith("/") && !u.startsWith("//") && !/[\s<>"'`]/.test(u)) return u;
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol === "https:" && !parsed.username && !parsed.password) return parsed.toString();
+  } catch {
+    /* fall through */
+  }
+  throw new HttpError(400, "Links must be an in-app path like /plans or an https:// address.");
+}
 
 function toRow(input: Partial<AnnouncementInput>) {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -30,7 +55,13 @@ function toRow(input: Partial<AnnouncementInput>) {
   if (input.body !== undefined) row.body = input.body;
   if (input.imageUrl !== undefined) row.image_url = input.imageUrl || null;
   if (input.ctaLabel !== undefined) row.cta_label = input.ctaLabel || null;
-  if (input.ctaUrl !== undefined) row.cta_url = input.ctaUrl || null;
+  if (input.ctaUrl !== undefined) row.cta_url = safeCtaUrl(input.ctaUrl);
+  if (input.cta2Label !== undefined) row.cta2_label = input.cta2Label || null;
+  if (input.cta2Url !== undefined) row.cta2_url = safeCtaUrl(input.cta2Url);
+  if (input.priority !== undefined) row.priority = input.priority;
+  if (input.variant !== undefined) row.variant = input.variant;
+  if (input.accent !== undefined) row.accent = input.accent;
+  if (input.icon !== undefined) row.icon = input.icon;
   if (input.kind !== undefined) row.kind = input.kind;
   if (input.audience !== undefined) row.audience = input.audience;
   if (input.platforms !== undefined) row.platforms = input.platforms;
@@ -43,17 +74,23 @@ export async function listAnnouncements() {
   const { data, error } = await supabaseAdmin.from("announcements").select("*").order("created_at", { ascending: false }).limit(200);
   if (error) throw new HttpError(500, error.message);
   const ids = (data ?? []).map((a) => a.id as string);
-  const seen = new Map<string, { views: number; clicks: number }>();
+  type Stats = { views: number; clicks: number; acknowledged: number; dismissed: number };
+  const seen = new Map<string, Stats>();
+  const version = new Map((data ?? []).map((a) => [a.id as string, Number(a.version ?? 1)]));
   if (ids.length) {
-    const { data: views } = await supabaseAdmin.from("announcement_views").select("announcement_id, clicked").in("announcement_id", ids);
+    const { data: views } = await supabaseAdmin.from("announcement_views").select("announcement_id, clicked, state, version").in("announcement_id", ids);
     for (const v of views ?? []) {
-      const s = seen.get(v.announcement_id as string) ?? { views: 0, clicks: 0 };
+      // Stats are for the CURRENT version (a re-published update starts counting again).
+      if (Number(v.version ?? 1) !== version.get(v.announcement_id as string)) continue;
+      const s = seen.get(v.announcement_id as string) ?? { views: 0, clicks: 0, acknowledged: 0, dismissed: 0 };
       s.views++;
-      if (v.clicked) s.clicks++;
+      if (v.clicked || v.state === "clicked") s.clicks++;
+      if (v.state === "acknowledged") s.acknowledged++;
+      if (v.state === "dismissed") s.dismissed++;
       seen.set(v.announcement_id as string, s);
     }
   }
-  return (data ?? []).map((a) => ({ ...a, stats: seen.get(a.id as string) ?? { views: 0, clicks: 0 } }));
+  return (data ?? []).map((a) => ({ ...a, stats: seen.get(a.id as string) ?? { views: 0, clicks: 0, acknowledged: 0, dismissed: 0 } }));
 }
 
 export async function createAnnouncement(input: AnnouncementInput, userId: string) {
@@ -110,12 +147,12 @@ export function matchesAudience(audience: string, user: { plan: string; createdA
   }
 }
 
-/** Live updates this user hasn't seen yet on this platform — newest first, at most 3. */
+/** Live updates this person hasn't been shown yet (in their current version) on this platform — priority first, at most 3. */
 export async function pendingForUser(userId: string, platform: Platform) {
   const nowIso = new Date().toISOString();
   const { data: live, error } = await supabaseAdmin
     .from("announcements")
-    .select("id, title, body, image_url, cta_label, cta_url, kind, audience, platforms, publish_at, expires_at")
+    .select("*")
     .eq("status", "published")
     .lte("publish_at", nowIso)
     .contains("platforms", [platform])
@@ -129,30 +166,91 @@ export async function pendingForUser(userId: string, platform: Platform) {
   const candidates = (live ?? []).filter((a) => !a.expires_at || (a.expires_at as string) > nowIso);
   if (candidates.length === 0) return [];
   const [{ data: seen }, { data: profile }, { data: auth }] = await Promise.all([
-    supabaseAdmin.from("announcement_views").select("announcement_id").eq("user_id", userId).in("announcement_id", candidates.map((a) => a.id)),
+    supabaseAdmin.from("announcement_views").select("announcement_id, version").eq("user_id", userId).in("announcement_id", candidates.map((a) => a.id)),
     supabaseAdmin.from("profiles").select("plan").eq("id", userId).maybeSingle(),
     supabaseAdmin.auth.admin.getUserById(userId),
   ]);
-  const seenIds = new Set((seen ?? []).map((s) => s.announcement_id as string));
+  const seenKeys = new Set((seen ?? []).map((s) => `${s.announcement_id}:${s.version ?? 1}`));
   const user = { plan: (profile?.plan as string) ?? "free", createdAt: auth?.user?.created_at ?? new Date().toISOString() };
   return candidates
-    .filter((a) => !seenIds.has(a.id as string) && matchesAudience(a.audience as string, user))
+    .filter((a) => !seenKeys.has(`${a.id}:${a.version ?? 1}`) && matchesAudience(a.audience as string, user))
+    .sort((a, b) => Number(b.priority ?? 0) - Number(a.priority ?? 0))
     .slice(0, 3)
     .map((a) => ({
-      id: a.id,
+      id: a.id as string,
+      version: Number(a.version ?? 1),
       title: a.title,
       body: a.body,
       imageUrl: a.image_url,
       ctaLabel: a.cta_label,
       ctaUrl: a.cta_url,
+      cta2Label: a.cta2_label ?? null,
+      cta2Url: a.cta2_url ?? null,
       kind: a.kind,
+      variant: (a.variant as string) ?? "modal",
+      accent: (a.accent as string) ?? "default",
+      icon: (a.icon as string) ?? "sparkles",
       publishedAt: a.publish_at,
     }));
 }
 
+/** Claims the right to show one version now (atomic: one tab / device wins). */
+export async function claimDisplay(userId: string, id: string, version: number, platform: Platform): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc("announcement_claim", { p_announcement: id, p_user: userId, p_version: version, p_platform: platform });
+  if (error) throw new HttpError(500, error.message);
+  return data === true;
+}
+
+export async function recordAction(userId: string, id: string, version: number, state: "dismissed" | "acknowledged" | "clicked") {
+  const { error } = await supabaseAdmin.rpc("announcement_act", { p_announcement: id, p_user: userId, p_version: version, p_state: state });
+  if (error) throw new HttpError(500, error.message);
+}
+
+/**
+ * Older app builds (Android/iOS before 0062) report "seen" for the items they showed: recorded as
+ * displayed + acknowledged for each update's current version, so they never pop up again there.
+ */
 export async function markSeen(userId: string, announcementIds: string[], clickedId?: string) {
   if (announcementIds.length === 0) return;
-  const rows = announcementIds.map((id) => ({ announcement_id: id, user_id: userId, clicked: id === clickedId }));
-  const { error } = await supabaseAdmin.from("announcement_views").upsert(rows, { onConflict: "announcement_id,user_id" });
-  if (error) throw new HttpError(500, error.message);
+  const { data } = await supabaseAdmin.from("announcements").select("id, version").in("id", announcementIds);
+  for (const a of data ?? []) {
+    const version = Number(a.version ?? 1);
+    await claimDisplay(userId, a.id as string, version, "web").catch(() => false);
+    await recordAction(userId, a.id as string, version, a.id === clickedId ? "clicked" : "acknowledged").catch(() => undefined);
+  }
+}
+
+/** "Show it again": a published update becomes a new version that everyone in its audience sees once more. */
+export async function publishNewVersion(id: string) {
+  const { data: a } = await supabaseAdmin.from("announcements").select("version, status").eq("id", id).maybeSingle();
+  if (!a) throw new HttpError(404, "Update not found");
+  if (a.status !== "published") throw new HttpError(409, "Only a published update can be shown again.");
+  const { data, error } = await supabaseAdmin
+    .from("announcements")
+    .update({ version: Number(a.version ?? 1) + 1, publish_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("version", a.version)
+    .select()
+    .single();
+  if (error || !data) throw new HttpError(409, "Someone changed this update at the same time — reload and try again.");
+  return data;
+}
+
+/** The person's What's New history for the inbox (published, matching audience, newest first). */
+export async function historyForUser(userId: string, platform: Platform) {
+  const nowIso = new Date().toISOString();
+  const { data } = await supabaseAdmin
+    .from("announcements")
+    .select("id, title, body, cta_label, cta_url, kind, audience, publish_at, expires_at, icon")
+    .eq("status", "published")
+    .lte("publish_at", nowIso)
+    .contains("platforms", [platform])
+    .order("publish_at", { ascending: false })
+    .limit(20);
+  const { data: profile } = await supabaseAdmin.from("profiles").select("plan, created_at").eq("id", userId).maybeSingle();
+  const user = { plan: (profile?.plan as string) ?? "free", createdAt: (profile?.created_at as string) ?? nowIso };
+  return (data ?? [])
+    .filter((a) => matchesAudience(a.audience as string, user))
+    .slice(0, 10)
+    .map((a) => ({ id: a.id as string, title: a.title as string, body: a.body as string, ctaLabel: a.cta_label as string | null, ctaUrl: a.cta_url as string | null, kind: a.kind as string, icon: (a.icon as string) ?? "sparkles", publishedAt: a.publish_at as string }));
 }
