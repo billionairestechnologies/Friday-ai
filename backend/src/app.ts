@@ -18,7 +18,7 @@ import { libraryRouter } from "./routes/library.js";
 import { memoryRouter } from "./routes/memory.js";
 import { automationsRouter } from "./routes/automations.js";
 import { consoleRouter } from "./routes/console.js";
-import { emailRouter, offersRouter, programsRouter, supportRouter, updatesRouter } from "./routes/engagement.js";
+import { emailRouter, notificationsRouter, offersRouter, programsRouter, supportRouter, updatesRouter } from "./routes/engagement.js";
 import { statusRouter } from "./routes/status.js";
 import { filesRouter } from "./routes/files.js";
 import { skillsRouter } from "./routes/skills.js";
@@ -106,6 +106,7 @@ export function createApp() {
   app.use("/api/email", emailRouter);
   app.use("/api/offers", offersRouter);
   app.use("/api/programs", programsRouter);
+  app.use("/api/notifications", notificationsRouter);
   app.use("/api/status", statusRouter);
   app.use("/api/files", filesRouter);
   app.use("/api/skills", skillsRouter);

@@ -152,7 +152,14 @@ const announcementSchema = z.object({
   body: z.string().max(8000).default(""),
   imageUrl: optionalUrl,
   ctaLabel: z.string().max(40).nullable().optional(),
-  ctaUrl: optionalUrl,
+  // CTA links: in-app paths ("/plans") or https — checked by announcementService.safeCtaUrl.
+  ctaUrl: z.string().trim().max(500).nullable().optional(),
+  cta2Label: z.string().max(40).nullable().optional(),
+  cta2Url: z.string().trim().max(500).nullable().optional(),
+  priority: z.number().int().min(-100).max(100).optional(),
+  variant: z.enum(["modal", "banner"]).optional(),
+  accent: z.enum(["default", "blue", "green", "amber", "purple", "red"]).optional(),
+  icon: z.enum(["sparkles", "rocket", "gift", "wrench", "shield", "megaphone", "graduation"]).optional(),
   kind: z.enum(["feature", "improvement", "news", "maintenance"]).default("feature"),
   audience: audience.default("all"),
   platforms: z.array(z.enum(["web", "android", "ios"])).min(1).default(["web", "android", "ios"]),
@@ -180,6 +187,13 @@ export async function setUpdateStatus(req: Request, res: Response) {
   const { status } = z.object({ status: z.enum(["draft", "published", "archived"]) }).parse(req.body);
   const row = await updates.setAnnouncementStatus(id.parse(req.params.updateId), status);
   audit(req, `console.update.${status}`, "announcement", row.id as string);
+  res.json({ update: row });
+}
+
+/** "Show it again": a published update becomes a new version that its audience sees once more. */
+export async function republishUpdate(req: Request, res: Response) {
+  const row = await updates.publishNewVersion(id.parse(req.params.updateId));
+  audit(req, "console.update.new_version", "announcement", row.id as string, { version: row.version });
   res.json({ update: row });
 }
 

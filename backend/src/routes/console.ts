@@ -44,6 +44,7 @@ consoleRouter.post("/updates", can("updates.manage"), h(c.createUpdate));
 consoleRouter.patch("/updates/:updateId", can("updates.manage"), h(c.editUpdate));
 consoleRouter.post("/updates/:updateId/status", can("updates.manage"), h(c.setUpdateStatus));
 consoleRouter.delete("/updates/:updateId", can("updates.manage"), h(c.deleteUpdate));
+consoleRouter.post("/updates/:updateId/new-version", can("updates.manage"), h(c.republishUpdate));
 consoleRouter.post("/updates/:updateId/campaign", can("marketing.manage"), h(c.campaignFromUpdate));
 
 consoleRouter.get("/campaigns", can("marketing.view"), h(c.listCampaigns));

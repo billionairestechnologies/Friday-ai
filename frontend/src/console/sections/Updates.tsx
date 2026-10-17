@@ -21,7 +21,14 @@ type Update = {
   publish_at: string | null;
   expires_at: string | null;
   created_at: string;
-  stats: { views: number; clicks: number };
+  stats: { views: number; clicks: number; acknowledged?: number; dismissed?: number };
+  version?: number;
+  priority?: number;
+  variant?: "modal" | "banner";
+  accent?: "default" | "blue" | "green" | "amber" | "purple" | "red";
+  icon?: "sparkles" | "rocket" | "gift" | "wrench" | "shield" | "megaphone" | "graduation";
+  cta2_label?: string | null;
+  cta2_url?: string | null;
 };
 
 export const AUDIENCES = [
@@ -65,6 +72,8 @@ export default function Updates() {
               <div className="flex items-center gap-4 text-sm text-muted">
                 <span className="inline-flex items-center gap-1.5"><Eye className="size-3.5" /> {u.stats.views}</span>
                 <span className="inline-flex items-center gap-1.5"><MousePointerClick className="size-3.5" /> {u.stats.clicks}</span>
+                <span title="Got it / closed">{u.stats.acknowledged ?? 0} ✓ · {u.stats.dismissed ?? 0} ✕</span>
+                {(u.version ?? 1) > 1 && <span>v{u.version}</span>}
               </div>
             </Card>
           ))}
@@ -79,7 +88,10 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
   const navigate = useNavigate();
   const canManage = useCan("updates.manage");
   const canMarket = useCan("marketing.manage");
-  const blank = { title: "", body: "", imageUrl: "", ctaLabel: "", ctaUrl: "", kind: "feature" as Update["kind"], audience: "all", platforms: ["web", "android", "ios"], publishAt: "", expiresAt: "" };
+  const blank = {
+    title: "", body: "", imageUrl: "", ctaLabel: "", ctaUrl: "", kind: "feature" as Update["kind"], audience: "all", platforms: ["web", "android", "ios"], publishAt: "", expiresAt: "",
+    cta2Label: "", cta2Url: "", priority: "0", variant: "modal" as NonNullable<Update["variant"]>, accent: "default" as NonNullable<Update["accent"]>, icon: "sparkles" as NonNullable<Update["icon"]>,
+  };
   const [form, setForm] = useState(blank);
   const [id, setId] = useState<string | null>(null);
   const [status, setStatus] = useState<Update["status"]>("draft");
@@ -101,6 +113,12 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
         platforms: update.platforms,
         publishAt: toLocalInput(update.publish_at),
         expiresAt: toLocalInput(update.expires_at),
+        cta2Label: update.cta2_label ?? "",
+        cta2Url: update.cta2_url ?? "",
+        priority: String(update.priority ?? 0),
+        variant: update.variant ?? "modal",
+        accent: update.accent ?? "default",
+        icon: update.icon ?? "sparkles",
       });
       setId(update.id);
       setStatus(update.status);
@@ -108,7 +126,17 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update]);
 
-  const payload = () => ({ ...form, imageUrl: form.imageUrl || null, ctaLabel: form.ctaLabel || null, ctaUrl: form.ctaUrl || null, publishAt: fromLocalInput(form.publishAt), expiresAt: fromLocalInput(form.expiresAt) });
+  const payload = () => ({
+    ...form,
+    imageUrl: form.imageUrl || null,
+    ctaLabel: form.ctaLabel || null,
+    ctaUrl: form.ctaUrl || null,
+    cta2Label: form.cta2Label || null,
+    cta2Url: form.cta2Url || null,
+    priority: Number(form.priority) || 0,
+    publishAt: fromLocalInput(form.publishAt),
+    expiresAt: fromLocalInput(form.expiresAt),
+  });
 
   async function save(): Promise<string | null> {
     let savedId = id;
@@ -165,6 +193,22 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
             <Button onClick={() => run("save", async () => { if (await save()) onClose(); })} loading={busy === "save"} disabled={!form.title.trim()}>
               Save {status === "published" ? "" : "draft"}
             </Button>
+            {status === "published" && id && (
+              <Button
+                variant="secondary"
+                loading={busy === "again"}
+                onClick={() =>
+                  run("again", async () => {
+                    if (!window.confirm("Show this update again to everyone in its audience (once more each)?")) return;
+                    if (await save()) {
+                      if (await act(() => api.post(`/console/updates/${id}/new-version`, {}), "Published as a new version — everyone sees it once more")) onChanged();
+                    }
+                  })
+                }
+              >
+                Show again
+              </Button>
+            )}
             {status === "published" ? (
               <Button variant="secondary" loading={busy === "unpublish"} onClick={() => run("unpublish", async () => { if (id && (await act(() => api.post(`/console/updates/${id}/status`, { status: "archived" }), "Archived — no longer shown"))) { setStatus("archived"); onChanged(); } })}>
                 Archive
@@ -202,7 +246,13 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
           <Field label="Image URL" hint="Optional — 16:8 works best."><Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://…" /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Button label"><Input value={form.ctaLabel} onChange={(e) => setForm({ ...form, ctaLabel: e.target.value })} placeholder="Try it" /></Field>
-            <Field label="Button link"><Input value={form.ctaUrl} onChange={(e) => setForm({ ...form, ctaUrl: e.target.value })} placeholder="https://…/build" /></Field>
+            <Field label="Button link" hint="An in-app path like /plans, or https://"><Input value={form.ctaUrl} onChange={(e) => setForm({ ...form, ctaUrl: e.target.value })} placeholder="/build" /></Field>
+            <Field label="Second button"><Input value={form.cta2Label} onChange={(e) => setForm({ ...form, cta2Label: e.target.value })} placeholder="Learn more" /></Field>
+            <Field label="Second link"><Input value={form.cta2Url} onChange={(e) => setForm({ ...form, cta2Url: e.target.value })} placeholder="https://…" /></Field>
+            <Field label="Shown as"><Select value={form.variant} onChange={(e) => setForm({ ...form, variant: e.target.value as typeof form.variant })} options={[{ value: "modal", label: "Popup card" }, { value: "banner", label: "Slim banner (top of screen)" }]} /></Field>
+            <Field label="Priority" hint="Higher shows first"><Input type="number" min={-100} max={100} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} /></Field>
+            <Field label="Icon"><Select value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value as typeof form.icon })} options={["sparkles", "rocket", "gift", "wrench", "shield", "megaphone", "graduation"].map((v) => ({ value: v, label: v[0]!.toUpperCase() + v.slice(1) }))} /></Field>
+            <Field label="Colour"><Select value={form.accent} onChange={(e) => setForm({ ...form, accent: e.target.value as typeof form.accent })} options={["default", "blue", "green", "amber", "purple", "red"].map((v) => ({ value: v, label: v[0]!.toUpperCase() + v.slice(1) }))} /></Field>
           </div>
           <Field label="Platforms">
             <div className="flex gap-2">
@@ -229,7 +279,7 @@ function UpdateEditor({ update, onClose, onChanged }: { update: Update | "new" |
         <div>
           <div className="mb-2 text-xs font-semibold tracking-wide text-subtle uppercase">Live preview</div>
           <div className="sticky top-0 overflow-hidden rounded-[var(--radius-2xl)] border border-border bg-background shadow-[var(--shadow-panel)]">
-            <WhatsNewCard item={{ id: "preview", title: form.title, body: form.body, imageUrl: form.imageUrl || null, ctaLabel: form.ctaLabel || null, ctaUrl: form.ctaUrl || null, kind: form.kind }} />
+            <WhatsNewCard item={{ id: "preview", title: form.title, body: form.body, imageUrl: form.imageUrl || null, ctaLabel: form.ctaLabel || null, ctaUrl: form.ctaUrl || null, cta2Label: form.cta2Label || null, cta2Url: form.cta2Url || null, kind: form.kind, accent: form.accent, icon: form.icon }} />
             <div className="border-t border-border px-6 py-3 text-right text-xs text-muted">Got it</div>
           </div>
         </div>

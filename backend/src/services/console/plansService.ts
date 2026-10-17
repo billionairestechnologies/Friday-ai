@@ -491,7 +491,8 @@ async function applyOffer(offer: OfferRow, userId: string, actorId: string | nul
       p_requires_approval: false,
       p_source: "offer",
     });
-    if (!row.duplicate) await announceGrant(userId, String(row.grant_id), offer.credit_tokens as number, expiresAt);
+    // They redeemed it themselves and see the result on screen: inbox + email, no popup.
+    if (!row.duplicate) await announceGrant(userId, String(row.grant_id), offer.credit_tokens as number, expiresAt, "offer", false);
     return { kind: "credits", grantId: row.grant_id, tokens: offer.credit_tokens, expiresAt };
   }
   const grant =

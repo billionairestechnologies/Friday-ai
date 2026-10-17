@@ -1,4 +1,5 @@
 import { useIsWorking, WorkingSpinner } from "@/components/working-indicator";
+import { InboxButton } from "@/components/inbox-button";
 import { useEffect, useState } from "react";
 import {
   Building2,
@@ -181,6 +182,7 @@ export function Sidebar() {
             <BrandWordmark className="text-xl" />
           </div>
           <div className="flex items-center gap-1">
+            <InboxButton />
             <button
               type="button"
               aria-label={searchOpen ? "Close search" : "Search chats"}
