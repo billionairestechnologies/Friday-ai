@@ -16,8 +16,7 @@ import {
   restoreVersion,
   setSharing,
   updatePage,
-  type PageKind,
-} from "../services/pages/pageService.js";
+  type PageKind, diffVersions, duplicatePage } from "../services/pages/pageService.js";
 import type { DocFormat } from "../services/documents/render.js";
 import { FORMAT_MIME } from "../services/documents/render.js";
 
@@ -76,6 +75,17 @@ pagesRouter.post(
   "/:pageId/versions/:version/restore",
   asyncHandler(async (req, res) => res.json({ page: await restoreVersion(req.user!.id, id.parse(req.params.pageId), z.coerce.number().int().positive().parse(req.params.version)) })),
 );
+
+// What changed between two versions (`to` omitted = the current page).
+pagesRouter.get(
+  "/:pageId/diff",
+  asyncHandler(async (req, res) => {
+    const q = z.object({ from: z.coerce.number().int().positive(), to: z.coerce.number().int().positive().optional() }).parse(req.query);
+    res.json(await diffVersions(req.user!.id, id.parse(req.params.pageId), q.from, q.to));
+  }),
+);
+
+pagesRouter.post("/:pageId/duplicate", asyncHandler(async (req, res) => res.status(201).json({ page: await duplicatePage(req.user!.id, id.parse(req.params.pageId)) })));
 
 pagesRouter.post(
   "/:pageId/share",

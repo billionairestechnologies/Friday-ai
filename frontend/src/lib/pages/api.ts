@@ -53,6 +53,17 @@ export const EXPORT_FORMATS: Record<PageKind, { format: string; label: string }[
   slides: [{ format: "pptx", label: "PowerPoint (.pptx)" }],
 };
 
+/** GET /pages/:id/diff — what changed between two versions (backend services/pages/pageEdits.ts#diffContent). */
+export type PageDiff = {
+  from: { version: number; title: string };
+  to: { version: number; title: string };
+  titleChanged: boolean;
+  diff:
+    | { kind: "doc"; lines: Array<{ op: "same" | "add" | "del"; text: string }>; added: number; removed: number }
+    | { kind: "sheet"; cells: Array<{ sheet: string; cell: string; before: string; after: string }>; sheetsAdded: string[]; sheetsRemoved: string[] }
+    | { kind: "slides"; slides: Array<{ index: number; change: "added" | "removed" | "changed"; title: string }> };
+};
+
 export const pagesApi = {
   list: () => api.get<{ pages: PageSummary[] }>("/pages").then((r) => r.pages),
   create: (kind: PageKind, title = "Untitled") => api.post<{ page: Page }>("/pages", { kind, title }).then((r) => r.page),
@@ -61,6 +72,8 @@ export const pagesApi = {
   remove: (id: string) => api.delete<void>(`/pages/${id}`),
   versions: (id: string) => api.get<{ versions: PageVersion[] }>(`/pages/${id}/versions`).then((r) => r.versions),
   restore: (id: string, version: number) => api.post<{ page: Page }>(`/pages/${id}/versions/${version}/restore`).then((r) => r.page),
+  diff: (id: string, from: number, to?: number) => api.get<PageDiff>(`/pages/${id}/diff?from=${from}${to ? `&to=${to}` : ""}`),
+  duplicate: (id: string) => api.post<{ page: Page }>(`/pages/${id}/duplicate`).then((r) => r.page),
   share: (id: string, on: boolean) => api.post<{ page: Page }>(`/pages/${id}/share`, { on }).then((r) => r.page),
   shared: (token: string) => api.get<{ page: Pick<Page, "kind" | "title" | "content" | "updated_at"> }>(`/pages/shared/${encodeURIComponent(token)}`).then((r) => r.page),
 };

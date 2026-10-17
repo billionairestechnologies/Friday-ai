@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api";
 import { DocEditor } from "@/components/pages/doc-editor";
 import { SheetEditor } from "@/components/pages/sheet-editor";
 import { SlidesEditor } from "@/components/pages/slides-editor";
-import { EXPORT_FORMATS, KIND_LABEL, exportPage, pagesApi, shareUrl, type DocContent, type Page, type PageContent, type PageKind, type PageSummary, type PageVersion, type SheetContent, type SlidesContent } from "@/lib/pages/api";
+import { EXPORT_FORMATS, KIND_LABEL, exportPage, pagesApi, shareUrl, type DocContent, type PageDiff, type Page, type PageContent, type PageKind, type PageSummary, type PageVersion, type SheetContent, type SlidesContent } from "@/lib/pages/api";
 import { useDismiss } from "@/lib/use-dismiss";
 import { cn } from "@/lib/utils";
 
@@ -346,6 +346,23 @@ export function PageEditorPage({ pageId }: { pageId: string }) {
         >
           <History className="size-4" />
         </button>
+        <button
+          type="button"
+          aria-label="Duplicate"
+          title="Duplicate"
+          onClick={async () => {
+            try {
+              if (stateRef.current === "dirty") await save();
+              const copy = await pagesApi.duplicate(page.id);
+              void navigate({ to: "/pages/$pageId", params: { pageId: copy.id } });
+            } catch {
+              /* the save state indicator already shows a failed save */
+            }
+          }}
+          className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-chip hover:text-foreground"
+        >
+          <Copy className="size-4" />
+        </button>
         <ExportMenu page={page} title={title} beforeExport={async () => (stateRef.current === "dirty" ? save() : undefined)} />
         <ShareMenu page={page} onChange={(p) => adopt({ ...p, content: draft.current.content ?? p.content, title: draft.current.title })} />
       </header>
@@ -527,6 +544,15 @@ function HistoryPanel({ page, onClose, onRestored }: { page: Page; onClose: () =
   const [versions, setVersions] = useState<PageVersion[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compare, setCompare] = useState<{ version: number; data: PageDiff | null } | null>(null);
+
+  useEffect(() => {
+    if (!compare || compare.data) return;
+    pagesApi
+      .diff(page.id, compare.version)
+      .then((data) => setCompare((c) => (c && c.version === compare.version ? { ...c, data } : c)))
+      .catch((e) => (setError(e instanceof Error ? e.message : "Couldn't compare"), setCompare(null)));
+  }, [compare, page.id]);
 
   useEffect(() => {
     pagesApi
@@ -538,17 +564,25 @@ function HistoryPanel({ page, onClose, onRestored }: { page: Page; onClose: () =
   return (
     <motion.aside
       initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 300, opacity: 1 }}
+      animate={{ width: compare ? 440 : 300, opacity: 1 }}
       exit={{ width: 0, opacity: 0 }}
       transition={{ duration: 0.2 }}
       className="absolute inset-y-0 right-0 z-30 flex shrink-0 flex-col overflow-hidden border-l border-border bg-background md:relative"
     >
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-        <span className="text-sm font-medium">Version history</span>
+        <span className="text-sm font-medium">{compare ? `v${compare.version} → now` : "Version history"}</span>
         <button type="button" aria-label="Close history" onClick={onClose} className="flex size-8 items-center justify-center rounded-lg text-muted hover:bg-chip">
           <X className="size-4" />
         </button>
       </div>
+      {compare ? (
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <button type="button" onClick={() => setCompare(null)} className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground">
+            <ArrowLeft className="size-3.5" /> All versions
+          </button>
+          {!compare.data ? <Loader2 className="mx-auto mt-6 size-4 animate-spin text-muted" /> : <DiffView d={compare.data} />}
+        </div>
+      ) : (
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {error && <p className="p-2 text-xs text-danger">{error}</p>}
         {!versions && !error && <Loader2 className="mx-auto mt-6 size-4 animate-spin text-muted" />}
@@ -568,6 +602,10 @@ function HistoryPanel({ page, onClose, onRestored }: { page: Page; onClose: () =
               {current ? (
                 <span className="text-xs text-subtle">Current</span>
               ) : (
+                <>
+                <button type="button" onClick={() => setCompare({ version: v.version, data: null })} className="h-7 rounded-full px-2 text-xs text-muted hover:bg-background hover:text-foreground">
+                  Compare
+                </button>
                 <button
                   type="button"
                   disabled={busy !== null}
@@ -585,13 +623,78 @@ function HistoryPanel({ page, onClose, onRestored }: { page: Page; onClose: () =
                 >
                   {busy === v.version ? <Loader2 className="size-3 animate-spin" /> : "Restore"}
                 </button>
+                </>
               )}
             </div>
           );
         })}
         <p className="px-2.5 py-3 text-xs text-subtle">Restoring makes a new version — nothing is lost.</p>
       </div>
+      )}
     </motion.aside>
+  );
+}
+
+/** What changed from an older version to now: lines (doc), cells (sheet) or slides. */
+function DiffView({ d }: { d: PageDiff }) {
+  const x = d.diff;
+  const nothing = <p className="text-sm text-muted">No changes{d.titleChanged ? " except the title" : ""}.</p>;
+  return (
+    <div className="grid gap-2 text-sm">
+      {d.titleChanged && (
+        <p className="text-xs text-muted">
+          Title: <s>{d.from.title}</s> → <b className="text-foreground">{d.to.title}</b>
+        </p>
+      )}
+      {x.kind === "doc" &&
+        (x.added + x.removed === 0 ? (
+          nothing
+        ) : (
+          <>
+            <p className="text-xs text-muted">
+              <span className="text-emerald-500">+{x.added}</span> / <span className="text-danger">−{x.removed}</span> lines
+            </p>
+            <pre className="overflow-x-auto rounded-xl border border-border bg-chip/40 p-2 text-[12px] leading-relaxed whitespace-pre-wrap">
+              {x.lines.map((l, i) =>
+                l.op === "same" ? (
+                  <div key={i} className="text-muted">{`  ${l.text}`}</div>
+                ) : (
+                  <div key={i} className={l.op === "add" ? "bg-emerald-500/15 text-foreground" : "bg-red-500/15 text-foreground line-through decoration-red-500/60"}>
+                    {`${l.op === "add" ? "+" : "−"} ${l.text}`}
+                  </div>
+                ),
+              )}
+            </pre>
+          </>
+        ))}
+      {x.kind === "sheet" &&
+        (x.cells.length + x.sheetsAdded.length + x.sheetsRemoved.length === 0 ? (
+          nothing
+        ) : (
+          <ul className="grid gap-1 text-xs">
+            {x.sheetsAdded.map((n) => <li key={`a${n}`} className="text-emerald-500">+ sheet “{n}”</li>)}
+            {x.sheetsRemoved.map((n) => <li key={`r${n}`} className="text-danger">− sheet “{n}”</li>)}
+            {x.cells.map((c) => (
+              <li key={`${c.sheet}!${c.cell}`} className="flex flex-wrap gap-1">
+                <span className="font-mono text-muted">{c.sheet}!{c.cell}</span>
+                <s className="text-danger">{c.before || "∅"}</s> → <b>{c.after || "∅"}</b>
+              </li>
+            ))}
+          </ul>
+        ))}
+      {x.kind === "slides" &&
+        (x.slides.length === 0 ? (
+          nothing
+        ) : (
+          <ul className="grid gap-1 text-xs">
+            {x.slides.map((s) => (
+              <li key={s.index}>
+                <b>Slide {s.index}</b> {s.change} — {s.title}
+              </li>
+            ))}
+          </ul>
+        ))}
+    </div>
   );
 }
 

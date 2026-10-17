@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { LIMITS, renderDocument, type DocFormat, type SheetSpec, type SlideSpec } from "../documents/render.js";
+import { diffContent } from "./pageEdits.js";
 
 /**
  * Pages: live documents, spreadsheets and slide decks (migration 0044). The user edits them in
@@ -145,6 +146,25 @@ export async function getVersion(userId: string, id: string, version: number) {
 export async function restoreVersion(userId: string, id: string, version: number): Promise<Page> {
   const old = await getVersion(userId, id, version);
   return updatePage(userId, id, { title: old.title as string, content: old.content });
+}
+
+/** What changed between two versions (or a version and the current page when `to` is omitted). */
+export async function diffVersions(userId: string, id: string, from: number, to?: number) {
+  const page = await getPage(userId, id);
+  const a = await getVersion(userId, id, from);
+  const b = to == null || to === page.version ? { version: page.version, title: page.title, content: page.content } : await getVersion(userId, id, to);
+  return {
+    from: { version: from, title: a.title as string },
+    to: { version: Number(b.version), title: b.title as string },
+    titleChanged: a.title !== b.title,
+    diff: diffContent(page.kind, normalizeContent(page.kind, a.content), normalizeContent(page.kind, b.content)),
+  };
+}
+
+/** A copy as a new page (its own history starts at version 1); the original is untouched. */
+export async function duplicatePage(userId: string, id: string): Promise<Page> {
+  const page = await getPage(userId, id);
+  return createPage(userId, { kind: page.kind, title: `${page.title} (copy)`.slice(0, 200), content: page.content, conversationId: page.conversation_id, author: "user" });
 }
 
 export async function setSharing(userId: string, id: string, on: boolean): Promise<Page> {
