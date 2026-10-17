@@ -111,6 +111,9 @@ Gotchas:
   versions, scheduled/promo windows, applied value stored on every ledger row (meter `billable-v2`); 0× still records provider cost.
   **+ bonus credits** (migration 0060, `quota/credits.ts`, Console → Credits): grants on top of the allowance that outlive the month,
   expire per grant, used after the allowance (soonest expiry first), approval above a threshold, bulk with preview; `quota_remaining()` is the one balance rule.
+- Offers v2 + programmes (migration 0061): redemption is claimed atomically in SQL (`offer_claim` → apply → `offer_confirm`, or `offer_release` on failure);
+  offer kinds incl. `credits`, states draft/active/paused/archived, `exclusive_group` stacking. `services/console/programService.ts`: student/startup/company
+  applications (`/api/programs`, Help & support → Programmes; Console → Programmes), evidence sniffed by magic bytes into the private `program-evidence` bucket.
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →

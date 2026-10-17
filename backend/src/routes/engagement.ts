@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as c from "../controllers/engagementController.js";
 import * as plans from "../controllers/plansController.js";
+import * as prog from "../controllers/programController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -32,3 +33,11 @@ export const offersRouter = Router();
 offersRouter.use(requireAuth);
 offersRouter.post("/redeem", rateLimit({ name: "offer-redeem", limit: 20, windowMs: 60 * 60_000 }), asyncHandler(plans.redeem));
 offersRouter.get("/mine", asyncHandler(plans.mine));
+
+/** /api/programs — student / startup / company programme applications (the applicant's side). */
+export const programsRouter = Router();
+programsRouter.use(requireAuth);
+programsRouter.get("/", asyncHandler(prog.mine));
+programsRouter.post("/apply", rateLimit({ name: "program-apply", limit: 10, windowMs: 60 * 60_000 }), asyncHandler(prog.apply));
+programsRouter.post("/:applicationId/respond", rateLimit({ name: "program-respond", limit: 20, windowMs: 60 * 60_000 }), asyncHandler(prog.respond));
+programsRouter.post("/:applicationId/withdraw", asyncHandler(prog.withdraw));

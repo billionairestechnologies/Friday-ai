@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, GraduationCap, LifeBuoy, Loader2, MessageSquar
 import { api } from "@/lib/api";
 import { useChat } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
+import { ProgramsPanel } from "./programs-panel";
 
 /**
  * Help & support, in the app: message the team (lands in the Team Console's support inbox and is
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 type TicketRow = { id: string; number: number; subject: string; status: string; created_at: string; last_message_at: string };
 type TicketDetail = TicketRow & { messages: { id: string; author_type: "user" | "staff" | "system"; body: string; created_at: string }[] };
-type Tab = "contact" | "tickets" | "redeem";
+type Tab = "contact" | "tickets" | "redeem" | "programs";
 
 const STATUS_STYLE: Record<string, string> = {
   open: "bg-[#4f8cff]/15 text-[#4f8cff]",
@@ -48,7 +49,7 @@ export function SupportCenter() {
     params.delete("support");
     window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
     // ?support=contact (from the mobile apps' "Help & support"), ?support=redeem, or a ticket number.
-    setTab(value === "contact" || value === "redeem" ? (value as Tab) : "tickets");
+    setTab(value === "contact" || value === "redeem" || value === "programs" ? (value as Tab) : "tickets");
     setDialog("help");
     if (number) {
       api
@@ -76,9 +77,10 @@ export function SupportCenter() {
           <div className="mx-6 mt-4 flex rounded-full bg-chip p-0.5">
             {(
               [
-                ["contact", "Contact us", MessageSquare],
-                ["tickets", "My requests", LifeBuoy],
-                ["redeem", "Redeem a code", Ticket],
+                ["contact", "Contact", MessageSquare],
+                ["tickets", "Requests", LifeBuoy],
+                ["redeem", "Redeem", Ticket],
+                ["programs", "Programmes", GraduationCap],
               ] as const
             ).map(([id, label, Icon]) => (
               <button
@@ -102,6 +104,7 @@ export function SupportCenter() {
                 {tab === "contact" && <ContactForm onSent={() => setTab("tickets")} />}
                 {tab === "tickets" && (openTicket ? <TicketThread id={openTicket} onBack={() => setOpenTicket(null)} /> : <TicketList onOpen={setOpenTicket} />)}
                 {tab === "redeem" && <RedeemForm />}
+                {tab === "programs" && <ProgramsPanel />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -273,7 +276,7 @@ function RedeemForm() {
         setBusy(true);
         setResult(null);
         try {
-          const r = await api.post<{ status: "applied" | "pending" | "discount"; message: string }>("/offers/redeem", { code, proof });
+          const r = await api.post<{ status: "applied" | "credits" | "pending" | "discount"; message: string }>("/offers/redeem", { code, proof });
           setResult({ tone: r.status === "pending" ? "wait" : "ok", text: r.message });
           setNeedsProof(false);
         } catch (err) {

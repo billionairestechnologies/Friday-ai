@@ -7,6 +7,7 @@ import * as ul from "../controllers/usageLedgerController.js";
 import * as mail from "../controllers/mailController.js";
 import * as mult from "../controllers/multiplierController.js";
 import * as credits from "../controllers/creditsController.js";
+import * as prog from "../controllers/programController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -92,6 +93,13 @@ consoleRouter.delete("/plans/offers/:offerId", can("plans.manage"), h(p.deleteOf
 consoleRouter.post("/plans/grants", can("plans.manage"), h(p.grant));
 consoleRouter.post("/plans/grants/:grantId/revoke", can("plans.manage"), h(p.revoke));
 consoleRouter.post("/plans/redemptions/:redemptionId/review", can("plans.review"), h(p.review));
+
+// Student / startup / company programmes (supabase 0061).
+consoleRouter.get("/programs", can("plans.view"), h(prog.consoleOverview));
+consoleRouter.post("/programs/applications/:applicationId/decide", can("plans.review"), h(prog.decide));
+consoleRouter.post("/programs/applications/:applicationId/retry", can("plans.review"), h(prog.retry));
+consoleRouter.get("/programs/applications/:applicationId/evidence/:fileId", can("plans.review"), h(prog.evidence));
+consoleRouter.post("/programs/settings/:program", can("plans.manage"), h(prog.saveSettings));
 
 consoleRouter.get("/audit", can("audit.view"), h(c.auditLog));
 
