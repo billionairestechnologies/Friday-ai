@@ -52,6 +52,8 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -111,7 +113,7 @@ import kotlin.math.roundToInt
  * the home list opens its own dedicated page; only Account/Appearance/Notifications are visible
  * to guests, everything else needs a session.
  */
-private enum class SettingsSub { Profile, Appearance, Behavior, Voice, Billing, Usage, DataControls, Memory, Connectors }
+private enum class SettingsSub { Profile, Appearance, Behavior, Voice, Billing, Usage, DataControls, Memory, Connectors, Devices }
 
 @Composable
 fun SettingsScreen(
@@ -158,6 +160,9 @@ fun SettingsScreen(
         }
         SettingsSub.Connectors -> SubPageScaffold("MCP servers", onBack = { sub = null }) {
             com.friday.app.ui.agent.ConnectorsContent()
+        }
+        SettingsSub.Devices -> SubPageScaffold("Devices", onBack = { sub = null }) {
+            DevicesSection()
         }
         SettingsSub.DataControls -> SubPageScaffold("Data Controls", onBack = { sub = null }) {
             DataControlsSection(vm, onAccountDeleted = { sub = null; onBack() })
@@ -261,6 +266,8 @@ private fun SettingsHome(
                 Spacer(Modifier.height(18.dp))
                 SectionLabel("Data & Information")
                 SettingsCard {
+                    SettingsRow(Icons.Default.Devices, "Devices", onClick = { onOpen(SettingsSub.Devices) })
+                    SettingsDivider()
                     SettingsRow(Icons.Default.Storage, "Data Controls", onClick = { onOpen(SettingsSub.DataControls) })
                 }
 
@@ -274,6 +281,8 @@ private fun SettingsHome(
                 }
                 SettingsCard {
                     SettingsRow(Icons.Default.SupportAgent, "Help & support") { openWeb("/?support=contact") }
+                    SettingsDivider()
+                    SettingsRow(Icons.Default.School, "Student & startup programmes") { openWeb("/?support=programs") }
                     SettingsDivider()
                     SettingsRow(Icons.Default.MonitorHeart, "System status") { openWeb("/status") }
                 }
