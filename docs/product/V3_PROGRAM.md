@@ -42,8 +42,8 @@ through the same `UsageMeter`). Inventory against the brief:
 | 14–15 | Response experience engine + components | **Built in 07** — `friday-chart` / `friday-experience` data blocks (allow-listed, validated on server and client, readable fallback), chart component, model guidance ("don't force it") | `structuredBlocks.ts`, `lib/experiences`, `components/experiences` |
 | 16–19 | Artifact studio + documents | **Built in 08 (on Pages)** — targeted edits (one slide / one section / one cell / exact text; ambiguous → nothing changes, model asks), version compare (doc lines, sheet cells, slides), duplicate; versions, restore, CAS, export already existed | `pages/pageEdits.ts`, `routes/pages.tsx` |
 | 20 | File storage security | **Partial** — owner-scoped storage, SSRF guard; no content sniffing / malware scan | `attachmentStorage.ts` |
-| 21 | Image edit continuity | **Missing** — generation only | — |
-| 22 | Jobs / turn lifecycle | **Partial** — `active_turns` heartbeat + resume; stream stall watchdog (bae289b) | `services/jobs` |
+| 21 | Image edit continuity | **Built in 09** — edits always send the real image (attachment / last / numbered image), ambiguity → ask, every result a new asset with lineage (`image_assets`), failures never replace the last good image | `agent/tools/image.ts`, `0064` |
+| 22 | Jobs / turn lifecycle | **Partial** — `active_turns` heartbeat + resume, drain on deploy, stream stall watchdog; no general queue / dead-letter / tenant fairness yet | `services/jobs` |
 | 23 | Device/session limits | **Missing** (policy decision needed before enforcing caps) | — |
 | 26 | Observability | **Partial** — status probes, provider issues, crash reports, structured logger | `services/status` |
 | 36 | Interactive gallery + offside simulator | **Built in 07** — /gallery (search, categories), offside simulator (drag, keyboard, boundaries tested), EMI calculator, projectile explorer; shareable state in the URL | `routes/gallery.tsx` |
@@ -60,8 +60,8 @@ through the same `UsageMeter`). Inventory against the brief:
 | 05 | Benefit popups + versioned one-time campaigns + inbox + benefit email (web; Android/iOS keep the old /updates/seen path) | 04 | **Merged into v3** (PR #7); needs migration 0062 on prod before release |
 | 06 | Finance actuals: payment ledger, cash vs earned vs deferred, margins, burn, break-even, reconciliation | — | **Merged into v3** (PR #8); needs migration 0063 on prod before release |
 | 07 | Experience engine: structured chart/experience blocks, gallery, offside simulator, EMI, projectile | — | **Merged into v3** (PR #9); no migration |
-| 08 | Artifact studio on Pages: targeted NL edits, compare versions, duplicate | 07 | **PR open** (`feat/v3-08-artifacts`); no migration |
-| 09 | Reliability: image asset lineage + edit routing, job states, load test on staging | — | planned |
+| 08 | Artifact studio on Pages: targeted NL edits, compare versions, duplicate | 07 | **Merged into v3** (PR #10); no migration |
+| 09 | Reliability: image lineage + exact edit targeting; staged load-test harness (refuses prod) | — | **PR open** (`feat/v3-09-reliability`); needs migration 0064; load test **blocked: no staging** |
 | 10 | Power Skills: manifest schema, versions, declared permissions enforced server-side, eval harness, Skill Builder | 07 | planned |
 | 11 | Sessions & devices: registry across web/CLI/IDE, revocation, user device page (policy first) | — | needs owner policy |
 

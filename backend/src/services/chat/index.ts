@@ -52,7 +52,7 @@ import { detectBuildIntent } from "../projectBuild/intent.js";
 import { invalidateMemoized } from "../../utils/ttlMemo.js";
 import { streamWithHedging } from "./hedgedStream.js";
 import { buildModelDriven, runBuildAgent } from "../projectBuild/agent.js";
-import { imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
+import { chatImages, imageTool, lastGeneratedImageUrl } from "../agent/tools/image.js";
 import { researchAgentsTool } from "../agent/tools/research.js";
 import { setTurnKind } from "../jobs/turns.js";
 import { projectSearchTool } from "../agent/tools/projectSearch.js";
@@ -927,6 +927,7 @@ async function streamTurn(
         ...(await (toolsetPromise ?? buildToolset(userId))),
         imageTool({
           lastImageUrl: lastGeneratedImageUrl(historyWithImages),
+          images: chatImages(historyWithImages),
           attachedImage: currentImageAttachment?.dataUrl ?? null,
           imagesPerDay: (await entitlementsPromise).imagesPerDay,
         }),
