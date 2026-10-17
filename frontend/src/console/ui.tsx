@@ -128,13 +128,15 @@ export function Stat({ label, value, hint, accent }: { label: string; value: Rea
   );
 }
 
+// Pale text reads on the dark theme; the light theme (html.light) needs the deep shades — the
+// -300s were near-invisible on white (every console badge).
 const TONES: Record<string, string> = {
   neutral: "bg-chip text-muted",
-  blue: "bg-[#4f8cff]/15 text-[#8fb4ff]",
-  green: "bg-emerald-500/15 text-emerald-300",
-  amber: "bg-amber-500/15 text-amber-300",
-  red: "bg-red-500/15 text-red-300",
-  purple: "bg-purple-500/15 text-purple-300",
+  blue: "bg-[#4f8cff]/15 text-[#8fb4ff] [.light_&]:text-[#1d4ed8]",
+  green: "bg-emerald-500/15 text-emerald-300 [.light_&]:text-emerald-700",
+  amber: "bg-amber-500/15 text-amber-300 [.light_&]:text-amber-700",
+  red: "bg-red-500/15 text-red-300 [.light_&]:text-red-700",
+  purple: "bg-purple-500/15 text-purple-300 [.light_&]:text-purple-700",
 };
 
 export function Badge({ children, tone = "neutral", className }: { children: ReactNode; tone?: keyof typeof TONES | string; className?: string }) {

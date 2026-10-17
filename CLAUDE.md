@@ -118,6 +118,9 @@ Gotchas:
   `version`; "Show again" bumps it) and acted on (`/updates/act`: dismissed/acknowledged/clicked, forward-only); CTA links allow-listed (`safeCtaUrl`).
   `services/notificationService.ts#notify` is the ONE way to tell a user something (inbox row, one-time popup, push, email: 'account' always, 'marketing'
   honours the opt-out). Web: `whats-new-modal.tsx`, `benefit-popup.tsx`, `inbox-button.tsx` (sidebar bell).
+- Finance actuals (migration 0063): `payment_ledger` (payment/refund/chargeback + Razorpay fee, keyed on Razorpay ids, one payment per order) written
+  by the webhook; `finance_revenue()` = cash vs revenue earned straight-line over each payment's term vs deferred; `finance/summary.ts` labels every
+  figure actual/entered/calculated/estimate with its formula (Console → Finance → Summary, `GET /console/finance/summary`).
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →

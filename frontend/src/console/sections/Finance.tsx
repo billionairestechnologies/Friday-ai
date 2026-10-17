@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCan } from "../access";
 import { Badge, Button, Card, Drawer, EmptyState, ErrorNote, Field, Input, Loading, PageHeader, Segmented, Select, Stat, Textarea, Toggle, act, useResource } from "../ui";
+import { FinanceSummary } from "./FinanceSummary";
 
 /**
  * Finance (Team Console): what every model costs us vs what we charge (per 1M tokens, ₹ and %),
@@ -117,13 +118,14 @@ const profitTone = (n: number) => (n > 0 ? "text-emerald-400" : n < 0 ? "text-da
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function Finance() {
-  const [tab, setTab] = useState<"pnl" | "live" | "pricing" | "expenses">("pnl");
+  const [tab, setTab] = useState<"summary" | "pnl" | "live" | "pricing" | "expenses">("summary");
   return (
     <>
       <PageHeader title="Finance" description="Model cost vs price per 1M tokens, profit by model, the company P&L and expenses — all in ₹." />
       <div className="mb-5">
-        <Segmented value={tab} onChange={setTab} options={[{ value: "pnl", label: "Profit & loss" }, { value: "live", label: "Live usage" }, { value: "pricing", label: "Model pricing" }, { value: "expenses", label: "Expenses" }]} />
+        <Segmented value={tab} onChange={setTab} options={[{ value: "summary", label: "Summary" }, { value: "pnl", label: "Profit & loss" }, { value: "live", label: "Live usage" }, { value: "pricing", label: "Model pricing" }, { value: "expenses", label: "Expenses" }]} />
       </div>
+      {tab === "summary" && <FinanceSummary />}
       {tab === "pnl" && <PnL />}
       {tab === "live" && <LiveUsage />}
       {tab === "pricing" && <Pricing />}

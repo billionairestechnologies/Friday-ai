@@ -255,8 +255,61 @@ export function verifyRazorpayWebhook(rawBody: Buffer, signature: string | undef
   return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
-type PaymentEntity = { id?: unknown; order_id?: unknown; error_description?: unknown };
-type RefundEntity = { id?: unknown; payment_id?: unknown; amount?: unknown };
+type PaymentEntity = { id?: unknown; order_id?: unknown; error_description?: unknown; amount?: unknown; currency?: unknown; fee?: unknown; tax?: unknown; created_at?: unknown };
+type RefundEntity = { id?: unknown; payment_id?: unknown; amount?: unknown; currency?: unknown; created_at?: unknown };
+type DisputeEntity = { id?: unknown; payment_id?: unknown; amount?: unknown; currency?: unknown; created_at?: unknown };
+
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : typeof v === "string" && /^\d+$/.test(v) ? Number(v) : null);
+/** Razorpay timestamps are unix seconds. */
+const when = (v: unknown): string => (typeof v === "number" && v > 0 ? new Date(v * 1000).toISOString() : new Date().toISOString());
+
+/**
+ * Writes one money movement to payment_ledger (supabase 0063), keyed on Razorpay's own id so a
+ * redelivered webhook records it once. Never throws into the webhook: the plan change matters more,
+ * and a missing row shows up in Finance → Reconciliation.
+ */
+async function recordMoney(row: {
+  kind: "payment" | "refund" | "chargeback";
+  ref: string;
+  orderId: string | null;
+  userId: string | null;
+  organizationId: string | null;
+  plan: string | null;
+  amountPaise: number;
+  currency: string;
+  feePaise?: number | null;
+  taxPaise?: number | null;
+  occurredAt: string;
+  termStart?: string | null;
+  termEnd?: string | null;
+}) {
+  const { error } = await supabaseAdmin.from("payment_ledger").insert(
+    {
+      provider: "razorpay",
+      provider_ref: row.ref,
+      kind: row.kind,
+      order_id: row.orderId,
+      user_id: row.userId,
+      organization_id: row.organizationId,
+      plan: row.plan,
+      amount_paise: row.amountPaise,
+      currency: row.currency,
+      fee_paise: row.feePaise ?? null,
+      tax_paise: row.taxPaise ?? null,
+      occurred_at: row.occurredAt,
+      term_start: row.termStart ?? null,
+      term_end: row.termEnd ?? null,
+    },
+  );
+  // 23505 = already recorded (same Razorpay id, or this order's payment came in by the other event).
+  if (error && error.code !== "23505") logger.error("payment_ledger_write_failed", { kind: row.kind, ref: row.ref, error: error.message });
+}
+
+function addMonths(iso: string, months: number): string {
+  const d = new Date(iso);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString();
+}
 
 /**
  * Razorpay → plans. Everything that changes what someone can use runs through an idempotent SQL
@@ -282,9 +335,20 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
     if (eventError && eventError.code !== "23505") logger.warn("razorpay_webhook_event_log_failed", { eventError });
   }
 
-  const entities = payload.payload as { payment?: { entity?: PaymentEntity }; refund?: { entity?: RefundEntity } } | undefined;
+  const entities = payload.payload as { payment?: { entity?: PaymentEntity }; refund?: { entity?: RefundEntity }; dispute?: { entity?: DisputeEntity } } | undefined;
   const paymentEntity = entities?.payment?.entity;
   const refundEntity = entities?.refund?.entity;
+
+  // A dispute the customer won (chargeback): money gone, access unchanged — recorded for Finance only.
+  if (eventType === "payment.dispute.lost") {
+    const dispute = entities?.dispute?.entity;
+    const payId = typeof dispute?.payment_id === "string" ? dispute.payment_id : null;
+    const { data: o } = payId ? await supabaseAdmin.from("razorpay_orders").select("razorpay_order_id, user_id, organization_id, plan").eq("razorpay_payment_id", payId).maybeSingle() : { data: null };
+    if (typeof dispute?.id === "string" && num(dispute.amount) != null) {
+      await recordMoney({ kind: "chargeback", ref: dispute.id, orderId: (o?.razorpay_order_id as string) ?? null, userId: (o?.user_id as string) ?? null, organizationId: (o?.organization_id as string) ?? null, plan: (o?.plan as string) ?? null, amountPaise: num(dispute.amount)!, currency: typeof dispute.currency === "string" ? dispute.currency : "INR", occurredAt: when(dispute.created_at) });
+    }
+    return;
+  }
   const paymentId = typeof paymentEntity?.id === "string" ? paymentEntity.id : typeof refundEntity?.payment_id === "string" ? refundEntity.payment_id : null;
   let orderId = typeof paymentEntity?.order_id === "string" ? paymentEntity.order_id : null;
 
@@ -330,6 +394,9 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
   }
 
   if (refunded) {
+    if (refundEntity && typeof refundEntity.id === "string" && num(refundEntity.amount) != null) {
+      await recordMoney({ kind: "refund", ref: refundEntity.id, orderId, userId: order.user_id as string, organizationId: (order.organization_id as string) ?? null, plan, amountPaise: num(refundEntity.amount)!, currency: typeof refundEntity.currency === "string" ? refundEntity.currency : "INR", occurredAt: when(refundEntity.created_at) });
+    }
     if (plan === "pro" || plan === "premium") {
       const { error: refundError } = await supabaseAdmin.rpc("quota_apply_refund", { p_user: order.user_id, p_plan: plan, p_months: months, p_order: orderId });
       if (refundError) throw new Error(`refund apply failed: ${refundError.message}`);
@@ -345,6 +412,31 @@ export async function handleRazorpayWebhook(payload: Record<string, unknown>) {
     .update({ status: "paid", razorpay_payment_id: paymentId, updated_at: new Date().toISOString() })
     .eq("razorpay_order_id", orderId);
   if (updateError) throw new Error(`razorpay order update failed: ${updateError.message}`);
+  {
+    // The money, with the period it pays for (revenue is recognised over it — supabase 0063).
+    const occurredAt = when(paymentEntity?.created_at);
+    let termEnd = addMonths(occurredAt, months);
+    if (plan === "package" && metadata.packageId) {
+      const { data: pkg } = await supabaseAdmin.from("plan_packages").select("duration_days").eq("id", metadata.packageId).maybeSingle();
+      if (pkg?.duration_days) termEnd = new Date(Date.parse(occurredAt) + Number(pkg.duration_days) * 86_400_000).toISOString();
+    }
+    const { data: amounts } = await supabaseAdmin.from("razorpay_orders").select("amount_paise, currency").eq("razorpay_order_id", orderId).maybeSingle();
+    await recordMoney({
+      kind: "payment",
+      ref: paymentId ?? `order:${orderId}`,
+      orderId,
+      userId: order.user_id as string,
+      organizationId: (order.organization_id as string) ?? null,
+      plan,
+      amountPaise: num(paymentEntity?.amount) ?? Number(amounts?.amount_paise ?? 0),
+      currency: typeof paymentEntity?.currency === "string" ? paymentEntity.currency : ((amounts?.currency as string) ?? "INR"),
+      feePaise: num(paymentEntity?.fee),
+      taxPaise: num(paymentEntity?.tax),
+      occurredAt,
+      termStart: occurredAt,
+      termEnd,
+    });
+  }
   if (metadata.offerId && order.status !== "paid") await recordDiscountUse(metadata.offerId, order.user_id as string, orderId).catch(() => {});
 
   if (plan === "package" && metadata.packageId) {

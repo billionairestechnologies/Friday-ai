@@ -131,6 +131,7 @@ consoleRouter.get("/models/multipliers", can("providers.view"), h(mult.overview)
 consoleRouter.post("/models/multipliers", can("models.multipliers"), h(mult.publish));
 consoleRouter.post("/models/multipliers/:multiplierId/cancel", can("models.multipliers"), h(mult.cancel));
 consoleRouter.get("/finance/live", can("finance.view"), h(fin.live));
+consoleRouter.get("/finance/summary", can("finance.view"), h(fin.summary));
 consoleRouter.get("/finance/report", can("finance.view"), h(fin.report));
 consoleRouter.get("/finance/pricing", can("finance.view"), h(fin.pricing));
 consoleRouter.post("/finance/pricing", can("finance.manage"), h(fin.savePrice));

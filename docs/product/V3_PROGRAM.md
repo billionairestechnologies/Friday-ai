@@ -37,7 +37,7 @@ through the same `UsageMeter`). Inventory against the brief:
 | 9 | Pop-ups / announcements | **Built in 05** — atomic display claim (once per person per version, across tabs/devices), state tracking, new-version re-show, banner variant, benefit popups, inbox, consent-aware benefit email | `announcementService.ts`, `notificationService.ts`, `0062` |
 | 10 | Email campaigns | **Exists** — audience, test, schedule, send ledger, signed unsubscribe (Resend); delivery webhooks unverified | `campaignService.ts` |
 | 11 | Customer profiles | **Partial** — user lookup, plan, usage; no unified timeline, sessions | `Users` section |
-| 12 | Finance | **Partial** — model cost vs sell, live usage, expenses, P&L estimate; revenue from Razorpay not reconciled as actuals | `services/finance/*` |
+| 12 | Finance | **Built in 06** — payment ledger (payments, refunds, chargebacks, fees), cash vs earned (straight-line) vs deferred, margins, burn, break-even, credit exposure, reconciliation; every figure labelled actual / entered / calculated / estimate | `finance/summary.ts`, `0063` |
 | 13 | Provider/model registry + health | **Exists** — keys, health, provider issues, status page | `adminProviders`, `services/status` |
 | 14–15 | Response experience engine + components | **Partial** — markdown, code, file cards, Pages (doc/sheet/slides); no typed component protocol, charts, interactive components | `message-thread.tsx`, `pages/*` |
 | 16–19 | Artifact studio + documents | **Partial** — Pages with versions + CAS, pptx/xlsx/docx/pdf render, edit-in-same-format | `services/pages`, `services/documents` |
@@ -57,8 +57,8 @@ through the same `UsageMeter`). Inventory against the brief:
 | 03a | Model usage multipliers: versioned, scheduled, promo overrides, preview, history, applied value stored per ledger row | ledger 0057 | **Merged into v3** (PR #4); needs migration 0059 on prod before release |
 | 03b | Credits: bulk grants with preview + caps, expiry, approval threshold, grant → notification + push (popup in 05, email in 05) | 03a | **Merged into v3** (PR #5); needs migration 0060 on prod before release |
 | 04 | Offers v2 (credits, states, stacking, atomic redemption) + student/startup/company programmes | 03b | **Merged into v3** (PR #6); needs migration 0061 on prod before release |
-| 05 | Benefit popups + versioned one-time campaigns + inbox + benefit email (web; Android/iOS keep the old /updates/seen path) | 04 | **PR open** (`feat/v3-05-popups`); needs migration 0062 on prod before release |
-| 06 | Finance actuals: Razorpay payments/refunds ledger, cash vs recognised, burn, break-even | — | planned |
+| 05 | Benefit popups + versioned one-time campaigns + inbox + benefit email (web; Android/iOS keep the old /updates/seen path) | 04 | **Merged into v3** (PR #7); needs migration 0062 on prod before release |
+| 06 | Finance actuals: payment ledger, cash vs earned vs deferred, margins, burn, break-even, reconciliation | — | **PR open** (`feat/v3-06-finance`); needs migration 0063 on prod before release |
 | 07 | Experience engine: typed response-component protocol, charts/tables/diagrams, gallery, offside simulator | — | planned |
 | 08 | Artifact studio: unified artifacts over Pages + files, diff/restore, NL targeted edits | 07 | planned |
 | 09 | Reliability: image asset lineage + edit routing, job states, load test on staging | — | planned |

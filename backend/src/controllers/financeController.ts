@@ -1,4 +1,5 @@
 import { liveUsage } from "../services/finance/liveUsage.js";
+import { financeSummary, financeTrend } from "../services/finance/summary.js";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler.js";
@@ -118,6 +119,16 @@ export async function settings(req: Request, res: Response) {
 
 export async function live(_req: Request, res: Response) {
   res.json(await liveUsage(24));
+}
+
+/** GET /console/finance/summary — cash vs revenue, costs, margins, burn, break-even, reconciliation (supabase 0063). */
+export async function summary(req: Request, res: Response) {
+  const q = z.object({ from: date.optional(), to: date.optional(), trend: z.coerce.boolean().optional() }).parse(req.query);
+  const to = q.to ?? new Date().toISOString().slice(0, 10);
+  const from = q.from ?? `${to.slice(0, 7)}-01`;
+  if (from > to) throw new HttpError(400, "The start date is after the end date");
+  const [s, trend] = await Promise.all([financeSummary(from, to), q.trend === false ? Promise.resolve([]) : financeTrend(6)]);
+  res.json({ ...s, trend });
 }
 
 export async function report(req: Request, res: Response) {
