@@ -10,7 +10,7 @@ import {
   type Plan,
 } from "./tierConfig.js";
 import { getPlanCatalog } from "./planCatalog.js";
-import { snapshotFromRow, type QuotaBlockReason, type QuotaSnapshot } from "./allowance.js";
+import { snapshotFromRow, type QuotaBlockReason, type QuotaSnapshot, allowanceConsumed } from "./allowance.js";
 
 export type { Plan } from "./tierConfig.js";
 
@@ -323,6 +323,10 @@ export type QuotaStatus = {
     used: number;
     adjustments: number;
     reserved: number;
+    /** Unspent credit-grant balance (on top of the month's allowance; see supabase 0060). */
+    credits: number;
+    /** This period's usage that credits paid for. */
+    creditDrawn: number;
     remaining: number;
     status: "active" | "suspended";
     subscription: SubscriptionState;
@@ -352,7 +356,7 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
   const s = snapshotFromRow(row);
   // Re-read the plan: quota_sync may just have expired a lapsed term.
   const after = orgId ? effective : await planLookup(userId);
-  const consumed = s.used + s.adjustments;
+  const consumed = allowanceConsumed(s);
   const subscription: SubscriptionState =
     s.status === "suspended"
       ? "suspended"
@@ -374,6 +378,8 @@ export async function getQuotaStatus(userId: string): Promise<QuotaStatus> {
       used: s.used,
       adjustments: s.adjustments,
       reserved: s.reserved,
+      credits: s.credits,
+      creditDrawn: s.creditDrawn,
       remaining: Math.max(0, s.remaining),
       status: s.status,
       subscription,

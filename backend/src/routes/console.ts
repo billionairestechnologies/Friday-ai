@@ -6,6 +6,7 @@ import * as fin from "../controllers/financeController.js";
 import * as ul from "../controllers/usageLedgerController.js";
 import * as mail from "../controllers/mailController.js";
 import * as mult from "../controllers/multiplierController.js";
+import * as credits from "../controllers/creditsController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -104,6 +105,18 @@ consoleRouter.post("/usage/accounts/:accountId/status", can("users.manage"), h(u
 consoleRouter.get("/usage/calls", can("users.view"), h(ul.calls));
 consoleRouter.get("/usage/export.csv", can("users.view"), h(ul.exportCsv));
 consoleRouter.post("/usage/reconcile", can("users.manage"), h(ul.reconcile));
+// Credit grants: bonus tokens on top of the monthly allowance, with expiry and approval (supabase 0060).
+consoleRouter.get("/credits", can("credits.view"), h(credits.overview));
+consoleRouter.get("/credits/grants", can("credits.view"), h(credits.list));
+consoleRouter.post("/credits/grants", can("credits.grant"), h(credits.grant));
+consoleRouter.post("/credits/bulk/preview", can("credits.grant"), h(credits.preview));
+consoleRouter.post("/credits/bulk", can("credits.grant"), h(credits.bulk));
+consoleRouter.post("/credits/grants/:grantId/approve", can("credits.approve"), h(credits.approve));
+consoleRouter.post("/credits/grants/:grantId/revoke", can("credits.grant"), h(credits.revoke));
+consoleRouter.post("/credits/batches/:batchId/approve", can("credits.approve"), h(credits.approveBatchRoute));
+consoleRouter.post("/credits/batches/:batchId/reject", can("credits.approve"), h(credits.rejectBatchRoute));
+consoleRouter.post("/credits/settings", can("credits.settings"), h(credits.settings));
+
 // Model usage multipliers: how much of the allowance each model's tokens cost (supabase 0059).
 consoleRouter.get("/models/multipliers", can("providers.view"), h(mult.overview));
 consoleRouter.post("/models/multipliers", can("models.multipliers"), h(mult.publish));

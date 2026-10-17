@@ -109,6 +109,8 @@ Gotchas:
   Premium 25M, Enterprise 30M/seat pooled; billable = fresh input + cache writes + output + 10% of cache reads (`quota/allowance.ts`).
   **× per-model usage multiplier** (migration 0059, `quota/multipliers.ts`, Console → Models & keys → Usage multipliers): append-only
   versions, scheduled/promo windows, applied value stored on every ledger row (meter `billable-v2`); 0× still records provider cost.
+  **+ bonus credits** (migration 0060, `quota/credits.ts`, Console → Credits): grants on top of the allowance that outlive the month,
+  expire per grant, used after the allowance (soonest expiry first), approval above a threshold, bulk with preview; `quota_remaining()` is the one balance rule.
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →

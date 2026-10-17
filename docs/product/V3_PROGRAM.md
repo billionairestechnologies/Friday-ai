@@ -31,7 +31,7 @@ through the same `UsageMeter`). Inventory against the brief:
 | 24 | RBAC + audit log | **Exists** — data-driven roles, `admin_audit_logs` | `console/permissions.ts`, `usageService.recordAdminAuditLog` |
 | 1.2 | Usage ledger (must not be replaced) | **Exists, authoritative** — Postgres `quota_*` functions, idempotent `token_ledger` | `supabase 0057`, `services/quota/*` |
 | 5 | **Model-wise usage multipliers** | **Built in 03a** — versions, schedule, promos, preview, history, stored per ledger row | `quota/multipliers.ts`, `0059` |
-| 6 | Credit grants / corrections | **Partial** — `quota_adjust` (idempotent, audited), console adjust; no bulk, no expiry, no approval threshold | `UsageLedger` section |
+| 6 | Credit grants / corrections | **Built in 03b** — grants with expiry that outlive the month, approval threshold, bulk with preview, revoke, user notice | `quota/credits.ts`, `0060` |
 | 7 | Offers | **Partial** — codes, plan grants, packages, % discounts, caps, student review; no bonus-credit offers, scheduling states, stacking rules | `plansService.ts`, `0032` |
 | 8 | Student / startup / company programs | **Partial** — student pass review; packages/org seats; no startup application, evidence upload | `plansService.ts` |
 | 9 | Pop-ups / announcements | **Partial** — What's New once per account (`announcement_views`); no per-user benefit popups, versioning, inbox | `announcementService.ts` |
@@ -54,8 +54,8 @@ through the same `UsageMeter`). Inventory against the brief:
 
 | # | Slice | Depends on | Status |
 |---|---|---|---|
-| 03a | Model usage multipliers: versioned, scheduled, promo overrides, preview, history, applied value stored per ledger row | ledger 0057 | **PR open** (`feat/v3-03-model-multipliers`); needs migration 0059 on prod before release |
-| 03b | Credits: bulk grants with preview + caps, expiry, approval threshold, grant → popup/email | 03a | planned |
+| 03a | Model usage multipliers: versioned, scheduled, promo overrides, preview, history, applied value stored per ledger row | ledger 0057 | **Merged into v3** (PR #4); needs migration 0059 on prod before release |
+| 03b | Credits: bulk grants with preview + caps, expiry, approval threshold, grant → notification + push (popup in 05, email in 05) | 03a | **PR open** (`feat/v3-03b-credits`); needs migration 0060 on prod before release |
 | 04 | Offers v2: bonus-credit + multiplier offers, lifecycle states, stacking; startup & company applications | 03b | planned |
 | 05 | Benefit popups + versioned one-time campaigns + inbox (web, then Android/iOS) | 04 | planned |
 | 06 | Finance actuals: Razorpay payments/refunds ledger, cash vs recognised, burn, break-even | — | planned |

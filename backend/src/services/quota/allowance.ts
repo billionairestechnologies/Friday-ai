@@ -29,10 +29,12 @@ export function billableTokens(raw: TokenUsage): number {
 }
 
 /**
- * The balance rule (mirrors quota_account_snapshot in supabase 0057):
- *   remaining = allowance − used − adjustments − reserved
- * `used` is Σ ledger billable tokens this period; `adjustments` is Σ admin corrections/bonuses
- * (negative = tokens given back); `reserved` is the holds of requests still running.
+ * The balance rule (mirrors quota_remaining in supabase 0060):
+ *   remaining = allowance + creditDrawn + credits − used − adjustments − reserved
+ * `used` is Σ ledger billable tokens this period; `adjustments` is Σ admin corrections (negative =
+ * tokens given back); `reserved` is the holds of requests still running; `credits` is the unspent
+ * balance of credit grants (survives rollovers, expires per grant); `creditDrawn` is how much of
+ * this period's usage credits paid for (usage past the allowance). No grants → 0057's rule.
  */
 export type QuotaSnapshot = {
   accountId: string;
@@ -41,6 +43,8 @@ export type QuotaSnapshot = {
   used: number;
   adjustments: number;
   reserved: number;
+  credits: number;
+  creditDrawn: number;
   remaining: number;
   periodStart: string;
   /**
@@ -52,14 +56,21 @@ export type QuotaSnapshot = {
   status: "active" | "suspended";
 };
 
-export function remainingOf(s: Pick<QuotaSnapshot, "allowance" | "used" | "adjustments" | "reserved">): number {
-  return s.allowance - s.used - s.adjustments - s.reserved;
+type Balance = Pick<QuotaSnapshot, "allowance" | "used" | "adjustments" | "reserved"> & Partial<Pick<QuotaSnapshot, "credits" | "creditDrawn">>;
+
+export function remainingOf(s: Balance): number {
+  return s.allowance + (s.creditDrawn ?? 0) + (s.credits ?? 0) - s.used - s.adjustments - s.reserved;
 }
 
-/** Percent of the allowance consumed (finalized usage + adjustments), clamped 0–100 for display. */
-export function percentUsed(s: Pick<QuotaSnapshot, "allowance" | "used" | "adjustments">): number {
+/** Period usage paid from the month's allowance (what credits covered is not), for the meter. */
+export function allowanceConsumed(s: Pick<QuotaSnapshot, "used" | "adjustments"> & Partial<Pick<QuotaSnapshot, "creditDrawn">>): number {
+  return s.used + s.adjustments - (s.creditDrawn ?? 0);
+}
+
+/** Percent of the MONTH'S allowance consumed (credits are shown separately), clamped 0–100 for display. */
+export function percentUsed(s: Pick<QuotaSnapshot, "allowance" | "used" | "adjustments"> & Partial<Pick<QuotaSnapshot, "creditDrawn">>): number {
   if (s.allowance <= 0) return 100;
-  return Math.max(0, Math.min(100, Math.floor(((s.used + s.adjustments) / s.allowance) * 100)));
+  return Math.max(0, Math.min(100, Math.floor((allowanceConsumed(s) / s.allowance) * 100)));
 }
 
 /** Snake-case JSON from the SQL functions → QuotaSnapshot. Every number is validated. */
@@ -75,6 +86,8 @@ export function snapshotFromRow(row: Record<string, unknown>): QuotaSnapshot {
     used: n(row.used),
     adjustments: n(row.adjustments),
     reserved: n(row.reserved),
+    credits: n(row.credits),
+    creditDrawn: n(row.credit_drawn),
     remaining: n(row.remaining),
     periodStart: new Date(String(row.period_start)).toISOString(),
     periodKey: String(row.period_start),

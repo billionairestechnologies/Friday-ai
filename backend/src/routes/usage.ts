@@ -6,10 +6,14 @@ import { getQuotaStatus } from "../services/quota/tokenQuotaService.js";
 import { usageReport } from "../services/quota/usageReport.js";
 import { resolveEntitlements } from "../services/quota/entitlements.js";
 import { USAGE_NOTICE_THRESHOLDS } from "../services/quota/allowance.js";
+import { mine as myCredits } from "../controllers/creditsController.js";
 
 export const usageRouter = Router();
 
 usageRouter.use(requireAuth);
+
+/** The signed-in person's bonus credit grants: what's left and when each expires (supabase 0060). */
+usageRouter.get("/credits", asyncHandler(myCredits));
 
 usageRouter.get(
   "/summary",
