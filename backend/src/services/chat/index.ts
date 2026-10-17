@@ -953,7 +953,7 @@ async function streamTurn(
         tools,
         maxRounds: research ? DEEP_RESEARCH_ROUNDS : undefined,
         // A user skill picked in the composer may only use its declared capabilities (supabase 0065).
-        allowedTools: activeSkill?.source === "user" ? allowedToolsFor(activeSkill.capabilities) : null,
+        allowedTools: activeSkill && activeSkill.source !== "builtin" ? allowedToolsFor(activeSkill.capabilities) : null,
         budget,
         ctx: {
           userId,

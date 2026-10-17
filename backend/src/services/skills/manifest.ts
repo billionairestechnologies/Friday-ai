@@ -13,7 +13,7 @@ export const CAPABILITIES = {
   web: { label: "Search and read the web", risk: "low", tools: ["web_search", "fetch_url", "research_in_parallel"] },
   documents: { label: "Create and edit documents and pages", risk: "low", tools: ["create_document", "create_page", "read_page", "update_page"] },
   project_files: { label: "Search your project's files", risk: "low", tools: ["search_project_files"] },
-  code: { label: "Run code in a sandbox", risk: "medium", tools: ["run_code"] },
+  code: { label: "Run code in a sandbox (incl. the skill's own scripts)", risk: "medium", tools: ["run_code", "run_skill_script"] },
   images: { label: "Generate and edit images (uses your image allowance)", risk: "medium", tools: ["generate_image"] },
   memory: { label: "Remember or forget things about you", risk: "medium", tools: ["remember", "forget"] },
   browser: { label: "Drive a web browser", risk: "high", tools: ["browser"] },
@@ -44,14 +44,30 @@ const evalCase = z.object({
 });
 export type EvalCase = z.infer<typeof evalCase>;
 
-export const manifestSchema = z.object({
-  name: z.string().trim().min(2).max(60),
-  description: z.string().trim().max(300).default(""),
-  instructions: z.string().trim().min(20).max(12000),
-  icon: z.string().trim().max(8).default("✨"),
-  capabilities: z.array(z.enum(CAPABILITY_IDS as [Capability, ...Capability[]])).max(CAPABILITY_IDS.length).nullable().default(null),
-  evals: z.array(evalCase).max(20).default([]),
+/** A script the skill can run with run_skill_script — only ever inside the isolated code sandbox. */
+const script = z.object({
+  name: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/, "lower-case letters, numbers, - and _"),
+  language: z.enum(["python", "javascript"]),
+  description: z.string().trim().max(200).default(""),
+  code: z.string().min(1).max(20_000),
 });
+export type SkillScript = z.infer<typeof script>;
+
+export const manifestSchema = z
+  .object({
+    name: z.string().trim().min(2).max(60),
+    description: z.string().trim().max(300).default(""),
+    instructions: z.string().trim().min(20).max(12000),
+    icon: z.string().trim().max(8).default("✨"),
+    capabilities: z.array(z.enum(CAPABILITY_IDS as [Capability, ...Capability[]])).max(CAPABILITY_IDS.length).nullable().default(null),
+    evals: z.array(evalCase).max(20).default([]),
+    scripts: z.array(script).max(5).default([]),
+  })
+  .refine((m) => m.scripts.length === 0 || (m.capabilities ?? DEFAULT_CAPABILITIES).includes("code"), {
+    message: "A skill with scripts must declare the “Run code” capability",
+    path: ["capabilities"],
+  })
+  .refine((m) => new Set(m.scripts.map((s) => s.name)).size === m.scripts.length, { message: "Two scripts have the same name", path: ["scripts"] });
 export type SkillManifest = z.infer<typeof manifestSchema>;
 
 /** Lint beyond the schema: things that make a skill unsafe or useless. Empty = fine. */
@@ -71,7 +87,7 @@ export function lintManifest(m: SkillManifest): string[] {
 }
 
 export function manifestHash(m: SkillManifest): string {
-  return createHash("sha256").update(JSON.stringify({ n: m.name, d: m.description, i: m.instructions, c: m.capabilities, e: m.evals })).digest("hex").slice(0, 32);
+  return createHash("sha256").update(JSON.stringify({ n: m.name, d: m.description, i: m.instructions, c: m.capabilities, e: m.evals, s: m.scripts })).digest("hex").slice(0, 32);
 }
 
 export type EvalResult = { name: string; passed: boolean; failures: string[]; excerpt: string };

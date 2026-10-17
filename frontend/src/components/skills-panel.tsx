@@ -13,8 +13,34 @@ import { cn } from "@/lib/utils";
  * loads a matching enabled skill by itself when a request calls for it.
  */
 
-type Skill = { id: string; source: "builtin" | "user"; name: string; description: string; icon: string; category: string; enabled: boolean; instructions?: string };
+type Skill = { id: string; source: "builtin" | "user" | "team"; name: string; description: string; icon: string; category: string; enabled: boolean; instructions?: string };
 type SkillsResponse = { categories: string[]; skills: Skill[]; limits: { customSkills: number } };
+type PendingShare = { id: string; name: string; description: string; icon: string; capabilities: string[] | null; instructions: string };
+
+/** Org owners/admins: skills members asked to share with the team (supabase 0067). */
+function TeamRequests() {
+  const [items, setItems] = useState<PendingShare[]>([]);
+  const load = () => void api.get<{ skills: PendingShare[] }>("/skills/team/pending").then((r) => setItems(r.skills)).catch(() => {});
+  useEffect(load, []);
+  if (!items.length) return null;
+  return (
+    <div className="mb-4 grid gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+      <p className="text-xs font-semibold text-muted">Team requests — skills members want to share</p>
+      {items.map((s) => (
+        <details key={s.id} className="rounded-xl bg-background p-2.5 text-sm">
+          <summary className="flex cursor-pointer items-center justify-between gap-2">
+            <span>{s.icon} {s.name} <span className="text-xs text-muted">· may use: {(s.capabilities ?? ["web", "documents"]).join(", ")}</span></span>
+            <span className="flex gap-1.5">
+              <button type="button" onClick={(e) => (e.preventDefault(), void api.post(`/skills/${s.id}/review`, { approve: false }).then(load))} className="h-7 rounded-full border border-border px-2.5 text-xs">Reject</button>
+              <button type="button" onClick={(e) => (e.preventDefault(), void api.post(`/skills/${s.id}/review`, { approve: true }).then(load))} className="h-7 rounded-full bg-foreground px-2.5 text-xs text-background">Approve</button>
+            </span>
+          </summary>
+          <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-chip p-2 text-xs whitespace-pre-wrap">{s.instructions}</pre>
+        </details>
+      ))}
+    </div>
+  );
+}
 
 const ICONS = ["✨", "🧠", "📊", "📝", "💼", "🧑‍💻", "🎯", "📈", "🎨", "📚", "⚡", "🔍"];
 
@@ -38,6 +64,7 @@ export function SkillsPanel({ query }: { query: string }) {
   const grouped = useMemo(() => {
     const skills = (data?.skills ?? []).filter((s) => !q || `${s.name} ${s.description}`.toLowerCase().includes(q));
     return (data?.categories ?? []).map((c) => ({ category: c, skills: skills.filter((s) => s.category === c) })).filter((g) => g.skills.length || g.category === "My skills");
+  // (Team skills show up as their own category when a teammate shares one.)
   }, [data, q]);
 
   async function toggle(skill: Skill) {
@@ -61,6 +88,7 @@ export function SkillsPanel({ query }: { query: string }) {
   const mine = data?.skills.filter((s) => s.source === "user").length ?? 0;
   return (
     <div>
+      <TeamRequests />
       <div className="mb-5 flex items-start gap-3 rounded-2xl border border-border bg-background/60 p-4">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-canvas/15 text-canvas"><Sparkles className="size-4.5" /></span>
         <div className="min-w-0 flex-1 text-sm">

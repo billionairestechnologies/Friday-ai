@@ -102,3 +102,15 @@ test("a composer-picked user skill is restricted from the first call", async () 
   });
   assert.equal(ran, false);
 });
+
+test("scripts need the code capability, unique names and safe names", () => {
+  const withScript = { ...base, scripts: [{ name: "summarise", language: "python", code: "print(FRIDAY_INPUT[:100])" }] };
+  assert.equal(manifestSchema.safeParse(withScript).success, false, "no code capability → refused");
+  assert.equal(manifestSchema.safeParse({ ...withScript, capabilities: ["code"] }).success, true);
+  assert.equal(manifestSchema.safeParse({ ...withScript, capabilities: ["code"], scripts: [{ name: "../etc", language: "python", code: "x" }] }).success, false);
+  assert.equal(manifestSchema.safeParse({ ...withScript, capabilities: ["code"], scripts: [{ name: "a", language: "ruby", code: "x" }] }).success, false);
+  const dup = { ...withScript, capabilities: ["code"], scripts: [withScript.scripts[0], withScript.scripts[0]] };
+  assert.equal(manifestSchema.safeParse(dup).success, false);
+  assert.ok(allowedToolsFor(["code"]).has("run_skill_script"));
+  assert.ok(!allowedToolsFor(["web"]).has("run_skill_script"), "a skill without code can't run scripts");
+});

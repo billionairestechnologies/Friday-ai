@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { SKILL_CATEGORIES } from "../services/skills/catalog.js";
-import { createSkill, deleteSkill, getSkill, listSkills, publishDraft, rollbackSkill, runSkillEvals, saveDraft, setSkillEnabled, setSkillStatus, skillDetail, updateSkill } from "../services/skills/skillService.js";
+import { createSkill, deleteSkill, getSkill, listSkills, pendingShares, publishDraft, reviewShare, shareSkill, unshareSkill, rollbackSkill, runSkillEvals, saveDraft, setSkillEnabled, setSkillStatus, skillDetail, updateSkill } from "../services/skills/skillService.js";
 import { CAPABILITIES } from "../services/skills/manifest.js";
 import { checkAndReserve, canUseModelTier } from "../services/quota/tokenQuotaService.js";
 import { UsageMeter } from "../services/quota/usageMeter.js";
@@ -31,7 +31,7 @@ skillsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const [skills, entitlements] = await Promise.all([listSkills(req.user!.id), entitlementsFor(req.user!.id)]);
-    res.json({ categories: [...SKILL_CATEGORIES, "My skills"], skills, limits: { customSkills: entitlements.customSkills } });
+    res.json({ categories: [...SKILL_CATEGORIES, "My skills", "Team skills"], skills, limits: { customSkills: entitlements.customSkills } });
   }),
 );
 // ── Skill Builder (supabase 0065, services/skills/manifest.ts) ──────────────────────────────────
@@ -83,6 +83,15 @@ skillsRouter.post(
       await meter.settle();
     }
   }),
+);
+
+// Team sharing (supabase 0067)
+skillsRouter.get("/team/pending", asyncHandler(async (req, res) => res.json({ skills: await pendingShares(req.user!.id) })));
+skillsRouter.post("/:id/share", asyncHandler(async (req, res) => res.json(await shareSkill(req.user!.id, skillId.parse(req.params.id), z.object({ organizationId: z.string().uuid() }).parse(req.body).organizationId))));
+skillsRouter.post("/:id/unshare", asyncHandler(async (req, res) => (await unshareSkill(req.user!.id, skillId.parse(req.params.id)), res.json({ ok: true }))));
+skillsRouter.post(
+  "/:id/review",
+  asyncHandler(async (req, res) => (await reviewShare(req.user!.id, skillId.parse(req.params.id), z.object({ approve: z.boolean() }).parse(req.body).approve), res.json({ ok: true }))),
 );
 
 skillsRouter.get("/:id", asyncHandler(async (req, res) => res.json({ skill: await getSkill(req.user!.id, skillId.parse(req.params.id)) })));
