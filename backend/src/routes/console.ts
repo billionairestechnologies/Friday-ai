@@ -5,6 +5,7 @@ import * as st from "../controllers/statusController.js";
 import * as fin from "../controllers/financeController.js";
 import * as ul from "../controllers/usageLedgerController.js";
 import * as mail from "../controllers/mailController.js";
+import * as mult from "../controllers/multiplierController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -103,6 +104,10 @@ consoleRouter.post("/usage/accounts/:accountId/status", can("users.manage"), h(u
 consoleRouter.get("/usage/calls", can("users.view"), h(ul.calls));
 consoleRouter.get("/usage/export.csv", can("users.view"), h(ul.exportCsv));
 consoleRouter.post("/usage/reconcile", can("users.manage"), h(ul.reconcile));
+// Model usage multipliers: how much of the allowance each model's tokens cost (supabase 0059).
+consoleRouter.get("/models/multipliers", can("providers.view"), h(mult.overview));
+consoleRouter.post("/models/multipliers", can("models.multipliers"), h(mult.publish));
+consoleRouter.post("/models/multipliers/:multiplierId/cancel", can("models.multipliers"), h(mult.cancel));
 consoleRouter.get("/finance/live", can("finance.view"), h(fin.live));
 consoleRouter.get("/finance/report", can("finance.view"), h(fin.report));
 consoleRouter.get("/finance/pricing", can("finance.view"), h(fin.pricing));

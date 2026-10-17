@@ -33,6 +33,26 @@ fresh input = prompt − cache reads − cache writes
 - **Cache reads count at 10% (owner decision, 2026-10-17).** One Build turn re-reads its transcript every round: about 1.2M prompt tokens, about 90% from cache.
 - Raw input / output / cached / cache-write / reasoning counts are stored on every ledger row next to the billable figure, so the rule can be audited or re-run. Code: `quota/allowance.ts#billableTokens`; normalizers: `tokenUsage.ts`.
 
+### Model usage multipliers (migration 0059, meter `billable-v2`)
+
+Each model can cost more or less of the allowance: **charged billable = ⌈billable (above) × the model's multiplier⌉**.
+Set in Console → Models & keys → **Usage multipliers** (permission `models.multipliers`; viewing needs `providers.view`).
+
+- **Versions, never edits.** `model_multipliers` is append-only. A *standing* value applies from its start time until a
+  later one; a *promotion* overrides it for `[start, end)`. Precedence: exact-provider promo > every-provider (`*`) promo >
+  exact standing > `*` standing > 1×. A revert is a new row with the old value. Scheduled rows can be withdrawn and running
+  promotions ended early (`cancelled_at`); a standing value already in effect can't be cancelled, only replaced.
+- **No retroactive change.** Every ledger row stores `usage_multiplier`, `multiplier_id` and `base_billable_tokens`;
+  changes can't be backdated (API refuses; SQL clamps the start to `now()`).
+- **Concurrency.** A publish names the newest row the admin saw per model (`expected_latest`); if a teammate published
+  since, the whole batch is refused with 409. Per-model advisory locks make concurrent publishes serialise.
+- **0× is free for the customer only** — `cost_usd` is still recorded, so Finance sees the real provider cost.
+- Non-chargeable rows (hedge losers, routing probes) stay at 0 whatever the multiplier.
+- The backend caches the config for 30 s (scheduled rows start/stop exactly on time since they're already cached;
+  a publish drops the cache in that process). If the config can't be read, the last loaded config is used, else 1×.
+- Known gap: the *first* hold of a turn (`middleware/quotaLimit.ts`) is sized unweighted; agent rounds after it are
+  sized at the model's multiplier, and any overrun is recorded in full (`overrun_tokens`) and blocks the next request.
+
 ### Subscription lifecycle
 
 Payments are one-time Razorpay orders: **1 calendar month** for monthly, **12 months** for annual (never "30 days": a term then ends exactly where an allowance period ends, so a short month can't produce a two-day extra period with a fresh allowance). There is no auto-renew. Every rule below runs in an idempotent SQL function keyed on the order, so a duplicate or retried webhook changes nothing.

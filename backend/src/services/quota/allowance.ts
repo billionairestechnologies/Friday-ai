@@ -18,7 +18,8 @@ import { normalizeUsage, type TokenUsage } from "../tokenUsage.js";
  * billable figure, so the rule can be audited or re-run.
  */
 export const CACHE_READ_WEIGHT = 0.1;
-export const METER_VERSION = "billable-v1";
+/** v2 (supabase 0059): charged billable = ⌈v1 billable × the model's usage multiplier⌉ (multipliers.ts). */
+export const METER_VERSION = "billable-v2";
 
 export function billableTokens(raw: TokenUsage): number {
   const u = normalizeUsage(raw);

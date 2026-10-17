@@ -34,6 +34,7 @@ export const PERMISSIONS = [
   { id: "plans.manage", group: "Plans & Offers", label: "Build packages, create offers, grant and revoke access" },
   { id: "providers.view", group: "Models", label: "See model providers and keys" },
   { id: "providers.manage", group: "Models", label: "Manage providers, keys and model tiers" },
+  { id: "models.multipliers", group: "Models", label: "Change model usage multipliers (how much of a plan's allowance each model costs)" },
   { id: "mail.manage", group: "Mail", label: "Manage team mail addresses, company domains and employee mailboxes" },
   { id: "mailbox.use", group: "Mail", label: "Use the Mailbox (own company mailbox + Gmail/other accounts)" },
   { id: "finance.view", group: "Finance", label: "See model prices, profitability, revenue and expenses" },

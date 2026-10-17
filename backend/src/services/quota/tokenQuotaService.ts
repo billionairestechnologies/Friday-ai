@@ -247,6 +247,10 @@ export type UsageEvent = {
   cache_write_tokens: number;
   reasoning_tokens: number;
   billable_tokens: number;
+  /** billable before the model multiplier (supabase 0059); billable_tokens = ⌈base × usage_multiplier⌉. */
+  base_billable_tokens?: number;
+  usage_multiplier?: number;
+  multiplier_id?: string | null;
   usage_source: "provider" | "estimated" | "none";
   call_status: "ok" | "partial" | "failed" | "aborted";
   feature: LedgerFeature;
