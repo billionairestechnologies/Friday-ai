@@ -55,6 +55,22 @@ export const PUBLIC_PAGES: Record<string, PageMeta> = {
     title: "Terms of Service — Friday AI",
     description: "The terms that apply to your use of Friday on web, Android and iOS.",
   },
+  "/gallery": {
+    title: "Interactive gallery — Friday AI",
+    description: "Learn by doing: an offside simulator, a loan EMI calculator and a projectile-motion explorer — every result calculated by exact rules.",
+  },
+  "/gallery/offside": {
+    title: "Offside, explained — interactive simulator · Friday AI",
+    description: "Drag the attacker and see instantly whether they're offside, why level is onside, and when an offside position becomes an offence.",
+  },
+  "/gallery/emi": {
+    title: "Loan EMI calculator — Friday AI",
+    description: "Your monthly instalment, total interest, and how each year's EMIs split between principal and interest.",
+  },
+  "/gallery/projectile": {
+    title: "Projectile motion explorer — Friday AI",
+    description: "Launch a ball at any speed and angle on Earth, the Moon, Mars or Jupiter and see why 45° goes furthest.",
+  },
   "/status": {
     title: "System Status — Friday AI",
     description: "Live status of Friday and every AI model it runs: uptime over 90 days, model success rates, current and past incidents. Report a problem to the team.",

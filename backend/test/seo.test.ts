@@ -44,3 +44,13 @@ test("robots.txt points at the sitemap, and the sitemap lists every public page"
   const xml = sitemapXml(new Date("2026-09-28T00:00:00Z"));
   for (const p of Object.keys(PUBLIC_PAGES)) assert.ok(xml.includes(`<loc>${SITE_ORIGIN}${p}</loc>`), p);
 });
+
+test("the interactive gallery is a public, indexable page (not a soft 404)", () => {
+  for (const path of ["/gallery", "/gallery/offside", "/gallery/emi", "/gallery/projectile"]) {
+    const { status, html } = renderIndexHtml(TEMPLATE, path, HOST);
+    assert.equal(status, 200, path);
+    assert.ok(!html.includes("noindex"), `${path} is indexable`);
+  }
+  assert.ok(sitemapXml(new Date()).includes("/gallery/offside"));
+  assert.equal(renderIndexHtml(TEMPLATE, "/gallery/nope", HOST).status, 404);
+});
