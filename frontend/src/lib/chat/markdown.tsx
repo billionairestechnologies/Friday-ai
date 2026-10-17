@@ -1,4 +1,6 @@
-import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, memo, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { parseChart } from "@/lib/experiences/chart";
+import { parseExperienceBlock } from "@/lib/experiences/registry";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
@@ -185,6 +187,37 @@ function FadeInImage({ src, alt }: { src?: string; alt?: string }) {
   );
 }
 
+const ChartBlock = lazy(() => import("@/components/experiences/chart-block").then((m) => ({ default: m.ChartBlock })));
+const ExperienceCard = lazy(() => import("@/components/experiences/experience-view").then((m) => ({ default: m.ExperienceCard })));
+
+/** `friday-chart` / `friday-experience`: JSON data, validated against the allow-list before anything renders. */
+function StructuredBlock({ lang, text, fallback }: { lang: "friday-chart" | "friday-experience"; text: string; fallback: ReactNode }) {
+  let raw: unknown = null;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return <>{fallback}</>;
+  }
+  if (lang === "friday-chart") {
+    const spec = parseChart(raw);
+    return spec ? (
+      <Suspense fallback={fallback}>
+        <ChartBlock spec={spec} />
+      </Suspense>
+    ) : (
+      <>{fallback}</>
+    );
+  }
+  const block = parseExperienceBlock(raw);
+  return block ? (
+    <Suspense fallback={fallback}>
+      <ExperienceCard id={block.meta.id} title={block.title ?? block.meta.title} params={block.params} />
+    </Suspense>
+  ) : (
+    <>{fallback}</>
+  );
+}
+
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_HIGHLIGHT = [rehypeHighlight];
 const NO_REHYPE: typeof REHYPE_HIGHLIGHT = [];
@@ -238,7 +271,10 @@ export const Markdown = memo(function Markdown({ text: rawText, live = false }: 
                 {children}
               </CodeBlock>
             );
-            return lang === "mermaid" && !live ? <MermaidBlock text={value} fallback={block} /> : block;
+            if (lang === "mermaid" && !live) return <MermaidBlock text={value} fallback={block} />;
+            // Model-supplied DATA for an allow-listed chart / experience; invalid or still streaming → the code block.
+            if ((lang === "friday-chart" || lang === "friday-experience") && !live) return <StructuredBlock lang={lang} text={value} fallback={block} />;
+            return block;
           },
           code: ({ className, children, node: _node, ...props }) => (
             <code className={className} {...props}>

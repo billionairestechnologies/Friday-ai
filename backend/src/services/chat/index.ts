@@ -27,6 +27,7 @@ import { detectImageIntent, findImageCorrection, isShortEnoughForCorrection, typ
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { rehostGeneratedImage } from "../providers/imageHosting.js";
 import { createStreamingLeakScrubber, scrubVendorLeak } from "../../utils/vendorLeak.js";
+import { sanitizeStructuredBlocks } from "./structuredBlocks.js";
 import { digitiseDocument, isDigitisable } from "../providers/sarvamDocAI.js";
 import { extractOfficeText, isOfficeDocument } from "../providers/officeDocs.js";
 import { extractPlainText, isPlainTextDocument } from "../providers/plainTextDocs.js";
@@ -1076,6 +1077,8 @@ async function streamTurn(
     // run after whichever branch produced the final text, before it's persisted/replayed into
     // future history. See utils/vendorLeak.ts.
     full = scrubVendorLeak(full);
+    // Chart / experience blocks are data for allow-listed components: anything invalid is saved as plain JSON.
+    full = sanitizeStructuredBlocks(full);
 
     // Real-traffic model uptime for /status: did the model that handled this turn actually answer?
     const outcomeModel = usedCandidate ?? candidates[0];

@@ -34,7 +34,7 @@ export const LIBRARY_CATEGORIES: LibraryCategory[] = [
 type Extracted = { kind: string; lang: string | null; category: LibraryCategory; title: string; content: string };
 
 const FENCE = /```([\w+-]*)[^\n]*\n([\s\S]*?)```/g;
-const SKIP_LANGS = new Set(["text", "txt", "plaintext", "markdown", "md", "console", "output", "diff", "log", "mermaid"]);
+const SKIP_LANGS = new Set(["text", "txt", "plaintext", "markdown", "md", "console", "output", "diff", "log", "mermaid", "friday-chart", "friday-experience"]);
 
 function looksLikeReact(body: string) {
   return (

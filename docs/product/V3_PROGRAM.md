@@ -39,14 +39,14 @@ through the same `UsageMeter`). Inventory against the brief:
 | 11 | Customer profiles | **Partial** — user lookup, plan, usage; no unified timeline, sessions | `Users` section |
 | 12 | Finance | **Built in 06** — payment ledger (payments, refunds, chargebacks, fees), cash vs earned (straight-line) vs deferred, margins, burn, break-even, credit exposure, reconciliation; every figure labelled actual / entered / calculated / estimate | `finance/summary.ts`, `0063` |
 | 13 | Provider/model registry + health | **Exists** — keys, health, provider issues, status page | `adminProviders`, `services/status` |
-| 14–15 | Response experience engine + components | **Partial** — markdown, code, file cards, Pages (doc/sheet/slides); no typed component protocol, charts, interactive components | `message-thread.tsx`, `pages/*` |
+| 14–15 | Response experience engine + components | **Built in 07** — `friday-chart` / `friday-experience` data blocks (allow-listed, validated on server and client, readable fallback), chart component, model guidance ("don't force it") | `structuredBlocks.ts`, `lib/experiences`, `components/experiences` |
 | 16–19 | Artifact studio + documents | **Partial** — Pages with versions + CAS, pptx/xlsx/docx/pdf render, edit-in-same-format | `services/pages`, `services/documents` |
 | 20 | File storage security | **Partial** — owner-scoped storage, SSRF guard; no content sniffing / malware scan | `attachmentStorage.ts` |
 | 21 | Image edit continuity | **Missing** — generation only | — |
 | 22 | Jobs / turn lifecycle | **Partial** — `active_turns` heartbeat + resume; stream stall watchdog (bae289b) | `services/jobs` |
 | 23 | Device/session limits | **Missing** (policy decision needed before enforcing caps) | — |
 | 26 | Observability | **Partial** — status probes, provider issues, crash reports, structured logger | `services/status` |
-| 36 | Interactive gallery + offside simulator | **Missing** | → Phase 7 |
+| 36 | Interactive gallery + offside simulator | **Built in 07** — /gallery (search, categories), offside simulator (drag, keyboard, boundaries tested), EMI calculator, projectile explorer; shareable state in the URL | `routes/gallery.tsx` |
 | 37–38 | Power Skills (manifests, permissions, evals) | **Partial** — 16 built-in playbooks + user skills, `use_skill`; no manifest schema, versions, permissions, evals | `services/skills` |
 | 1.2 | Public pay-as-you-go API | **Out of scope** (not touched) | — |
 
@@ -58,8 +58,8 @@ through the same `UsageMeter`). Inventory against the brief:
 | 03b | Credits: bulk grants with preview + caps, expiry, approval threshold, grant → notification + push (popup in 05, email in 05) | 03a | **Merged into v3** (PR #5); needs migration 0060 on prod before release |
 | 04 | Offers v2 (credits, states, stacking, atomic redemption) + student/startup/company programmes | 03b | **Merged into v3** (PR #6); needs migration 0061 on prod before release |
 | 05 | Benefit popups + versioned one-time campaigns + inbox + benefit email (web; Android/iOS keep the old /updates/seen path) | 04 | **Merged into v3** (PR #7); needs migration 0062 on prod before release |
-| 06 | Finance actuals: payment ledger, cash vs earned vs deferred, margins, burn, break-even, reconciliation | — | **PR open** (`feat/v3-06-finance`); needs migration 0063 on prod before release |
-| 07 | Experience engine: typed response-component protocol, charts/tables/diagrams, gallery, offside simulator | — | planned |
+| 06 | Finance actuals: payment ledger, cash vs earned vs deferred, margins, burn, break-even, reconciliation | — | **Merged into v3** (PR #8); needs migration 0063 on prod before release |
+| 07 | Experience engine: structured chart/experience blocks, gallery, offside simulator, EMI, projectile | — | **PR open** (`feat/v3-07-experiences`); no migration |
 | 08 | Artifact studio: unified artifacts over Pages + files, diff/restore, NL targeted edits | 07 | planned |
 | 09 | Reliability: image asset lineage + edit routing, job states, load test on staging | — | planned |
 | 10 | Power Skills: manifest schema, versions, declared permissions enforced server-side, eval harness, Skill Builder | 07 | planned |
