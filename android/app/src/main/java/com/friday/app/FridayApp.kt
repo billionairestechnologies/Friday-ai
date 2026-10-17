@@ -207,6 +207,7 @@ fun FridayApp(
                     user = ui.user,
                     plan = ui.plan,
                     updateAvailable = ui.updateInfo != null,
+                    unreadNotifications = ui.unreadNotifications,
                     recents = ui.chats,
                     currentId = ui.currentId,
                     onNewChat = {
@@ -265,6 +266,7 @@ fun FridayApp(
                 onClose = { page = "chat" },
                 onOpenChat = { id -> vm.openChat(id); page = "chat" },
             )
+            "inbox" -> com.friday.app.ui.settings.InboxScreen(vm = vm, onBack = { page = "chat" })
             "settings" -> com.friday.app.ui.settings.SettingsScreen(
                 vm = vm,
                 onBack = { page = "chat" },
@@ -403,15 +405,14 @@ fun FridayApp(
         )
     }
 
-    // "What's new": product updates published from the Team Console, shown once per account (the
-    // server records each view, so it's once across web, Android and iOS). Never over the consent gate.
-    val announcements = ui.announcements
-    if (gateUser != null && gateUser.policyVersion == FridayViewModel.POLICY_VERSION && announcements.isNotEmpty()) {
-        var index by remember(announcements) { mutableStateOf(0) }
-        val item = announcements[index.coerceIn(0, announcements.size - 1)]
-        val last = index >= announcements.size - 1
+    // "What's new": product updates published from the Team Console, one at a time. Each is claimed
+    // by the server right before it shows, so a version shows once per person across web, Android
+    // and iOS. Never over the consent gate. Benefit popups (credits, programme approvals) follow.
+    val consented = gateUser != null && gateUser.policyVersion == FridayViewModel.POLICY_VERSION
+    val item = ui.announcements.firstOrNull()
+    if (consented && item != null) {
         AlertDialog(
-            onDismissRequest = { vm.dismissAnnouncements() },
+            onDismissRequest = { vm.finishAnnouncement("dismissed") },
             title = {
                 Column {
                     Text(
@@ -429,29 +430,35 @@ fun FridayApp(
                     Text(item.title, fontWeight = FontWeight.SemiBold)
                 }
             },
-            text = {
-                Column {
-                    com.friday.app.ui.chat.MarkdownText(item.body)
-                    if (announcements.size > 1) {
-                        Spacer(Modifier.height(10.dp))
-                        Text("${index + 1} of ${announcements.size}", fontSize = 12.sp, color = Color(0xFF9CA3AF))
-                    }
-                }
-            },
+            text = { com.friday.app.ui.chat.MarkdownText(item.body) },
             confirmButton = {
-                TextButton(onClick = {
-                    if (last) vm.dismissAnnouncements() else index += 1
-                }) { Text(if (last) "Got it" else "Next") }
+                TextButton(onClick = { vm.finishAnnouncement("acknowledged") }) { Text("Got it") }
             },
             dismissButton = {
                 val cta = item.ctaUrl
                 if (cta != null && item.ctaLabel != null) {
                     TextButton(onClick = {
-                        vm.dismissAnnouncements(clickedId = item.id)
+                        vm.finishAnnouncement("clicked")
                         CustomTabsIntent.Builder().build().launchUrl(ctx, Uri.parse(cta))
                     }) { Text(item.ctaLabel) }
                 }
             },
+        )
+    }
+
+    val benefit = ui.benefitPopup
+    if (consented && item == null && benefit != null) {
+        AlertDialog(
+            onDismissRequest = { vm.acknowledgeBenefit() },
+            title = {
+                Column {
+                    Text("FOR YOU", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF059669))
+                    Spacer(Modifier.height(4.dp))
+                    Text(benefit.title, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            text = { com.friday.app.ui.chat.MarkdownText(benefit.body) },
+            confirmButton = { TextButton(onClick = { vm.acknowledgeBenefit() }) { Text("Got it") } },
         )
     }
 

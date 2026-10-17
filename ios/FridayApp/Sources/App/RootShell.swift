@@ -9,6 +9,7 @@ struct RootShell: View {
         ZStack {
             switch vm.page {
             case "settings": SettingsScreen()
+            case "inbox": InboxScreen()
             case "plans": PlansScreen()
             case "library": LibraryScreen()
             case "projects": ProjectsScreen()

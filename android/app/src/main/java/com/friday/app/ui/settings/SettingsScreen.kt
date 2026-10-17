@@ -696,6 +696,7 @@ private fun UsageSection(onUpgrade: () -> Unit = {}) {
             q.orgPool?.let { UsageBar("Team pool (${q.orgSeats} seats)", it, q.monthlyBreakdown, null) }
             q.weekly?.let { UsageBar("Weekly Limit", it, q.breakdown, null) }
             q.rolling?.let { UsageBar("5-Hour Limit", it, q.rollingBreakdown, null) }
+            if (q.credits > 0 || q.creditDrawn > 0) CreditsCard(q)
             q.memberCap?.let { UsageBar("Your Monthly Cap", it, emptyList(), "A personal sub-limit your org admin set within the shared pool.") }
             q.entitlements?.let { PlanIncludes(it) }
         }
@@ -731,6 +732,24 @@ private fun UsageBar(title: String, bucket: UsageBreakdown?, breakdown: List<Usa
         formatReset(bucket?.resetAt)?.let { Text(it, color = FridayMuted, fontSize = 12.sp) }
         help?.let { Text(it, color = FridayMuted, fontSize = 12.sp) }
         if (breakdown.isNotEmpty()) Text(breakdown.joinToString("  ·  ") { "${usageLabel(it.type)} ${maxOf(0, it.percent)}%" }, color = FridayMuted, fontSize = 12.sp)
+    }
+}
+
+/** Bonus credits (granted by the team or a programme) — used only after the month's tokens run out. */
+@Composable
+private fun CreditsCard(q: UsageQuota) {
+    val usingCredits = (q.monthly ?: q.orgPool)?.let { it.limit > 0 && it.used >= it.limit } == true && q.credits > 0
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(FridaySurface.copy(alpha = 0.5f)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Bonus credits", color = FridayText, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text("${compactTokens(q.credits)} left", color = FridayMuted, fontSize = 13.sp)
+        }
+        if (q.creditDrawn > 0) Text("${compactTokens(q.creditDrawn)} used this month", color = FridayMuted, fontSize = 12.sp)
+        Text(
+            if (usingCredits) "You've used this month's tokens — you're now using your bonus credits."
+            else "Used automatically after this month's tokens run out. They don't renew.",
+            color = if (usingCredits) FridayText else FridayMuted, fontSize = 12.sp,
+        )
     }
 }
 

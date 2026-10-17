@@ -207,8 +207,15 @@ final class FridayViewModel: ObservableObject {
     @Published var planLoaded: Bool = TokenStore.shared.hasSession() && TokenStore.shared.plan != nil
     @Published var updateInfo: UpdateApi.Info?
     /// Unseen "What's new" product updates (shown once, then marked seen server-side).
+    /// The What's New update on screen now (at most one; see loadAnnouncements).
     @Published var announcements: [Announcement] = []
     private var announcementsLoaded = false
+    private var announcementQueue: [Announcement] = []
+    /// A benefit granted to this person (credits, programme approval), shown once (supabase 0062).
+    @Published var benefitPopup: UserNotification?
+    private var benefitQueue: [UserNotification]?
+    @Published var inbox: [UserNotification] = []
+    @Published var unreadNotifications = 0
 
     // Voice preference (device-level, survives logout)
     @Published var voiceId: String?
@@ -765,14 +772,68 @@ final class FridayViewModel: ObservableObject {
     func loadAnnouncements() async {
         guard !announcementsLoaded, user?.policyVersion == Self.policyVersion else { return }
         announcementsLoaded = true
-        let pending = await EngagementApi.pending()
-        if !pending.isEmpty { announcements = pending }
+        // One at a time: each update is CLAIMED right before it shows (another device or tab may
+        // already have shown it); nothing that wasn't shown is marked seen. Benefits follow.
+        announcementQueue = await EngagementApi.pending()
+        await showNextAnnouncement()
+        await refreshInbox()
     }
 
-    func dismissAnnouncements(clickedId: String? = nil) async {
-        let ids = announcements.map(\.id)
+    private func showNextAnnouncement() async {
+        while !announcementQueue.isEmpty {
+            let next = announcementQueue.removeFirst()
+            if await EngagementApi.claim(next) {
+                announcements = [next]
+                return
+            }
+        }
         announcements = []
-        if !ids.isEmpty { await EngagementApi.markSeen(ids: ids, clickedId: clickedId) }
+        await showNextBenefit()
+    }
+
+    /// "Got it" (acknowledged) shows the next one; closing stops for now; the button counts as clicked.
+    func finishAnnouncement(_ state: String) async {
+        guard let current = announcements.first else { return }
+        announcements = []
+        await EngagementApi.act(current, state: state)
+        if state == "dismissed" {
+            announcementQueue = []
+            await showNextBenefit()
+        } else {
+            await showNextAnnouncement()
+        }
+    }
+
+    private func showNextBenefit() async {
+        if benefitQueue == nil { benefitQueue = await EngagementApi.popups() }
+        while let next = benefitQueue?.first {
+            benefitQueue?.removeFirst()
+            if await EngagementApi.claimPopup(next.id) {
+                benefitPopup = next
+                return
+            }
+        }
+    }
+
+    func acknowledgeBenefit() async {
+        guard let current = benefitPopup else { return }
+        benefitPopup = nil
+        await EngagementApi.acknowledge(current.id)
+        await showNextBenefit()
+    }
+
+    func refreshInbox() async {
+        let (items, unread) = await EngagementApi.inbox()
+        inbox = items
+        unreadNotifications = unread
+    }
+
+    /// Opening the inbox marks everything read.
+    func openedInbox() async {
+        guard unreadNotifications > 0 else { return }
+        unreadNotifications = 0
+        inbox = inbox.map { var n = $0; n.read = true; return n }
+        await EngagementApi.markAllRead()
     }
 
     func resendOtp() async {
@@ -829,6 +890,11 @@ final class FridayViewModel: ObservableObject {
     func logout() async {
         announcementsLoaded = false
         announcements = []
+        announcementQueue = []
+        benefitQueue = nil
+        benefitPopup = nil
+        inbox = []
+        unreadNotifications = 0
         queued = [:]
         for (_, job) in streamJobs { job.cancel() }
         streamJobs.removeAll()

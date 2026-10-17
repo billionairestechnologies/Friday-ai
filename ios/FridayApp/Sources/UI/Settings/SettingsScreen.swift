@@ -603,6 +603,7 @@ private struct UsagePage: View {
                 if let o = quota.orgPool { bar("Team pool (\(quota.orgSeats) seats)", o, quota.monthlyBreakdown, nil) }
                 if let w = quota.weekly { bar("Weekly Limit", w, quota.breakdown, nil) }
                 if let r = quota.rolling { bar("5-Hour Limit", r, quota.rollingBreakdown, nil) }
+                if quota.credits > 0 || quota.creditDrawn > 0 { credits(quota) }
                 if let c = quota.memberCap { bar("Your Monthly Cap", c, [], "A personal sub-limit your org admin set within the shared pool.") }
                 if let e = quota.entitlements { includes(e) }
             } else {
@@ -613,6 +614,28 @@ private struct UsagePage: View {
             quota = try? await UsageApi.quota()
             loading = false
         }
+    }
+
+    /// Bonus credits (granted by the team or a programme) — used only after the month's tokens run out.
+    private func credits(_ q: UsageQuota) -> some View {
+        let pool = q.monthly ?? q.orgPool
+        let usingCredits = q.credits > 0 && (pool.map { $0.limit > 0 && $0.used >= $0.limit } ?? false)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Bonus credits").font(.system(size: 15, weight: .medium)).foregroundColor(FridayColor.text)
+                Spacer()
+                Text("\(compactTokens(q.credits)) left").font(.system(size: 13)).foregroundColor(FridayColor.muted)
+            }
+            if q.creditDrawn > 0 {
+                Text("\(compactTokens(q.creditDrawn)) used this month").font(.system(size: 12)).foregroundColor(FridayColor.muted)
+            }
+            Text(usingCredits ? "You've used this month's tokens — you're now using your bonus credits." : "Used automatically after this month's tokens run out. They don't renew.")
+                .font(.system(size: 12)).foregroundColor(usingCredits ? FridayColor.text : FridayColor.muted)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(FridayColor.surface.opacity(0.5))
+        .cornerRadius(14)
     }
 
     /// 2,450,000 → "2.45M", 12,300 → "12.3K" (the web's formatTokens).
