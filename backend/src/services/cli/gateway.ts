@@ -1,4 +1,6 @@
 import type { Response } from "express";
+import { applySkill, filterToolsForSkill, findSkill, parseSkillDirective, skillsListText } from "./skills.js";
+import { getSkill, listSkills } from "../skills/skillService.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { logger } from "../../utils/logger.js";
@@ -197,10 +199,23 @@ function sendJsonError(res: Response, status: number, message: string, type: str
  * the provider's usage → settle the hold.
  */
 export async function runCompletion(userId: string, body: CompletionRequest, res: Response, signal: AbortSignal): Promise<void> {
-  const messages = toAgentMessages(Array.isArray(body.messages) ? body.messages : []);
+  let messages = toAgentMessages(Array.isArray(body.messages) ? body.messages : []);
   if (!messages.some((m) => m.role === "user" || m.role === "tool")) return sendJsonError(res, 400, "`messages` needs at least one user message.", "invalid_request_error");
-  const tools: ToolSpec[] = toToolSpecs(body.tools);
+  let tools: ToolSpec[] = toToolSpecs(body.tools);
   const stream = body.stream !== false;
+
+  // Power Skills from the CLI / editors (cli/skills.ts): "/skills" lists them, "@name …" applies one.
+  const directive = parseSkillDirective(messages);
+  if (directive) {
+    const skills = await listSkills(userId);
+    const reply = (t: string) => sendLocalAnswer(res, stream, t);
+    if (directive.kind === "list") return reply(skillsListText(skills));
+    const skill = findSkill(skills, directive.ref);
+    if (!skill) return reply(`No skill called @${directive.ref} is switched on for you.\n\n${skillsListText(skills)}`);
+    const full = await getSkill(userId, skill.id);
+    messages = applySkill(messages, full, directive.messageIndex);
+    tools = filterToolsForSkill(tools, full);
+  }
 
   let candidate: ChatCandidate;
   try {
@@ -314,6 +329,22 @@ export async function runCompletion(userId: string, body: CompletionRequest, res
   }
   send(finishChunk(id, modelName, calls.length ? "tool_calls" : "stop"));
   send(usageChunk(id, modelName, finalUsage));
+  res.write("data: [DONE]\n\n");
+  res.end();
+}
+
+/** An answer Friday gives itself (skill list / unknown skill): OpenAI-shaped, no model call, nothing charged. */
+function sendLocalAnswer(res: Response, stream: boolean, text: string) {
+  const id = `chatcmpl-fx-local-${Date.now().toString(36)}`;
+  const model = "friday-x/skills";
+  const usage = emptyTokenUsage();
+  if (!stream) return void res.json(completionBody(id, model, text, [], usage));
+  res.status(200);
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.write(`data: ${JSON.stringify(textChunk(id, model, text, true))}\n\n`);
+  res.write(`data: ${JSON.stringify(finishChunk(id, model, "stop"))}\n\n`);
+  res.write(`data: ${JSON.stringify(usageChunk(id, model, usage))}\n\n`);
   res.write("data: [DONE]\n\n");
   res.end();
 }

@@ -73,3 +73,14 @@ chat completions. Not yet verified: live provider keys, a real deployment, signe
 ## Editor extension
 
 The VS Code extension (`ide/vscode`) is documented in [FRIDAY_X_IDE.md](FRIDAY_X_IDE.md).
+
+## Power Skills in FridayX (server-side, no client release needed)
+
+The gateway (`backend/src/services/cli/skills.ts`) reads a directive at the start of the latest user message:
+
+- `/skills` — Friday answers instantly with your switched-on skills (built-in, yours, your team's). No model call, nothing charged.
+- `@release-notes <task>` — applies that skill (matched by name slug or id) for the conversation: its playbook is added as a
+  system message after the client's own, and the `@name` prefix is removed. It stays active through the tool rounds that follow.
+- A user/team skill's declared capabilities filter the client's tools offered to the model, by tool name: without "Run code"
+  no shell/terminal/exec tools, without "web" no fetch/browse tools. These tools run on the user's own machine, so this is a
+  best-effort guard on top of the editor's own approval prompts, not a sandbox.
