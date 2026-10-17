@@ -129,6 +129,9 @@ Gotchas:
 - Images (migration 0064): `generate_image` edits name their source (attachment / last / `image` + number from the chat's numbered list;
   ambiguous → ask); every result is a new `image_assets` row with parent + version. Load tests: `scripts/load/load-test.mjs` (staging only, see
   `docs/operations/LOAD_TESTING.md`).
+- Power Skills (migration 0065): `skills/manifest.ts` — capability groups → real tools; an active USER skill (use_skill or composer-picked)
+  restricts the tool loop to `allowedToolsFor(capabilities)` (default web+documents); built-ins unrestricted. Draft → `/skills/:id/evals`
+  (metered) → publish (blocked unless the latest run of that exact draft passed) → immutable `skill_versions`; rollback = republish old.
   No 5-hour/daily/weekly windows. Periods are `anchor + n months` from the subscription start. **Postgres is the authority**: row-locked
   plpgsql functions (`quota_reserve` → `quota_extend_hold` → `quota_record_usage` (one `token_ledger` row per model call, unique
   idempotency key) → `quota_settle`), fail CLOSED (503 `quota_unavailable`). `quota/usageMeter.ts` meters a turn (running totals →

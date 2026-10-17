@@ -99,13 +99,25 @@ export async function runToolLoop(opts: {
    *  a 12-round research turn can't run far past the plan limit. */
   /** Called each round with the turn's running usage; a string means "stop now" (limit reached). */
   budget?: (usage: TokenUsage, candidate?: ChatCandidate | null) => Promise<string | null>;
+  /** Tools an active user skill may use (supabase 0065); null/undefined = no restriction. */
+  allowedTools?: Set<string> | null;
   /** Adapter + key lookup; injectable for tests. */
   resolve?: (candidate: ChatCandidate) => Promise<{ adapter: ProviderAdapter; apiKey: string }>;
 }): Promise<ToolLoopResult> {
   const resolve =
     opts.resolve ??
     (async (c: ChatCandidate) => ({ adapter: getProviderAdapter(c.slug), apiKey: await getWorkingKeyForProvider(c.slug) }));
-  const { tools, ctx, onStep } = opts;
+  const { tools, onStep } = opts;
+  // Server-side skill permissions: a skill's own text can't grant it a tool (brief §37.5).
+  let allowed: Set<string> | null = opts.allowedTools ?? null;
+  let skillName = "the active skill";
+  const ctx: ToolContext = {
+    ...opts.ctx,
+    activateSkill: (set, name) => {
+      allowed = set;
+      skillName = name;
+    },
+  };
   const maxRounds = opts.maxRounds ?? MAX_TOOL_ROUNDS;
   const byName = new Map(tools.map((t) => [t.spec.name, t]));
   const specs = tools.map((t) => t.spec);
@@ -165,6 +177,12 @@ export async function runToolLoop(opts: {
       step.detail = "Too long — cut off at the output limit; asking the model to split it";
       onStep({ ...step });
       return CUT_OFF_RESULT;
+    }
+    if (tool && allowed && !allowed.has(call.name)) {
+      step.state = "error";
+      step.detail = `Not allowed for ${skillName}`;
+      onStep({ ...step });
+      return `Error: ${skillName} isn't allowed to use ${call.name} (it doesn't declare that capability). Do the task without it, or tell the user the skill would need that permission.`;
     }
     if (!tool) {
       step.state = "error";

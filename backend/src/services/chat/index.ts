@@ -73,6 +73,7 @@ import { planSatisfiesTier } from "../quota/tierConfig.js";
 import { consumeDailyAllowance, entitlementsFor, refundDailyAllowance } from "../quota/entitlements.js";
 import { recordModelOutcome } from "../status/statusService.js";
 import { activeSkillPrompt, getSkill, listSkills, skillMenu, type Skill } from "../skills/skillService.js";
+import { allowedToolsFor } from "../skills/manifest.js";
 import type { GeneratedFile } from "../documents/documentService.js";
 import { TURN_CAP_MESSAGE, turnTokenCap } from "../agent/loopGuard.js";
 import { checkAndReserve, estimateReservationTokens, resolveEffectivePlan, type Reservation } from "../quota/tokenQuotaService.js";
@@ -951,6 +952,8 @@ async function streamTurn(
         history: withToolPreamble(history, guidance),
         tools,
         maxRounds: research ? DEEP_RESEARCH_ROUNDS : undefined,
+        // A user skill picked in the composer may only use its declared capabilities (supabase 0065).
+        allowedTools: activeSkill?.source === "user" ? allowedToolsFor(activeSkill.capabilities) : null,
         budget,
         ctx: {
           userId,

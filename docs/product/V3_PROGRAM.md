@@ -47,7 +47,7 @@ through the same `UsageMeter`). Inventory against the brief:
 | 23 | Device/session limits | **Missing** (policy decision needed before enforcing caps) | — |
 | 26 | Observability | **Partial** — status probes, provider issues, crash reports, structured logger | `services/status` |
 | 36 | Interactive gallery + offside simulator | **Built in 07** — /gallery (search, categories), offside simulator (drag, keyboard, boundaries tested), EMI calculator, projectile explorer; shareable state in the URL | `routes/gallery.tsx` |
-| 37–38 | Power Skills (manifests, permissions, evals) | **Partial** — 16 built-in playbooks + user skills, `use_skill`; no manifest schema, versions, permissions, evals | `services/skills` |
+| 37–38 | Power Skills (manifests, permissions, evals) | **Built in 10** — validated manifests + lint, declared capabilities enforced by the tool loop (a skill's text grants nothing), draft → test → publish gate, immutable versions + rollback, disable; Skill Builder UI. Not done: shared/org skill marketplace, sandboxed skill scripts, CLI/IDE skill use | `skills/manifest.ts`, `0065`, `skill-builder.tsx` |
 | 1.2 | Public pay-as-you-go API | **Out of scope** (not touched) | — |
 
 ## Phase plan (each line = one or more `feat/v3-NN-*` PRs)
@@ -61,8 +61,8 @@ through the same `UsageMeter`). Inventory against the brief:
 | 06 | Finance actuals: payment ledger, cash vs earned vs deferred, margins, burn, break-even, reconciliation | — | **Merged into v3** (PR #8); needs migration 0063 on prod before release |
 | 07 | Experience engine: structured chart/experience blocks, gallery, offside simulator, EMI, projectile | — | **Merged into v3** (PR #9); no migration |
 | 08 | Artifact studio on Pages: targeted NL edits, compare versions, duplicate | 07 | **Merged into v3** (PR #10); no migration |
-| 09 | Reliability: image lineage + exact edit targeting; staged load-test harness (refuses prod) | — | **PR open** (`feat/v3-09-reliability`); needs migration 0064; load test **blocked: no staging** |
-| 10 | Power Skills: manifest schema, versions, declared permissions enforced server-side, eval harness, Skill Builder | 07 | planned |
+| 09 | Reliability: image lineage + exact edit targeting; staged load-test harness (refuses prod) | — | **Merged into v3** (PR #11); needs migration 0064; load test **blocked: no staging** |
+| 10 | Power Skills: manifest, enforced capabilities, evals + publish gate, versions/rollback, Skill Builder | 07 | **PR open** (`feat/v3-10-skills`); needs migration 0065 |
 | 11 | Sessions & devices: registry across web/CLI/IDE, revocation, user device page (policy first) | — | needs owner policy |
 
 ## Blockers that need the owner (not code)
