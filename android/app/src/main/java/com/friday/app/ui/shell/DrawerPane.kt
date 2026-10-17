@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -81,6 +82,8 @@ fun DrawerPane(
     user: FridayUser?,
     plan: String?,
     updateAvailable: Boolean = false,
+    /** Unread notifications — a dot on the bell next to Settings. */
+    unreadNotifications: Int = 0,
     recents: List<ChatThread>,
     currentId: String?,
     onNewChat: () -> Unit,
@@ -356,6 +359,17 @@ fun DrawerPane(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Default.Settings, "Settings", tint = FridayText, modifier = Modifier.size(19.dp))
+            }
+            if (user != null) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(FridaySurface).clickable { onNavigate("inbox") },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Notifications, if (unreadNotifications > 0) "Notifications, $unreadNotifications unread" else "Notifications", tint = FridayText, modifier = Modifier.size(19.dp))
+                    if (unreadNotifications > 0) {
+                        Box(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 9.dp).size(8.dp).clip(CircleShape).background(FridayStop))
+                    }
+                }
             }
             Row(
                 Modifier

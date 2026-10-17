@@ -41,6 +41,10 @@ struct UsageQuota {
     let rollingBreakdown: [UsageBreakdownEntry]
     let monthlyBreakdown: [UsageBreakdownEntry]
     let entitlements: PlanEntitlements?
+    /// Unspent bonus-credit tokens on top of the month's allowance (supabase 0060).
+    var credits: Double = 0
+    /// This period's usage that credits paid for.
+    var creditDrawn: Double = 0
 }
 
 private func num(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
@@ -60,6 +64,7 @@ enum UsageApi {
         }
         let e = json["entitlements"] as? [String: Any]
         let org = status?["org"] as? [String: Any]
+        let period = status?["period"] as? [String: Any]
         return UsageQuota(
             plan: status?["plan"] as? String ?? json["plan"] as? String,
             isEnterprise: status?["isEnterprise"] as? Bool ?? false,
@@ -81,7 +86,9 @@ enum UsageApi {
                     teamUpModels: Int(num($0["teamUpModels"]) ?? 0), mcpServers: Int(num($0["mcpServers"]) ?? 0),
                     automations: Int(num($0["automations"]) ?? 0), prioritySupport: $0["prioritySupport"] as? Bool ?? false
                 )
-            }
+            },
+            credits: num(period?["credits"]) ?? 0,
+            creditDrawn: num(period?["creditDrawn"]) ?? 0
         )
     }
 }

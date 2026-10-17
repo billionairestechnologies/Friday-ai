@@ -77,6 +77,10 @@ data class FridayUiState(
     val updateInfo: UpdateInfo? = null,
     /** "What's new" product updates not yet seen by this account (shown once, then marked seen). */
     val announcements: List<Announcement> = emptyList(),
+    /** A benefit granted to this person, shown once (supabase 0062). */
+    val benefitPopup: com.friday.app.data.api.UserNotification? = null,
+    val inbox: List<com.friday.app.data.api.UserNotification> = emptyList(),
+    val unreadNotifications: Int = 0,
     /** Files staged in the composer, not yet sent — cleared once [FridayViewModel.send] fires.
      *  Capped at 4 to match the backend's per-message attachment limit. */
     val pendingAttachments: List<PendingAttachment> = emptyList(),
@@ -442,22 +446,85 @@ class FridayViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { onResult(AuthApi.exportData()) }
     }
 
-    /** Fetches unseen product updates once per app session (best effort). */
+    /**
+     * Product updates, one at a time: each is CLAIMED right before it shows (another device or tab
+     * may already have shown it), and what the person did is recorded per update. Nothing that
+     * wasn't shown is marked seen. Benefit popups follow once updates are done.
+     */
     private var announcementsLoaded = false
+    private var announcementQueue: List<Announcement> = emptyList()
     fun loadAnnouncements() {
         if (announcementsLoaded) return
         announcementsLoaded = true
         viewModelScope.launch {
-            val pending = EngagementApi.pending()
-            if (pending.isNotEmpty()) _state.update { it.copy(announcements = pending) }
+            announcementQueue = EngagementApi.pending()
+            showNextAnnouncement()
+            refreshInbox()
         }
     }
 
-    /** The What's New dialog closed (optionally via its button) — record the views so it never shows again. */
-    fun dismissAnnouncements(clickedId: String? = null) {
-        val ids = _state.value.announcements.map { it.id }
+    private suspend fun showNextAnnouncement() {
+        while (announcementQueue.isNotEmpty()) {
+            val next = announcementQueue.first()
+            announcementQueue = announcementQueue.drop(1)
+            if (EngagementApi.claim(next)) {
+                _state.update { it.copy(announcements = listOf(next)) }
+                return
+            }
+        }
         _state.update { it.copy(announcements = emptyList()) }
-        if (ids.isNotEmpty()) viewModelScope.launch { EngagementApi.markSeen(ids, clickedId) }
+        showNextBenefit()
+    }
+
+    /** "Got it" (acknowledged) shows the next one; closing stops for now; the button counts as clicked. */
+    fun finishAnnouncement(state: String) {
+        val current = _state.value.announcements.firstOrNull() ?: return
+        _state.update { it.copy(announcements = emptyList()) }
+        viewModelScope.launch {
+            EngagementApi.act(current, state)
+            if (state == "dismissed") {
+                announcementQueue = emptyList()
+                showNextBenefit()
+            } else showNextAnnouncement()
+        }
+    }
+
+    private var benefitQueue: List<com.friday.app.data.api.UserNotification>? = null
+    private suspend fun showNextBenefit() {
+        val queue = benefitQueue ?: EngagementApi.popups().also { benefitQueue = it }
+        var rest = queue
+        while (rest.isNotEmpty()) {
+            val next = rest.first()
+            rest = rest.drop(1)
+            benefitQueue = rest
+            if (EngagementApi.claimPopup(next.id)) {
+                _state.update { it.copy(benefitPopup = next) }
+                return
+            }
+        }
+    }
+
+    fun acknowledgeBenefit() {
+        val current = _state.value.benefitPopup ?: return
+        _state.update { it.copy(benefitPopup = null) }
+        viewModelScope.launch {
+            EngagementApi.acknowledge(current.id)
+            showNextBenefit()
+        }
+    }
+
+    fun refreshInbox() {
+        viewModelScope.launch {
+            val (items, unread) = EngagementApi.inbox()
+            _state.update { it.copy(inbox = items, unreadNotifications = unread) }
+        }
+    }
+
+    /** Opening the inbox marks everything read. */
+    fun openedInbox() {
+        if (_state.value.unreadNotifications == 0) return
+        _state.update { s -> s.copy(unreadNotifications = 0, inbox = s.inbox.map { it.copy(read = true) }) }
+        viewModelScope.launch { EngagementApi.markAllRead() }
     }
 
     /** PolicyConsentDialog's "I Agree" button — records acceptance and closes the gate. */

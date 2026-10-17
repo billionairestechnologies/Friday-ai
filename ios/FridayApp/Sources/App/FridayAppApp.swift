@@ -15,6 +15,8 @@ struct FridayAppApp: App {
                         PolicyConsentGate().environmentObject(vm)
                     } else if vm.user != nil && !vm.announcements.isEmpty {
                         WhatsNewCard().environmentObject(vm)
+                    } else if vm.user != nil, let benefit = vm.benefitPopup {
+                        BenefitCard(item: benefit).environmentObject(vm)
                     }
                 }
                 .task { await vm.bootstrap() }

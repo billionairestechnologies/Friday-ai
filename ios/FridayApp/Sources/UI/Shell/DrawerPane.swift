@@ -240,6 +240,15 @@ struct DrawerPane: View {
             Button { vm.page = "settings" } label: {
                 Image(systemName: "gearshape").frame(width: 36, height: 36).background(FridayColor.surface).clipShape(Circle())
             }
+            if vm.user != nil {
+                Button { vm.page = "inbox" } label: {
+                    Image(systemName: "bell").frame(width: 36, height: 36).background(FridayColor.surface).clipShape(Circle())
+                        .overlay(alignment: .topTrailing) {
+                            if vm.unreadNotifications > 0 { Circle().fill(FridayColor.stop).frame(width: 8, height: 8).padding(7) }
+                        }
+                }
+                .accessibilityLabel(vm.unreadNotifications > 0 ? "Notifications, \(vm.unreadNotifications) unread" : "Notifications")
+            }
             HStack {
                 Image(systemName: "magnifyingglass").font(.system(size: 13)).foregroundColor(FridayColor.muted)
                 TextField("Search chats", text: $search).font(.system(size: 14))

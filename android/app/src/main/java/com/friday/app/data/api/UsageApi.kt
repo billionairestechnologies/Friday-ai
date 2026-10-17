@@ -42,6 +42,10 @@ data class UsageQuota(
     val rollingBreakdown: List<UsageBreakdownEntry> = emptyList(),
     val monthlyBreakdown: List<UsageBreakdownEntry> = emptyList(),
     val entitlements: PlanEntitlements? = null,
+    /** Unspent bonus-credit tokens on top of the month's allowance (supabase 0060). */
+    val credits: Double = 0.0,
+    /** This period's usage that credits paid for. */
+    val creditDrawn: Double = 0.0,
 )
 
 /** GET /api/usage/quota — backs both the Settings > Usage pane and the Billing plan/renewal row. */
@@ -65,6 +69,7 @@ object UsageApi {
                 }
                 val org = status.optJSONObject("org")
                 val e = json.optJSONObject("entitlements")
+                val period = status.optJSONObject("period")
                 UsageQuota(
                     plan = status.optString("plan").ifBlank { "free" },
                     isEnterprise = status.optBoolean("isEnterprise"),
@@ -78,6 +83,8 @@ object UsageApi {
                     breakdown = entries("breakdown"),
                     rollingBreakdown = entries("rollingBreakdown"),
                     monthlyBreakdown = entries("monthlyBreakdown"),
+                    credits = period?.optDouble("credits", 0.0) ?: 0.0,
+                    creditDrawn = period?.optDouble("creditDrawn", 0.0) ?: 0.0,
                     entitlements = e?.let {
                         PlanEntitlements(
                             buildMode = it.optBoolean("buildMode"), buildMaxRounds = it.optInt("buildMaxRounds"),
