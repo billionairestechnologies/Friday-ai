@@ -173,6 +173,11 @@ Gotchas:
   CLI-token sections), `routes/install.ts`; `middleware/cliAuth.ts` checks token + the `fridayX` entitlement on EVERY request. Web:
   `routes/device.tsx` (`/device`), Settings → FridayX (install commands, signed-in devices).
   **Rule: no client holds plans, models or limits** — the CLI/editors read everything from `/api/x` at runtime.
+- `services/sessions/sessionService.ts` — Sessions & devices (migration 0068): `requireAuth` → `guardSession` records each
+  Supabase `session_id` (≤1/min, coarse IP prefix only) and 401s a revoked one at once; `session_revoke` also deletes the
+  `auth.sessions` row. `/api/sessions` (list, sign out one, sign out everywhere else — incl. FridayX `cli_tokens`), Console →
+  Users → Signed-in devices, suspend signs every device out. Plan entitlement `maxDevices` (0 = no limit, the default): a new
+  sign-in over the limit signs out the least-recently-used one. Fails open if the table is missing.
 - `services/billingService.ts` — prices from the catalog; `planId: "package"` checkout; webhook applies
   plans, enterprise seats (catalog tokens/seat) or packages (as access grants).
 

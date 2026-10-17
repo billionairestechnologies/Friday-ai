@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Ban, MessageSquare, Search, ShieldCheck, Users as UsersIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCan } from "../access";
+import { DeviceIcon, lastActive, type DeviceSession } from "@/components/devices-pane";
 import { Avatar, Badge, Button, Card, Drawer, EmptyState, ErrorNote, Loading, PageHeader, Select, Stat, act, formatDate, formatNumber, statusTone, timeAgo, useResource } from "../ui";
 
 type Row = { id: string; email: string | null; full_name: string | null; plan: string; role: string; created_at: string; last_sign_in_at: string | null; marketing_opt_out: boolean; banned_until: string | null };
@@ -142,6 +143,7 @@ function UserDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
               <p className="mt-2 text-xs text-subtle">For time-limited access, packages or offers use Plans & offers → Grant access.</p>
             </Card>
           )}
+          <UserSessions userId={user.id} canManage={canManage} />
           <div>
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><MessageSquare className="size-4 text-muted" /> Support tickets</div>
             {user.tickets.length === 0 ? (
@@ -167,5 +169,62 @@ function UserDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
         </div>
       )}
     </Drawer>
+  );
+}
+
+/** Where this person is signed in (supabase 0068) — sign out one device or all of them (audited). */
+function UserSessions({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const res = useResource<{ sessions: DeviceSession[] }>(`/console/users/${userId}/sessions`);
+  const sessions = res.data?.sessions ?? [];
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold">Signed-in devices</span>
+        {canManage && sessions.length > 0 && (
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => {
+              if (!window.confirm("Sign this person out on every device, including FridayX?")) return;
+              void act(async () => {
+                await api.post(`/console/users/${userId}/sessions/revoke-all`);
+                await res.reload();
+              }, "Signed out everywhere");
+            }}
+          >
+            Sign out everywhere
+          </Button>
+        )}
+      </div>
+      <ErrorNote error={res.error} />
+      {res.loading && !res.data ? (
+        <Loading />
+      ) : sessions.length === 0 ? (
+        <p className="text-sm text-muted">No active devices.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {sessions.map((s) => (
+            <li key={`${s.kind}-${s.id}`} className="flex items-center gap-2 text-sm">
+              <DeviceIcon platform={s.platform} />
+              <span className="min-w-0 flex-1 truncate">{s.client}</span>
+              <span className="text-xs text-subtle">{lastActive(s.lastSeenAt)}{s.ipPrefix ? ` · ${s.ipPrefix}` : ""}</span>
+              {canManage && (
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    void act(async () => {
+                      await api.delete(`/console/users/${userId}/sessions/${s.id}?kind=${s.kind}`);
+                      await res.reload();
+                    }, "Device signed out")
+                  }
+                >
+                  Sign out
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

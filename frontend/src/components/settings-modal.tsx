@@ -7,6 +7,7 @@ import {
   Brain,
   Check,
   CreditCard,
+  Laptop,
   Lock,
   Palette,
   Plug,
@@ -30,6 +31,7 @@ import { api } from "@/lib/api";
 import { formatResetAt, formatTokens, mainBucket, type QuotaResponse } from "@/lib/usage/quota";
 import { useQuota } from "@/lib/usage/quotaStore";
 import { UsagePanel } from "@/components/usage-panel";
+import { DevicesPane } from "@/components/devices-pane";
 
 const NAV = [
   {
@@ -40,6 +42,7 @@ const NAV = [
       { id: "behavior", label: "Behavior", icon: SlidersHorizontal },
       { id: "voice", label: "Voice", icon: AudioLines },
       { id: "notifications", label: "Notifications", icon: Bell },
+      { id: "devices", label: "Devices", icon: Laptop },
       { id: "friday-x", label: "FridayX", icon: Terminal },
     ],
   },
@@ -128,6 +131,7 @@ export function SettingsModal() {
               {tab === "behavior" && <BehaviorPane />}
               {tab === "voice" && <VoicePane />}
               {tab === "notifications" && <NotificationsPane />}
+              {tab === "devices" && <DevicesPane />}
               {tab === "friday-x" && <FridayXPane />}
               {tab === "billing" && <BillingPane />}
               {tab === "usage" && <UsagePane />}

@@ -38,6 +38,7 @@ export type Entitlements = {
   mcpServers: number;
   automations: number;
   prioritySupport: boolean;
+  maxDevices?: number;
 };
 
 /** A plan from the console-edited catalog (GET /billing/config → plans). */
