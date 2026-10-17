@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, FlaskConical, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { SkillBuilder } from "./skill-builder";
 import { api } from "@/lib/api";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useChat } from "@/lib/chat/store";
@@ -128,6 +129,7 @@ function SkillDetail({ skill, onBack, onSaved, onUse }: { skill: Skill | "new"; 
   const creating = skill === "new";
   const [full, setFull] = useState<Skill | null>(creating ? null : skill);
   const [editing, setEditing] = useState(creating);
+  const [building, setBuilding] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", instructions: "", icon: "✨" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +167,7 @@ function SkillDetail({ skill, onBack, onSaved, onUse }: { skill: Skill | "new"; 
   }
 
   const own = creating || (skill as Skill).source === "user";
+  if (building && full && full.source === "user") return <SkillBuilder skillId={full.id} onBack={() => setBuilding(false)} onChanged={onSaved} />;
   return (
     <AnimatePresence mode="wait">
       <motion.div key={editing ? "edit" : "view"} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
@@ -208,6 +211,7 @@ function SkillDetail({ skill, onBack, onSaved, onUse }: { skill: Skill | "new"; 
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" onClick={() => onUse(full)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground"><Sparkles className="size-4" /> Use in chat</button>
               {own && <button type="button" onClick={() => setEditing(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3.5 text-sm hover:bg-chip"><Pencil className="size-3.5" /> Edit</button>}
+              {own && <button type="button" onClick={() => setBuilding(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3.5 text-sm hover:bg-chip"><FlaskConical className="size-3.5" /> Test, permissions & versions</button>}
               {own && <button type="button" onClick={() => void remove()} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-danger hover:bg-danger/10"><Trash2 className="size-3.5" /> Delete</button>}
             </div>
             {error && <p className="mt-3 text-sm text-danger">{error}</p>}

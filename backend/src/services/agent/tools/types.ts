@@ -14,6 +14,11 @@ export type ToolContext = {
   onStep?: (step: import("../../chat/types.js").BuildStep) => void;
   /** Tokens a tool spent on its own model calls (sub-agents) — counted toward the turn's usage. */
   onUsage?: (usage: import("../../tokenUsage.js").TokenUsage) => void;
+  /**
+   * use_skill calls this when a USER skill is loaded: from then on the tool loop refuses every tool
+   * outside the skill's declared capabilities (null = unrestricted, for first-party skills).
+   */
+  activateSkill?: (allowedTools: Set<string> | null, skillName: string) => void;
 };
 
 /** A tool the chat agent can call. `run` returns plain text for the model; throwing reports an error
