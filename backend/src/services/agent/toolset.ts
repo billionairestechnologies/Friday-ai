@@ -8,13 +8,13 @@ import { loadMcpTools } from "./mcpService.js";
 import { googleToolsForScopes } from "./tools/google.js";
 import { MEMORY_TOOLS } from "./tools/memory.js";
 import { createDocumentTool } from "./tools/documents.js";
-import { useSkillTool } from "./tools/skills.js";
+import { skillScriptTools, useSkillTool } from "./tools/skills.js";
 import type { FridayTool } from "./tools/types.js";
 import { fetchUrlTool, webSearchTool } from "./tools/web.js";
 
 /** Every chat turn gets web + memory tools; connector tools only for connectors the user linked. */
 export async function buildToolset(userId: string): Promise<FridayTool[]> {
-  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), ...browserTools(), createDocumentTool, useSkillTool];
+  const tools: FridayTool[] = [webSearchTool, fetchUrlTool, ...MEMORY_TOOLS, ...codeTools(), ...browserTools(), createDocumentTool, useSkillTool, ...skillScriptTools()];
   // Both lookups sit on the critical path before the first token — run them concurrently.
   const mcpPromise = loadMcpTools(userId).catch(() => [] as FridayTool[]);
   const connected = await listConnectedProviders(userId).catch(() => new Map<string, string[]>());

@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 
 type Capability = { id: string; label: string; risk: "low" | "medium" | "high" };
 type EvalCase = { name: string; prompt: string; mustInclude: string[]; mustNotInclude: string[]; maxChars?: number };
-type Manifest = { name: string; description: string; instructions: string; icon: string; capabilities: string[] | null; evals: EvalCase[] };
+type Script = { name: string; language: "python" | "javascript"; description: string; code: string };
+type Manifest = { name: string; description: string; instructions: string; icon: string; capabilities: string[] | null; evals: EvalCase[]; scripts?: Script[] };
+type Org = { id: string; name: string };
 type EvalResult = { name: string; passed: boolean; failures: string[]; excerpt: string };
 type Detail = {
   id: string;
@@ -35,6 +37,8 @@ export function SkillBuilder({ skillId, onBack, onChanged }: { skillId: string; 
   const [error, setError] = useState<string | null>(null);
   const [changelog, setChangelog] = useState("");
   const [results, setResults] = useState<{ passed: number; total: number; results: EvalResult[] } | null>(null);
+  const [orgs, setOrgs] = useState<Org[]>([]);
+  const [share, setShare] = useState<{ organizationId: string | null; shareStatus: string } | null>(null);
 
   const load = async () => {
     const detail = await api.get<Detail>(`/skills/${skillId}/builder`);
@@ -44,6 +48,11 @@ export function SkillBuilder({ skillId, onBack, onChanged }: { skillId: string; 
   };
   useEffect(() => {
     void api.get<{ capabilities: Capability[] }>("/skills/builder/capabilities").then((r) => setCaps(r.capabilities)).catch(() => {});
+    void api.get<{ organizations: Org[] }>("/organizations").then((r) => setOrgs(r.organizations ?? [])).catch(() => {});
+    void api.get<{ skills: Array<{ id: string; organizationId?: string | null; shareStatus?: string }> }>("/skills").then((r) => {
+      const me = r.skills.find((s) => s.id === skillId);
+      if (me) setShare({ organizationId: me.organizationId ?? null, shareStatus: me.shareStatus ?? "private" });
+    }).catch(() => {});
     void load().catch((e) => setError(e instanceof Error ? e.message : "Couldn't load the skill"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skillId]);
@@ -127,6 +136,61 @@ export function SkillBuilder({ skillId, onBack, onChanged }: { skillId: string; 
         })}
         {results && <p className={cn("text-xs", results.passed === results.total ? "text-emerald-600" : "text-danger")}>{results.passed} of {results.total} passed on the last run of this draft.</p>}
       </div>
+
+      <div className="grid gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-muted">Scripts (run only in the isolated sandbox; needs “Run code”)</span>
+          <button type="button" onClick={() => setM({ ...m, capabilities: declared.includes("code") ? declared : [...declared, "code"], scripts: [...(m.scripts ?? []), { name: `script-${(m.scripts?.length ?? 0) + 1}`, language: "python", description: "", code: "print(FRIDAY_INPUT)" }] })} className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground">
+            <Plus className="size-3.5" /> Add script
+          </button>
+        </div>
+        {(m.scripts ?? []).map((sc, i) => {
+          const set = (patch: Partial<Script>) => setM({ ...m, scripts: (m.scripts ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+          return (
+            <div key={i} className="grid gap-1.5 rounded-xl border border-border p-3">
+              <div className="flex items-center gap-2">
+                <input aria-label="Script name" className={cn(field, "py-1 font-mono")} value={sc.name} onChange={(e) => set({ name: e.target.value.toLowerCase() })} />
+                <select aria-label="Language" className={cn(field, "w-36 py-1")} value={sc.language} onChange={(e) => set({ language: e.target.value as Script["language"] })}>
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                </select>
+                <button type="button" aria-label="Remove script" onClick={() => setM({ ...m, scripts: (m.scripts ?? []).filter((_, j) => j !== i) })}>
+                  <Trash2 className="size-4 text-muted" />
+                </button>
+              </div>
+              <input aria-label="What it does" placeholder="What it does (shown to Friday)" className={cn(field, "py-1")} value={sc.description} onChange={(e) => set({ description: e.target.value })} />
+              <textarea aria-label="Code" spellCheck={false} className={cn(field, "min-h-[100px] font-mono text-xs")} value={sc.code} onChange={(e) => set({ code: e.target.value })} />
+              <span className="text-[11px] text-subtle">The text Friday passes in is available as FRIDAY_INPUT.</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {d.version > 0 && orgs.length > 0 && share && (
+        <div className="grid gap-2 rounded-xl border border-border p-3 text-sm">
+          <span className="text-xs font-semibold text-muted">Share with your team</span>
+          {share.organizationId ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                {orgs.find((o) => o.id === share.organizationId)?.name ?? "Your organisation"} ·{" "}
+                {share.shareStatus === "approved" ? "shared — members can use it" : share.shareStatus === "pending" ? "waiting for an admin to approve" : "not approved"}
+              </span>
+              <button type="button" disabled={busy !== null} onClick={() => void run("unshare", async () => { await api.post(`/skills/${skillId}/unshare`); setShare({ organizationId: null, shareStatus: "private" }); })} className="text-xs text-muted hover:text-foreground">
+                Stop sharing
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {orgs.map((o) => (
+                <button key={o.id} type="button" disabled={busy !== null} onClick={() => void run("share", async () => { const r = await api.post<{ status: string }>(`/skills/${skillId}/share`, { organizationId: o.id }); setShare({ organizationId: o.id, shareStatus: r.status }); })} className="h-8 rounded-full border border-border px-3 text-xs hover:bg-chip">
+                  Share with {o.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="text-[11px] text-subtle">Members get the published version, read-only, with the same permissions. An org admin approves it first.</span>
+        </div>
+      )}
 
       {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 
