@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../config/supabase.js";
+import { enqueueJob } from "../jobs/queue.js";
 import { HttpError } from "../../middleware/errorHandler.js";
 import { logger } from "../../utils/logger.js";
 import { userLabels } from "../console/directory.js";
@@ -20,9 +21,9 @@ import { quotaRpc } from "./tokenQuotaService.js";
 export const GRANT_KINDS = ["promotional", "goodwill", "trial", "compensation", "campaign", "offer", "program"] as const;
 export type GrantKind = (typeof GRANT_KINDS)[number];
 
-export type CreditSettings = { approvalThresholdTokens: number; maxGrantTokens: number; bulkMaxRecipients: number };
+export type CreditSettings = { approvalThresholdTokens: number; maxGrantTokens: number; bulkMaxRecipients: number; /** ₹ value of 1M bonus tokens (owner-set; null = not set, never guessed). */ inrPerMillionTokens: number | null };
 
-const DEFAULT_SETTINGS: CreditSettings = { approvalThresholdTokens: 10_000_000, maxGrantTokens: 1_000_000_000, bulkMaxRecipients: 5_000 };
+const DEFAULT_SETTINGS: CreditSettings = { approvalThresholdTokens: 10_000_000, maxGrantTokens: 1_000_000_000, bulkMaxRecipients: 5_000, inrPerMillionTokens: null };
 
 export async function getCreditSettings(): Promise<CreditSettings> {
   const { data, error } = await supabaseAdmin.from("credit_settings").select("*").eq("id", true).maybeSingle();
@@ -31,6 +32,7 @@ export async function getCreditSettings(): Promise<CreditSettings> {
     approvalThresholdTokens: Number(data.approval_threshold_tokens),
     maxGrantTokens: Number(data.max_grant_tokens),
     bulkMaxRecipients: Number(data.bulk_max_recipients),
+    inrPerMillionTokens: data.inr_per_million_tokens == null ? null : Number(data.inr_per_million_tokens),
   };
 }
 
@@ -40,11 +42,22 @@ export async function saveCreditSettings(next: CreditSettings, actorId: string):
     approval_threshold_tokens: next.approvalThresholdTokens,
     max_grant_tokens: next.maxGrantTokens,
     bulk_max_recipients: next.bulkMaxRecipients,
+    inr_per_million_tokens: next.inrPerMillionTokens,
     updated_by: actorId,
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error(error.message);
   return next;
+}
+
+/** ₹ ↔ tokens at the owner's rate. Null when no rate is set — callers must not invent one. */
+export function tokensForInr(inr: number, settings: Pick<CreditSettings, "inrPerMillionTokens">): number | null {
+  if (!settings.inrPerMillionTokens || !(inr > 0)) return null;
+  return Math.round((inr / settings.inrPerMillionTokens) * 1_000_000);
+}
+export function inrForTokens(tokens: number, settings: Pick<CreditSettings, "inrPerMillionTokens">): number | null {
+  if (!settings.inrPerMillionTokens) return null;
+  return Math.round((tokens / 1_000_000) * settings.inrPerMillionTokens * 100) / 100;
 }
 
 /** Pure rule, unit-tested: does this grant (or bulk batch total) need a second approver? */
@@ -240,23 +253,39 @@ export async function grantBulk(input: BulkInput, actorId: string) {
   if (people.length === 0) throw new HttpError(400, "Nobody matches this audience.");
   if (people.length !== input.expectedCount) throw new HttpError(409, `The audience changed since the preview (${input.expectedCount} → ${people.length}). Preview again before granting.`);
   const approval = needsApproval(people.length * input.tokens, settings);
+  // Runs as a background job (supabase 0066): survives restarts and retries; every grant is keyed
+  // bulk:<batch>:<user>, so a retried job can't credit anyone twice.
+  const job = await enqueueJob(
+    "credit_bulk_grant",
+    { input: { ...input, audience: undefined }, actorId, approval, userIds: people.map((p) => p.id) },
+    { tenant: `staff:${actorId}`, idempotencyKey: `bulk:${input.batchId}`, maxAttempts: 5 },
+  );
+  return { batchId: input.batchId, jobId: job.id, queued: people.length, status: approval ? "pending" : "active" };
+}
+
+/** Job handler: grants to every person of a bulk batch (idempotent per person), then announces. */
+export async function runBulkGrantJob(payload: Record<string, unknown>) {
+  const input = payload.input as Omit<BulkInput, "audience">;
+  const actorId = String(payload.actorId);
+  const approval = Boolean(payload.approval);
+  const userIds = (payload.userIds as string[]) ?? [];
   let created = 0;
   let duplicates = 0;
   const failed: string[] = [];
   const toAnnounce: Array<{ userId: string; grantId: string }> = [];
-  // Sequential on purpose: each grant locks one account row; a burst of thousands of parallel
-  // transactions would only contend with live traffic. Retries are safe (keys are batch:user).
-  for (const person of people) {
+  // Sequential on purpose: each grant locks one account row; thousands of parallel transactions
+  // would only contend with live traffic.
+  for (const userId of userIds) {
     try {
       const row = await quotaRpc<Record<string, unknown>>("quota_grant_credits", {
-        p_user: person.id,
+        p_user: userId,
         p_org: null,
         p_tokens: input.tokens,
         p_expires_at: input.expiresAt,
         p_kind: input.kind,
         p_reason: input.reason.trim(),
         p_actor: actorId,
-        p_key: `bulk:${input.batchId}:${person.id}`,
+        p_key: `bulk:${input.batchId}:${userId}`,
         p_requires_approval: approval,
         p_batch: input.batchId,
         p_source: input.source ?? "bulk",
@@ -264,14 +293,16 @@ export async function grantBulk(input: BulkInput, actorId: string) {
       const r = grantResult(row);
       if (r.duplicate) duplicates++;
       else created++;
-      if (r.grantStatus === "active" && !r.duplicate) toAnnounce.push({ userId: person.id, grantId: r.grantId });
+      if (r.grantStatus === "active" && !r.duplicate) toAnnounce.push({ userId, grantId: r.grantId });
     } catch (err) {
-      failed.push(person.id);
-      logger.error("bulk_credit_grant_failed", { batchId: input.batchId, userId: person.id, error: err instanceof Error ? err.message : String(err) });
+      failed.push(userId);
+      logger.error("bulk_credit_grant_failed", { batchId: input.batchId, userId, error: err instanceof Error ? err.message : String(err) });
     }
   }
-  void announceAll(toAnnounce, input.tokens, input.expiresAt, input.kind);
-  return { batchId: input.batchId, created, duplicates, failed: failed.length, status: approval ? "pending" : "active" };
+  await announceAll(toAnnounce, input.tokens, input.expiresAt, input.kind);
+  // Some failed: retry the job (people already granted are skipped by their keys).
+  if (failed.length) throw new Error(`${failed.length} of ${userIds.length} grants failed; will retry`);
+  return { created, duplicates };
 }
 
 async function announceAll(list: Array<{ userId: string; grantId: string }>, tokens: number, expiresAt: string | null, kind: string) {

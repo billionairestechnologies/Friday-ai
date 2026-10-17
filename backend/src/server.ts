@@ -16,6 +16,9 @@ const { startStatusMonitor } = await import("./services/status/statusService.js"
 const { startTurnSweeper, stopTurnSweeper } = await import("./services/jobs/sweeper.js");
 const { startQuotaMaintenance } = await import("./services/quota/quotaJobs.js");
 const { drainTurns } = await import("./services/jobs/turns.js");
+const { registerJobHandler, startJobWorker, stopJobWorker } = await import("./services/jobs/queue.js");
+const { runBulkGrantJob } = await import("./services/quota/credits.js");
+const { runNotificationEmailJob } = await import("./services/notificationService.js");
 const app = createApp();
 const sockets = new Set<Socket>();
 
@@ -33,6 +36,10 @@ const server = app.listen(env.port, () => {
   startStatusMonitor();
   startTurnSweeper();
   startQuotaMaintenance();
+  // Background jobs (supabase 0066). Kill switch: FRIDAY_DISABLE_JOBS=1.
+  registerJobHandler("credit_bulk_grant", runBulkGrantJob);
+  registerJobHandler("notification_email", runNotificationEmailJob);
+  startJobWorker();
 });
 
 server.on("connection", (socket) => {
@@ -53,7 +60,10 @@ async function shutdown(reason: string, exitCode = 0) {
   // Running chat/research/Build turns get a short grace period to finish; whatever is still running
   // is handed over (another instance — or this service after it restarts — resumes Builds, and
   // reports the rest as interrupted). Keep FRIDAY_DRAIN_SECONDS below the platform's kill timeout.
-  await drainTurns(Number(process.env.FRIDAY_DRAIN_SECONDS ?? 20) * 1000).catch(() => undefined);
+  await Promise.all([
+    drainTurns(Number(process.env.FRIDAY_DRAIN_SECONDS ?? 20) * 1000).catch(() => undefined),
+    stopJobWorker(Number(process.env.FRIDAY_DRAIN_SECONDS ?? 20) * 1000).catch(() => undefined),
+  ]);
 
   const forceTimer = setTimeout(() => {
     logger.error("server_shutdown_timeout", { activeConnections: sockets.size });

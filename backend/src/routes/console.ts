@@ -125,6 +125,8 @@ consoleRouter.post("/credits/grants/:grantId/revoke", can("credits.grant"), h(cr
 consoleRouter.post("/credits/batches/:batchId/approve", can("credits.approve"), h(credits.approveBatchRoute));
 consoleRouter.post("/credits/batches/:batchId/reject", can("credits.approve"), h(credits.rejectBatchRoute));
 consoleRouter.post("/credits/settings", can("credits.settings"), h(credits.settings));
+consoleRouter.get("/jobs", can("status.view"), h(credits.jobs));
+consoleRouter.post("/jobs/:jobId", can("status.manage"), h(credits.jobAction));
 
 // Model usage multipliers: how much of the allowance each model's tokens cost (supabase 0059).
 consoleRouter.get("/models/multipliers", can("providers.view"), h(mult.overview));

@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
+import { cancelJob, jobsOverview, retryJob } from "../services/jobs/queue.js";
 import { z } from "zod";
 import { logger } from "../utils/logger.js";
+import { HttpError } from "../middleware/errorHandler.js";
 import { recordAdminAuditLog } from "../services/usageService.js";
 import {
   approveBatch,
@@ -105,6 +107,7 @@ export async function settings(req: Request, res: Response) {
       approvalThresholdTokens: z.number().int().positive().max(1_000_000_000_000),
       maxGrantTokens: z.number().int().positive().max(1_000_000_000_000),
       bulkMaxRecipients: z.number().int().positive().max(100_000),
+      inrPerMillionTokens: z.number().positive().max(1_000_000).nullable().default(null),
     })
     .parse(req.body);
   const before = await getCreditSettings();
@@ -116,4 +119,18 @@ export async function settings(req: Request, res: Response) {
 /** GET /api/usage/credits — the signed-in person's own grants. */
 export async function mine(req: Request, res: Response) {
   res.json(await myCredits(req.user!.id));
+}
+
+// ── Console → Jobs (supabase 0066) ─────────────────────────────────────────────────────────────
+
+export async function jobs(_req: Request, res: Response) {
+  res.json(await jobsOverview());
+}
+export async function jobAction(req: Request, res: Response) {
+  const id = z.string().uuid().parse(req.params.jobId);
+  const { action } = z.object({ action: z.enum(["retry", "cancel"]) }).parse(req.body);
+  const ok = action === "retry" ? await retryJob(id) : await cancelJob(id);
+  if (!ok) throw new HttpError(409, action === "retry" ? "Only a failed or cancelled job can be retried." : "Only a waiting job can be cancelled.");
+  await audit(req, `job_${action}`, id, {});
+  res.json({ ok });
 }

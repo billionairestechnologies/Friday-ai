@@ -44,3 +44,14 @@ test("the TypeScript balance mirror matches quota_remaining (credits on top, the
   assert.equal(parsed.credits, 400_000);
   assert.equal(parsed.creditDrawn, 5);
 });
+
+import { inrForTokens, tokensForInr } from "../src/services/quota/credits.js";
+
+test("₹ ↔ tokens only at the owner's rate; with no rate nothing is converted", () => {
+  const rate = { inrPerMillionTokens: 50 };
+  assert.equal(tokensForInr(500, rate), 10_000_000, "₹500 at ₹50 per 1M = 10M tokens");
+  assert.equal(inrForTokens(10_000_000, rate), 500);
+  assert.equal(tokensForInr(500, { inrPerMillionTokens: null }), null);
+  assert.equal(inrForTokens(1_000, { inrPerMillionTokens: null }), null);
+  assert.equal(tokensForInr(0, rate), null);
+});

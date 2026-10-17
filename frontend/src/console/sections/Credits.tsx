@@ -53,7 +53,8 @@ type Grant = {
   created_at: string;
   recipient: { name: string; email: string | null } | null;
 };
-type Settings = { approvalThresholdTokens: number; maxGrantTokens: number; bulkMaxRecipients: number };
+type Settings = { approvalThresholdTokens: number; maxGrantTokens: number; bulkMaxRecipients: number; inrPerMillionTokens: number | null };
+const inrOf = (tokens: number, s: Settings) => (s.inrPerMillionTokens ? `≈ ₹${((tokens / 1_000_000) * s.inrPerMillionTokens).toLocaleString("en-IN", { maximumFractionDigits: 0 })}` : null);
 type Overview = {
   summary: { outstanding: number; pendingCount: number; pendingTokens: number; expiringIn7Days: number; granted30d: number; used30d: number };
   settings: Settings;
@@ -293,10 +294,11 @@ function Recipient({ grant }: { grant: Grant }) {
   );
 }
 
-function TokensField({ value, onChange, max }: { value: string; onChange: (v: string) => void; max: number }) {
+function TokensField({ value, onChange, max, settings }: { value: string; onChange: (v: string) => void; max: number; settings: Settings }) {
   const n = Number(value);
+  const money = n > 0 ? inrOf(n, settings) : null;
   return (
-    <Field label="Tokens" hint={`Up to ${fmt(max)} per grant.`}>
+    <Field label="Tokens" hint={`Up to ${fmt(max)} per grant.${money ? ` ${fmt(n)} tokens ${money} at your rate.` : ""}`}>
       <div className="flex flex-wrap gap-2">
         {QUICK.map((q) => (
           <button
@@ -417,7 +419,7 @@ function GrantDrawer({ settings, onClose, onDone }: { settings: Settings; onClos
             </>
           )}
         </Field>
-        <TokensField value={tokens} onChange={setTokens} max={settings.maxGrantTokens} />
+        <TokensField value={tokens} onChange={setTokens} max={settings.maxGrantTokens} settings={settings} />
         <CommonFields kind={kind} setKind={setKind} expiry={expiry} setExpiry={setExpiry} customExpiry={customExpiry} setCustomExpiry={setCustomExpiry} reason={reason} setReason={setReason} />
         {big && <p className="rounded-xl bg-chip px-3 py-2 text-sm">Above {fmt(settings.approvalThresholdTokens)} tokens — a teammate with approval rights has to approve it before it reaches the account.</p>}
       </div>
@@ -465,7 +467,7 @@ function BulkDrawer({ settings, onClose, onDone }: { settings: Settings; onClose
     setBusy(true);
     const ok = await act(
       () => api.post("/console/credits/bulk", { audience: audience(), tokens: n, expiresAt, kind, reason: reason.trim(), batchId, expectedCount: preview!.count }),
-      preview!.requiresApproval ? "Batch sent for approval" : `Granted to ${preview!.count.toLocaleString()} people`,
+      preview!.requiresApproval ? "Batch sent for approval" : `Granting to ${preview!.count.toLocaleString()} people in the background — they'll be notified as it completes`,
     );
     setBusy(false);
     if (ok) onDone();
@@ -526,7 +528,7 @@ function BulkDrawer({ settings, onClose, onDone }: { settings: Settings; onClose
             )}
           </div>
         </Field>
-        <TokensField value={tokens} onChange={(v) => (setTokens(v), reset())} max={settings.maxGrantTokens} />
+        <TokensField value={tokens} onChange={(v) => (setTokens(v), reset())} max={settings.maxGrantTokens} settings={settings} />
         <CommonFields kind={kind} setKind={setKind} expiry={expiry} setExpiry={setExpiry} customExpiry={customExpiry} setCustomExpiry={setCustomExpiry} reason={reason} setReason={setReason} />
 
         {preview && (
@@ -604,12 +606,13 @@ function SettingsDrawer({ settings, onClose, onDone }: { settings: Settings; onC
   const [threshold, setThreshold] = useState(String(settings.approvalThresholdTokens));
   const [max, setMax] = useState(String(settings.maxGrantTokens));
   const [bulk, setBulk] = useState(String(settings.bulkMaxRecipients));
+  const [rate, setRate] = useState(settings.inrPerMillionTokens ? String(settings.inrPerMillionTokens) : "");
   const [busy, setBusy] = useState(false);
   const vals = [threshold, max, bulk].map(Number);
   const ok = vals.every((v) => Number.isInteger(v) && v > 0);
   const submit = async () => {
     setBusy(true);
-    const done = await act(() => api.post("/console/credits/settings", { approvalThresholdTokens: vals[0], maxGrantTokens: vals[1], bulkMaxRecipients: vals[2] }), "Limits saved");
+    const done = await act(() => api.post("/console/credits/settings", { approvalThresholdTokens: vals[0], maxGrantTokens: vals[1], bulkMaxRecipients: vals[2], inrPerMillionTokens: rate ? Number(rate) : null }), "Limits saved");
     setBusy(false);
     if (done) onDone();
   };
@@ -636,6 +639,9 @@ function SettingsDrawer({ settings, onClose, onDone }: { settings: Settings; onC
         </Field>
         <Field label="Most people in one bulk grant">
           <Input inputMode="numeric" value={bulk} onChange={(e) => setBulk(e.target.value.replace(/[^\d]/g, ""))} />
+        </Field>
+        <Field label="Value of 1M bonus tokens (₹)" hint="Used only to show money values (e.g. a “₹500 of credits” offer). Empty = not set; Friday never guesses a rate.">
+          <Input inputMode="decimal" value={rate} placeholder="not set" onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ""))} />
         </Field>
       </div>
     </Drawer>
