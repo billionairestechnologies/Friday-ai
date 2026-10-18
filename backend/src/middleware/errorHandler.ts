@@ -28,9 +28,12 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   if (status >= 500) {
     logger.error("request_failed", {
       requestId: req.requestId,
-      path: req.originalUrl,
+      // originalUrl includes query parameters (OAuth codes, verification codes, etc.).
+      path: req.path,
       method: req.method,
-      error: err instanceof Error ? err.stack : err,
+      // Exception messages/stacks can contain upstream response bodies, user content or secrets.
+      // Keep a useful classification here; detailed diagnostics belong in a separately scrubbed sink.
+      errorType: err instanceof Error ? err.name : typeof err,
     });
   }
   res.status(status).json({ error: message, requestId: req.requestId });
