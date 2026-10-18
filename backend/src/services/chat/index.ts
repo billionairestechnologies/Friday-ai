@@ -23,7 +23,7 @@ import {
   type TokenUsage,
 } from "../tokenUsage.js";
 import { detectNeedsLiveSearch, shouldProbeForLiveSearch } from "./liveSearchIntent.js";
-import { detectImageIntent, findImageCorrection, isShortEnoughForCorrection, type ImageIntent } from "./imageIntent.js";
+import { detectImageIntent, findImageCorrection, looksLikeImageCorrection, type ImageIntent } from "./imageIntent.js";
 import { editImage, generateImage } from "../providers/scalemaxImages.js";
 import { rehostGeneratedImage } from "../providers/imageHosting.js";
 import { createStreamingLeakScrubber, scrubVendorLeak } from "../../utils/vendorLeak.js";
@@ -469,7 +469,7 @@ async function streamTurn(
     // generated image and this message is short (a correction, not a new unrelated request), redo
     // it as an edit of that image using the new wording. See findImageCorrection()'s comment for
     // why this exists and why the length cap keeps it from firing on unrelated follow-ups.
-    if (!imageIntent && !buildWorkspace && isShortEnoughForCorrection(content)) {
+    if (!imageIntent && !buildWorkspace && looksLikeImageCorrection(content)) {
       const correction = findImageCorrection(historyWithImages);
       if (correction) {
         imageIntent = { kind: "edit", prompt: `${correction.priorPrompt}. Correction: ${content}` };
@@ -528,7 +528,12 @@ async function streamTurn(
       // correction right after a real generated image — see imageIntent.ts) — a failure here
       // should say so plainly, not silently fall through and answer the raw text as an ordinary
       // chat prompt (confusing: "create an image of a macbook" makes a nonsensical chat question).
-      onEvent({ t: "err", c: "Couldn't create that image right now — the image service may be slow or unavailable. Try again in a moment." });
+      onEvent({
+        t: "err",
+        c: imageIntent.kind === "edit"
+          ? "Couldn't edit that image right now — the image service may be slow or unavailable. Try again in a moment."
+          : "Couldn't create that image right now — the image service may be slow or unavailable. Try again in a moment.",
+      });
       onEvent({ t: "done" });
       return;
     }

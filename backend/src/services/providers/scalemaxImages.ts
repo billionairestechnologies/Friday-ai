@@ -1,4 +1,5 @@
 import { safeErrorMessage } from "./types.js";
+import { safeFetch } from "../agent/safeFetch.js";
 
 // ScaleMax's Images & Video API (docs.scalemax.pro/docs/images/api) — a SEPARATE surface from
 // the chat /messages endpoint in scalemax.ts (different base path, different auth style: Bearer
@@ -39,7 +40,26 @@ interface ImagesResponse {
 // reply instead of hanging the whole turn indefinitely.
 const IMAGE_REQUEST_TIMEOUT_MS = 55_000;
 
+// Seen in production (2026-10-18): every /images/edits call for two days came back as a Cloudflare
+// "502 Bad gateway" page from api.scalemax.pro while /images/generations kept working, and the user
+// only saw "Couldn't create that image". A 502/503/504 or a timeout from their gateway is usually
+// transient, so one retry after a short pause turns most of those into a working edit.
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const RETRY_DELAY_MS = 2_000;
+
+class RetryableImageError extends Error {}
+
 async function callImagesEndpoint(path: string, apiKey: string, body: Record<string, unknown>): Promise<string> {
+  try {
+    return await callImagesEndpointOnce(path, apiKey, body);
+  } catch (err) {
+    if (!(err instanceof RetryableImageError)) throw err;
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    return callImagesEndpointOnce(path, apiKey, body);
+  }
+}
+
+async function callImagesEndpointOnce(path: string, apiKey: string, body: Record<string, unknown>): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMAGE_REQUEST_TIMEOUT_MS);
   let res: Response;
@@ -52,15 +72,17 @@ async function callImagesEndpoint(path: string, apiKey: string, body: Record<str
     });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error(`ScaleMax images ${path} timed out after ${IMAGE_REQUEST_TIMEOUT_MS / 1000}s`);
+      throw new RetryableImageError(`ScaleMax images ${path} timed out after ${IMAGE_REQUEST_TIMEOUT_MS / 1000}s`);
     }
     throw err;
   } finally {
     clearTimeout(timeout);
   }
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`ScaleMax images ${path} failed: ${res.status} ${errText}`);
+    // Gateway error pages are whole HTML documents; keep the log line readable.
+    const errText = (await res.text()).replace(/\s+/g, " ").slice(0, 300);
+    const message = `ScaleMax images ${path} failed: ${res.status} ${errText}`;
+    throw RETRYABLE_STATUS.has(res.status) ? new RetryableImageError(message) : new Error(message);
   }
   const json = (await res.json()) as ImagesResponse;
   const first = json.data?.[0];
@@ -96,14 +118,32 @@ export async function editImage(
   source: { dataUrl?: string; url?: string },
   options: { model?: string; size?: ImageSize; quality?: ImageQuality } = {},
 ): Promise<string> {
+  // A hosted source is downloaded here and sent as bytes, so the edit no longer depends on
+  // ScaleMax's gateway fetching our storage URL. image_url stays as the fallback if our own
+  // download fails.
+  const dataUrl = source.dataUrl ?? (source.url ? await toDataUrl(source.url) : null);
   return callImagesEndpoint("/images/edits", apiKey, {
     model: options.model ?? DEFAULT_IMAGE_MODEL,
     prompt,
-    ...(source.dataUrl ? { image: source.dataUrl } : { image_url: source.url }),
+    ...(dataUrl ? { image: dataUrl } : { image_url: source.url }),
     size: options.size ?? DEFAULT_IMAGE_SIZE,
     quality: options.quality ?? "medium",
     n: 1,
   });
+}
+
+const MAX_EDIT_SOURCE_BYTES = 15 * 1024 * 1024;
+
+async function toDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await safeFetch(url, { maxBytes: MAX_EDIT_SOURCE_BYTES });
+    if (res.status !== 200 || res.truncated || !res.body.length) return null;
+    const type = res.contentType.split(";")[0]!.trim() || "image/png";
+    if (!type.startsWith("image/")) return null;
+    return `data:${type};base64,${res.body.toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 export function isImageProviderError(err: unknown): string {
