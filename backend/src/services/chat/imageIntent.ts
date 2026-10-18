@@ -100,3 +100,19 @@ export function findImageCorrection(history: { role: string; content: string }[]
 export function isShortEnoughForCorrection(message: string): boolean {
   return message.trim().length > 0 && message.trim().length <= CORRECTION_MAX_CHARS;
 }
+
+// Confirmed live in production (2026-10-18): length alone isn't enough. After a generated image,
+// "type big story" was sent to the image editor, and so was any short document ask ("make it a
+// pdf"). Failed image turns are dropped from history, so the image stayed the "last reply" and
+// EVERY later short message was hijacked the same way — the chat looked stuck. A correction now
+// has to talk about the picture (a visual change, a colour, or "I said/told you…"), and a message
+// that names a text/document task never counts.
+const CORRECTION_CUE =
+  /\b(make|change|turn|add|remove|replace|put|without|instead|more|less|bigger|smaller|brighter|darker|lighter|colou?rs?|background|style|redo|again|retry|wrong|told|said|asked|fix|red|blue|green|yellow|black|white|pink|purple|orange|gold|silver|gr[ae]y|brown)\b/i;
+const TEXT_TASK =
+  /\b(type|write|story|poem|essay|article|blog|explain|summari[sz]e|translate|code|script|email|letter|list|pdf|docx?|word|excel|xlsx|sheet|spreadsheet|pptx?|slides?|presentation|deck|document|report|csv|json|caption|tell me|what|why|how|who|when|where)\b/i;
+
+export function looksLikeImageCorrection(message: string): boolean {
+  const text = message.trim();
+  return isShortEnoughForCorrection(text) && CORRECTION_CUE.test(text) && !TEXT_TASK.test(text);
+}
