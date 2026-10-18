@@ -225,8 +225,8 @@ Gotchas:
 ## Testing a branch / switching branches
 
 ```bash
-git fetch origin && git checkout v2 && git pull       # or any feature branch
-npm --prefix backend ci && npm --prefix frontend ci   # deps changed on v2 (pptxgenjs, docx, pdfkit)
+git fetch origin && git checkout <branch> && git pull  # main, or any task branch (old lines are tags v1/v2/v3)
+npm --prefix backend ci && npm --prefix frontend ci
 npm run verify                                        # migrations + typechecks + 193 tests + builds
 ```
 
@@ -263,7 +263,7 @@ calendar months (1 or 12), upgrades credit unused time at the price ratio, a per
 gets a prorated allowance. Main still runs v2 in production; never merge v3 into main or deploy it unless
 the owner says so explicitly.
 
-## Current state (branch `v2`)
+## Current state (historical notes — live code is `main`)
 
 On `feature/build-agent-loop` (not merged yet): Build is ONE model-driven agent loop — the model answers
 ("hi" gets a hello, no sandbox), asks (`ask_user`), proposes a plan (`propose_plan`) or builds; repo +
@@ -349,4 +349,7 @@ Razorpay payments + webhook, Resend delivery (campaigns, support, alerts), mobil
 
 ## Git
 
-Develop on a feature branch; commit messages describe what + why. Never commit `.env`, tokens or user ids.
+Only `main` is long-lived (it auto-deploys to prod). Work on a short-lived `<type>/<area>-<what>` branch off the
+latest main (e.g. `feature/usage-meter-rollover`), open a PR, merge when CI is green, delete the branch. The old
+v1/v2/v3 branches are now tags. Full rules: `docs/operations/BRANCHING.md`. Commit messages describe what + why.
+Never commit `.env`, tokens or user ids.
