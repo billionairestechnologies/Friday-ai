@@ -1,0 +1,62 @@
+name: Sync module branches
+
+# Every module/* branch gets main merged in after each push to main, so the standing module branches
+# never drift (drift is what made the old v1/v2/v3 branches unmergeable). A branch that conflicts is
+# left untouched and gets an issue, so its owner merges main in by hand.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-module-branches
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into every module branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "friday-sync-bot"
+          git config user.email "friday-sync-bot@users.noreply.github.com"
+          failed=""
+          for ref in $(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/module/*'); do
+            branch="${ref#origin/}"
+            if git merge-base --is-ancestor origin/main "$ref"; then
+              echo "$branch: already up to date"
+              continue
+            fi
+            git checkout -q -B "$branch" "$ref"
+            if git merge --no-edit origin/main -m "Sync main into $branch"; then
+              git push origin "HEAD:refs/heads/$branch" && echo "$branch: synced"
+            else
+              git merge --abort
+              echo "::warning::$branch conflicts with main"
+              failed="$failed $branch"
+            fi
+          done
+          for branch in $failed; do
+            title="Merge conflict: main → $branch"
+            if [ -z "$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
+              gh issue create --title "$title" --body "Automatic sync of \`main\` into \`$branch\` hit a merge conflict (commit ${GITHUB_SHA}). Resolve by hand:
+
+          \`\`\`bash
+          git checkout $branch && git pull && git merge origin/main   # fix conflicts, commit
+          git push
+          \`\`\`
+          Close this issue once pushed."
+            fi
+          done

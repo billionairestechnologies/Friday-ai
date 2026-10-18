@@ -16,3 +16,7 @@ infra/aws/app.env
 
 # The FridayX CLI workspace has a source crate in cli/crates/build/ (the "build/" rule above would hide it from CI)
 !cli/crates/build/
+
+# Locally installed agent skills (personal AI tooling, not app code)
+.agents/
+skills-lock.json
