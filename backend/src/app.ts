@@ -78,7 +78,9 @@ export function createApp() {
     }),
   );
   morgan.token("request-id", (req) => (req as express.Request).requestId);
-  app.use(morgan(':method :url :status :response-time ms request_id=:request-id'));
+  // Query strings can contain OAuth codes and other short-lived credentials. Log only the path.
+  morgan.token("request-path", (req) => (req as express.Request).path);
+  app.use(morgan(':method :request-path :status :response-time ms request_id=:request-id'));
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
