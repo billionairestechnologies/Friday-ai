@@ -4,24 +4,24 @@
 @theme {
   /* Friday's own surface tokens: a cool ink canvas in dark, warm paper in light, one deep-teal
      accent. Layers are separated by tone and hairlines, not shadows, so the page stays quiet. */
-  --color-background: #131314;
-  --color-foreground: #e3e3e3;
-  --color-muted: #c4c7c5;
-  --color-subtle: #8e918f;
-  --color-surface: #1e1f20;
-  --color-elevated: #282a2c;
-  --color-composer: #1e1f20;
-  --color-border: #2f3133;
-  --color-primary: #a8c7fa;
-  --color-primary-foreground: #131314;
+  --color-background: #0e0f11;
+  --color-foreground: #ececea;
+  --color-muted: #a9aaa7;
+  --color-subtle: #7c7d7a;
+  --color-surface: #151618;
+  --color-elevated: #1c1d20;
+  --color-composer: #17181b;
+  --color-border: #34363b;
+  --color-primary: #7dd3c0;
+  --color-primary-foreground: #0b1412;
   --color-accent: #d6d3cc;
   --color-danger: #e5786f;
-  --color-chip: #282a2c;
-  --color-chip-on: #2f3133;
-  --color-selected: #37393b;
+  --color-chip: #1b1c1f;
+  --color-chip-on: #25272b;
+  --color-selected: #1f2b29;
   --color-hex-chip: var(--color-chip);
-  --color-notify: #a8c7fa;
-  --color-search: #8ab4f8;
+  --color-notify: #7dd3c0;
+  --color-search: #7dd3c0;
   --color-think: #8b5cf6;
   --color-canvas: #f97316;
   /* Inter for everything (one family keeps the UI calm); headings only tighten tracking. */
@@ -41,6 +41,10 @@
   --shadow-soft: 0 14px 40px rgba(0, 0, 0, 0.2);
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
   /* Emphasized easing — composer focus halo, press-scale and chip transitions. */
+  /* Friday's aurora: teal through mint to a soft indigo, used for the composer focus ring. */
+  --aurora-a: #3ea99a;
+  --aurora-b: #7dd3c0;
+  --aurora-c: #7b8cf0;
   --ease-m3: cubic-bezier(0.2, 0, 0, 1);
   --ease-decel: cubic-bezier(0, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -52,7 +56,7 @@
   --focus-ring: color-mix(in oklab, var(--color-primary) 80%, transparent);
   --color-scrollbar: rgba(255, 255, 255, 0.16);
   --color-scrollbar-hover: rgba(255, 255, 255, 0.3);
-  --ambient-glow: radial-gradient(ellipse 70% 75% at 50% 60%, rgba(34, 58, 130, 0.62) 0%, rgba(24, 36, 84, 0.3) 40%, rgba(19, 19, 20, 0) 75%);
+  --ambient-glow: radial-gradient(ellipse 70% 75% at 50% 60%, rgba(125, 211, 192, 0.16) 0%, rgba(125, 211, 192, 0.06) 40%, rgba(14, 15, 17, 0) 75%);
 }
 
 html {
@@ -62,6 +66,9 @@ html {
 
 html.light {
   color-scheme: light;
+  --aurora-a: #0f6b63;
+  --aurora-b: #3ea99a;
+  --aurora-c: #5b6bd6;
   --color-scrollbar: rgba(0, 0, 0, 0.16);
   --color-scrollbar-hover: rgba(0, 0, 0, 0.3);
   --color-background: #fafaf8;
@@ -250,7 +257,7 @@ html.light {
     inset: -1px;
     border-radius: inherit;
     padding: 1.5px;
-    background: linear-gradient(74deg, #4285f4 0%, #9b72cb 15%, #d96570 35%, #9b72cb 55%, #4285f4 70%);
+    background: linear-gradient(74deg, var(--aurora-a) 0%, var(--aurora-b) 15%, var(--aurora-c) 35%, var(--aurora-b) 55%, var(--aurora-a) 70%);
     background-size: 400% 400%;
     animation: aurora-shimmer 8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -281,7 +288,7 @@ html.light {
     inset: -1px;
     border-radius: inherit;
     padding: 1.5px;
-    background: linear-gradient(74deg, #4285f4 0%, #9b72cb 15%, #d96570 35%, #9b72cb 55%, #4285f4 70%);
+    background: linear-gradient(74deg, var(--aurora-a) 0%, var(--aurora-b) 15%, var(--aurora-c) 35%, var(--aurora-b) 55%, var(--aurora-a) 70%);
     background-size: 400% 400%;
     animation: aurora-shimmer 8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
