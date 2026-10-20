@@ -33,7 +33,7 @@ import { useBuildPrefs } from "@/lib/build-mode/prefs";
 import { fileToAttachment } from "@/lib/chat/files";
 import { uid } from "@/lib/utils";
 import { useQueue } from "@/lib/chat/queue";
-import { Hammer, X } from "lucide-react";
+import { Code2, Hammer, Lightbulb, Map, Newspaper, X } from "lucide-react";
 import { SITE_NAV } from "@/lib/site/pages";
 
 type ConversationMode = "single" | "auto" | "teamup";
@@ -48,6 +48,8 @@ const PROMPTS = [
   "Plan a 3-day trip to Lisbon",
   "Write a Python script that renames files in bulk",
 ];
+
+const PROMPT_ICONS = [Newspaper, Lightbulb, Map, Code2];
 
 const BUILD_PROMPTS = [
   "Build a SaaS landing page with pricing and a waitlist form",
@@ -703,20 +705,24 @@ export function Home({ conversationId, workspace = "chat" }: { conversationId?: 
                   buildWorkspace={buildMode}
                 />
                 {available && (
-                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {(buildMode ? BUILD_PROMPTS : PROMPTS).map((p, i) => (
-                      <motion.button
-                        key={p}
-                        type="button"
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(i * 0.08, 0.15), duration: 0.56, ease: [0.2, 0, 0, 1] }}
-                        onClick={() => usePrompt(p)}
-                        className="premium-control rounded-xl border border-border bg-elevated px-3.5 py-3 text-left text-sm text-muted shadow-[var(--shadow-soft)] hover:bg-chip hover:text-foreground"
-                      >
-                        {p}
-                      </motion.button>
-                    ))}
+                  <div className="mt-5 flex flex-col items-start gap-1 px-3">
+                    {(buildMode ? BUILD_PROMPTS : PROMPTS).map((p, i) => {
+                      const Icon = PROMPT_ICONS[i % PROMPT_ICONS.length]!;
+                      return (
+                        <motion.button
+                          key={p}
+                          type="button"
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(i * 0.08, 0.3), duration: 0.56, ease: [0.2, 0, 0, 1] }}
+                          onClick={() => usePrompt(p)}
+                          className="premium-control flex items-center gap-3 rounded-full px-3 py-2 text-left text-sm text-muted hover:bg-chip hover:text-foreground"
+                        >
+                          <Icon className="size-4 shrink-0" />
+                          {p}
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 )}
                 {!isPending && !(user && !user.isDevFallback) && (
