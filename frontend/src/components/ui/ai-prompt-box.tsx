@@ -423,7 +423,7 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           <div
             ref={ref}
             className={cn(
-              "m3-focus-halo rounded-2xl border border-border bg-composer p-2 shadow-[var(--shadow-composer)]",
+              "m3-focus-halo rounded-[32px] border border-border bg-composer px-3 py-2.5 shadow-[var(--shadow-composer)]",
               isLoading && "border border-red-500/70",
               className,
             )}
@@ -513,17 +513,7 @@ const PromptInputAction: React.FC<{
   );
 };
 
-const CustomDivider: React.FC = () => (
-  <div className="relative mx-1 h-6 w-[1.5px] shrink-0">
-    <div
-      className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-[#9b87f5]/70 to-transparent"
-      style={{
-        clipPath:
-          "polygon(0% 0%, 100% 0%, 100% 40%, 140% 50%, 100% 60%, 100% 100%, 0% 100%, 0% 60%, -40% 50%, 0% 40%)",
-      }}
-    />
-  </div>
-);
+const CustomDivider: React.FC = () => <div className="mx-1 h-5 w-px shrink-0 bg-border" />;
 
 /** Everything the backend can read (providers/officeDocs, archiveDocs, pdfText, plainTextDocs). */
 const DOCUMENT_ACCEPT = [

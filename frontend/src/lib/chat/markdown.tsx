@@ -59,8 +59,8 @@ function nodeText(node: ReactNode): string {
  *  caller, passing it the already-highlighted <code> element as `children`. */
 function CodeBlock({ lang, text, children }: { lang?: string; text: string; children: ReactNode }) {
   return (
-    <div className="code-block my-3 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#131314] shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
-      <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-[#1e1f20] px-[18px] py-2.5">
+    <div className="code-block my-3 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0e0f11] shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+      <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-[#17181b] px-[18px] py-2.5">
         <span className="font-mono text-xs lowercase text-[#9aa0a6]">{lang || "text"}</span>
         <div className="flex items-center gap-1.5">
           <IconAction
