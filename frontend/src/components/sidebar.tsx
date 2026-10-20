@@ -39,8 +39,8 @@ function NavRow({ icon: Icon, label, onClick, active = false }: { icon: typeof M
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-semibold text-foreground hover:bg-chip-on",
-        active && "bg-chip-on",
+        "premium-control flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm font-medium text-foreground hover:bg-chip-on",
+        active && "bg-selected",
       )}
     >
       <Icon className="size-4 text-muted" />
